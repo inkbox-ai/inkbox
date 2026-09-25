@@ -456,7 +456,13 @@ impl WebhookSubscriptionsResource {
         scope: Option<WebhookSubscriptionScope>,
     ) -> Result<WebhookSubscription> {
         self.update_with_slack_filter_and_scope(
-            sub_id, url, event_types, context_config, auth_token, None, scope,
+            sub_id,
+            url,
+            event_types,
+            context_config,
+            auth_token,
+            None,
+            scope,
         )
     }
 
@@ -471,11 +477,18 @@ impl WebhookSubscriptionsResource {
         slack_filter: Option<Option<&SlackWebhookFilter>>,
     ) -> Result<WebhookSubscription> {
         self.update_with_slack_filter_and_scope(
-            sub_id, url, event_types, context_config, auth_token, slack_filter, None,
+            sub_id,
+            url,
+            event_types,
+            context_config,
+            auth_token,
+            slack_filter,
+            None,
         )
     }
 
     /// Update Slack filters with explicit identity scope for a mixed subscription.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_with_slack_filter_and_scope(
         &self,
         sub_id: Uuid,

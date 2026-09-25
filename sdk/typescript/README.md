@@ -1474,8 +1474,8 @@ identity selectors without explicit scope. Explicit identity scope checks the
 catalog once per list call and fails clearly when unsupported; omitted scope adds
 no request. The mixed-event examples below assume the capability is available.
 
-Each notification subscription belongs to an agent identity and can combine all
-21 current mail, text, iMessage, call-lifecycle and A2A event types. Optional
+Each notification subscription belongs to an agent identity and can combine
+mail, text, iMessage, call-lifecycle, A2A, and Slack event types. Optional
 channels do not have to be configured before subscribing. Multiple receivers
 remain supported; one identity and URL cannot have overlapping event selections.
 
@@ -2040,7 +2040,10 @@ selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_d
 means any reply, not a managed thread watch. Connection-status events bypass
 conversation/kind selectors but retain connection scope. A filter selector array must
 be nonempty and distinct (maximum 100 IDs or 5 kinds). Null means unrestricted.
-Slack subscriptions belong to the identity and reject conversation context. Omitted
+Slack events can share an identity-owned subscription with other notification families.
+A Slack filter requires at least one Slack event and affects only Slack deliveries.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion. Omitted
 filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
 logs contain metadata only; historical replay is not supported. The agent runtime
 owns attention rules, thread watches, and its own memory.

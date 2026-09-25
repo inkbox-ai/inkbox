@@ -237,6 +237,29 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       },
     );
     await check(
+      ["webhook", "subscription", "create", "--agent-identity-id", i,
+        "--url", "https://example.com/hook", "--event-type", "slack.message_received",
+        "--event-type", "message.received", "--context-email", "count:1",
+        "--slack-filter", '{"messageKinds":["mention"]}'],
+      f.subscription, "POST", "/api/v1/webhooks/subscriptions",
+      {agent_identity_id: i, url: "https://example.com/hook",
+        event_types: ["slack.message_received", "message.received"],
+        context_config: {email: {mode: "count", count: 1}},
+        slack_filter: {message_kinds: ["mention"]}},
+    );
+    for (const [flags, body] of [
+      [[], {}],
+      [["--slack-filter", "null"], {slack_filter: null}],
+      [["--slack-filter", '{"messageKinds":["mention"]}'], {slack_filter: {message_kinds: ["mention"]}}],
+    ]) {
+      await check(
+        ["webhook", "subscription", "update", f.subscription.id, "--scope", "identity",
+          "--event-type", "slack.message_received", "--event-type", "message.received", ...flags],
+        f.subscription, "PATCH", `/api/v1/webhooks/subscriptions/${f.subscription.id}?scope=identity`,
+        {event_types: ["slack.message_received", "message.received"], ...body},
+      );
+    }
+    await check(
       [
         "webhook",
         "subscription",
@@ -264,7 +287,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       `/api/v1/webhooks/subscriptions/${f.subscription.id}`,
       { url: "https://example.com/new" },
     );
-    assert.equal(requests.length, 16);
+    assert.equal(requests.length, 20);
     const rejected = await run([
       ...globals,
       "slack",
@@ -279,7 +302,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(rejected.error);
     assert.match(rejected.stderr, /idempotency-key/);
-    assert.equal(requests.length, 16);
+    assert.equal(requests.length, 20);
     const missingRecipient = await run([
       ...globals,
       "slack",
@@ -290,7 +313,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(missingRecipient.error);
     assert.match(missingRecipient.stderr, /required option.*--user-id/);
-    assert.equal(requests.length, 16);
+    assert.equal(requests.length, 20);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });

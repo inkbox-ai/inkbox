@@ -240,13 +240,6 @@ def test_filters_preserve_clear_replace_and_channel_rules(wire):
             phone_number_id=IDENTITY_ID,
             slack_filter={},
         )
-    with pytest.raises(ValueError):
-        subs.create(
-            url="https://example.com/hook",
-            event_types=["slack.message_received"],
-            agent_identity_id=IDENTITY_ID,
-            context_config={"email": {"mode": "count", "count": 1}},
-        )
     assert len(requests) == 4
 
 
@@ -256,3 +249,40 @@ def test_exact_webhook_event_vocabulary():
     )
     assert len(payloads) == 19
     assert {p["event_type"] for p in payloads} == set(get_args(SlackWebhookEventType))
+
+
+@pytest.mark.parametrize(
+    "event_types",
+    [["slack.message_received"], ["slack.message_received", "message.received"]],
+)
+def test_slack_context_and_mixed_filter_scoped_updates(wire, event_types):
+    c, requests, replies = wire
+    row = dict(DATA["subscription"], event_types=event_types)
+    replies.extend([row] * 4)
+    context = {"email": {"mode": "count", "count": 1}}
+    filter_value = {"message_kinds": ["mention"]}
+    subscription = c.webhooks.subscriptions.create(
+        url="https://example.com/hook",
+        agent_identity_id=IDENTITY_ID,
+        event_types=event_types,
+        context_config=context,
+        slack_filter=filter_value,
+    )
+    assert json.loads(requests[-1].content) == {
+        "url": "https://example.com/hook",
+        "agent_identity_id": IDENTITY_ID,
+        "event_types": event_types,
+        "context_config": context,
+        "slack_filter": filter_value,
+    }
+    for kwargs in [{}, {"slack_filter": None}, {"slack_filter": filter_value}]:
+        c.webhooks.subscriptions.update(
+            subscription.id, scope="identity", event_types=event_types, **kwargs
+        )
+        assert requests[-1].method == "PATCH"
+        assert dict(requests[-1].url.params) == {"scope": "identity"}
+        assert json.loads(requests[-1].content) == {
+            "event_types": event_types,
+            **kwargs,
+        }
+    assert len(requests) == 4  # Explicit mutation scope requires no catalog request.

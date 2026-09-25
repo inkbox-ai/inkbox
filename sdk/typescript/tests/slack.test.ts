@@ -215,7 +215,7 @@ it.each([409, 429, 503])(
     expect(fetch).toHaveBeenCalledTimes(1);
   },
 );
-it("preserves, clears and replaces filters without allowing cross-channel context", async () => {
+it("preserves, clears and replaces filters with valid Slack event selection", async () => {
   const { fetch, reply } = mock();
   const subs = client().webhooks.subscriptions;
   reply(fixture.subscription);
@@ -253,15 +253,7 @@ it("preserves, clears and replaces filters without allowing cross-channel contex
       eventTypes: ["text.received"],
       slackFilter: {},
     }),
-  ).rejects.toThrow("only supported for Slack");
-  await expect(
-    subs.create({
-      url: "https://example.com/hook",
-      agentIdentityId: I,
-      eventTypes: events,
-      contextConfig: { email: { mode: "count", count: 1 } },
-    }),
-  ).rejects.toThrow("not supported for Slack");
+  ).rejects.toThrow("requires at least one Slack event");
   await expect(
     subs.update(row.id, { slackFilter: { messageKinds: [] } }),
   ).rejects.toThrow("nonempty");
@@ -309,3 +301,35 @@ it("accepts explicit null for optional Slack thread and cursor fields", async ()
   const url = new URL(String(fetch.mock.calls.at(-1)![0]));
   expect(Object.fromEntries(url.searchParams)).toEqual({ limit: "15" });
 });
+
+
+it.each([["slack.message_received"], ["slack.message_received", "message.received"]])(
+  "keeps Slack context and mixed filters compatible with identity scope: %j",
+  async (...eventTypes) => {
+    const { fetch, reply } = mock();
+    const subs = client().webhooks.subscriptions;
+    const contextConfig = { email: { mode: "count" as const, count: 1 } };
+    const slackFilter = { messageKinds: ["mention" as const] };
+    reply({ ...fixture.subscription, event_types: eventTypes });
+    const row = await subs.create({
+      url: "https://example.com/hook", agentIdentityId: I, eventTypes, contextConfig, slackFilter,
+    });
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body))).toEqual({
+      url: "https://example.com/hook", agent_identity_id: I, event_types: eventTypes,
+      context_config: contextConfig, slack_filter: { message_kinds: ["mention"] },
+    });
+    for (const [options, wire] of [
+      [{}, {}],
+      [{ slackFilter: null }, { slack_filter: null }],
+      [{ slackFilter }, { slack_filter: { message_kinds: ["mention"] } }],
+    ] as const) {
+      reply(fixture.subscription);
+      await subs.update(row.id, { scope: "identity", eventTypes, ...options });
+      const [url, init] = fetch.mock.calls.at(-1)!;
+      expect(new URL(String(url)).searchParams.get("scope")).toBe("identity");
+      expect(init?.method).toBe("PATCH");
+      expect(JSON.parse(String(init?.body))).toEqual({ event_types: eventTypes, ...wire });
+    }
+    expect(fetch).toHaveBeenCalledTimes(4);
+  },
+);

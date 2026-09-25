@@ -791,10 +791,6 @@ let subscriptions = client.webhooks().subscriptions().list_with_scope(
 Identity-owned responses use `agent_identity_id` with null legacy mailbox and phone
 fields. Older servers can still return legacy resource owners.
 
-## License
-
-MIT
-
 ## Companion mode
 
 `client.companion()` provides `get`, `update`, `conversations`,
@@ -927,7 +923,9 @@ let invitation = management_client.slack().create_invitation(identity_id, None)?
 actions, file metadata, pages, send options, and filters are public typed exports.
 
 For webhook subscriptions use `create_with_slack_filter` and
-`update_with_slack_filter`; the existing `create` / `update` signatures remain
+`update_with_slack_filter` for Slack-only subscriptions. For mixed subscriptions,
+use `update_with_slack_filter_and_scope` with
+`Some(WebhookSubscriptionScope::Identity)`; the existing `create` / `update` signatures remain
 unchanged. The update filter argument is `None` to preserve, `Some(None)` to clear,
 or `Some(Some(&filter))` to replace a `SlackWebhookFilter`.
 
@@ -998,7 +996,10 @@ selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_d
 means any reply, not a managed thread watch. Connection-status events bypass
 conversation/kind selectors but retain connection scope. A filter selector array must
 be nonempty and distinct (maximum 100 IDs or 5 kinds). Null means unrestricted.
-Slack subscriptions belong to the identity and reject conversation context. Omitted
+Slack events can share an identity-owned subscription with other notification families.
+A Slack filter requires at least one Slack event and affects only Slack deliveries.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion. Omitted
 filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
 logs contain metadata only; historical replay is not supported. The agent runtime
 owns attention rules, thread watches, and its own memory.

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Allow Slack events and filters in mixed identity-owned subscriptions; preserve explicit
+  identity scope, context settings, and unchanged/clear/replace filter updates.
+
 - Add identity-wide Slack message search across workspace connections in all SDKs and
   `inkbox slack search`, with optional narrowing filters and agent identity inference.
 

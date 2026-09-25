@@ -1146,7 +1146,10 @@ selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_d
 means any reply, not a managed thread watch. Connection-status events bypass
 conversation/kind selectors but retain connection scope. A filter selector array must
 be nonempty and distinct (maximum 100 IDs or 5 kinds). Null means unrestricted.
-Slack subscriptions belong to the identity and reject conversation context. Omitted
+Slack events can share an identity-owned subscription with other notification families.
+A Slack filter requires at least one Slack event and affects only Slack deliveries.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion. Omitted
 filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
 logs contain metadata only; historical replay is not supported. The agent runtime
 owns attention rules, thread watches, and its own memory.
