@@ -210,3 +210,13 @@ Subscriptions cover all accessible conversations across connected workspaces.
 There are no Slack-specific filters. Context applies only to received mail, text,
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
+
+## Threaded iMessages
+
+Native replies target a specific message within an existing conversation.
+Python/TypeScript send helpers accept `reply_to_message_id` / `replyToMessageId`
+with the conversation ID; the CLI accepts `--reply-to-message-id`. Read threads
+by any message or by conversation plus opaque thread ID. Follow thread-page
+cursors; ordinary conversation lists remain flat and use offset pagination.
+Thread IDs are distinct from message IDs. See the language and CLI skills for
+methods, nullable metadata, and examples.

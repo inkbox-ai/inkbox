@@ -1267,3 +1267,32 @@ Use `--json` to inspect the complete response. Public search also accepts `--que
 including domain fragments. Text matches can include agents without a verified
 domain. Add `--verified-domain example.com` to require an exact, current domain
 affiliation in public results.
+
+## Threaded iMessage replies
+
+```bash
+inkbox imessage send -i support-bot --conversation-id <conversation-id> --reply-to-message-id <message-id> --text "Agreed"
+inkbox --json imessage thread <message-id> -i support-bot --limit 50
+inkbox --json imessage thread <message-id> -i support-bot --cursor <next-cursor>
+inkbox --json imessage conversation-thread <conversation-id> <thread-id> -i support-bot
+inkbox imessage conversation <conversation-id> -i support-bot --thread-id <thread-id>
+inkbox imessage list -i support-bot --conversation-id <conversation-id> --thread-id <thread-id>
+```
+
+`--reply-to-message-id` requires `--conversation-id` and cannot be combined
+with `--to`. Thread commands return `threadId`, `conversationId`,
+`threadRootMessageId`, `messages`, and `nextCursor`; use `--json` to preserve
+the complete page. Messages include `replyToMessageId`, `threadId`, and
+`threadRootMessageId` when available.
+
+Thread IDs are opaque and distinct from message IDs. Thread pages include the
+root and its replies in chronological order; follow `next_cursor` (Python/Rust)
+or `nextCursor` (TypeScript/CLI) until null. An ordinary message can be a singleton
+thread. Thread metadata may be null for pending or older messages, and the root
+or direct parent can be unavailable. Conversation message lists remain flat and
+newest-first. A thread filter requires its conversation ID; it uses the existing
+limit/offset pagination, unlike the chronological thread endpoints.
+
+Replies work in supported one-to-one and group iMessage conversations. Use a
+message from the same conversation. An unsupported reply is rejected rather
+than sent as a plain message. Omitting the target preserves ordinary sending.

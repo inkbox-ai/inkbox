@@ -101,3 +101,35 @@ test("buildIMessageSendOptions rejects missing destination or content", () => {
     to: "+15551234567",
   }), { error: "Pass --text, --media-url, or both." });
 });
+
+test("threaded replies require a conversation and retain the message target", () => {
+  assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", replyToMessageId: "message", text: "Agreed" }), {
+    sendOptions: { conversationId: "conversation", replyToMessageId: "message", text: "Agreed" },
+  });
+  assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", to: "+15550100101", replyToMessageId: "message", text: "Agreed" }), {
+    error: "--reply-to-message-id requires --conversation-id.",
+  });
+});
+
+test("thread commands expose cursor pagination and conversation list filtering", () => {
+  const program = new Command();
+  registerIMessageCommands(program);
+  const imessage = program.commands.find((command) => command.name() === "imessage");
+  for (const name of ["thread", "conversation-thread"]) {
+    const command = imessage.commands.find((command) => command.name() === name);
+    assert.ok(command);
+    assert.ok(command.options.some((option) => option.long === "--cursor"));
+    assert.equal(command.options.some((option) => option.long === "--offset"), false);
+    assert.ok(command.options.find((option) => option.long === "--identity").mandatory);
+  }
+  for (const name of ["list", "conversation"]) {
+    assert.ok(imessage.commands.find((command) => command.name() === name).options.some((option) => option.long === "--thread-id"));
+  }
+});
+
+
+test("an empty explicit reply target never becomes an ordinary message", () => {
+  assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", replyToMessageId: "", text: "Agreed" }), {
+    error: "--reply-to-message-id must not be empty.",
+  });
+});

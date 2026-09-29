@@ -2139,3 +2139,37 @@ Directory `q` searches handles, descriptions, skills, and published verified
 domains, including domain fragments. Text matches can include unverified agents.
 Use `verified_domain="example.com"` to require an exact current domain in public
 results. Preserve the query and filters when following a cursor.
+
+## Threaded iMessage replies
+
+```python
+message = identity.get_imessage(message_id)
+reply = identity.send_imessage(
+    conversation_id=message.conversation_id,
+    reply_to_message_id=message.id,
+    text="Agreed — let's use that option.",
+)
+page = identity.get_imessage_thread(message.id, limit=50)
+if page.next_cursor:
+    next_page = identity.get_imessage_thread(message.id, cursor=page.next_cursor)
+if message.thread_id:
+    page = identity.get_imessage_conversation_thread(message.conversation_id, message.thread_id)
+    rows = identity.list_imessages(conversation_id=message.conversation_id, thread_id=message.thread_id)
+```
+
+`IMessage` and message webhook payloads expose nullable `reply_to_message_id`,
+`thread_id`, and `thread_root_message_id`. Resource-level equivalents are
+`imessages.get`, `get_thread`, `get_conversation_thread`, `send`, and `list`;
+these also accept `agent_identity_id`.
+
+Thread IDs are opaque and distinct from message IDs. Thread pages include the
+root and its replies in chronological order; follow `next_cursor` (Python/Rust)
+or `nextCursor` (TypeScript/CLI) until null. An ordinary message can be a singleton
+thread. Thread metadata may be null for pending or older messages, and the root
+or direct parent can be unavailable. Conversation message lists remain flat and
+newest-first. A thread filter requires its conversation ID; it uses the existing
+limit/offset pagination, unlike the chronological thread endpoints.
+
+Replies work in supported one-to-one and group iMessage conversations. Use a
+message from the same conversation. An unsupported reply is rejected rather
+than sent as a plain message. Omitting the target preserves ordinary sending.

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.7.12 — Threaded iMessage replies
+
+- Reply to a specific message in existing one-to-one and group conversations.
+- Read chronological, cursor-paginated threads by message or by conversation and
+  opaque thread ID; filter conversation message lists by thread.
+- Expose nullable parent, thread, and root-message metadata in reads and webhooks.
+- Add identity helpers and CLI reply/thread commands. Rust adds thread-aware
+  wrappers and methods without changing existing public structs or signatures.
+- Preserve ordinary sends and existing list pagination when new options are omitted.
+
 ## 0.7.11 - Slack workspace connections (unreleased)
 
 See the [canonical SDK and CLI changelog](../CHANGELOG.md#0711---slack-workspace-connections-unreleased) for the complete upcoming release.

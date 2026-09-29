@@ -654,3 +654,19 @@ conversation access remain required.
 ## License
 
 MIT
+
+## Threaded iMessage replies
+
+Reply to a specific message in an existing one-to-one or group conversation with
+Python `reply_to_message_id`, TypeScript `replyToMessageId`, Rust `send_reply`, or
+CLI `--reply-to-message-id`. Supply its conversation ID too; do not use `to`.
+Messages expose nullable direct-parent, thread, and root-message IDs. A thread ID
+is opaque and distinct from its root message ID.
+
+Read a chronological page by any message using Python `imessages.get_thread`,
+TypeScript `imessages.getThread`, Rust `imessages().get_thread`, or CLI
+`imessage thread`. Read by conversation and thread IDs with the corresponding
+`get_conversation_thread` / `getConversationThread` / `conversation-thread` operation.
+Follow the returned cursor for more; existing message lists remain flat and
+newest-first with optional conversation-scoped thread filtering. See each
+language's README for complete examples and Rust's additive wrapper types.

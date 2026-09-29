@@ -17,7 +17,8 @@ use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
     IMessageMarkReadResult, IMessageMediaUpload, IMessageNumber, IMessageReaction,
-    IMessageReactionType, IMessageSendStyle, IMessageTriageNumber,
+    IMessageReactionType, IMessageSendStyle, IMessageThread, IMessageThreadListOptions,
+    IMessageTriageNumber, ThreadedIMessage,
 };
 
 pub struct IMessagesResource {
@@ -27,6 +28,148 @@ pub struct IMessagesResource {
 impl IMessagesResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+
+    /// Read one message including nullable thread metadata.
+    pub fn get_with_thread(
+        &self,
+        message_id: &Uuid,
+        agent_identity_id: Option<&Uuid>,
+    ) -> Result<ThreadedIMessage> {
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        Ok(serde_json::from_value(
+            self.http.get(&format!("/messages/{message_id}"), &params)?,
+        )?)
+    }
+
+    /// Read a chronological thread page using any visible message in it.
+    pub fn get_thread(
+        &self,
+        message_id: &Uuid,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.get_thread_page(
+            &format!("/messages/{message_id}/thread"),
+            agent_identity_id,
+            limit,
+            cursor,
+        )
+    }
+
+    /// Read a thread by its opaque ID within a conversation.
+    pub fn get_conversation_thread(
+        &self,
+        conversation_id: &Uuid,
+        thread_id: &Uuid,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.get_thread_page(
+            &format!("/conversations/{conversation_id}/threads/{thread_id}"),
+            agent_identity_id,
+            limit,
+            cursor,
+        )
+    }
+
+    fn get_thread_page(
+        &self,
+        path: &str,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        let mut params = vec![("limit", limit.to_string())];
+        if let Some(id) = agent_identity_id {
+            params.push(("agent_identity_id", id.to_string()));
+        }
+        if let Some(cursor) = cursor {
+            params.push(("cursor", cursor.to_string()));
+        }
+        Ok(serde_json::from_value(self.http.get(path, &params)?)?)
+    }
+
+    /// List messages with threading metadata, newest first. Existing list methods are unchanged.
+    pub fn list_with_threads(
+        &self,
+        options: &IMessageThreadListOptions,
+    ) -> Result<Vec<ThreadedIMessage>> {
+        if options.thread_id.is_some() && options.conversation_id.is_none() {
+            return Err(InkboxError::InvalidArgument(
+                "thread_id requires conversation_id".into(),
+            ));
+        }
+        let mut params = vec![
+            ("limit", options.limit.to_string()),
+            ("offset", options.offset.to_string()),
+        ];
+        if let Some(id) = options.agent_identity_id {
+            params.push(("agent_identity_id", id.to_string()));
+        }
+        if let Some(id) = options.conversation_id {
+            params.push(("conversation_id", id.to_string()));
+        }
+        if let Some(id) = options.thread_id {
+            params.push(("thread_id", id.to_string()));
+        }
+        if let Some(value) = options.is_read {
+            params.push(("is_read", value.to_string()));
+        }
+        if let Some(value) = options.is_blocked {
+            params.push(("is_blocked", value.to_string()));
+        }
+        if options.include_groups {
+            params.push(("include_groups", "true".to_string()));
+        }
+        options.date_range.apply(&mut params);
+        Ok(serde_json::from_value(
+            self.http.get("/messages", &params)?,
+        )?)
+    }
+
+    /// Reply to a specific message in an existing one-to-one or group conversation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_reply(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: Option<&str>,
+    ) -> Result<ThreadedIMessage> {
+        let mut body = serde_json::Map::new();
+        body.insert("conversation_id".into(), json!(conversation_id));
+        body.insert("reply_to_message_id".into(), json!(reply_to_message_id));
+        if let Some(text) = text {
+            body.insert("text".into(), json!(text));
+        }
+        if let Some(urls) = media_urls {
+            body.insert("media_urls".into(), json!(urls));
+        }
+        if let Some(style) = send_style {
+            body.insert("send_style".into(), json!(style.as_str()));
+        }
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        let data = self.http.post_message(
+            "/messages",
+            &serde_json::Value::Object(body),
+            &params,
+            idempotency_key,
+        )?;
+        Ok(serde_json::from_value(
+            data.get("message")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        )?)
     }
 
     /// Read a visible message and its current delivery status.
@@ -640,6 +783,114 @@ mod tests {
             .base_url(server.base_url())
             .build()
             .unwrap()
+    }
+
+    fn thread_page_json() -> serde_json::Value {
+        let mut message = group_message_json();
+        message["thread_id"] = json!("eeee5555-0000-0000-0000-000000000001");
+        message["reply_to_message_id"] = json!("aaaa7777-0000-0000-0000-000000000001");
+        message["thread_root_message_id"] = message["reply_to_message_id"].clone();
+        json!({"thread_id": message["thread_id"], "conversation_id": message["conversation_id"],
+            "thread_root_message_id": message["thread_root_message_id"], "messages": [message], "next_cursor": "opaque:next"})
+    }
+
+    #[test]
+    fn threaded_reply_and_thread_pages_preserve_wire_contract() {
+        let server = MockServer::start();
+        let page = thread_page_json();
+        let conversation = Uuid::parse_str(page["conversation_id"].as_str().unwrap()).unwrap();
+        let message = Uuid::parse_str(page["thread_root_message_id"].as_str().unwrap()).unwrap();
+        let thread = Uuid::parse_str(page["thread_id"].as_str().unwrap()).unwrap();
+        let identity = Uuid::new_v4();
+        let send = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/imessage/messages")
+                .query_param("agent_identity_id", identity.to_string())
+                .header("Idempotency-Key", "reply-one")
+                .json_body(json!({"conversation_id":conversation,"reply_to_message_id":message,"text":"Agreed"}));
+            then.status(200).json_body(json!({"message":page["messages"][0]}));
+        });
+        let by_message = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/imessage/messages/{message}/thread"))
+                .query_param("agent_identity_id", identity.to_string())
+                .query_param("limit", "2")
+                .query_param("cursor", "prior+/=");
+            then.status(200).json_body(page.clone());
+        });
+        let by_conversation = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!(
+                    "/api/v1/imessage/conversations/{conversation}/threads/{thread}"
+                ))
+                .query_param("limit", "50");
+            then.status(200).json_body(page.clone());
+        });
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/messages")
+                .query_param("conversation_id", conversation.to_string())
+                .query_param("thread_id", thread.to_string())
+                .query_param("limit", "50")
+                .query_param("offset", "10");
+            then.status(200).json_body(page["messages"].clone());
+        });
+        let sdk = client(&server);
+        let reply = sdk
+            .imessages()
+            .send_reply(
+                &conversation,
+                &message,
+                Some("Agreed"),
+                None,
+                None,
+                Some(&identity),
+                Some("reply-one"),
+            )
+            .unwrap();
+        assert_eq!(reply.thread_id, Some(thread));
+        let result = sdk
+            .imessages()
+            .get_thread(&message, Some(&identity), 2, Some("prior+/="))
+            .unwrap();
+        assert_eq!(result.next_cursor.as_deref(), Some("opaque:next"));
+        assert_eq!(result.messages[0].reply_to_message_id, Some(message));
+        sdk.imessages()
+            .get_conversation_thread(&conversation, &thread, None, 50, None)
+            .unwrap();
+        let options = crate::imessage::IMessageThreadListOptions {
+            conversation_id: Some(conversation),
+            thread_id: Some(thread),
+            offset: 10,
+            ..Default::default()
+        };
+        assert_eq!(
+            sdk.imessages().list_with_threads(&options).unwrap()[0].thread_id,
+            Some(thread)
+        );
+        for mock in [send, by_message, by_conversation, list] {
+            mock.assert();
+        }
+        let invalid = crate::imessage::IMessageThreadListOptions {
+            conversation_id: None,
+            ..options
+        };
+        assert!(matches!(
+            sdk.imessages().list_with_threads(&invalid),
+            Err(InkboxError::InvalidArgument(_))
+        ));
+    }
+
+    #[test]
+    fn thread_wrapper_accepts_missing_and_null_metadata_without_changing_message() {
+        let legacy: crate::imessage::ThreadedIMessage =
+            serde_json::from_value(group_message_json()).unwrap();
+        assert_eq!(legacy.thread_id, None);
+        assert_eq!(legacy.reply_to_message_id, None);
+        assert_eq!(legacy.thread_root_message_id, None);
+        let mut nulls = group_message_json();
+        nulls["thread_id"] = serde_json::Value::Null;
+        let parsed: crate::imessage::ThreadedIMessage = serde_json::from_value(nulls).unwrap();
+        assert_eq!(parsed.message.id, legacy.message.id);
     }
 
     fn number_json() -> serde_json::Value {

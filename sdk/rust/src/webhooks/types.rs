@@ -807,6 +807,31 @@ pub struct IMessageWebhookPayload {
     pub data: IMessageWebhookData,
 }
 
+/// iMessage webhook message with nullable threading metadata.
+pub type ThreadedIMessageWebhookMessage =
+    crate::imessage::WithIMessageThread<IMessageWebhookMessage>;
+
+/// Thread-aware webhook data. Existing webhook types remain source-compatible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadedIMessageWebhookData {
+    pub message: Option<ThreadedIMessageWebhookMessage>,
+    pub reaction: Option<IMessageWebhookReaction>,
+    pub contacts: Vec<WebhookContact>,
+    pub agent_identities: Vec<WebhookAgentIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<WebhookContext>,
+}
+
+/// Top-level iMessage webhook payload retaining threading metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadedIMessageWebhookPayload {
+    #[serde(default)]
+    pub id: String,
+    pub event_type: IMessageWebhookEventType,
+    pub timestamp: String,
+    pub data: ThreadedIMessageWebhookData,
+}
+
 // ---- Inbound call (FLAT - no envelope) -----------------------------------
 
 /// Inbound call payload. **Flat** -- no `{event_type, timestamp, data}`
@@ -1129,6 +1154,24 @@ mod tests {
         }"#;
 
         let value: serde_json::Value = serde_json::from_str(raw).unwrap();
+        let legacy_threaded: ThreadedIMessageWebhookPayload =
+            serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(legacy_threaded.data.message.unwrap().thread_id, None);
+        let mut threaded = value.clone();
+        let thread_id = uuid::Uuid::new_v4();
+        let root_id = uuid::Uuid::new_v4();
+        threaded["data"]["message"]["thread_id"] = serde_json::json!(thread_id);
+        threaded["data"]["message"]["reply_to_message_id"] = serde_json::json!(root_id);
+        threaded["data"]["message"]["thread_root_message_id"] = serde_json::json!(root_id);
+        let parsed: ThreadedIMessageWebhookPayload = serde_json::from_value(threaded).unwrap();
+        let message = parsed.data.message.unwrap();
+        assert_eq!(message.thread_id, Some(thread_id));
+        assert_eq!(message.reply_to_message_id, Some(root_id));
+        assert_eq!(message.thread_root_message_id, Some(root_id));
+        assert_eq!(
+            message.message.sender_number.as_deref(),
+            Some("+15551234567")
+        );
         assert_sender_access_contract::<IMessageWebhookMessage>(value["data"]["message"].clone());
         let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
         let message = payload.data.message.unwrap();

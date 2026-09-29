@@ -47,7 +47,8 @@ use crate::identities::types::{AgentIdentityData, IdentityMailbox, IdentityPhone
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
     IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction, IMessageReactionType,
-    IMessageSendStyle, IdentityIMessageNumber,
+    IMessageSendStyle, IMessageThread, IMessageThreadListOptions, IdentityIMessageNumber,
+    ThreadedIMessage,
 };
 use crate::mail::types::{
     DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
@@ -1294,6 +1295,79 @@ impl AgentIdentity {
     // -----------------------------------------------------------------------
     // iMessage helpers
     // -----------------------------------------------------------------------
+
+    /// Read one iMessage including thread metadata, scoped to this identity.
+    pub fn get_imessage_with_thread(&self, message_id: &Uuid) -> Result<ThreadedIMessage> {
+        self.require_imessage()?;
+        self.inkbox
+            .imessages()
+            .get_with_thread(message_id, Some(&self.id()))
+    }
+
+    /// Read a chronological thread page using any message in it.
+    pub fn get_imessage_thread(
+        &self,
+        message_id: &Uuid,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.require_imessage()?;
+        self.inkbox
+            .imessages()
+            .get_thread(message_id, Some(&self.id()), limit, cursor)
+    }
+
+    /// Read a thread by its opaque ID within a conversation.
+    pub fn get_imessage_conversation_thread(
+        &self,
+        conversation_id: &Uuid,
+        thread_id: &Uuid,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.require_imessage()?;
+        self.inkbox.imessages().get_conversation_thread(
+            conversation_id,
+            thread_id,
+            Some(&self.id()),
+            limit,
+            cursor,
+        )
+    }
+
+    /// List this identity's messages with nullable thread metadata.
+    pub fn list_imessages_with_threads(
+        &self,
+        options: &IMessageThreadListOptions,
+    ) -> Result<Vec<ThreadedIMessage>> {
+        self.require_imessage()?;
+        let mut scoped = options.clone();
+        scoped.agent_identity_id = Some(self.id());
+        self.inkbox.imessages().list_with_threads(&scoped)
+    }
+
+    /// Reply to a specific message in an existing one-to-one or group conversation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_imessage_reply(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        idempotency_key: Option<&str>,
+    ) -> Result<ThreadedIMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_reply(
+            conversation_id,
+            reply_to_message_id,
+            text,
+            media_urls,
+            send_style,
+            Some(&self.id()),
+            idempotency_key,
+        )
+    }
 
     /// Send an outbound iMessage as this identity.
     ///

@@ -163,6 +163,9 @@ export interface IMessageMessageReaction {
  * and expose per-recipient outbound delivery state.
  */
 export interface IMessage {
+  replyToMessageId?: string | null;
+  threadId?: string | null;
+  threadRootMessageId?: string | null;
   id: string;
   conversationId: string;
   assignmentId: string | null;
@@ -193,6 +196,33 @@ export interface IMessage {
   reactions: IMessageMessageReaction[] | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A chronological thread page. Pass nextCursor to retrieve more messages. */
+export interface IMessageThread {
+  threadId: string | null;
+  conversationId: string;
+  threadRootMessageId: string | null;
+  messages: IMessage[];
+  nextCursor: string | null;
+}
+
+export interface RawIMessageThread {
+  thread_id: string | null;
+  conversation_id: string;
+  thread_root_message_id: string | null;
+  messages: RawIMessage[];
+  next_cursor: string | null;
+}
+
+export function parseIMessageThread(r: RawIMessageThread): IMessageThread {
+  return {
+    threadId: r.thread_id ?? null,
+    conversationId: r.conversation_id,
+    threadRootMessageId: r.thread_root_message_id ?? null,
+    messages: r.messages.map(parseIMessage),
+    nextCursor: r.next_cursor ?? null,
+  };
 }
 
 /**
@@ -326,6 +356,9 @@ export interface RawIMessageMessageReaction {
 }
 
 export interface RawIMessage {
+  reply_to_message_id?: string | null;
+  thread_id?: string | null;
+  thread_root_message_id?: string | null;
   id: string;
   conversation_id: string;
   assignment_id: string | null;
@@ -480,6 +513,9 @@ export function parseIMessageMessageReaction(
 
 export function parseIMessage(r: RawIMessage): IMessage {
   return {
+    replyToMessageId: r.reply_to_message_id ?? null,
+    threadId: r.thread_id ?? null,
+    threadRootMessageId: r.thread_root_message_id ?? null,
     id: r.id,
     conversationId: r.conversation_id,
     assignmentId: r.assignment_id,

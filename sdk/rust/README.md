@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.11"
+inkbox = "0.7.12"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.11", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.12", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -1087,6 +1087,53 @@ Additional methods on `client.slack()` include users/members, exact message cont
 and permalinks, reactions/pins, own-message update/delete, join/leave, native processing
 status, general `upload_file`, and `get_operation`. Archive settings, listing/search,
 backfill, coverage, and purge use exported `SlackArchive*` response and option types.
+
+## Threaded iMessage replies
+
+Thread-aware methods are additive: existing `IMessage` construction and positional
+send/list signatures are unchanged. Use `ThreadedIMessage` (`message` plus nullable
+`reply_to_message_id`, `thread_id`, and `thread_root_message_id`) for metadata.
+
+```rust
+let message = identity.get_imessage_with_thread(&message_id)?;
+let reply = identity.send_imessage_reply(
+    &message.message.conversation_id, &message.message.id,
+    Some("Agreed"), None, None, Some("reply-request-one"),
+)?;
+let page = identity.get_imessage_thread(&message.message.id, 50, None)?;
+if let Some(cursor) = page.next_cursor.as_deref() {
+    let next_page = identity.get_imessage_thread(&message.message.id, 50, Some(cursor))?;
+}
+if let Some(thread_id) = message.thread_id {
+    let thread = identity.get_imessage_conversation_thread(
+        &message.message.conversation_id, &thread_id, 50, None,
+    )?;
+    let rows = identity.list_imessages_with_threads(&inkbox::imessage::IMessageThreadListOptions {
+        conversation_id: Some(message.message.conversation_id),
+        thread_id: Some(thread_id),
+        ..Default::default()
+    })?;
+}
+```
+
+Resource equivalents are `imessages().get_with_thread`, `send_reply`,
+`get_thread`, `get_conversation_thread`, and `list_with_threads`.
+Deserialize thread-aware webhook deliveries into
+`inkbox::webhooks::ThreadedIMessageWebhookPayload`. Legacy webhook types remain
+available. `send_reply` accepts an optional request key; preserve a caller-supplied
+key when retrying across separate calls.
+
+Thread IDs are opaque and distinct from message IDs. Thread pages include the
+root and its replies in chronological order; follow `next_cursor` (Python/Rust)
+or `nextCursor` (TypeScript/CLI) until null. An ordinary message can be a singleton
+thread. Thread metadata may be null for pending or older messages, and the root
+or direct parent can be unavailable. Conversation message lists remain flat and
+newest-first. A thread filter requires its conversation ID; it uses the existing
+limit/offset pagination, unlike the chronological thread endpoints.
+
+Replies work in supported one-to-one and group iMessage conversations. Use a
+message from the same conversation. An unsupported reply is rejected rather
+than sent as a plain message. Omitting the target preserves ordinary sending.
 
 ## License
 
