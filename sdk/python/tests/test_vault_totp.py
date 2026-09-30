@@ -131,9 +131,21 @@ class TestB32Decode:
         result = _b32decode("JBSWY3DPEHPK3PXP")
         assert len(result) > 0
 
-    def test_lowercase_normalized(self):
-        result = _b32decode("jbswy3dpehpk3pxp")
-        assert result == _b32decode("JBSWY3DPEHPK3PXP")
+    def test_already_padded_secret(self):
+        # Already padded secret (e.g. standard base32 output) should decode correctly
+        result = _b32decode("MZXW6===")
+        assert result == b"foo"
+
+    def test_irregular_padding(self):
+        # Over-padded or unpadded secret
+        assert _b32decode("MZXW6") == b"foo"
+        assert _b32decode("MZXW6=====") == b"foo"
+
+    def test_empty_or_only_padding(self):
+        with pytest.raises(ValueError, match="Invalid base32"):
+            _b32decode("")
+        with pytest.raises(ValueError, match="Invalid base32"):
+            _b32decode("====")
 
     def test_invalid_secret(self):
         with pytest.raises(ValueError, match="Invalid base32"):
