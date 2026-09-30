@@ -7,7 +7,7 @@ Identity-centered call operations: list, get, transcripts, place.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from inkbox.phone.types import (
     CallMode,
@@ -15,6 +15,7 @@ from inkbox.phone.types import (
     HostedAgentAuthorityMode,
     HostedAgentToolInvocationPage,
     PhoneCall,
+    PhoneCallForwarding,
     PhoneCallWithRateLimit,
     PhoneTranscript,
     OnVoicemail,
@@ -109,6 +110,35 @@ class CallsResource:
         """
         data = self._http.post(f"/calls/{call_id}/hangup")
         return PhoneCall._from_dict(data)
+
+    def transfer(
+        self,
+        call_id: UUID | str,
+        to_number: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> PhoneCallForwarding:
+        """Request a live call transfer to an E.164 phone number.
+
+        Outbound phone contact rules apply. Acceptance is not connection:
+        read the call's ``forwardings`` for completion. Reuse a preserved
+        key when retrying the same request; omitted keys are generated once.
+        Keys contain 1–128 printable ASCII characters. Request failures expose
+        the generated key as ``error.idempotency_key``.
+        """
+        key = str(uuid4()) if idempotency_key is None else idempotency_key
+        if not key.strip() or len(key) > 128 or not key.isascii() or not key.isprintable():
+            raise ValueError("idempotency_key must contain 1–128 printable ASCII characters")
+        try:
+            data = self._http.post(
+                f"/calls/{call_id}/transfer",
+                json={"to_number": to_number},
+                headers={"Idempotency-Key": key},
+            )
+            return PhoneCallForwarding._from_dict(data)
+        except Exception as error:
+            error.idempotency_key = key
+            raise
 
     def transcripts(self, call_id: UUID | str) -> list[PhoneTranscript]:
         """List all transcript segments for a call, ordered by sequence number.

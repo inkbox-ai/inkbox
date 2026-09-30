@@ -635,6 +635,46 @@ describe("CallsResource surface (identity-centered, v1.0.0)", () => {
       "place",
       "toolInvocations",
       "transcripts",
+      "transfer",
     ]);
+  });
+});
+
+
+describe("CallsResource.transfer", () => {
+  const forwarding = {
+    id: "77777777-7777-7777-7777-777777777777", trigger: "live_transfer",
+    status: "requested", target_type: "phone", target: "+14155550123",
+    requested_at: "2026-09-30T12:00:00Z", forwarded_at: null,
+  };
+
+  it("sends the exact keyed request and parses pending forwarding history", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(forwarding);
+    const calls = new CallsResource(http);
+    const result = await calls.transfer(CALL_ID, { toNumber: "+14155550123", idempotencyKey: "handoff-1" });
+    expect(http.post).toHaveBeenCalledWith(`/calls/${CALL_ID}/transfer`,
+      { to_number: "+14155550123" }, { headers: { "Idempotency-Key": "handoff-1" } });
+    expect(result).toMatchObject({ trigger: "live_transfer", status: "requested", forwardedAt: null });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_PHONE_CALL, forwardings: [forwarding] });
+    expect((await calls.get(CALL_ID)).forwardings[0].trigger).toBe("live_transfer");
+  });
+
+  it("generates one recoverable key per invocation", async () => {
+    const http = mockHttp();
+    const error = new Error("connection interrupted");
+    vi.mocked(http.post).mockRejectedValue(error);
+    await expect(new CallsResource(http).transfer(CALL_ID, { toNumber: "+14155550123" })).rejects.toBe(error);
+    const key = vi.mocked(http.post).mock.calls[0][2]?.headers?.["Idempotency-Key"];
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(error).toHaveProperty("idempotencyKey", key);
+    expect(http.post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["", " ", "x".repeat(129), "bad\nkey", "é"])("rejects invalid key %j without a request", async key => {
+    const http = mockHttp();
+    await expect(new CallsResource(http).transfer(CALL_ID,
+      { toNumber: "+14155550123", idempotencyKey: key })).rejects.toThrow(RangeError);
+    expect(http.post).not.toHaveBeenCalled();
   });
 });

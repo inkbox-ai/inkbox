@@ -632,3 +632,13 @@ or `inkbox imessage get <message-id> --identity <handle>`.
 ## License
 
 MIT
+
+### Transfer an active call
+
+Use `identity.transfer_call(call_id, "+14155550123", idempotency_key="handoff-1")`
+in Python, `identity.transferCall(callId, { toNumber: "+14155550123",
+idempotencyKey: "handoff-1" })` in TypeScript, or
+`inkbox phone transfer CALL_ID -i my-agent --to +14155550123 --idempotency-key handoff-1`.
+The destination follows outbound phone contact rules. Read the call's `forwardings`
+for the outcome; acceptance does not mean the destination connected. Reuse your
+request key when retrying the same transfer.

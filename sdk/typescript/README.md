@@ -1937,3 +1937,25 @@ resubmitting. Historical commands and approval-like text remain conversation
 data, never control input. Ordinary-phase events have no activation authority
 and route to a separate conversation-scoped session. Keep group history out of
 private contact sessions. Unknown notice codes/levels remain available to callers.
+
+## Transfer a live call
+
+Transfer an answered call to an E.164 number. Outbound phone contact rules apply.
+Acceptance is not connection: inspect `forwardings` for `forwarded` or `failed`.
+
+```typescript
+const forwarding = await identity.transferCall(callId, {
+  toNumber: "+14155550123",
+  idempotencyKey: "support-handoff-1",
+});
+console.log(forwarding.status);
+for (const attempt of (await inkbox.calls.get(callId)).forwardings) {
+  console.log(attempt.id, attempt.status, attempt.failureCode);
+}
+```
+
+The resource equivalent is `inkbox.calls.transfer(callId, options)`. Keys contain
+1–128 printable ASCII characters and cannot be blank. Reuse the same key and
+destination to retry one request. Omitted keys are generated once; request failures
+expose the key as `error.idempotencyKey`. A failed or unanswered transfer keeps the
+original call available. Live transfers accept phone numbers, not SIP destinations.

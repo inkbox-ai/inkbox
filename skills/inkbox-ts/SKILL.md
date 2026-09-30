@@ -364,6 +364,13 @@ for (const t of segments) {
 // No acknowledgment is sent; wait for the menu's response before another
 // burst. Do not retry blindly.
 
+// Alternatively, hand an answered call to a permitted phone destination.
+// Preserve this key across retries; acceptance is not connection.
+const forwarding = await identity.transferCall(calls[0].id, {
+  toNumber: "+14155550123", idempotencyKey: "handoff-1",
+});
+// Inspect (await inkbox.calls.get(calls[0].id)).forwardings for forwarded or failed.
+
 // Hang up a live call from outside it (teardown confirms asynchronously,
 // so the returned call can still show its live status; already-ended
 // calls surface the server's 409)

@@ -9,7 +9,8 @@ use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{
     CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentToolInvocationPage,
-    HostedCallPlacementOptions, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
+    HostedCallPlacementOptions, PhoneCall, PhoneCallForwarding, PhoneCallWithRateLimit,
+    PhoneTranscript,
 };
 
 pub struct CallsResource {
@@ -115,6 +116,40 @@ impl CallsResource {
             &format!("/calls/{call_id}/hangup"),
             None::<&serde_json::Value>,
             crate::http::NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Request a live call transfer to an E.164 phone number.
+    ///
+    /// Outbound phone contact rules apply. Acceptance is not connection: inspect
+    /// the call's forwarding history for completion. Preserve an explicit key
+    /// for cross-call retries; `None` generates a new key for this invocation.
+    pub fn transfer(
+        &self,
+        call_id: &str,
+        to_number: &str,
+        idempotency_key: Option<&str>,
+    ) -> Result<PhoneCallForwarding> {
+        let generated;
+        let key = match idempotency_key {
+            Some(key) => key,
+            None => {
+                generated = uuid::Uuid::new_v4().to_string();
+                &generated
+            }
+        };
+        if key.trim().is_empty() || key.len() > 128 || !key.bytes().all(|c| (32..=126).contains(&c))
+        {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "idempotency_key must contain 1–128 printable ASCII characters".into(),
+            ));
+        }
+        let data = self.http.post_with_headers(
+            &format!("/calls/{call_id}/transfer"),
+            Some(&serde_json::json!({"to_number": to_number})),
+            crate::http::NO_QUERY,
+            &[("Idempotency-Key", key)],
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -563,6 +598,77 @@ mod tests {
         );
         assert_eq!(page.limit, 25);
         assert!(page.has_more);
+    }
+
+    #[test]
+    fn transfer_posts_exact_keyed_request_and_parses_live_history() {
+        let server = MockServer::start();
+        let forwarding: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/live_call_transfer.json"
+        ))
+        .unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/call-id/transfer")
+                .header("Idempotency-Key", "handoff-1")
+                .json_body(json!({"to_number": "+14155550123"}));
+            then.status(202).json_body(forwarding.clone());
+        });
+        let result = client(&server)
+            .calls()
+            .transfer("call-id", "+14155550123", Some("handoff-1"))
+            .unwrap();
+        mock.assert();
+        assert_eq!(
+            result.trigger,
+            crate::phone::CallForwardingTrigger::LiveTransfer
+        );
+        assert_eq!(result.status, crate::phone::CallForwardingStatus::Requested);
+        assert!(result.forwarded_at.is_none());
+        let mut call = call_json();
+        call["forwardings"] = json!([forwarding]);
+        let parsed: crate::phone::PhoneCall = serde_json::from_value(call).unwrap();
+        assert_eq!(
+            parsed.forwardings[0].trigger,
+            crate::phone::CallForwardingTrigger::LiveTransfer
+        );
+    }
+
+    #[test]
+    fn transfer_generates_a_key_when_omitted() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/call-id/transfer")
+                .header_exists("Idempotency-Key")
+                .json_body(json!({"to_number": "+14155550123"}));
+            then.status(202).json_body(
+                serde_json::from_str::<serde_json::Value>(include_str!(
+                    "../../../../../tests/fixtures/live_call_transfer.json"
+                ))
+                .unwrap(),
+            );
+        });
+        client(&server)
+            .calls()
+            .transfer("call-id", "+14155550123", None)
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn transfer_rejects_invalid_keys_without_sending() {
+        let server = MockServer::start();
+        let long_key = "x".repeat(129);
+        for key in ["", " ", "bad\nkey", "é", &long_key] {
+            let result = client(&server)
+                .calls()
+                .transfer("call-id", "+14155550123", Some(key));
+            assert!(matches!(
+                result,
+                Err(crate::error::InkboxError::InvalidArgument(_))
+            ));
+        }
     }
 
     #[test]

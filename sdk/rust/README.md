@@ -884,3 +884,20 @@ top-level block, deserialize `CompanionMailWebhookPayload`,
 `inkbox::webhooks::types`. These alias `WithCompanion<T>`, exposing the original
 `payload` and optional `companion`. Ordinary-phase metadata has no activation
 authority and must not trigger history loading.
+
+## Transfer a live call
+
+```rust
+let forwarding = identity.transfer_call(
+    "call-uuid", "+14155550123", Some("support-handoff-1"),
+)?;
+println!("{:?}", forwarding.status);
+```
+
+`inkbox.calls().transfer(call_id, to_number, idempotency_key)` provides the same
+operation. Pass `Some(key)` and preserve that key for retries across invocations;
+`None` generates a fresh key. Keys contain 1–128 printable ASCII characters and
+cannot be blank. Outbound phone contact rules apply. Acceptance does not mean the
+destination connected: read `forwardings` until the attempt is `Forwarded` or
+`Failed`. A failed or unanswered transfer keeps the original call available.
+Live transfers accept E.164 phone numbers, not SIP destinations.

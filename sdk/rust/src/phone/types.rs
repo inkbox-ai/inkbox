@@ -326,6 +326,7 @@ impl ForwardingTargetType {
 #[serde(rename_all = "snake_case")]
 pub enum CallForwardingTrigger {
     IncomingAction,
+    LiveTransfer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

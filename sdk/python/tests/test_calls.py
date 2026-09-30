@@ -692,3 +692,62 @@ class TestRemovedNumberScopedSurface:
     def test_place_is_not_number_scoped(self):
         params = inspect.signature(CallsResource.place).parameters
         assert "phone_number_id" not in params
+
+
+class TestCallsTransfer:
+    @pytest.fixture
+    def forwarding(self):
+        import json
+        from pathlib import Path
+        return json.loads((Path(__file__).parents[3] / "tests/fixtures/live_call_transfer.json").read_text())
+
+    def test_exact_request_and_live_history(self, client, transport, forwarding):
+        from inkbox import CallForwardingTrigger
+        transport.post.return_value = forwarding
+        result = client.calls.transfer(CALL_ID, "+14155550123", idempotency_key="handoff-1")
+        transport.post.assert_called_once_with(
+            f"/calls/{CALL_ID}/transfer", json={"to_number": "+14155550123"},
+            headers={"Idempotency-Key": "handoff-1"},
+        )
+        assert result.trigger == CallForwardingTrigger.LIVE_TRANSFER
+        assert result.status == "requested"
+        assert result.forwarded_at is None
+        transport.get.return_value = {**PHONE_CALL_DICT, "forwardings": [forwarding]}
+        assert client.calls.get(CALL_ID).forwardings[0].trigger == CallForwardingTrigger.LIVE_TRANSFER
+
+    def test_generated_keys_and_error_recovery(self, client, transport, forwarding):
+        transport.post.return_value = forwarding
+        client.calls.transfer(CALL_ID, "+14155550123")
+        key = transport.post.call_args.kwargs["headers"]["Idempotency-Key"]
+        assert str(UUID(key)) == key
+        error = httpx.ReadError("connection interrupted")
+        transport.post.side_effect = error
+        with pytest.raises(httpx.ReadError) as caught:
+            client.calls.transfer(CALL_ID, "+14155550123")
+        retry_key = caught.value.idempotency_key
+        assert retry_key == transport.post.call_args.kwargs["headers"]["Idempotency-Key"]
+        assert retry_key != key
+
+    @pytest.mark.parametrize("key", ["", " ", "x" * 129, "bad\nkey", "é"])
+    def test_rejects_invalid_keys_without_request(self, client, transport, key):
+        with pytest.raises(ValueError):
+            client.calls.transfer(CALL_ID, "+14155550123", idempotency_key=key)
+        transport.post.assert_not_called()
+
+    def test_identity_delegate(self, client, transport, forwarding):
+        from inkbox.agent_identity import AgentIdentity
+        from inkbox.identities.types import _AgentIdentityData
+        from sample_data_identities import IDENTITY_DETAIL_DICT
+        identity = AgentIdentity(_AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT), client)
+        transport.post.return_value = forwarding
+        identity.transfer_call(CALL_ID, "+14155550123", idempotency_key="handoff-1")
+        assert transport.post.call_args.kwargs["headers"] == {"Idempotency-Key": "handoff-1"}
+
+
+    @pytest.mark.parametrize("status", [403, 409])
+    def test_policy_and_call_state_errors_keep_request_key(self, status):
+        calls = _calls_resource_returning(status, {"detail": "Transfer unavailable"})
+        with pytest.raises(InkboxAPIError) as caught:
+            calls.transfer(CALL_ID, "+14155550123", idempotency_key="handoff-1")
+        assert caught.value.status_code == status
+        assert caught.value.idempotency_key == "handoff-1"

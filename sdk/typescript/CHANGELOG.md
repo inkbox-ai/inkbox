@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Live call transfer
+
+- Transfer an answered call to an E.164 phone number with `calls.transfer` /
+  `identity.transfer_call`, TypeScript `calls.transfer` / `identity.transferCall`,
+  Rust `calls().transfer` / `identity.transfer_call`, or `inkbox phone transfer`.
+- Transfers use the identity's outbound phone contact rules. Acceptance is not
+  connection: inspect the call's `forwardings` for the final outcome.
+- Add the `live_transfer` forwarding trigger. Upgrade forwarding-history readers
+  before enabling live transfers; older Python and Rust enum readers cannot parse
+  the new trigger. Existing incoming-call forwarding stays compatible.
+- Optional request keys support safe retries of one transfer. Preserve an explicit
+  key across invocations; an omitted key creates a new request identity.
+
 ## 0.7.9 — Media WebSocket keypad guidance
 
 - Documented the media WebSocket `dtmf` event for live client-driven calls:

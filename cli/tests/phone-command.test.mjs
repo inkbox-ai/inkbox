@@ -960,3 +960,38 @@ test("text send and list work with a UK identity phone without a state", async (
     mock.server.close();
   }
 });
+
+
+test("phone transfer posts a keyed request and displays acceptance without claiming connection", async () => {
+  const requests = [];
+  const mock = await listen((req, res) => {
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", () => {
+      requests.push({ method: req.method, url: req.url, key: req.headers["idempotency-key"], body });
+      res.writeHead(req.method === "POST" ? 202 : 200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(req.method === "POST" ? {
+        id: "77777777-7777-7777-7777-777777777777", trigger: "live_transfer",
+        status: "requested", target_type: "phone", target: "+14155550123",
+        requested_at: "2026-09-30T12:00:00Z",
+      } : IDENTITY));
+    });
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "phone", "transfer", "call-id", "-i", "support-bot", "--to", "+14155550123",
+      "--idempotency-key", "handoff-1",
+    ]);
+    assert.ifError(result.error);
+    const request = requests.find(r => r.method === "POST");
+    assert.equal(request.url, "/api/v1/phone/calls/call-id/transfer");
+    assert.equal(request.key, "handoff-1");
+    assert.deepEqual(JSON.parse(request.body), { to_number: "+14155550123" });
+    assert.equal(JSON.parse(result.stdout).status, "requested");
+    assert.equal(JSON.parse(result.stdout).forwardedAt, null);
+    assert.match(help("phone", "transfer"), /--idempotency-key <key>/);
+  } finally {
+    mock.server.close();
+  }
+});

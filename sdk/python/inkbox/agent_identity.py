@@ -81,6 +81,7 @@ from inkbox.phone.types import (
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
+    PhoneCallForwarding,
     PhoneCallWithRateLimit,
     PhoneIdentityContactRule,
     PhoneRuleAction,
@@ -986,6 +987,18 @@ class AgentIdentity:
             call_id: ID of the call to hang up.
         """
         return self._inkbox._calls.hangup(call_id)
+
+    def transfer_call(
+        self,
+        call_id: str,
+        to_number: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> PhoneCallForwarding:
+        """Request a live transfer; inspect call forwarding history for completion."""
+        return self._inkbox._calls.transfer(
+            call_id, to_number, idempotency_key=idempotency_key,
+        )
 
     def get_hosted_agent_config(self) -> HostedAgentConfig:
         """Get this identity's Inkbox Voice AI config."""
