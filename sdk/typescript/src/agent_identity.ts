@@ -68,6 +68,7 @@ import type {
 } from "./imessage/types.js";
 import type {
   PhoneCall,
+  PhoneCallForwarding,
   PhoneCallWithRateLimit,
   HostedAgentToolInvocationPage,
   PhoneTranscript,
@@ -708,6 +709,14 @@ export class AgentIdentity {
    */
   async hangupCall(callId: string): Promise<PhoneCall> {
     return this._inkbox._calls.hangup(callId);
+  }
+
+  /** Request a live transfer; inspect call forwarding history for completion. */
+  async transferCall(callId: string, options: {
+    toNumber: string;
+    idempotencyKey?: string;
+  }): Promise<PhoneCallForwarding> {
+    return this._inkbox._calls.transfer(callId, options);
   }
 
   /** Get this identity's Inkbox Voice AI config. */

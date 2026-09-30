@@ -398,6 +398,7 @@ inkbox phone calls -i <handle>               # List calls
                                              #   mode / reason / post_call_action_items
                                              #     ride each call; read them with --json
 
+inkbox phone transfer <call-id> -i <handle> --to +14155550123 --idempotency-key handoff-1
 inkbox phone hangup <call-id> -i <handle>    # Hang up a live call from outside it
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
@@ -1043,3 +1044,13 @@ Read an iMessage with `imessage get <message-id> --identity <handle>`.
 ## License
 
 MIT
+
+### Live call transfers
+
+`inkbox phone transfer CALL_ID -i my-agent --to +14155550123` requests a handoff
+of an answered call. The destination must pass outbound phone contact rules.
+The command reports an attempt, not a confirmed connection; inspect the call's
+`forwardings` for completion. Pass `--idempotency-key` with the same preserved key
+and destination when retrying one request. Keys contain 1–128 printable ASCII
+characters and cannot be blank. Without the flag, each invocation generates a
+new key. Live transfer destinations must be E.164 phone numbers, not SIP URIs.

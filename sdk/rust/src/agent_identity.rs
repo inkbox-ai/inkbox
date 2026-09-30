@@ -58,9 +58,9 @@ use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
     CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentConfig,
     HostedAgentToolInvocationPage, HostedCallPlacementOptions, IncomingCallAction,
-    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
-    TextConversationUpdateResult, TextMessage,
+    IncomingCallActionConfig, PhoneCall, PhoneCallForwarding, PhoneCallWithRateLimit,
+    PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript,
+    TextConversationSummary, TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -1065,6 +1065,18 @@ impl AgentIdentity {
     /// Hang up one of this identity's live calls, from outside the call.
     pub fn hangup_call(&self, call_id: &str) -> Result<PhoneCall> {
         self.inkbox.calls().hangup(call_id)
+    }
+
+    /// Request a live transfer; inspect call forwarding history for completion.
+    pub fn transfer_call(
+        &self,
+        call_id: &str,
+        to_number: &str,
+        idempotency_key: Option<&str>,
+    ) -> Result<PhoneCallForwarding> {
+        self.inkbox
+            .calls()
+            .transfer(call_id, to_number, idempotency_key)
     }
 
     /// Get this identity's inbound-call handling config.

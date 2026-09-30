@@ -284,6 +284,7 @@ inkbox phone call -i <handle> --to +15551234567 --hosted --reason "Confirm tomor
 inkbox phone call -i <handle> --to +15551234567 --hosted --reason "..." --on-voicemail leave_message --voicemail-message "Please call us back."
 inkbox phone call -i <handle> --to +15551234567 --origination shared_imessage_number
 inkbox phone calls -i <handle> --limit 10 --offset 0
+inkbox phone transfer <call-id> -i <handle> --to +14155550123 --idempotency-key handoff-1
 inkbox phone hangup <call-id> -i <handle>
 inkbox phone transcripts <call-id> -i <handle>
 inkbox phone search-transcripts -i <handle> -q "refund" --party remote
@@ -924,3 +925,9 @@ the same intended message across command invocations. Preserve the exact input.
 through the existing get commands, including `imessage get`. Request retries do
 not guarantee delivery retries. Errors print the original request key. Do not
 submit a new message solely because confirmation is missing.
+
+`phone transfer` accepts an answered call and an E.164 phone destination. It follows
+outbound phone contact rules, including for calls on iMessage lines. Preserve the
+same `--idempotency-key` and destination across retries of one handoff. Acceptance
+is not connection: inspect call `forwardings` for `forwarded` or `failed` before
+reporting success. A failed or unanswered handoff keeps the original call available.

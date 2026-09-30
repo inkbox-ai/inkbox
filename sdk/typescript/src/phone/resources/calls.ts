@@ -4,6 +4,7 @@
  * Identity-scoped call operations: list, get, transcripts, place.
  */
 
+import { randomUUID } from "node:crypto";
 import { HttpTransport } from "../../_http.js";
 import {
   CallMode,
@@ -11,9 +12,12 @@ import {
   HostedAgentAuthorityMode,
   HostedAgentToolInvocationPage,
   PhoneCall,
+  PhoneCallForwarding,
   PhoneCallWithRateLimit,
   PhoneTranscript,
   RawPhoneCall,
+  RawPhoneCallForwarding,
+  parsePhoneCallForwarding,
   RawPhoneCallWithRateLimit,
   RawHostedAgentToolInvocationPage,
   RawPhoneTranscript,
@@ -96,6 +100,33 @@ export class CallsResource {
   async hangup(callId: string): Promise<PhoneCall> {
     const data = await this.http.post<RawPhoneCall>(`/calls/${callId}/hangup`);
     return parsePhoneCall(data);
+  }
+
+  /**
+   * Request a live transfer to an E.164 number. Outbound phone contact rules apply.
+   * Acceptance is not connection: read the call's forwardings for completion.
+   * Preserve an explicit key for retries across invocations. Omitted keys are
+   * generated once; request failures expose the key as error.idempotencyKey.
+   */
+  async transfer(callId: string, options: {
+    toNumber: string;
+    idempotencyKey?: string;
+  }): Promise<PhoneCallForwarding> {
+    const key = options.idempotencyKey ?? randomUUID();
+    if (!key.trim() || key.length > 128 || /[^\x20-\x7e]/.test(key)) {
+      throw new RangeError("idempotencyKey must contain 1–128 printable ASCII characters");
+    }
+    try {
+      const data = await this.http.post<RawPhoneCallForwarding>(
+        `/calls/${callId}/transfer`,
+        { to_number: options.toNumber },
+        { headers: { "Idempotency-Key": key } },
+      );
+      return parsePhoneCallForwarding(data);
+    } catch (error) {
+      if (error instanceof Error) Object.assign(error, { idempotencyKey: key });
+      throw error;
+    }
   }
 
   /**

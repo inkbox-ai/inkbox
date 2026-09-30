@@ -1892,3 +1892,27 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ## License
 
 MIT
+
+## Transfer a live call
+
+Transfer an answered call without asking the caller to dial again. Outbound phone
+contact rules apply. The accepted attempt is not a completed handoff: read the
+call's `forwardings` and wait for `forwarded` or `failed`.
+
+```python
+forwarding = identity.transfer_call(
+    call_id,
+    "+14155550123",
+    idempotency_key="support-handoff-1",
+)
+print(forwarding.status)
+for attempt in inkbox.calls.get(call_id).forwardings:
+    print(attempt.id, attempt.status, attempt.failure_code)
+```
+
+The resource equivalent is `inkbox.calls.transfer(call_id, to_number,
+idempotency_key=...)`. Keys must contain 1–128 printable ASCII characters and
+cannot be blank. Reuse the same key and destination to retry one request. If you
+omit the key, the SDK generates one; request failures expose it as
+`error.idempotency_key`. A failed or unanswered transfer keeps the original call
+available. SIP destinations are not supported for live transfers.

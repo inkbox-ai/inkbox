@@ -288,6 +288,29 @@ export function registerPhoneCommands(program: Command): void {
     );
 
   phone
+    .command("transfer <call-id>")
+    .description("Request a live call transfer to a phone number")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption("--to <number>", "Destination phone number (E.164)")
+    .option("--idempotency-key <key>", "Preserved request key for retries (1–128 printable ASCII characters)")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        callId: string,
+        cmdOpts: { identity: string; to: string; idempotencyKey?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const forwarding = await identity.transferCall(callId, {
+          toNumber: cmdOpts.to,
+          idempotencyKey: cmdOpts.idempotencyKey,
+        });
+        output(forwarding, { json: !!opts.json });
+      }),
+    );
+
+  phone
     .command("hangup <call-id>")
     .description("Hang up a live call")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

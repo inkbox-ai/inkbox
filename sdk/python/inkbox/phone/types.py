@@ -174,6 +174,7 @@ class CallForwardingTrigger(StrEnum):
     """What initiated a call-forwarding attempt."""
 
     INCOMING_ACTION = "incoming_action"
+    LIVE_TRANSFER = "live_transfer"
 
 
 class CallForwardingStatus(StrEnum):

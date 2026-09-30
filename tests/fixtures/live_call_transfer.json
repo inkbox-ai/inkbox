@@ -1,0 +1,12 @@
+{
+  "id": "77777777-7777-7777-7777-777777777777",
+  "trigger": "live_transfer",
+  "status": "requested",
+  "target_type": "phone",
+  "target": "+14155550123",
+  "requested_at": "2026-09-30T12:00:00Z",
+  "dialing_at": null,
+  "forwarded_at": null,
+  "ended_at": null,
+  "failure_code": null
+}

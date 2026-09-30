@@ -129,7 +129,7 @@ export function withErrorHandler<T extends unknown[]>(
         }
         if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
         if (!wantsJson(this) && err instanceof Error && "idempotencyKey" in err && typeof err.idempotencyKey === "string") {
-          console.error(`Request key: ${err.idempotencyKey}. Keep this key when retrying this message.`);
+          console.error(`Request key: ${err.idempotencyKey}. Keep this key when retrying this request.`);
         }
         if (!wantsJson(this)) renderNotices();
         // Allow piped stderr to drain before exiting, including large JSON errors.
