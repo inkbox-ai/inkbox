@@ -38,9 +38,9 @@ class IdentitiesResource:
     def get_domain_affiliation(self, agent_handle: str) -> IdentityDomainAffiliation:
         return parse_identity_domain_affiliation(self._http.get(f"/{quote(agent_handle, safe='')}/domain-affiliation"))
 
-    def set_domain_affiliation(self, agent_handle: str, domain_claim_id: str, *, publish_publicly: bool) -> IdentityDomainAffiliation:
+    def set_domain_affiliation(self, agent_handle: str, domain_claim_id: str) -> IdentityDomainAffiliation:
         return parse_identity_domain_affiliation(self._http.put(f"/{quote(agent_handle, safe='')}/domain-affiliation", json={
-            "domain_claim_id": domain_claim_id, "publish_publicly": publish_publicly,
+            "domain_claim_id": domain_claim_id,
         }))
 
     def remove_domain_affiliation(self, agent_handle: str) -> None:

@@ -46,12 +46,12 @@ describe("organization domains", () => {
   it("exposes identity management without fetching an identity first", async () => {
     const client = new Inkbox({ apiKey: "test-key" });
     const http = { get: vi.fn(), put: vi.fn(), delete: vi.fn() };
-    const config = { domain_claim_id: "claim", domain: "example.com", publish_publicly: false, affiliation: fixture.affiliation };
+    const config = { domain_claim_id: "claim", domain: "example.com", affiliation: fixture.affiliation };
     http.get.mockResolvedValue(config); http.put.mockResolvedValue(config);
     Object.assign(client.identities, { http });
     expect((await client.identities.getDomainAffiliation("@helper")).affiliation?.validUntil).toBe(fixture.affiliation.valid_until);
-    await client.identities.setDomainAffiliation("@helper", { domainClaimId: "claim", publishPublicly: false });
-    expect(http.put).toHaveBeenCalledWith("/%40helper/domain-affiliation", { domain_claim_id: "claim", publish_publicly: false });
+    await client.identities.setDomainAffiliation("@helper", { domainClaimId: "claim" });
+    expect(http.put).toHaveBeenCalledWith("/%40helper/domain-affiliation", { domain_claim_id: "claim" });
     await client.identities.removeDomainAffiliation("@helper");
     expect(http.delete).toHaveBeenCalledWith("/%40helper/domain-affiliation");
   });

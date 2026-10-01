@@ -69,10 +69,11 @@ impl IdentitiesResource {
         &self,
         agent_handle: &str,
         domain_claim_id: &str,
-        publish_publicly: bool,
     ) -> Result<IdentityDomainAffiliation> {
-        Ok(serde_json::from_value(self.http.put(&format!("/{}/domain-affiliation", path_segment(agent_handle)),
-            &serde_json::json!({"domain_claim_id": domain_claim_id, "publish_publicly": publish_publicly}))?)?)
+        Ok(serde_json::from_value(self.http.put(
+            &format!("/{}/domain-affiliation", path_segment(agent_handle)),
+            &serde_json::json!({"domain_claim_id": domain_claim_id}),
+        )?)?)
     }
 
     pub fn remove_domain_affiliation(&self, agent_handle: &str) -> Result<()> {

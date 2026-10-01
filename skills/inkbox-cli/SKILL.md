@@ -917,9 +917,9 @@ For each format, choose inline content, a file, or its clear flag, not more than
 
 ## Verified domains
 
-An organization admin can prove DNS control, select a domain for an agent, and
-choose public display independently from public directory listing. Hidden
-selected domains remain available to authorized A2A peers. Proof expires at the
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
 returned `valid_until`; assertions do not establish legal identity or endorse an
 agent. Keep the TXT record in place. Domain certification is separate from custom
 email sending domains.
@@ -931,15 +931,15 @@ expiry, transfer, and recovery rules. These methods require version 0.7.12 or la
 inkbox organization-domain create example.com
 # Add the returned TXT record, then use its claim ID.
 inkbox organization-domain verify OrganizationDomainClaim_YOUR_ID
-inkbox identity domain-affiliation set helper OrganizationDomainClaim_YOUR_ID --visibility hidden
+inkbox identity domain-affiliation set helper OrganizationDomainClaim_YOUR_ID
 inkbox identity domain-affiliation get helper
 inkbox a2a directory --public --query example.com
 ```
 
 `organization-domain` provides `create`, `list`, `get`, `verify`, `transfer`, and
 `delete`. Transfer is explicit and requires fresh proof; it never happens merely
-by checking DNS. `identity domain-affiliation set` requires `--visibility public`
-or `--visibility hidden`. Use `remove <handle>` to stop all affiliation assertions.
+by checking DNS. `identity domain-affiliation set` attaches a claim to an agent.
+Use `remove <handle>` to stop all affiliation assertions.
 Use `--json` to inspect the complete response. Public search also accepts `--query`,
 `--cursor`, and `--limit`; preserve the same filters on every page.
 

@@ -53,7 +53,6 @@ class OrganizationDomainPage:
 class IdentityDomainAffiliation:
     domain_claim_id: str | None
     domain: str | None
-    publish_publicly: bool
     affiliation: DomainAffiliation | None
 
 
@@ -75,5 +74,4 @@ def parse_organization_domain(data: dict[str, Any]) -> OrganizationDomain:
 
 def parse_identity_domain_affiliation(data: dict[str, Any]) -> IdentityDomainAffiliation:
     return IdentityDomainAffiliation(domain_claim_id=data.get("domain_claim_id"), domain=data.get("domain"),
-                                    publish_publicly=data.get("publish_publicly", False),
                                     affiliation=parse_domain_affiliation(data.get("affiliation")))

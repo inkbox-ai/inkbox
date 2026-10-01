@@ -1454,9 +1454,9 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 
 ## Verified domains
 
-An organization admin can prove DNS control, select a domain for an agent, and
-choose public display independently from public directory listing. Hidden
-selected domains remain available to authorized A2A peers. Proof expires at the
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
 returned `valid_until`; assertions do not establish legal identity or endorse an
 agent. Keep the TXT record in place. Domain certification is separate from custom
 email sending domains.
@@ -1473,14 +1473,14 @@ print(claim.dns_record.name, claim.dns_record.value)
 # Add the exact TXT record before verifying.
 claim = client.organization_domains.verify(claim.id)
 if claim.state == "verified":
-    client.identities.set_domain_affiliation("helper", claim.id, publish_publicly=False)
+    client.identities.set_domain_affiliation("helper", claim.id)
 for item in client.a2a.iter_public_directory(q="example.com"):
     print(item.card.name)
 ```
 
 Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
 Use `client.identities.get_domain_affiliation(handle)` to inspect saved settings,
-`set_domain_affiliation(..., publish_publicly=True)` to publish explicitly, and
+`set_domain_affiliation(handle, claim_id)` to attach a domain, and
 `remove_domain_affiliation(handle)` to remove the selection. Task and context
 participants expose optional `.affiliation`; message assertions identify the author.
 

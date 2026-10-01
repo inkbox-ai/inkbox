@@ -360,10 +360,9 @@ export function registerIdentityCommands(program: Command): void {
       output(await createClient(getGlobalOpts(this)).identities.getDomainAffiliation(handle), { json: !!getGlobalOpts(this).json });
     }));
   affiliation.command("set <handle> <claim-id>")
-    .addOption(new Option("--visibility <visibility>", "Public display; hidden affiliations remain visible to authorized A2A peers").choices(["public", "hidden"]).makeOptionMandatory())
-    .action(withErrorHandler(async function (this: Command, handle: string, claimId: string, options: { visibility: string }) {
+    .action(withErrorHandler(async function (this: Command, handle: string, claimId: string) {
       output(await createClient(getGlobalOpts(this)).identities.setDomainAffiliation(handle, {
-        domainClaimId: claimId, publishPublicly: options.visibility === "public",
+        domainClaimId: claimId,
       }), { json: !!getGlobalOpts(this).json });
     }));
   affiliation.command("remove <handle>")

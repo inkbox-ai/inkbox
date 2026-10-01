@@ -53,8 +53,6 @@ pub struct OrganizationDomainPage {
 pub struct IdentityDomainAffiliation {
     pub domain_claim_id: Option<String>,
     pub domain: Option<String>,
-    #[serde(default)]
-    pub publish_publicly: bool,
     pub affiliation: Option<DomainAffiliation>,
 }
 
@@ -188,13 +186,16 @@ mod tests {
             expected.assert();
         }
         let affiliation = server.mock(|when, then| {
-            when.method(PUT).path("/api/v1/identities/%40helper/domain-affiliation")
-                .json_body(json!({"domain_claim_id":"claim", "publish_publicly":false}));
-            then.status(200).json_body(json!({"domain_claim_id":"claim", "domain":"example.com", "publish_publicly":false, "affiliation":null}));
+            when.method(PUT)
+                .path("/api/v1/identities/%40helper/domain-affiliation")
+                .json_body(json!({"domain_claim_id":"claim"}));
+            then.status(200).json_body(
+                json!({"domain_claim_id":"claim", "domain":"example.com", "affiliation":null}),
+            );
         });
         assert!(client
             .identities()
-            .set_domain_affiliation("@helper", "claim", false)
+            .set_domain_affiliation("@helper", "claim")
             .unwrap()
             .affiliation
             .is_none());

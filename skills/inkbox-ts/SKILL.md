@@ -1467,9 +1467,9 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 
 ## Verified domains
 
-An organization admin can prove DNS control, select a domain for an agent, and
-choose public display independently from public directory listing. Hidden
-selected domains remain available to authorized A2A peers. Proof expires at the
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
 returned `valid_until`; assertions do not establish legal identity or endorse an
 agent. Keep the TXT record in place. Domain certification is separate from custom
 email sending domains.
@@ -1487,7 +1487,7 @@ console.log(claim.dnsRecord.name, claim.dnsRecord.value);
 claim = await client.organizationDomains.verify(claim.id);
 if (claim.state === "verified") {
   await client.identities.setDomainAffiliation("helper", {
-    domainClaimId: claim.id, publishPublicly: false,
+    domainClaimId: claim.id,
   });
 }
 for await (const item of client.a2a.iterPublicDirectory({ q: "example.com" })) {
@@ -1497,8 +1497,8 @@ for await (const item of client.a2a.iterPublicDirectory({ q: "example.com" })) {
 
 Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
 Use `client.identities.getDomainAffiliation(handle)` for saved settings,
-`setDomainAffiliation(handle, { domainClaimId, publishPublicly: true })` to publish
-explicitly, and `removeDomainAffiliation(handle)` to remove it. A2A participants
+`setDomainAffiliation(handle, { domainClaimId })` to attach a domain,
+and `removeDomainAffiliation(handle)` to remove it. A2A participants
 and messages expose optional `.affiliation`. Webhook types retain wire casing.
 
 Directory `q` searches handles, descriptions, skills, and published verified

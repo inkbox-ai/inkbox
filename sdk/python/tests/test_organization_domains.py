@@ -30,19 +30,19 @@ def test_claim_methods_encoding_and_unknown_state():
     http.get.assert_called_with("/organization-domains", params={"cursor": "before", "limit": 50})
 
 
-def test_public_identity_resource_requires_explicit_publication_and_preserves_expired_selection():
+def test_identity_attachment_omits_publication_and_preserves_expired_selection():
     client = Inkbox(api_key="test-key")
     http = MagicMock()
     client.identities._http = http
     http.get.return_value = http.put.return_value = {
-        "domain_claim_id": "claim", "domain": "example.com", "publish_publicly": False, "affiliation": None,
+        "domain_claim_id": "claim", "domain": "example.com", "affiliation": None,
     }
     assert client.identities.get_domain_affiliation("@helper").domain_claim_id == "claim"
     http.get.assert_called_with("/%40helper/domain-affiliation")
     with pytest.raises(TypeError):
-        client.identities.set_domain_affiliation("helper", "claim")
-    client.identities.set_domain_affiliation("@helper", "claim", publish_publicly=False)
-    http.put.assert_called_with("/%40helper/domain-affiliation", json={"domain_claim_id": "claim", "publish_publicly": False})
+        client.identities.set_domain_affiliation("helper", "claim", publish_publicly=False)
+    client.identities.set_domain_affiliation("@helper", "claim")
+    http.put.assert_called_with("/%40helper/domain-affiliation", json={"domain_claim_id": "claim"})
     client.identities.remove_domain_affiliation("@helper")
     http.delete.assert_called_with("/%40helper/domain-affiliation")
 

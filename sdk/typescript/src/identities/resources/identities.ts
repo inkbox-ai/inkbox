@@ -37,7 +37,7 @@ export class IdentitiesResource {
 
   async setDomainAffiliation(agentHandle: string, options: SetDomainAffiliationOptions): Promise<IdentityDomainAffiliation> {
     return parseIdentityDomainAffiliation(await this.http.put(`/${encodeURIComponent(agentHandle)}/domain-affiliation`, {
-      domain_claim_id: options.domainClaimId, publish_publicly: options.publishPublicly,
+      domain_claim_id: options.domainClaimId,
     }));
   }
 

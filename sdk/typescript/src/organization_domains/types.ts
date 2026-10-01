@@ -39,13 +39,11 @@ export interface OrganizationDomainPage {
 export interface IdentityDomainAffiliation {
   domainClaimId: string | null;
   domain: string | null;
-  publishPublicly: boolean;
   affiliation: DomainAffiliation | null;
 }
 
 export interface SetDomainAffiliationOptions {
   domainClaimId: string;
-  publishPublicly: boolean;
 }
 
 type Raw = Record<string, any>;
@@ -69,5 +67,5 @@ export function parseOrganizationDomain(raw: Raw): OrganizationDomain {
 
 export function parseIdentityDomainAffiliation(raw: Raw): IdentityDomainAffiliation {
   return { domainClaimId: raw.domain_claim_id ?? null, domain: raw.domain ?? null,
-    publishPublicly: raw.publish_publicly ?? false, affiliation: parseDomainAffiliation(raw.affiliation) };
+    affiliation: parseDomainAffiliation(raw.affiliation) };
 }

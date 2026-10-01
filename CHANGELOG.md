@@ -11,12 +11,13 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Manage organization domain claims, TXT verification, explicit transfer, and release from Python, TypeScript, Rust, and the CLI.
-- Select an agent domain with an explicit public-display choice while retaining authorized A2A visibility for hidden affiliations.
+- Attach or detach a verified domain; its visibility follows the agent's public/private setting.
 - Filter public A2A directory results by exact verified domain and read optional affiliation assertions on A2A participants, messages, and webhooks.
 - Search handles, descriptions, skills, and published verified domains with the existing directory `q` parameter or CLI `--query`; domain fragments are supported and exact domain filters remain available.
 
 ### Changed
 
+- Affiliation setters take only a claim ID. The separate publication field and CLI `--visibility` option are removed; callers using those arguments must omit them.
 - Bump Python, TypeScript, Rust, CLI, and bundled Claude plugin versions together to 0.7.12.
 - Bump the bundled Codex and Cursor plugin manifests to 0.1.11 and 1.0.5.
 - Rust directory options and A2A response/webhook structs gain additive fields; exhaustive struct literals must include them, while directory options can use `..Default::default()`.

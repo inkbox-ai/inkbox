@@ -10,7 +10,7 @@ const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const exec = promisify(execFile);
 const fixture = JSON.parse(readFileSync(new URL("../../tests/fixtures/domain-certification.json", import.meta.url), "utf8"));
 
-test("claim commands, explicit publication, and filtered directory use the intended contracts", async (t) => {
+test("claim commands, attachment, and filtered directory use the intended contracts", async (t) => {
   const calls = [];
   const server = createServer(async (request, response) => {
     let raw = "";
@@ -20,7 +20,7 @@ test("claim commands, explicit publication, and filtered directory use the inten
     response.setHeader("content-type", "application/json");
     if (request.method === "DELETE") { response.statusCode = 204; response.end(); return; }
     if (url.pathname.endsWith("domain-affiliation")) {
-      response.end(JSON.stringify({ domain_claim_id: "claim", domain: "example.com", publish_publicly: false, affiliation: null }));
+      response.end(JSON.stringify({ domain_claim_id: "claim", domain: "example.com", affiliation: null }));
     } else if (url.pathname === "/a2a/directory") {
       response.end(JSON.stringify({ items: [{ card_url: "https://inkbox.ai/a2a/helper/card", visibility: "public", card: {
         name: "@helper", capabilities: { extensions: [{ uri: "https://inkbox.ai/a2a/extensions/domain-affiliation/v1", params: fixture.affiliation }] },
@@ -37,11 +37,11 @@ test("claim commands, explicit publication, and filtered directory use the inten
   assert.equal(claim.dnsRecord.name, "_inkbox.example.com");
   for (const action of ["get", "verify", "transfer", "delete"]) await run("--json", "organization-domain", action, "claim");
   await run("organization-domain", "list", "--cursor", "before");
-  await assert.rejects(run("identity", "domain-affiliation", "set", "helper", "claim"), /required option/);
-  await run("--json", "identity", "domain-affiliation", "set", "@helper", "claim", "--visibility", "hidden");
+  await run("--json", "identity", "domain-affiliation", "set", "@helper", "claim");
+  await assert.rejects(run("identity", "domain-affiliation", "set", "helper", "claim", "--visibility", "hidden"), /unknown option/);
   await run("identity", "domain-affiliation", "get", "helper");
   await run("identity", "domain-affiliation", "remove", "helper");
-  assert.deepEqual(calls.find((call) => call.method === "PUT").body, { domain_claim_id: "claim", publish_publicly: false });
+  assert.deepEqual(calls.find((call) => call.method === "PUT").body, { domain_claim_id: "claim" });
   assert(calls.some((call) => call.url.pathname === "/api/v1/identities/%40helper/domain-affiliation"));
   await assert.rejects(run("a2a", "directory", "--verified-domain", "example.com"), /requires --public/);
   const table = await run("a2a", "directory", "--public", "--verified-domain", "example.com", "--cursor", "next", "--query", "helper");
