@@ -1,5 +1,11 @@
 # Changelog
 
+All notable changes to the Inkbox SDK, CLI, and skills live here.
+Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
+(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
+
+## Unreleased
+
 ## 0.7.12
 
 - Add Slack directional contact rules and independent incoming/outgoing defaults
@@ -10,13 +16,6 @@
 - Support Slack Companion activation, native reply coordinates, and receipt-time
   `sender_access` metadata. Slack webhook Companion metadata stays top-level,
   matching the other channels.
-
-
-All notable changes to the Inkbox SDK, CLI, and skills live here.
-Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
-(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
-
-## Unreleased
 
 ## 0.7.11 - Slack workspace connections (unreleased)
 

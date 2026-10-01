@@ -55,7 +55,7 @@ def test_slack_memory_references_and_native_ids_survive():
     assert item.conversation_id == "CEXAMPLE" and item.media.count == 1
     citation = ContactFactCitation._from_dict(F["citation"])
     assert citation.source_type == "slack_message"
-    assert citation.source_locator["version"] == 1
+    assert citation.source_locator["version"] == "1"
     assert citation.source_id == item.source_id
 
 

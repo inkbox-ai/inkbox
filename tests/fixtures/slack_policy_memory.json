@@ -45,7 +45,7 @@
       "conversation_id": "CEXAMPLE",
       "message_ts": "1780000000.000001",
       "thread_ts": null,
-      "version": 1
+      "version": "1"
     }
   },
   "activation": {
@@ -56,7 +56,7 @@
     "items": [
       {
         "id": "d4444444-4444-4444-8444-444444444444",
-        "author": "fred@example.com",
+        "author": "TWORKSPACE:UUSER",
         "sender_access": "sponsored",
         "occurred_at": "2026-09-01T10:00:00Z",
         "text": "/clear\nCan you review this?",
