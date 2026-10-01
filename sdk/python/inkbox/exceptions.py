@@ -11,9 +11,9 @@ from uuid import UUID
 
 
 class InkboxError(Exception):
-    """
-    Base exception for all Inkbox SDK errors.
-    """
+    """Base exception for all Inkbox SDK errors."""
+
+    idempotency_key: str | None = None
 
 
 class InkboxVaultKeyError(InkboxError):
@@ -198,7 +198,7 @@ class MailImportQuotaExceededError(InkboxAPIError):
 
 
 class IdempotencyKeyReusedError(InkboxAPIError):
-    """Raised when an iMessage claim key is reused incompatibly."""
+    """Raised when an idempotency key is reused with incompatible input."""
 
     def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
         super().__init__(status_code=status_code, detail=detail)

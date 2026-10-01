@@ -265,6 +265,45 @@ describe("TunnelRuntime reconnect establishment", () => {
     expect(statuses).toEqual(["connecting", "closed"]);
   });
 
+  it("does not start a competing handoff while the initial HELLO is pending", async () => {
+    fakeServer.deferNextHello();
+    const sessions: http2.ClientHttp2Session[] = [];
+    const runtime = makeRuntime({
+      connectTimeoutMs: 1_000,
+      helloTimeoutMs: 10_000,
+      http2Connect: (authority, options) => {
+        const session = realConnect(authority, options);
+        sessions.push(session);
+        return session;
+      },
+    });
+    const servePromise = runtime.serveForever();
+
+    try {
+      await waitFor(() => fakeServer.pendingHelloCount() === 1);
+      let dialCountAtGoaway: number | null = null;
+      // Registered after the runtime's listener: capture dials started by GOAWAY.
+      sessions[0].once("goaway", () => { dialCountAtGoaway = sessions.length; });
+      fakeServer.injectGoaway(http2.constants.NGHTTP2_NO_ERROR);
+      await waitFor(() => dialCountAtGoaway !== null);
+      expect(dialCountAtGoaway).toBe(1);
+
+      fakeServer.closeActiveSessions();
+      await fakeServer.awaitNextIntakePost(2_000);
+      await waitFor(() => fakeServer.sessionCloseCount() === 1);
+      expect(sessions).toHaveLength(2);
+      expect(fakeServer.helloCount()).toBe(2);
+      expect(fakeServer.helloResponseCount()).toBe(1);
+      expect(fakeServer.incompleteHelloCloseCount()).toBe(1);
+      expect(fakeServer.pendingHelloCount()).toBe(0);
+      expect(fakeServer.sessionCount()).toBe(1);
+      expect(runtime.status).toBe("connected");
+    } finally {
+      await runtime.aclose();
+      await servePromise;
+    }
+  });
+
   it.each(["timeout", "early close"] as const)(
     "recovers after HELLO %s without retaining the failed session",
     async (failure) => {
@@ -273,18 +312,22 @@ describe("TunnelRuntime reconnect establishment", () => {
       const runtime = makeRuntime({ helloTimeoutMs: 30 });
       const servePromise = runtime.serveForever();
 
-      await fakeServer.awaitNextIntakePost(2_000);
-      expect(fakeServer.helloCount()).toBeGreaterThanOrEqual(2);
-      expect(fakeServer.acceptedSessionCount()).toBeGreaterThanOrEqual(2);
-      expect(fakeServer.sessionCount()).toBe(1);
-      expect(fakeServer.pendingHelloCount()).toBe(0);
-      expect(fakeServer.incompleteHelloCloseCount()).toBe(1);
-      expect(fakeServer.helloResponseCount()).toBe(1);
-      expect(fakeServer.sessionCloseCount()).toBe(1);
-      expect(runtime.status).toBe("connected");
-
-      await runtime.aclose();
-      await servePromise;
+      try {
+        await fakeServer.awaitNextIntakePost(2_000);
+        // Replacement intake can arrive before the old session's server-side close event.
+        await waitFor(() => fakeServer.sessionCloseCount() >= 1);
+        expect(fakeServer.helloCount()).toBeGreaterThanOrEqual(2);
+        expect(fakeServer.acceptedSessionCount()).toBeGreaterThanOrEqual(2);
+        expect(fakeServer.sessionCount()).toBe(1);
+        expect(fakeServer.pendingHelloCount()).toBe(0);
+        expect(fakeServer.incompleteHelloCloseCount()).toBe(1);
+        expect(fakeServer.helloResponseCount()).toBe(1);
+        expect(fakeServer.sessionCloseCount()).toBe(1);
+        expect(runtime.status).toBe("connected");
+      } finally {
+        await runtime.aclose();
+        await servePromise;
+      }
     },
   );
 

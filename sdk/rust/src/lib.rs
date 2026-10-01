@@ -53,6 +53,7 @@ pub mod contacts;
 pub mod identities;
 pub mod imessage;
 pub mod mail;
+pub mod message_sends;
 pub mod notes;
 pub mod phone;
 pub mod tunnels;
@@ -88,3 +89,12 @@ pub use organization_domains::{
 mod directional_tests;
 #[cfg(test)]
 mod response_metadata_tests;
+
+pub mod slack;
+pub use slack::*;
+pub mod slack_operations;
+pub use slack_operations::*;
+pub use webhooks::types::{
+    SlackActorProfile, SlackUserProfile, SlackWebhookData, SlackWebhookEventType,
+    SlackWebhookPayload,
+};

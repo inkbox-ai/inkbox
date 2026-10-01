@@ -14,6 +14,7 @@ import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
+import { MessageSendsResource } from "./message_sends.js";
 import { DraftsResource } from "./mail/resources/drafts.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
 import { MailContactRulesResource } from "./mail/resources/contactRules.js";
@@ -41,6 +42,7 @@ import { NotesResource } from "./notes/resources/notes.js";
 import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
+import { SlackResource } from "./slack.js";
 import { A2AResource } from "./a2a/resource.js";
 import { OrganizationDomainsResource } from "./organization_domains/resource.js";
 import {
@@ -157,6 +159,7 @@ export interface InkboxOptions {
  */
 export class Inkbox {
   readonly companion: CompanionResource;
+  readonly messageSends: MessageSendsResource;
   readonly _mailboxes: MailboxesResource;
   readonly _messages: MessagesResource;
   readonly _drafts: DraftsResource;
@@ -188,6 +191,7 @@ export class Inkbox {
   readonly _tunnels: TunnelsResource;
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
+  readonly slack: SlackResource;
   readonly _a2a: A2AResource;
   readonly organizationDomains: OrganizationDomainsResource;
   readonly _a2aInvitations: A2AInvitationsResource;
@@ -277,10 +281,12 @@ export class Inkbox {
     this._idsResource = new IdentitiesResource(idsHttp);
 
     this._contacts = new ContactsResource(apiHttp);
+    this.messageSends = new MessageSendsResource(apiHttp, this._mailboxes);
     this.companion = new CompanionResource(apiHttp);
     this._notes = new NotesResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
+    this.slack = new SlackResource(apiHttp);
     this._a2a = new A2AResource(apiHttp, publicHttp);
     this._a2aInvitations = new A2AInvitationsResource(apiHttp, this._baseUrl);
 

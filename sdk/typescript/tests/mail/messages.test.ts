@@ -211,6 +211,7 @@ describe("MessagesResource.replyAll", () => {
         ],
         reply_to: "me@example.com",
       },
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
     expect(msg.id).toBe(RAW_MESSAGE.id);
   });
@@ -225,6 +226,7 @@ describe("MessagesResource.replyAll", () => {
     expect(http.post).toHaveBeenCalledWith(
       `/mailboxes/${ADDR}/messages/${MSG_ID}/reply-all`,
       {},
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
   });
 });
@@ -244,6 +246,7 @@ describe("MessagesResource.forward", () => {
         mode: ForwardMode.INLINE,
         include_original_attachments: true,
       },
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
     expect(msg.id).toBe(RAW_MESSAGE.id);
   });

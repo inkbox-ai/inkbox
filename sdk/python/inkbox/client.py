@@ -30,6 +30,7 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox.companion import CompanionResource
+from inkbox.message_sends import MessageSendsResource
 from inkbox.notes.resources.notes import NotesResource
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
@@ -67,6 +68,7 @@ from inkbox.phone.resources.identity_contact_rules import (
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.sms_opt_ins import SmsOptInsResource
 from inkbox.phone.resources.texts import TextsResource
+from inkbox.slack import SlackResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
 from inkbox.webhook_deliveries import WebhookDeliveriesResource
@@ -310,12 +312,14 @@ class Inkbox:
         )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+        self.slack = SlackResource(self._api_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
         self._organization_domains = OrganizationDomainsResource(self._api_http)
         self._a2a_invitations = A2AInvitationsResource(self._api_http, self._base_url)
 
         self._contacts = ContactsResource(self._contacts_http)
         self.companion = CompanionResource(self._api_http)
+        self.message_sends = MessageSendsResource(self._api_http, self._mailboxes)
         self._notes = NotesResource(self._contacts_http)
 
         self._tunnels = TunnelsResource(self._api_http, inkbox=self)

@@ -5,6 +5,7 @@ Tests for IMessagesResource and IMessageContactRulesResource.
 """
 
 from uuid import UUID
+from unittest.mock import ANY
 
 import pytest
 import inkbox
@@ -30,6 +31,14 @@ REACTION_ID = "aaaa7777-0000-0000-0000-000000000001"
 REMOTE = "+15551234567"
 GROUP_REMOTE = "+15557654321"
 HANDLE = "support-bot"
+
+
+def test_get_message_reads_current_status_with_identity_filter(client, transport):
+    transport.get.return_value = IMESSAGE_DICT
+    message = client.imessages.get(MSG_ID, agent_identity_id=IDENTITY_ID)
+    assert str(message.id) == MSG_ID
+    transport.get.assert_called_once_with(f"/messages/{MSG_ID}", params={"agent_identity_id": IDENTITY_ID})
+    transport.post.assert_not_called()
 
 IMESSAGE_NUMBER_DICT = {
     "id": "99999999-0000-0000-0000-000000000001",
@@ -162,7 +171,7 @@ class TestIMessagesSend:
         transport.post.assert_called_once_with(
             "/messages",
             json={"to": REMOTE, "text": "Hello over iMessage"},
-            params=None,
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
         )
 
     def test_passes_media_and_send_style_by_conversation_id(self, client, transport):
@@ -184,6 +193,7 @@ class TestIMessagesSend:
                 "media_urls": ["https://media.example/reply.jpg"],
                 "send_style": "slam",
             },
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             params={"agent_identity_id": IDENTITY_ID},
         )
 
@@ -213,6 +223,7 @@ class TestIMessagesSend:
                 "media_urls": ["https://media.example/group.jpg"],
                 "send_style": "confetti",
             },
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             params={"agent_identity_id": IDENTITY_ID},
         )
         assert msg.assignment_id is None

@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use crate::error::Result;
 use crate::filters::DateRangeFilter;
-use crate::http::{validate_idempotency_key, HttpTransport};
+use crate::http::HttpTransport;
 use crate::mail::types::{ForwardMode, Message, MessageDetail, MessageDirection};
 
 const DEFAULT_PAGE_SIZE: i64 = 50;
@@ -18,18 +18,7 @@ fn post_send(
     body: &Value,
     idempotency_key: Option<&str>,
 ) -> Result<Value> {
-    match idempotency_key {
-        Some(key) => {
-            validate_idempotency_key(key)?;
-            http.post_with_headers(
-                path,
-                Some(body),
-                crate::http::NO_QUERY,
-                &[("Idempotency-Key", key)],
-            )
-        }
-        None => http.post(path, Some(body), crate::http::NO_QUERY),
-    }
+    http.post_message(path, body, crate::http::NO_QUERY, idempotency_key)
 }
 
 /// An attachment to ride along with a `send`/`forward`.
@@ -231,15 +220,10 @@ impl MessagesResource {
 
     /// [`send`](Self::send) carrying an `Idempotency-Key`.
     ///
-    /// Makes the send safe to retry after a lost or timed-out response: a
-    /// retry under the same key cannot put a second copy of the email on the
-    /// wire. At-most-once, not a replay — a repeat under a key that already
-    /// sent returns 409 rather than the original message, and 503 when the
-    /// earlier attempt's outcome is unresolved. Keys are scoped per
-    /// organization and per method, last 7 days, and do not cover the request
-    /// body, so use a fresh key for each distinct email. Always retry with the
-    /// *same* key: a new key is a new send, so minting one after a failure is
-    /// what duplicates the email.
+    /// The same key and input replay the original response for seven days.
+    /// Changed input returns 409. Keys are scoped to the organization, mailbox,
+    /// and operation. Read the message for current delivery status; a new key
+    /// identifies a new message even if its content is unchanged.
     #[allow(clippy::too_many_arguments)]
     pub fn send_with_idempotency_key(
         &self,
@@ -862,15 +846,17 @@ mod tests {
     }
 
     #[test]
-    fn unkeyed_sends_omit_the_idempotency_key_header() {
+    fn sends_generate_an_idempotency_key_when_omitted() {
         let server = MockServer::start();
         let sent = server.mock(|when, then| {
             when.method(POST)
                 .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/messages"))
                 .matches(|req| {
-                    !req.headers.as_ref().is_some_and(|h| {
-                        h.iter()
-                            .any(|(k, _)| k.eq_ignore_ascii_case("idempotency-key"))
+                    req.headers.as_ref().is_some_and(|h| {
+                        h.iter().any(|(k, v)| {
+                            k.eq_ignore_ascii_case("idempotency-key")
+                                && uuid::Uuid::parse_str(v).is_ok()
+                        })
                     })
                 });
             then.status(201).json_body(message());

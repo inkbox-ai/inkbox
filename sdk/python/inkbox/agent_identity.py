@@ -1077,6 +1077,7 @@ class AgentIdentity:
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
+        idempotency_key: str | None = None,
     ) -> TextMessage:
         """Send an outbound SMS/MMS from this identity's phone number.
 
@@ -1092,9 +1093,9 @@ class AgentIdentity:
             The queued ``TextMessage``. The full outbound lifecycle
             (``text.sent`` -> ``text.delivered`` / ``text.delivery_failed``
             / ``text.delivery_unconfirmed``) arrives via webhook
-            subscriptions on the sender's phone number, not the return
+            subscriptions on the sender's identity, not the return
             value
-            (``inkbox.webhooks.subscriptions.create(phone_number_id=...,
+            (``inkbox.webhooks.subscriptions.create(agent_identity_id=...,
             url=..., event_types=[...])``). See ``TextWebhookEventType``
             and ``TextWebhookPayload`` for the typed receiver-side
             shapes.
@@ -1107,6 +1108,8 @@ class AgentIdentity:
         """
         self._require_phone()
         send_kwargs: dict[str, Any] = {}
+        if idempotency_key is not None:
+            send_kwargs["idempotency_key"] = idempotency_key
         if to is not None:
             send_kwargs["to"] = to
         if conversation_id is not None:
@@ -1275,6 +1278,7 @@ class AgentIdentity:
         text: str | None = None,
         media_urls: list[str] | None = None,
         send_style: IMessageSendStyle | str | None = None,
+        idempotency_key: str | None = None,
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
@@ -1308,6 +1312,7 @@ class AgentIdentity:
             media_urls=media_urls,
             send_style=send_style,
             agent_identity_id=self.id,
+            **({"idempotency_key": idempotency_key} if idempotency_key is not None else {}),
         )
 
     def list_imessages(

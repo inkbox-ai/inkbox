@@ -62,6 +62,27 @@ impl TextsResource {
         text: Option<&str>,
         media_urls: Option<&[String]>,
     ) -> Result<TextMessage> {
+        self.send_with_idempotency_key(
+            phone_number_id,
+            to,
+            conversation_id,
+            text,
+            media_urls,
+            &uuid::Uuid::new_v4().to_string(),
+        )
+    }
+
+    /// Reuse this key and input to retry the same SMS/MMS request.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_with_idempotency_key(
+        &self,
+        phone_number_id: &str,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        idempotency_key: &str,
+    ) -> Result<TextMessage> {
         // Build body conditionally, omitting any argument left as None.
         let mut body = Map::new();
         if let Some(recipients) = to {
@@ -76,10 +97,11 @@ impl TextsResource {
         if let Some(urls) = media_urls {
             body.insert("media_urls".into(), json!(urls));
         }
-        let data = self.http.post(
+        let data = self.http.post_message(
             &format!("/numbers/{phone_number_id}/texts"),
-            Some(&body),
+            &body,
             crate::http::NO_QUERY,
+            Some(idempotency_key),
         )?;
         Ok(serde_json::from_value(data)?)
     }

@@ -5,6 +5,7 @@ Tests for TextsResource.
 """
 
 from uuid import UUID
+from unittest.mock import ANY
 
 from sample_data import (
     TEXT_CONVERSATION_GROUP_SUMMARY_DICT,
@@ -32,6 +33,7 @@ class TestTextsSend:
 
         transport.post.assert_called_once_with(
             f"/numbers/{NUM_ID}/texts",
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             json={"to": "+15551234567", "text": "Hello"},
         )
 
@@ -71,6 +73,7 @@ class TestTextsSend:
                 "text": "Hello group",
                 "media_urls": ["https://example.com/photo.jpg"],
             },
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
         )
         assert msg.remote_phone_number is None
         assert msg.recipients is not None
@@ -85,6 +88,7 @@ class TestTextsSend:
         transport.post.assert_called_once_with(
             f"/numbers/{NUM_ID}/texts",
             json={"conversation_id": conv_id, "text": "Reply all"},
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
         )
 
 

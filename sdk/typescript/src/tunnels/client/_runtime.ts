@@ -804,8 +804,10 @@ export class TunnelRuntime {
    * connection before closing it. In-band: never trips the backoff loop.
    */
   private beginHandoff(oldConn: Connection): void {
+    // A failed initial HELLO belongs to the cold reconnect loop, not a handoff.
     if (
       this.stop ||
+      oldConn.ownerToken === null ||
       oldConn.draining ||
       this.active !== oldConn ||
       this.handoffInFlight ||

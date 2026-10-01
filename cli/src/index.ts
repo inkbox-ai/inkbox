@@ -9,6 +9,7 @@ import { registerIdentityCommands } from "./commands/identity.js";
 import { registerEmailCommands } from "./commands/email.js";
 import { registerPhoneCommands } from "./commands/phone.js";
 import { registerTextCommands } from "./commands/text.js";
+import { registerSendLookupCommand } from "./commands/send-lookup.js";
 import { registerIMessageCommands } from "./commands/imessage.js";
 import { registerSmsOptInCommands } from "./commands/sms-opt-in.js";
 import { registerVaultCommands } from "./commands/vault.js";
@@ -22,6 +23,7 @@ import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
 import { registerOrganizationDomainCommands } from "./commands/organization-domain.js";
+import { registerSlackCommands } from "./commands/slack.js";
 import { registerA2ACommands } from "./commands/a2a.js";
 
 // Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
@@ -55,6 +57,7 @@ registerIdentityCommands(program);
 registerEmailCommands(program);
 registerPhoneCommands(program);
 registerTextCommands(program);
+registerSendLookupCommand(program);
 registerIMessageCommands(program);
 registerSmsOptInCommands(program);
 registerVaultCommands(program);
@@ -69,5 +72,6 @@ registerNotesCommands(program);
 registerDomainCommands(program);
 registerOrganizationDomainCommands(program);
 registerA2ACommands(program);
+registerSlackCommands(program);
 
 program.parse();

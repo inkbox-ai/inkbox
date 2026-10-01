@@ -8,6 +8,8 @@ import { parseAgentSupport } from "./error-guidance.js";
 import { observeResponse, notifyResponseObservers, type ResponseObserver } from "./response_metadata.js";
 
 export class InkboxError extends Error {
+  /** Original message request key, when this error came from a send. */
+  idempotencyKey?: string;
   constructor(message: string) {
     super(message);
     this.name = "InkboxError";
@@ -30,8 +32,7 @@ export function validateIdempotencyKey(key: string): void {
 }
 
 /**
- * Thrown when a request fails before any HTTP response is received —
- * DNS failure, refused connection, TLS error, unreachable proxy.
+ * Thrown when connecting fails or a response body is interrupted.
  * `cause` carries the underlying fetch error.
  */
 export class InkboxConnectionError extends InkboxError {
@@ -535,8 +536,8 @@ export class HttpTransport {
     return (metadata) => notifyResponseObservers(metadata, this.collectMetadata, this.onResponse);
   }
 
-  async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("GET", path, { params, timeoutMs: opts?.timeoutMs });
+  async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number; headers?: Record<string, string> }): Promise<T> {
+    return this.request<T>("GET", path, { params, timeoutMs: opts?.timeoutMs, headers: opts?.headers });
   }
 
   async post<T>(
@@ -754,15 +755,23 @@ export class HttpTransport {
       return undefined as T;
     }
 
-    if (opts.rawResponse === "text") {
-      return (await resp.text()) as unknown as T;
-    }
+    try {
+      if (opts.rawResponse === "text") {
+        return (await resp.text()) as unknown as T;
+      }
 
-    if (opts.rawResponse === "bytes") {
-      const data = new Uint8Array(await resp.arrayBuffer());
-      return { data, headers: resp.headers } as T;
-    }
+      if (opts.rawResponse === "bytes") {
+        const data = new Uint8Array(await resp.arrayBuffer());
+        return { data, headers: resp.headers } as T;
+      }
 
-    return resp.json() as Promise<T>;
+      return await resp.json() as T;
+    } catch (err) {
+      // Native Node fetch uses this error for an interrupted response stream.
+      if (err instanceof TypeError && err.message === "terminated") {
+        throw new InkboxConnectionError(`Response from ${url} was interrupted.`, err);
+      }
+      throw err;
+    }
   }
 }

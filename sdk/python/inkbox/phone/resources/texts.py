@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+from inkbox._message_requests import post_message
 
 from inkbox.phone.types import (
     TextConversationSummary,
@@ -32,6 +33,7 @@ class TextsResource:
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
+        idempotency_key: str | None = None,
     ) -> TextMessage:
         """Send an outbound SMS/MMS from a phone number.
 
@@ -44,6 +46,8 @@ class TextsResource:
                 server resolves it to that conversation's participants.
             text: Message body.
             media_urls: MMS media URLs. Pass with ``text`` or by themselves.
+            idempotency_key: Optional stable key for retries across calls. Each
+                call otherwise generates a key and preserves it during retries.
 
         Returns:
             The queued ``TextMessage`` row. The full outbound lifecycle
@@ -74,9 +78,10 @@ class TextsResource:
         if media_urls is not None:
             body["media_urls"] = media_urls
 
-        data = self._http.post(
+        data = post_message(self._http,
             f"/numbers/{phone_number_id}/texts",
             json=body,
+            idempotency_key=idempotency_key,
         )
         return TextMessage._from_dict(data)
 

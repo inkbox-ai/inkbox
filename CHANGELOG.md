@@ -4,7 +4,9 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.8 - Verified domains
+## Unreleased
+
+## 0.7.12 - Verified domains (unreleased)
 
 ### Added
 
@@ -14,9 +16,186 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
-- Bump Python, TypeScript, Rust, CLI, and bundled Claude plugin versions together to 0.7.8.
-- Bump the bundled Codex and Cursor plugin manifests to 0.1.7 and 1.0.5.
+- Bump Python, TypeScript, Rust, CLI, and bundled Claude plugin versions together to 0.7.12.
+- Bump the bundled Codex and Cursor plugin manifests to 0.1.11 and 1.0.5.
 - Rust directory options and A2A response/webhook structs gain additive fields; exhaustive struct literals must include them, while directory options can use `..Default::default()`.
+
+## 0.7.11 - Slack workspace connections (unreleased)
+
+- Avoid competing tunnel reconnect attempts when the initial handshake closes early.
+- Support setup and installation with claimed agent keys for their own identity;
+  clarify organization-member session and organization admin API-key permissions.
+- Expose immediate rate-limit guidance on Slack send results as `retry_after` /
+  `retryAfter`, without automatic retries. Stored action reads and same-key replays
+  do not retain this hint. Rust `SlackAction` literals need `retry_after: None`.
+- Recover Slack sends without resending using `get_action_by_key` /
+  `getActionByKey` or `slack action get-by-key`. A missing action does not prove
+  that no send occurred.
+- Prepare Python, TypeScript, Rust, CLI, and bundled Claude plugin version `0.7.11`,
+  with bundled Codex plugin version `0.1.10`.
+
+- Add organization-owned provisioning workspaces across Python, TypeScript, Rust, and CLI.
+  Save both configuration tokens once and reuse verified workspace metadata. Credentials
+  are write-only; CLI input uses a private JSON file or stdin.
+- Require a saved provisioning-workspace UUID for app setup and expose selected workspace
+  metadata plus `needs_credentials` recovery. Browser installation targets that workspace.
+  Rust response struct literals need `provisioning_workspace` and setup status literals
+  need `provisioning_workspace_id` (both optional). Remove the unreleased Slack invitation API.
+
+- Report `application_created` / `applicationCreated` on Slack connection reads,
+  independently of enablement or connected workspaces. Older responses default to
+  `false`. Rust `SlackConnectionsResponse` literals need `application_created`.
+
+- Preserve the direction of bounded Slack message context: channel reads include
+  messages at or before the target; thread reads include the target and following
+  replies. `window` reports either direction. Rust keeps its existing string field.
+
+- Document bounded app preparation before installation, coordinated package and
+  skills availability, and typed Slack idempotency conflicts.
+
+- Preserve optional `page_boundary` / `pageBoundary` on retained Slack message
+  pages, including empty pages with a continuation cursor. Older responses remain
+  supported. Rust `SlackArchiveMessagesResponse` literals need `page_boundary: None`.
+
+- Add `start_setup` / `startSetup`, CLI `slack setup start`, and preparation status on Slack connection
+  reads. Setup returns promptly and can be followed without repeating installation.
+- Add optional Slack webhook sender profiles and linked contact references. Contact
+  reads include linked Slack workspace/user accounts when visible. Existing payloads
+  without these fields remain supported. Rust response struct literals for
+  `SlackConnectionsResponse`, `SlackWebhookData`, and `Contact` need the new fields.
+
+- Add `latest_per_conversation` to retained Slack message reads, with matching
+  `latestPerConversation` and `--latest-per-conversation` options. Conversation
+  lists paginate one latest matching message per conversation. Existing reads
+  still return individual messages. Rust struct literals for
+  `SlackArchiveMessagesOptions` need the new field or `..Default::default()`.
+
+- Prepare Slack apps directly for active identities without a separate identity
+  toggle. Connection responses report app creation and setup status.
+
+- Capture accessible observed Slack messages automatically. Retention remains configurable;
+  deleting retained history does not stop new capture. Remove the unreleased capture toggle
+  and conversation-filter options from settings, responses, and CLI flags; settings now accept only retention.
+
+- Allow Slack events in mixed identity-owned subscriptions; preserve explicit
+  identity scope, context settings, signing keys, and delivery authentication.
+
+- Add identity-wide Slack message search across workspace connections in all SDKs and
+  `inkbox slack search`, with optional narrowing filters and agent identity inference.
+
+- Add optional approved Console completion URLs to Slack installation handoffs,
+  preserving existing default requests across Python, TypeScript, Rust, and CLI.
+- Add Slack CLI identity-handle selection and require DM recipients before dispatch;
+  separate management onboarding from explicit connected-workspace selection in examples.
+- Remove unused archive message source URLs, type the Python purge result, and clarify
+  retention updates and independent send/utility-operation outcomes.
+
+- Add direct Slack browser installation handoffs, capabilities/users/members, exact message
+  context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
+  uploads, channel join/leave, native processing status, and durable operation lookup.
+- Add configurable retained-history settings, message search, bounded backfill/restart,
+  coverage, and purge with Python, TypeScript, Rust, and CLI parity.
+
+- Add Slack workspace setup/connections, live conversations/messages, durable
+  idempotent sends/actions, and byte-preserving file downloads across the SDKs and CLI.
+- Add 23 Slack webhook event types. Incoming messages use `slack.dm_received`,
+  `slack.group_dm_received`, `slack.channel_message_received`, `slack.mention_received`,
+  and `slack.thread_reply_received` through ordinary event selection. Overlapping
+  selections produce one logical delivery per subscription, prioritizing mention, thread,
+  DM, group DM, then channel among selected matches.
+- Document browser installation onboarding, terminal unknown send outcomes, and
+  metadata-only Slack delivery diagnostics without historical replay.
+
+## 0.7.10 - Retry-safe message requests
+
+### Added
+
+- Automatic request keys and bounded same-key request retries for email, SMS/MMS,
+  and iMessage sends. Explicit keys support workflows spanning separate calls.
+- SMS/MMS and iMessage key parameters in Python, TypeScript, and Rust, plus
+  `--idempotency-key` for `text send` and `imessage send`.
+- Read-only message-ID lookup by request key, including email-address helpers and
+  the `send-lookup` CLI command.
+- Single-message iMessage reads in all SDKs and `imessage get` in the CLI.
+- Typed `get_message_request_key(error)` / `getMessageRequestKey(error)` helpers
+  recover generated keys from Python/TypeScript send failures. Rust cross-call
+  recovery requires a caller-preserved key and the explicit-key send variants.
+
+### Changed
+
+- TypeScript and CLI message retries recover connection loss while reading a
+  successful response body, preserving the original request key.
+- Bundled Codex plugin version `0.1.9`.
+- Completed keyed sends replay their original response. Read the message or use
+  webhooks for current delivery status. Request retries do not guarantee delivery retries.
+- SDK send methods select replay with `Prefer: idempotency-replay`. Requests from
+  older SDKs retain their existing behavior, including completed email retry conflicts.
+  Email and SMS still wait for send acceptance; successful response shapes are unchanged.
+- New email keys are scoped to the organization, mailbox, and operation. Reusing a
+  key with changed input conflicts. Keys must contain 1–255 printable ASCII characters.
+- Original responses have a seven-day supported replay window. Do not recycle keys
+  or submit a new message merely because an earlier result is unavailable.
+- Rust keeps existing send signatures and response structs.
+- An interrupted send can remain unconfirmed without a recoverable message ID.
+  Missing lookup data never means it is safe to submit a new copy. An eligible
+  retry after confirmed non-acceptance can create the message using current settings.
+
+## 0.7.9 — Media WebSocket keypad guidance
+
+- Documented the media WebSocket `dtmf` event for live client-driven calls:
+  `{"event": "dtmf", "digits": "1"}` sends one to 30 keypad keys from `0-9`,
+  `*`, and `#`, in order. At most 20 bursts per call can be outstanding,
+  including the one being sent; further bursts are ignored.
+- Server-side call admission and quota changes affect older SDK and CLI versions:
+  `429 concurrent_calls_limit` means the live outbound-call limit is reached
+  (default: 3 across an organization's phone numbers or on one dedicated iMessage
+  line). `503 call_capacity_busy` means capacity is temporarily busy. Honor
+  `Retry-After` before retrying either response.
+- Daily call quotas count active calls, including `initiated` calls, provisionally.
+  Canceled outbound calls still count when dialing reached the phone network.
+  Failed placements, pre-dial outbound cancellations, and inbound calls that end
+  unanswered are excluded.
+- Bundled Codex plugin version `0.1.8`.
+
+## 0.7.8 — Identity-owned webhook subscriptions
+
+- When the server advertises `supports_identity_subscriptions: true` in
+  `GET /webhooks/catalog`, combine notification families on one identity regardless of
+  configured channels. Before availability, keep separate channel subscriptions and
+  mailbox/phone selectors; those selectors remain accepted after availability.
+- List scope is explicit: pass `scope="identity"` (Python), `scope: "identity"`
+  (TypeScript), Rust's `list_with_scope` with `WebhookSubscriptionScope::Identity`,
+  or CLI `--scope identity` to include every family and mixed subscriptions.
+  Explicit identity scope checks the catalog once per list call and raises an actionable
+  error when unsupported; it never silently returns a partial list. Omitted scope
+  preserves existing single-family list behavior without an extra request.
+- Ownership responses remain compatible across availability phases: older servers may
+  return mailbox/phone owners; identity-owned responses use `agent_identity_id` /
+  `agentIdentityId` with null legacy owners. CLI tables display all three owner columns.
+- A changed or unavailable owner can return 409 on mutation; refresh the subscription
+  and its owner before retrying. Before identity subscriptions are available, A2A-only
+  requests with conversation context return 422. After availability, a subscription
+  can retain context settings, but only received mail/text/iMessage events include context.
+- Rust adds `create_for_identity` without changing the existing `create` signature.
+- Event-family/owner matching and A2A context compatibility are now validated by the
+  server, not the SDK. Unsupported combinations return an API 422 instead of a local
+  validation exception; valid mixed events are accepted when the capability is available.
+- TypeScript replay metadata fields are optional for existing typed literals and
+  mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.
+- Mixed subscriptions require explicit identity scope for update/delete as well:
+  Python `scope="identity"`, TypeScript `{ scope: "identity" }`, Rust
+  `update_with_scope` / `delete_with_scope`, or CLI `--scope identity`. Mutation scope
+  defaults to omitted, adds no catalog request, and keeps old callers unchanged;
+  a mixed receiver rejects an unscoped mutation with 409. Event updates remain full
+  replacement. Incoming-call actions remain separate.
+- Expose delivery replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+- **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookDelivery`
+  literals must add `replayable: false` and `replay_unavailable_reason: None`.
+  Already compiled SDKs remain compatible, and response deserialization accepts older JSON
+  with these fields omitted.
+
+- Bundled Codex plugin version `0.1.7` includes the identity-owned webhook skills.
 
 ## 0.7.7 - Phone number country metadata
 

@@ -1,0 +1,33 @@
+{
+  "cases": [
+    {
+      "name": "older_response_without_boundary",
+      "response": {
+        "messages": [],
+        "next_cursor": "older-opaque-cursor",
+        "source": "archive"
+      }
+    },
+    {
+      "name": "exhausted_page_with_null_boundary",
+      "response": {
+        "messages": [],
+        "next_cursor": null,
+        "source": "archive",
+        "page_boundary": null
+      }
+    },
+    {
+      "name": "filtered_empty_page_with_scan_boundary",
+      "response": {
+        "messages": [],
+        "next_cursor": "next-opaque-cursor",
+        "source": "archive",
+        "page_boundary": {
+          "message_ts": "999999999999.000001",
+          "id": "44444444-4444-4444-8444-444444444444"
+        }
+      }
+    }
+  ]
+}

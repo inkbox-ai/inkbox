@@ -1,6 +1,6 @@
 # Inkbox Skills
 
-Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into your coding agent to get instant knowledge of the Inkbox SDK for email, phone, and agent identities.
+Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into your coding agent to get instant knowledge of the Inkbox SDK for email, phone, Slack, and agent identities.
 
 ## Installation
 
@@ -54,10 +54,10 @@ Once the skills are installed, your coding agent will automatically know how to 
 
 | Skill | Language | Description |
 |-------|----------|-------------|
-| **inkbox-onboarding** | Language-agnostic | Set up an existing identity's channels, recipient consent, inbound handling, and recurring triage with API, CLI, Python, and TypeScript examples |
-| **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Python SDK |
-| **inkbox-ts** | TypeScript / Node ≥ 22 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `@inkbox/sdk` TypeScript SDK |
-| **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
+| **inkbox-onboarding** | Language-agnostic | Set up an existing identity's channels, including Slack workspace connections, recipient consent, inbound handling, and recurring triage with API, CLI, Python, and TypeScript examples |
+| **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, text, iMessage, Slack, A2A history, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Python SDK |
+| **inkbox-ts** | TypeScript / Node ≥ 22 | Agent signup, identities, email, phone, text, iMessage, Slack, A2A history, contacts, notes, contact rules, vault, and webhooks using the `@inkbox/sdk` TypeScript SDK |
+| **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, iMessage, Slack, A2A history, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
 | **inkbox-all** | Language-agnostic | Index of all Inkbox skills in this repository, including example skills and links for choosing the right one |
 | **inkbox-agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |
 | **inkbox-tunnels** | Python, TypeScript, and Rust | Connect a local process to an identity's public tunnel and observe runtime liveness |

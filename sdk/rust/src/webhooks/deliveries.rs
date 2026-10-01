@@ -10,7 +10,8 @@
 //! *miss*: a compliant endpoint that already processed the original event
 //! dedupes the replay away. It does not force reprocessing. Incoming-call
 //! deliveries (which carry a `phone_number_id` and no `webhook_subscription_id`)
-//! are logged but not replayable.
+//! are logged but not replayable. Slack deliveries are also not replayable;
+//! their logs contain event metadata only, not original message content.
 
 use std::sync::Arc;
 
@@ -27,7 +28,7 @@ const BASE: &str = "/webhooks/deliveries";
 /// `webhook_subscription_id` is populated for subscription deliveries and
 /// `None` for incoming-call deliveries (which instead carry `phone_number_id`).
 /// `organization_id` is an `"org_..."` token string, not a UUID.
-/// `request_payload` is the raw signed request body that was delivered.
+/// `request_payload` is the signed body for replayable channels, but only event metadata for Slack.
 /// `response_status` / `response_body` are `None` on transport failure (in which
 /// case `error_detail` is set). `is_replay` is `true` for rows produced by
 /// [`WebhookDeliveriesResource::replay`].
@@ -46,6 +47,7 @@ pub struct WebhookDelivery {
     #[serde(default)]
     pub response_status: Option<i32>,
     #[serde(default)]
+    /// Not retained for Slack deliveries.
     pub response_body: Option<String>,
     #[serde(default)]
     pub error_detail: Option<String>,
@@ -54,6 +56,10 @@ pub struct WebhookDelivery {
     pub is_replay: bool,
     // ISO 8601 timestamp string (the contract keeps ISO strings as `String`).
     pub created_at: String,
+    #[serde(default)]
+    pub replayable: bool,
+    #[serde(default)]
+    pub replay_unavailable_reason: Option<String>,
 }
 
 /// Envelope for the `list` response.
@@ -131,7 +137,7 @@ impl WebhookDeliveriesResource {
     /// request-id/timestamp, and records a new delivery row with
     /// `is_replay = true` -- which is what this returns.
     ///
-    /// Errors if the delivery is an incoming-call row (not replayable, 422), or
+    /// Errors if the delivery is an incoming-call or Slack row (not replayable, 422), or
     /// if its subscription is no longer active or no longer subscribes to the
     /// event type (409).
     ///
@@ -148,5 +154,30 @@ impl WebhookDeliveriesResource {
             crate::http::NO_QUERY,
         )?;
         Ok(serde_json::from_value(data)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn history_preserves_original_target_and_optional_replay_projection() {
+        let original = Uuid::from_u128(2);
+        let raw = json!({
+            "id": Uuid::from_u128(1), "organization_id": "org_test",
+            "webhook_subscription_id": original, "event_id": "evt_example",
+            "event_type": "message.received", "url": "https://example.com/hook",
+            "request_payload": "{}", "is_replay": false,
+            "created_at": "2026-09-15T00:00:00Z"
+        });
+        let old: WebhookDelivery = serde_json::from_value(raw.clone()).unwrap();
+        assert!(!old.replayable);
+        let mut current = raw;
+        current["replayable"] = json!(true);
+        let row: WebhookDelivery = serde_json::from_value(current).unwrap();
+        assert_eq!(row.webhook_subscription_id, Some(original));
+        assert!(row.replayable);
     }
 }

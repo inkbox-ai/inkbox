@@ -4,7 +4,8 @@
  * Message operations: list (auto-paginated), get, send, flag updates, delete.
  */
 
-import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
+import { HttpTransport } from "../../_http.js";
+import { postMessage } from "../../message_sends.js";
 import {
   ForwardMode,
   MailAttachmentInput,
@@ -18,15 +19,6 @@ import {
 } from "../types.js";
 
 const DEFAULT_PAGE_SIZE = 50;
-
-/** Trailing `post` argument carrying a validated idempotency key, if given. */
-function idempotencyArgs(
-  key?: string,
-): [] | [{ headers: Record<string, string> }] {
-  if (key === undefined) return [];
-  validateIdempotencyKey(key);
-  return [{ headers: { "Idempotency-Key": key } }];
-}
 
 export class MessagesResource {
   constructor(private readonly http: HttpTransport) {}
@@ -115,15 +107,11 @@ export class MessagesResource {
    *   with 422. Opens surface as `firstOpenedAt`/`openCount`; `openCount` is
    *   approximate (proxy prefetch inflates it, the per-window debounce
    *   collapses repeats) so prefer `firstOpenedAt`. Pixels can raise spam scores.
-   * @param options.idempotencyKey - Makes this send safe to retry after a lost
-   *   or timed-out response: a retry under the same key cannot put a second
-   *   copy of the email on the wire. At-most-once, not a replay — a repeat
-   *   under a key that already sent throws 409 rather than returning the
-   *   original message, and 503 when the earlier attempt's outcome is
-   *   unresolved. Keys are scoped per organization and per method, last 7
-   *   days, and do not cover the request body, so use a fresh key for each
-   *   distinct email. Always retry with the *same* key: a new key is a new
-   *   send, so minting one after a failure is what duplicates the email.
+   * @param options.idempotencyKey - Optional stable key for retries across calls.
+   *   Each call otherwise generates a key and preserves it during bounded retries.
+   *   The same key and input replay the original response for seven days;
+   *   changed input returns 409. Scope is organization, mailbox, and operation.
+   *   Read the message for current delivery status. A new key is a new message.
    *
    * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
    *   plan's storage cap. Free space with `messages.delete` / `threads.delete`
@@ -175,10 +163,10 @@ export class MessagesResource {
     }
     if (options.trackOpens) body["track_opens"] = true;
 
-    const data = await this.http.post<RawMessage>(
+    const data = await postMessage<RawMessage>(this.http,
       `/mailboxes/${emailAddress}/messages`,
       body,
-      ...idempotencyArgs(options.idempotencyKey),
+      options.idempotencyKey,
     );
     return parseMessage(data);
   }
@@ -237,10 +225,10 @@ export class MessagesResource {
     }
     if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
 
-    const data = await this.http.post<RawMessage>(
+    const data = await postMessage<RawMessage>(this.http,
       `/mailboxes/${emailAddress}/messages/${messageId}/reply-all`,
       body,
-      ...idempotencyArgs(options.idempotencyKey),
+      options.idempotencyKey,
     );
     return parseMessage(data);
   }
@@ -332,10 +320,10 @@ export class MessagesResource {
     if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
     if (options.trackOpens) body["track_opens"] = true;
 
-    const data = await this.http.post<RawMessage>(
+    const data = await postMessage<RawMessage>(this.http,
       `/mailboxes/${emailAddress}/messages/${messageId}/forward`,
       body,
-      ...idempotencyArgs(options.idempotencyKey),
+      options.idempotencyKey,
     );
     return parseMessage(data);
   }

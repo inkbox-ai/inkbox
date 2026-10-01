@@ -4,7 +4,7 @@ sdk/python/tests/test_mail_messages.py
 Tests for MessagesResource.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 from sample_data_mail import (
     MESSAGE_DICT,
@@ -75,6 +75,7 @@ class TestMessagesSend:
 
         http.post.assert_called_once_with(
             f"/mailboxes/{MBOX}/messages",
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             json={
                 "recipients": {"to": ["user@example.com"]},
                 "subject": "Test",
@@ -161,6 +162,7 @@ class TestMessagesReplyAll:
 
         http.post.assert_called_once_with(
             f"/mailboxes/{MBOX}/messages/{MSG}/reply-all",
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             json={
                 "subject": "Re: custom",
                 "body_text": "Looping everyone in",
@@ -180,6 +182,7 @@ class TestMessagesReplyAll:
         http.post.assert_called_once_with(
             f"/mailboxes/{MBOX}/messages/{MSG}/reply-all",
             json={},
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
         )
 
 
@@ -192,6 +195,7 @@ class TestMessagesForward:
 
         http.post.assert_called_once_with(
             f"/mailboxes/{MBOX}/messages/{MSG}/forward",
+            headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
             json={
                 "recipients": {"to": ["fwd@example.com"]},
                 "mode": "inline",

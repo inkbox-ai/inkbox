@@ -13,7 +13,8 @@ Replay reuses the original envelope ``event_id``, so it only recovers a
 *miss*: a compliant endpoint that already processed the original event
 dedupes the replay away. It does not force reprocessing. Incoming-call
 deliveries (which have a ``phone_number_id`` and no
-``webhook_subscription_id``) are logged but not replayable.
+``webhook_subscription_id``) are logged but not replayable. Slack deliveries are also not replayable;
+their logs contain event metadata only, not original message content.
 """
 
 from __future__ import annotations
@@ -37,8 +38,8 @@ class WebhookDelivery:
     ``webhook_subscription_id`` is populated for subscription deliveries
     and ``None`` for incoming-call deliveries (which instead carry
     ``phone_number_id``). ``organization_id`` is an ``"org_..."`` token
-    string, not a UUID. ``request_payload`` is the raw signed request
-    body that was delivered. ``response_status`` / ``response_body`` are
+    string, not a UUID. ``request_payload`` is the signed request
+    body for replayable channels, but only event metadata for Slack. ``response_status`` / ``response_body`` are
     ``None`` on transport failure (in which case ``error_detail`` is
     set). ``is_replay`` is ``True`` for rows produced by ``replay``.
     """
@@ -52,11 +53,13 @@ class WebhookDelivery:
     url: str
     request_payload: str
     response_status: int | None
-    response_body: str | None
+    response_body: str | None  # Not retained for Slack deliveries.
     error_detail: str | None
     duration_ms: int | None
     is_replay: bool
     created_at: datetime
+    replayable: bool = False
+    replay_unavailable_reason: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookDelivery:
@@ -81,6 +84,8 @@ class WebhookDelivery:
             duration_ms=d.get("duration_ms"),
             is_replay=d["is_replay"],
             created_at=datetime.fromisoformat(d["created_at"]),
+            replayable=bool(d.get("replayable", False)),
+            replay_unavailable_reason=d.get("replay_unavailable_reason"),
         )
 
 
@@ -89,7 +94,6 @@ def _uuid_str(value: UUID | str) -> str:
 
 
 class WebhookDeliveriesResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -132,7 +136,7 @@ class WebhookDeliveriesResource:
         a fresh request-id/timestamp, and records a new delivery row with
         ``is_replay=True`` -- which is what this returns.
 
-        Raises if the delivery is an incoming-call row (not replayable,
+        Raises if the delivery is an incoming-call or Slack row (not replayable,
         422), or if its subscription is no longer active or no longer
         subscribes to the event type (409).
         """

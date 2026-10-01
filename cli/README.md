@@ -746,7 +746,7 @@ inkbox mailbox update <email-address>        # Update a mailbox
   --filter-mode <mode>                       #   whitelist or blacklist (admin-only)
 inkbox mailbox client-settings <email-address>  # IMAP/SMTP settings for a mail client
 # To attach a webhook receiver, use `inkbox webhook subscription create
-# --mailbox-id <id> --url <url> --event-type message.received ...`.
+# --agent-identity-id <id> --url <url> --event-type message.received ...`.
 ```
 
 `mailbox list` shows a `storage` column (`1.2 GiB / 2 GiB`) and `mailbox get`
@@ -858,7 +858,7 @@ inkbox number update <id>                    # Update phone number config
   --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
 inkbox number release <number-id>             # Release a phone number
 # To attach a text-webhook receiver, use `inkbox webhook subscription
-# create --phone-number-id <id> --url <url> --event-type text.received ...`.
+# create --agent-identity-id <id> --url <url> --event-type text.received ...`.
 ```
 
 ### whoami
@@ -889,16 +889,17 @@ inkbox webhook verify                        # Verify a webhook signature (local
   -H, --header <header>                      #   Header in Key: Value format (repeatable)
 
 inkbox webhook subscription list             # List webhook subscriptions
-  --mailbox-id <id>                          #   Filter by owning mailbox id
-  --phone-number-id <id>                     #   Filter by owning phone number id
-  --agent-identity-id <id>                   #   Filter by owning agent identity id (iMessage / call.ended)
+  --mailbox-id <id>                          #   Deprecated mailbox-identity mail filter
+  --phone-number-id <id>                     #   Deprecated phone-identity text filter
+  --agent-identity-id <id>                    #   Filter by owning agent identity id
+  --scope identity                          #   Include all families and mixed subscriptions
   --url <url>                                #   Filter by destination URL (exact)
   --event-type <type>                        #   Filter by event_type wire value
 inkbox webhook subscription get <sub-id>     # Get one subscription
 inkbox webhook subscription create           # Create a subscription
-  --mailbox-id <id>                          #   Owning mailbox id (exactly one of the
-  --phone-number-id <id>                     #     three owner FKs is required)
-  --agent-identity-id <id>                   #   Owning agent identity id (iMessage / call.ended events)
+  --mailbox-id <id>                          #   Deprecated mailbox selector (exactly one
+  --phone-number-id <id>                     #     identity/resource selector is required)
+  --agent-identity-id <id>                   #   Owning agent identity id (all notification events)
   --url <url>                                #   HTTPS destination (required)
   --event-type <type>                        #   Event type (repeatable; ≥1 required)
   --context-email <spec>                     #   Conversation context for the email
@@ -909,7 +910,7 @@ inkbox webhook subscription create           # Create a subscription
                                              #     stdin (never passed as an argument).
                                              #     Reads return the token; list tables
                                              #     show only hasAuthToken
-inkbox webhook subscription update <sub-id>  # Update url, event_types, context, and/or auth token
+inkbox webhook subscription update <sub-id> --scope identity  # Update url, event_types, context, and/or auth token
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
   --context-email <spec>                     #   Replace email context (count:N | window:H)
@@ -921,8 +922,33 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, context,
   --clear-auth-token                         #   Clear the delivery bearer token
                                              #     (mutually exclusive with
                                              #     --auth-token-stdin)
-inkbox webhook subscription delete <sub-id>  # Remove a subscription
+inkbox webhook subscription delete <sub-id> --scope identity  # Remove a subscription
 ```
+
+### Identity-owned notification subscriptions
+
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+Combine notification families on one identity, including channels not yet configured:
+
+```bash
+inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
+  --event-type message.received --event-type text.received --event-type imessage.received \
+  --event-type call.ended --event-type a2a.task.created
+inkbox webhook subscription update <sub-id> --scope identity --event-type message.received
+inkbox webhook subscription delete <sub-id> --scope identity
+```
+
+Update replaces the full event selection. Legacy mailbox and phone selectors resolve
+to their identity;
+prefer `--agent-identity-id`. Incoming-call actions remain separate. Delivery output
+includes replayability and any unavailable reason,
+while retaining the original target ID.
 
 ## Mail clients (IMAP/SMTP)
 
@@ -1003,6 +1029,209 @@ inkbox mailbox get alex@example.com --json
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
 
+## Message request retries
+
+`email send`, `text send`, and `imessage send` automatically preserve a generated
+key during bounded request retries. Use `--idempotency-key <key>` to retry the
+same message across separate command invocations. Do not change its input.
+Use `send-lookup --help` to recover an original message ID without sending again.
+Queued success is not delivery confirmation; use the message's get command for
+current status. A queued response is acceptance, not a promise of delivery retries.
+Send failures include the request key in stderr (`error.idempotencyKey` with `--json`).
+Read an iMessage with `imessage get <message-id> --identity <handle>`.
+
+## Slack
+
+```bash
+inkbox slack connection list --identity example-agent
+# Select the intended workspace with status connected from the returned connections.
+inkbox slack message send --connection-id 11111111-1111-4111-8111-111111111111 \
+  --conversation-id CEXAMPLE --text 'Hello from Inkbox' --idempotency-key greeting:2026-09-16
+inkbox slack message list --connection-id 11111111-1111-4111-8111-111111111111 \
+  --conversation-id CEXAMPLE --limit 15
+inkbox slack file download FEXAMPLE --connection-id 11111111-1111-4111-8111-111111111111 \
+  --output example.bin
+```
+
+Onboarding is separate from using an existing connection. Organization-member sessions,
+organization admin API keys, and claimed agent keys can save and list setup workspaces.
+Claimed agent keys can prepare and install only their own identity’s app. Save both
+app-configuration tokens for the target workspace, then prepare the identity’s app:
+
+```bash
+# credentials.json contains access_token and refresh_token. Keep it private.
+inkbox slack provisioning-workspace save --credentials-file credentials.json
+inkbox slack provisioning-workspace list
+inkbox slack setup start --identity example-agent \
+  --provisioning-workspace-id 44444444-4444-4444-8444-444444444444
+# If pending, check with slack connection list before installing.
+inkbox slack installation start --identity example-agent
+# Open authorizationUrl in a browser. After approval, list connections to confirm.
+```
+
+Use `--credentials-file -` to read JSON from stdin. Tokens are never returned.
+Reuse the saved workspace ID for subsequent identity apps. Each app is bound to
+its selected workspace. `needs_credentials` means its credentials need attention.
+
+Installation availability does not imply preparation is ready.
+`setup start`, `connection list`, and `installation start` accept exactly one of
+`-i/--identity <handle>` or `--identity-id <uuid>`. Handles use the existing identity
+lookup; the UUID form avoids that lookup.
+
+| Command group | Operations |
+| --- | --- |
+| `slack setup` | `start` (preparation status is returned by `connection list`) |
+| `slack search` | Search retained messages across an identity's workspace connections |
+| `slack connection` | `list`, `disconnect` |
+| `slack provisioning-workspace` | `list`, `save --credentials-file <path>` |
+| `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
+| `slack message` | `list`, `send` |
+| `slack action` | `get <action-id>`, `get-by-key --idempotency-key <key>` |
+| `slack file` | `get <file-id>`, `download <file-id>` |
+
+All conversation/message/action/file operations require `--connection-id`.
+Use `--conversation-id` for an existing conversation, `--thread-ts` for a thread,
+`--cursor` for another page, and `--json` for structured output. Downloads refuse to
+overwrite an existing path.
+
+```bash
+inkbox webhook subscription create --agent-identity-id 22222222-2222-4222-8222-222222222222 \
+  --url https://example.com/hooks/slack --event-type slack.mention_received \
+  --event-type slack.thread_reply_received
+inkbox webhook subscription update SUBSCRIPTION_ID \
+  --event-type slack.dm_received --event-type slack.mention_received
+```
+
+Repeat `--event-type` to select incoming Slack message categories. On update,
+the supplied event types replace the subscription's full event list.
+
+### Slack behavior
+
+Organization-member sessions and organization admin API keys can prepare and install
+apps for identities in their organization. Claimed agent keys can save workspace
+configuration and prepare, install, read, and use their own identity’s connections.
+Disconnecting connections, changing retention, and purging history require an
+organization-member session or organization admin API key. Installation availability
+does not mean preparation is complete; check `setup.status` before continuing.
+Direct installation is also supported: `start_installation` (Python/Rust),
+`startInstallation` (TypeScript), or `slack installation start` returns a short-lived
+opaque authorization URL to open in a browser. Treat it as a secret; the browser
+handoff establishes installation state. Workspace approval and channel permissions
+still apply. Join accessible public channels or invite the agent to private channels;
+Slack Connect conversations are supported when the connection has access.
+
+`slack installation start --return-url <url>` optionally selects an approved Console
+completion URL with the exact path `/console/slack/complete`, no query or fragment,
+and at most 2048 characters.
+Omit it to use the default completion page.
+
+Conversation/history/file reads are live and scoped to the selected connection, not
+an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
+page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
+messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
+stable 1..128-character idempotency key using letters, digits, `.`, `_`, `:`, or `-`.
+Reuse a key only for the exact same operation. A different body with the same key is a
+conflict. Poll an action while it is `sending`; `sent` is not a delivered/read receipt.
+Recover a lost response without resending with `inkbox slack action get-by-key --connection-id UUID --idempotency-key KEY`.
+A 404 lookup result does not prove that no send occurred; do not switch to a new key
+based on missing lookup data. A fresh `failed` / `rate_limited` send can include
+`retry_after` (`retryAfter` in TypeScript/CLI), the minimum wait in seconds before
+starting a deliberate new attempt. This hint is not retained on stored action reads
+or same-key replays. Reusing the original key returns its terminal action and does
+not send again. No automatic resend occurs.
+`unknown` is terminal uncertainty, not a promise of future reconciliation: do not
+blindly resend. Inspect authorized live history before deliberately starting a new
+operation. File downloads return bytes; unavailable or oversized files surface API
+errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
+content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
+deletions, channel join/leave, and native processing status use stable keys and return
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
+used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
+Disconnect removes Inkbox authority, not the workspace's Slack app installation.
+
+Slack setup creates the identity’s app directly in its selected workspace.
+No identity toggle is required. Connection responses report app creation,
+preparation readiness, and installation status separately.
+
+Retained history is separate from live reads and webhook diagnostics. All observed
+messages in conversations the connection can access are captured automatically,
+independently of webhook subscriptions, with no time-based retention limit by default.
+This is not an automatic whole-workspace or historical copy. Organization management
+can set retention or delete retained history, but cannot disable or filter capture.
+Omitted retention resets to no time limit.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
+restarts a completed/failed import. Purge deletes existing retained history without
+stopping new capture. Reconnecting resumes capture automatically, but does not restore
+deleted history. Archive reads still require current connection/conversation access.
+Use the live exact-message permalink method when a Slack link is needed.
+Live message context is a bounded window (`complete=false`), not full history.
+
+Slack webhook envelopes use the existing signature verification and stable `id`
+deduplication; delivery order is not guaranteed. All 23 event types are exported as
+`SlackWebhookEventType`, with `SlackWebhookData` and `SlackWebhookPayload` types.
+Select incoming messages through ordinary subscription event types:
+
+| Event | Trigger |
+| --- | --- |
+| `slack.dm_received` | Direct message |
+| `slack.group_dm_received` | Group direct message |
+| `slack.channel_message_received` | Channel message |
+| `slack.mention_received` | Message mentioning the agent |
+| `slack.thread_reply_received` | Any thread reply, not a managed thread watch |
+
+These categories overlap. Each incoming message produces at most one logical delivery per
+subscription. Its `event_type` is the first matching selected event in this priority:
+mention, thread reply, DM, group DM, channel message. `data.message_kinds` remains
+contextual metadata. Subscriptions cover all accessible conversations across the
+identity's connected workspaces; there are no connection/conversation selectors.
+Edits and deletions use their own events without message-kind filtering. The
+remaining event types cover message updates, reactions, files, and other activity.
+
+Slack events can share an identity-owned subscription with other notification families.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion.
+Slack delivery logs contain metadata only; historical replay is not supported.
+The agent runtime owns narrower attention rules, thread watches, and its own memory.
+
+### Retained history and utility actions
+
+Start with `inkbox slack search --q "release notes"` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
+```sh
+inkbox slack capabilities --connection-id "$CONNECTION_ID"
+inkbox slack search --q 'release notes'
+# Non-agent credentials: add --identity example-agent or --identity-id UUID.
+# Narrow to one workspace only when needed: add --connection-id "$CONNECTION_ID".
+inkbox slack reaction add --connection-id "$CONNECTION_ID" \
+  --conversation-id CEXAMPLE --message-ts 1780000000.000001 \
+  --name eyes --idempotency-key review:release:1
+inkbox slack file upload --connection-id "$CONNECTION_ID" \
+  --conversation-id CEXAMPLE --file ./report.pdf --idempotency-key report:1
+```
+
+Use `slack user`, `conversation members/join/leave`, `message get/context/permalink/
+update/delete`, `reaction`, `pin`, `processing-status set`, and `operation get
+--operation-id ID` for utilities. `slack archive settings update --connection-id ID
+--retention-days 90` sets a retention limit. Omitting `--retention-days` (or passing
+`null`) resets to no time limit. Capture is automatic for all accessible observed
+messages; select webhook events to control which events wake your agent. Archive subcommands
+include `messages`, `search`, `backfill [--restart]`, `coverage`, and `purge`.
+
 ## License
 
 MIT
@@ -1017,7 +1246,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
+expiry, transfer, and recovery rules. These methods require version 0.7.12 or later.
 
 ```bash
 inkbox organization-domain create example.com

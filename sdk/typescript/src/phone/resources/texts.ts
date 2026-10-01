@@ -5,6 +5,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { postMessage } from "../../message_sends.js";
 import {
   TextMessage,
   TextConversationSummary,
@@ -36,6 +37,8 @@ export class TextsResource {
    *   The server resolves it to that conversation's participants.
    * @param options.text - Message body.
    * @param options.mediaUrls - MMS media URLs.
+   * @param options.idempotencyKey - Reuse across calls with identical input;
+   *   otherwise a key is generated per call and retained during request retries.
    *
    * @throws {RecipientBlockedError} when the destination is blocked by an
    *   outbound contact rule on the sender.
@@ -49,6 +52,7 @@ export class TextsResource {
       conversationId?: string | null;
       text?: string | null;
       mediaUrls?: string[] | null;
+      idempotencyKey?: string;
     },
   ): Promise<TextMessage> {
     const body: {
@@ -69,9 +73,10 @@ export class TextsResource {
     if (options.mediaUrls != null) {
       body.media_urls = options.mediaUrls;
     }
-    const data = await this.http.post<RawTextMessage>(
+    const data = await postMessage<RawTextMessage>(this.http,
       `/numbers/${phoneNumberId}/texts`,
       body,
+      options.idempotencyKey,
     );
     return parseTextMessage(data);
   }

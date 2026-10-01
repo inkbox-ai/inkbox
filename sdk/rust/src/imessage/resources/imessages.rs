@@ -29,6 +29,15 @@ impl IMessagesResource {
         Self { http }
     }
 
+    /// Read a visible message and its current delivery status.
+    pub fn get(&self, message_id: &Uuid, agent_identity_id: Option<&Uuid>) -> Result<IMessage> {
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        let data = self.http.get(&format!("/messages/{message_id}"), &params)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// Return the active triage line and the connect command.
     ///
     /// Recipients text the returned `connect_command` (e.g.
@@ -102,6 +111,29 @@ impl IMessagesResource {
         send_style: Option<IMessageSendStyle>,
         agent_identity_id: Option<&Uuid>,
     ) -> Result<IMessage> {
+        self.send_with_idempotency_key(
+            to,
+            conversation_id,
+            text,
+            media_urls,
+            send_style,
+            agent_identity_id,
+            &Uuid::new_v4().to_string(),
+        )
+    }
+
+    /// Retry one iMessage request with a stable key and unchanged input.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_with_idempotency_key(
+        &self,
+        to: Option<&str>,
+        conversation_id: Option<&Uuid>,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: &str,
+    ) -> Result<IMessage> {
         // Build the body inserting only the fields that were supplied.
         let mut body = serde_json::Map::new();
         if let Some(t) = to {
@@ -127,7 +159,9 @@ impl IMessagesResource {
             params.push(("agent_identity_id", id.to_string()));
         }
 
-        let data = self.http.post("/messages", Some(&body), &params)?;
+        let data = self
+            .http
+            .post_message("/messages", &body, &params, Some(idempotency_key))?;
         // The server wraps the row under a "message" key.
         let message = data
             .get("message")
@@ -152,6 +186,27 @@ impl IMessagesResource {
         send_style: Option<IMessageSendStyle>,
         agent_identity_id: Option<&Uuid>,
     ) -> Result<IMessage> {
+        self.send_group_with_idempotency_key(
+            to,
+            text,
+            media_urls,
+            send_style,
+            agent_identity_id,
+            &Uuid::new_v4().to_string(),
+        )
+    }
+
+    /// Retry one group send using the original key.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_group_with_idempotency_key(
+        &self,
+        to: &[String],
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: &str,
+    ) -> Result<IMessage> {
         let mut body = serde_json::Map::new();
         body.insert("to".to_string(), json!(to));
         if let Some(t) = text {
@@ -169,7 +224,9 @@ impl IMessagesResource {
         if let Some(id) = agent_identity_id {
             params.push(("agent_identity_id", id.to_string()));
         }
-        let data = self.http.post("/messages", Some(&body), &params)?;
+        let data = self
+            .http
+            .post_message("/messages", &body, &params, Some(idempotency_key))?;
         let message = data
             .get("message")
             .cloned()
@@ -617,6 +674,28 @@ mod tests {
             "created_at": "2026-07-22T00:00:00Z",
             "updated_at": "2026-07-22T00:00:00Z"
         })
+    }
+
+    #[test]
+    fn get_message_uses_the_identity_filter() {
+        let server = MockServer::start();
+        let message_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let identity_id = Uuid::new_v4();
+        let request = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/imessage/messages/{message_id}"))
+                .query_param("agent_identity_id", identity_id.to_string());
+            then.status(200).json_body(group_message_json());
+        });
+        assert_eq!(
+            client(&server)
+                .imessages()
+                .get(&message_id, Some(&identity_id))
+                .unwrap()
+                .id,
+            message_id
+        );
+        request.assert();
     }
 
     #[test]

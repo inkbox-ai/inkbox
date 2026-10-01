@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+## 0.7.11 - Slack workspace connections (unreleased)
+
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0711---slack-workspace-connections-unreleased) for the complete upcoming release.
+
+## 0.7.9 — Media WebSocket keypad guidance
+
+- Documented the media WebSocket `dtmf` event for live client-driven calls:
+  `{"event": "dtmf", "digits": "1"}` sends one to 30 keypad keys from `0-9`,
+  `*`, and `#`, in order. At most 20 bursts per call can be outstanding,
+  including the one being sent; further bursts are ignored.
+- Server-side call admission and quota changes affect older SDK and CLI versions:
+  `429 concurrent_calls_limit` means the live outbound-call limit is reached
+  (default: 3 across an organization's phone numbers or on one dedicated iMessage
+  line). `503 call_capacity_busy` means capacity is temporarily busy. Honor
+  `Retry-After` before retrying either response.
+- Daily call quotas count active calls, including `initiated` calls, provisionally.
+  Canceled outbound calls still count when dialing reached the phone network.
+  Failed placements, pre-dial outbound cancellations, and inbound calls that end
+  unanswered are excluded.
+
+## 0.7.8 — Identity-owned webhook subscriptions
+
+- Combine all notification families on one identity, regardless of configured channels;
+  legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Event-family/owner and A2A context checks now follow server capability. Unsupported
+  combinations raise an API 422 instead of a local `ValueError`.
+- Expose delivery replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+
 ## 0.7.4 - Native Windows Python tunnels
 
 - Python `tunnels.connect()` now supports native Windows as well as Linux and macOS, without requiring WSL.

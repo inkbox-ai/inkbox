@@ -39,6 +39,7 @@ use crate::mail::resources::identity_contact_rules::MailIdentityContactRulesReso
 use crate::mail::resources::mailboxes::MailboxesResource;
 use crate::mail::resources::messages::MessagesResource;
 use crate::mail::resources::threads::ThreadsResource;
+use crate::message_sends::MessageSendsResource;
 use crate::notes::resources::notes::NotesResource;
 use crate::phone::resources::calls::CallsResource;
 use crate::phone::resources::contact_rules::PhoneContactRulesResource;
@@ -49,6 +50,7 @@ use crate::phone::resources::numbers::PhoneNumbersResource;
 use crate::phone::resources::sms_opt_ins::SmsOptInsResource;
 use crate::phone::resources::texts::TextsResource;
 use crate::signing_keys::{SigningKey, SigningKeysResource};
+use crate::slack::SlackResource;
 use crate::tunnels::resources::tunnels::TunnelsResource;
 use crate::vault::resources::vault::VaultResource;
 use crate::webhooks::deliveries::WebhookDeliveriesResource;
@@ -147,6 +149,7 @@ pub struct Inkbox {
     // Mail
     mailboxes: MailboxesResource,
     messages: MessagesResource,
+    message_sends: MessageSendsResource,
     drafts: DraftsResource,
     threads: ThreadsResource,
     mail_contact_rules: MailContactRulesResource,
@@ -182,6 +185,7 @@ pub struct Inkbox {
     api_keys: ApiKeysResource,
     identities: IdentitiesResource,
     tunnels: TunnelsResource,
+    slack: SlackResource,
     a2a: A2AResource,
     organization_domains: OrganizationDomainsResource,
 
@@ -309,6 +313,10 @@ impl Inkbox {
             vault,
             contacts: ContactsResource::new(contacts_http.clone()),
             companion: CompanionResource::new(api_http.clone()),
+            message_sends: MessageSendsResource::new(
+                api_http.clone(),
+                mk(&format!("{api_root}/mail")),
+            ),
             notes: NotesResource::new(contacts_http.clone()),
 
             signing_keys: SigningKeysResource::new(api_http.clone()),
@@ -318,6 +326,7 @@ impl Inkbox {
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
             organization_domains: OrganizationDomainsResource::new(api_http.clone()),
+            slack: SlackResource::new(api_http.clone()),
             a2a: A2AResource::new(api_http.clone(), public_http.clone(), trimmed.to_string()),
 
             root_api_http: root_api_http.clone(),
@@ -375,6 +384,11 @@ impl Inkbox {
     }
     pub fn messages(&self) -> &MessagesResource {
         &self.messages
+    }
+
+    /// Recover original message identifiers by request key.
+    pub fn message_sends(&self) -> &MessageSendsResource {
+        &self.message_sends
     }
     pub fn drafts(&self) -> &DraftsResource {
         &self.drafts
@@ -471,6 +485,10 @@ impl Inkbox {
     }
     pub fn organization_domains(&self) -> &OrganizationDomainsResource {
         &self.organization_domains
+    }
+
+    pub fn slack(&self) -> &SlackResource {
+        &self.slack
     }
 
     pub fn a2a(&self) -> &A2AResource {

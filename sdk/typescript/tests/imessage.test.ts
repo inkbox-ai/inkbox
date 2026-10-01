@@ -178,6 +178,14 @@ describe("IMessagesResource", () => {
     expect("IMessageNumberType" in InkboxExports).toBe(false);
   });
 
+  it("gets one message with its identity filter", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(IMESSAGE_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+    expect((await resource.get(MSG_ID, { agentIdentityId: IDENTITY_ID })).id).toBe(MSG_ID);
+    expect(lastCall().url).toBe(`${BASE}/messages/${MSG_ID}?agent_identity_id=${IDENTITY_ID}`);
+    expect(lastCall().init.method).toBe("GET");
+  });
+
   it("send posts style and media by conversation id", async () => {
     vi.mocked(fetch).mockResolvedValue(ok({ message: IMESSAGE_DICT }));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));

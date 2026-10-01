@@ -334,6 +334,14 @@ pub struct ContactMemorySummary {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactSlackAccount {
+    pub workspace_id: String,
+    pub user_id: String,
+    #[serde(default)]
+    pub workspace_name: Option<String>,
+}
+
 /// A contact (address-book entry) owned by your organisation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contact {
@@ -371,6 +379,12 @@ pub struct Contact {
     pub addresses: Vec<ContactAddress>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub custom_fields: Vec<ContactCustomField>,
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "null_as_default"
+    )]
+    pub slack_accounts: Vec<ContactSlackAccount>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub access: Vec<ContactAccess>,
     #[serde(default)]

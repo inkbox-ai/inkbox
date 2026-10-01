@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.3"
+inkbox = "0.7.11"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.3", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.11", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -745,9 +745,51 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 # }
 ```
 
-## License
+## Identity-owned webhook subscriptions
 
-MIT
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+`client.webhooks().subscriptions().create_for_identity(identity_id, url, &events,
+context_config, auth_token)` creates one receiver for any mix of notification
+families, including channels not yet configured. The legacy `create` signature
+remains available and resolves its mailbox/phone selector to the owning identity.
+
+`update(sub_id, url, event_types, context_config, auth_token)` replaces each
+supplied field. `event_types` replaces the full selection; omitted fields remain
+unchanged. `delete(sub_id)` removes the whole subscription. Mixed subscriptions
+require explicit `Some(WebhookSubscriptionScope::Identity)` through
+`update_with_scope(sub_id, url, event_types, context_config, auth_token, scope)` or
+`delete_with_scope(sub_id, scope)`. The existing methods retain omitted scope;
+upgrading the SDK does not opt old callers into changing shared event selections.
+
+Context is included only for received mail/text/iMessage events; other selected
+events ignore it. Incoming-call actions remain separate. Delivery records retain
+the original subscription ID and expose `replayable` and
+`replay_unavailable_reason` for current replay status.
+
+`list` retains legacy single-family views and excludes mixed subscriptions.
+To include all notification families, opt in explicitly:
+
+```rust,no_run
+use inkbox::webhooks::WebhookSubscriptionScope;
+# fn main() -> inkbox::Result<()> {
+# let client = inkbox::Inkbox::builder("YOUR_API_KEY").build()?;
+# let identity_id = uuid::Uuid::nil();
+let subscriptions = client.webhooks().subscriptions().list_with_scope(
+    None, None, Some(identity_id), None, None,
+    Some(WebhookSubscriptionScope::Identity),
+)?;
+# Ok(())
+# }
+```
+
+Identity-owned responses use `agent_identity_id` with null legacy mailbox and phone
+fields. Older servers can still return legacy resource owners.
 
 ## Companion mode
 
@@ -839,6 +881,217 @@ top-level block, deserialize `CompanionMailWebhookPayload`,
 `payload` and optional `companion`. Ordinary-phase metadata has no activation
 authority and must not trigger history loading.
 
+## Slack
+
+```rust,no_run
+use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};
+use uuid::Uuid;
+
+let client = Inkbox::new("ApiKey_...")?;
+let identity_id = Uuid::parse_str("22222222-2222-4222-8222-222222222222")?;
+let connections = client.slack().list_connections(identity_id)?;
+let connection = connections.connections.iter().find(|c| {
+    c.workspace_id == "TEXAMPLE" && c.status == SlackConnectionStatus::Connected
+}).ok_or("Connect or reauthorize the intended workspace first")?;
+let action = client.slack().send_message(connection.id, &SlackSendMessageOptions {
+    conversation_id: "CEXAMPLE".into(),
+    text: "Hello from Inkbox".into(),
+    idempotency_key: "greeting:2026-09-16".into(),
+    thread_ts: None,
+})?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Onboarding is separate from using an existing connection. Organization-member sessions,
+organization admin API keys, and claimed agent keys can save and list setup workspaces.
+Claimed agent keys can prepare and install their own identity’s app.
+`installation_available` reports installation availability; `setup.status` reports
+preparation readiness. Save app-configuration credentials for
+the target workspace first; reuse that saved workspace for later identity apps.
+Credentials are write-only. The returned metadata identifies the verified workspace.
+An identity app stays bound to its selected workspace.
+
+```rust,no_run
+use inkbox::{Inkbox, SlackSetupState};
+use std::time::{Duration, Instant};
+use uuid::Uuid;
+
+let setup_client = Inkbox::new("YOUR_INKBOX_API_KEY")?;
+let identity_id = Uuid::parse_str("22222222-2222-4222-8222-222222222222")?;
+let workspace = setup_client.slack().save_provisioning_workspace(
+    &std::env::var("SLACK_CONFIGURATION_ACCESS_TOKEN")?,
+    &std::env::var("SLACK_CONFIGURATION_REFRESH_TOKEN")?,
+)?;
+// For a workspace already saved, use list_provisioning_workspaces() and select its ID.
+let mut setup = setup_client.slack().start_setup(identity_id, workspace.id)?;
+let deadline = Instant::now() + Duration::from_secs(120);
+while setup.status == SlackSetupState::Pending && Instant::now() < deadline {
+    std::thread::sleep(Duration::from_secs(5));
+    setup = setup_client.slack().list_connections(identity_id)?.setup
+        .ok_or("Preparation status is unavailable; check again later")?;
+}
+if setup.status != SlackSetupState::Ready {
+    return Err("Slack is not ready; check preparation status before continuing".into());
+}
+let installation = setup_client.slack().start_installation(identity_id, None)?;
+// Open installation.authorization_url in a browser; keep it secret.
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The sample bounds its preparation wait to two minutes. Pending setup can take
+longer; resume status reads later without repeatedly starting installation.
+For failed or unavailable setup, inspect the status before taking further action.
+`needs_credentials` requires saving valid credentials for the selected workspace.
+After browser approval, list connections again to confirm `connected`.
+
+`client.slack()` also provides `list_provisioning_workspaces`, `save_provisioning_workspace`, `disconnect`,
+`list_conversations`, `open_conversation`, `get_conversation`, `list_messages`,
+`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). Pass
+`SlackPageOptions` / `SlackMessagesOptions` for pagination. Connections, saved workspaces,
+actions, file metadata, pages, and send options are public typed exports.
+
+For webhook subscriptions use `create` / `update` with ordinary event selection.
+For mixed subscriptions use `update_with_scope` with
+`Some(WebhookSubscriptionScope::Identity)`.
+
+Rust Slack enums parse strictly: an unrecognized response or webhook value fails
+deserialization and may require an SDK update. `Unknown` on action/operation status
+means terminal uncertainty, never an arbitrary unrecognized value.
+
+### Slack behavior
+
+Organization-member sessions and organization admin API keys can prepare and install
+apps for identities in their organization. Claimed agent keys can save workspace
+configuration and prepare, install, read, and use their own identity’s connections.
+Disconnecting connections, changing retention, and purging history require an
+organization-member session or organization admin API key. Installation availability
+does not mean preparation is complete; check `setup.status` before continuing.
+Direct installation is also supported: `start_installation` (Python/Rust),
+`startInstallation` (TypeScript), or `slack installation start` returns a short-lived
+opaque authorization URL to open in a browser. Treat it as a secret; the browser
+handoff establishes installation state. Workspace approval and channel permissions
+still apply. Join accessible public channels or invite the agent to private channels;
+Slack Connect conversations are supported when the connection has access.
+
+`start_installation_with_return_url(identity_id, workspace_id, return_url)` accepts
+an optional approved Console completion URL with the exact path `/console/slack/complete`,
+no query or fragment, and at most 2048 characters. `None`, or the existing `start_installation` method,
+uses the default completion page.
+
+Conversation/history/file reads are live and scoped to the selected connection, not
+an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
+page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
+messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
+stable 1..128-character idempotency key using letters, digits, `.`, `_`, `:`, or `-`.
+Reuse a key only for the exact same operation. A different body with the same key is a
+conflict. Poll an action while it is `sending`; `sent` is not a delivered/read receipt.
+Recover a lost response without resending with `client.slack().get_action_by_key(connection_id, idempotency_key)`.
+A 404 lookup result does not prove that no send occurred; do not switch to a new key
+based on missing lookup data. A fresh `failed` / `rate_limited` send can include
+`retry_after` (`retryAfter` in TypeScript/CLI), the minimum wait in seconds before
+starting a deliberate new attempt. This hint is not retained on stored action reads
+or same-key replays. Reusing the original key returns its terminal action and does
+not send again. No automatic resend occurs.
+`unknown` is terminal uncertainty, not a promise of future reconciliation: do not
+blindly resend. Inspect authorized live history before deliberately starting a new
+operation. File downloads return bytes; unavailable or oversized files surface API
+errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
+content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
+deletions, channel join/leave, and native processing status use stable keys and return
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. A key
+reused with a different request raises `InkboxError::IdempotencyKeyReused`; it is not
+a transient failure and must not be retried with changed arguments. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
+used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
+Disconnect removes Inkbox authority, not the workspace's Slack app installation.
+
+Slack setup creates the identity’s app directly in its selected workspace.
+No identity toggle is required. Connection responses report app creation,
+preparation readiness, and installation status separately.
+
+Retained history is separate from live reads and webhook diagnostics. All observed
+messages in conversations the connection can access are captured automatically,
+independently of webhook subscriptions, with no time-based retention limit by default.
+This is not an automatic whole-workspace or historical copy. Organization management
+can set retention or delete retained history, but cannot disable or filter capture.
+Omitted retention resets to no time limit.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
+restarts a completed/failed import. Purge deletes existing retained history without
+stopping new capture. Reconnecting resumes capture automatically, but does not restore
+deleted history. Archive reads still require current connection/conversation access.
+Use the live exact-message permalink method when a Slack link is needed.
+Live message context is a bounded window (`complete=false`), not full history.
+
+Slack webhook envelopes use the existing signature verification and stable `id`
+deduplication; delivery order is not guaranteed. All 23 event types are exported as
+`SlackWebhookEventType`, with `SlackWebhookData` and `SlackWebhookPayload` types.
+Select incoming messages through ordinary subscription event types:
+
+| Event | Trigger |
+| --- | --- |
+| `slack.dm_received` | Direct message |
+| `slack.group_dm_received` | Group direct message |
+| `slack.channel_message_received` | Channel message |
+| `slack.mention_received` | Message mentioning the agent |
+| `slack.thread_reply_received` | Any thread reply, not a managed thread watch |
+
+These categories overlap. Each incoming message produces at most one logical delivery per
+subscription. Its `event_type` is the first matching selected event in this priority:
+mention, thread reply, DM, group DM, channel message. `data.message_kinds` remains
+contextual metadata. Subscriptions cover all accessible conversations across the
+identity's connected workspaces; there are no connection/conversation selectors.
+Edits and deletions use their own events without message-kind filtering. The
+remaining event types cover message updates, reactions, files, and other activity.
+
+Slack events can share an identity-owned subscription with other notification families.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion.
+Slack delivery logs contain metadata only; historical replay is not supported.
+The agent runtime owns narrower attention rules, thread watches, and its own memory.
+
+### Retained history and utility actions
+
+Start with `search_messages` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
+```rust,no_run
+# fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
+let history = client.slack().search_messages(
+    "release notes",
+    &inkbox::SlackSearchMessagesOptions {
+        limit: Some(20), ..Default::default()
+    },
+)?;
+let operation = client.slack().add_reaction(
+    connection_id, "CEXAMPLE", "1780000000.000001", "eyes", "review:release:1",
+)?;
+// Observed messages are captured automatically. Never repeat an unknown outcome.
+# Ok(())
+# }
+```
+
+Additional methods on `client.slack()` include users/members, exact message context
+and permalinks, reactions/pins, own-message update/delete, join/leave, native processing
+status, general `upload_file`, and `get_operation`. Archive settings, listing/search,
+backfill, coverage, and purge use exported `SlackArchive*` response and option types.
+
+## License
+
+MIT
+
 ## Verified domains
 
 An organization admin can prove DNS control, select a domain for an agent, and
@@ -849,7 +1102,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
+expiry, transfer, and recovery rules. These methods require version 0.7.12 or later.
 
 ```rust
 let client = inkbox::Inkbox::from_env()?;

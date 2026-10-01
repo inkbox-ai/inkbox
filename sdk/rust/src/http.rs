@@ -54,6 +54,16 @@ pub(crate) fn validate_idempotency_key(key: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn validate_message_key(key: &str) -> Result<()> {
+    validate_idempotency_key(key)?;
+    if key.trim().is_empty() || !key.bytes().all(|b| (32..=126).contains(&b)) {
+        return Err(InkboxError::InvalidArgument(
+            "Use a nonempty printable ASCII idempotency key".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpTransport {
     client: Client,
@@ -138,6 +148,62 @@ impl HttpTransport {
 
     pub fn post<B: Serialize>(&self, path: &str, body: Option<&B>, params: Query) -> Result<Value> {
         self.post_with_headers(path, body, params, NO_HEADERS)
+    }
+
+    /// Submit one message, preserving its key through bounded request retries.
+    pub(crate) fn post_message<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+        params: Query,
+        key: Option<&str>,
+    ) -> Result<Value> {
+        let generated = uuid::Uuid::new_v4().to_string();
+        let key = key.unwrap_or(&generated);
+        validate_message_key(key)?;
+        for attempt in 0..3 {
+            match self.post_with_headers(
+                path,
+                Some(body),
+                params,
+                &[("Idempotency-Key", key), ("Prefer", "idempotency-replay")],
+            ) {
+                Ok(value) => return Ok(value),
+                Err(error) => {
+                    let retryable = match &error {
+                        InkboxError::Transport(_) | InkboxError::Decode(_) => true,
+                        InkboxError::Api {
+                            status_code,
+                            detail,
+                            ..
+                        } => {
+                            matches!(status_code, 429 | 502..=504)
+                                || detail
+                                    .as_object()
+                                    .and_then(|v| v.get("error"))
+                                    .and_then(Value::as_str)
+                                    == Some("idempotency_in_progress")
+                        }
+                        _ => false,
+                    };
+                    let delay = error.retry_after_seconds().unwrap_or(0);
+                    if !retryable || delay > 5 || attempt == 2 {
+                        return Err(error);
+                    }
+                    std::thread::sleep(Duration::from_millis((delay * 1000).max(250 << attempt)));
+                }
+            }
+        }
+        unreachable!()
+    }
+
+    /// Read a resource with additional request headers.
+    pub fn get_with_headers(&self, path: &str, params: Query, headers: Headers) -> Result<Value> {
+        let mut request = self.client.get(self.url(path)).query(params);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        raise_for_status(self.send(request, &self.url(path))?)?.json_value()
     }
 
     /// `POST` with caller-supplied per-request headers.
@@ -729,6 +795,69 @@ mod tests {
             "inkbox-rust-test",
         )
         .unwrap()
+    }
+
+    #[test]
+    fn message_retries_keep_the_key_and_body_on_unreadable_responses() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/messages")
+                .header("Idempotency-Key", "original")
+                .header("Prefer", "idempotency-replay")
+                .json_body(json!({"text": "hello"}));
+            then.status(201).body("{interrupted");
+        });
+        let error = transport(&server)
+            .post_message(
+                "/messages",
+                &json!({"text": "hello"}),
+                NO_QUERY,
+                Some("original"),
+            )
+            .unwrap_err();
+        assert!(matches!(error, InkboxError::Decode(_)));
+        request.assert_hits(3);
+    }
+
+    #[test]
+    fn message_retries_respect_long_retry_after_and_permanent_conflicts() {
+        for (status, code) in [(429, "rate_limited"), (409, "idempotency_key_reused")] {
+            let server = MockServer::start();
+            let request = server.mock(|when, then| {
+                when.method(POST).path("/messages");
+                then.status(status)
+                    .header("Retry-After", "60")
+                    .json_body(json!({"detail": {"error": code}}));
+            });
+            assert!(transport(&server)
+                .post_message("/messages", &json!({}), NO_QUERY, Some("original"))
+                .is_err());
+            request.assert_hits(1);
+        }
+    }
+
+    #[test]
+    fn message_retry_contract_keeps_keys_for_coordination_and_ambiguity() {
+        for (status, code, count) in [
+            (409, "idempotency_in_progress", 3),
+            (503, "send_outcome_ambiguous", 3),
+            (409, "result_unavailable", 1),
+        ] {
+            let server = MockServer::start();
+            let request = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/messages")
+                    .header("Idempotency-Key", "original");
+                then.status(status)
+                    .header("Retry-After", "0")
+                    .json_body(json!({"detail": {"error": code}}));
+            });
+            assert!(transport(&server)
+                .post_message("/messages", &json!({}), NO_QUERY, Some("original"))
+                .is_err());
+            request.assert_hits(count);
+        }
     }
 
     fn variant_name(error: &InkboxError) -> &'static str {

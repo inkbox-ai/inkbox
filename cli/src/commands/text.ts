@@ -29,6 +29,7 @@ export interface TextSendCommandOptions {
   conversationId?: string;
   text?: string;
   mediaUrl?: string[];
+  idempotencyKey?: string;
 }
 
 export function buildTextSendOptions(
@@ -47,6 +48,7 @@ export function buildTextSendOptions(
   }
 
   const sendOptions: SendTextOptions = {};
+  if (cmdOpts.idempotencyKey !== undefined) sendOptions.idempotencyKey = cmdOpts.idempotencyKey;
   if (recipients.length > 0) {
     sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
   }
@@ -74,6 +76,7 @@ export function registerTextCommands(program: Command): void {
     .option("--to <numbers>", "Comma-separated E.164 destination number(s)")
     .option("--conversation-id <id>", "Existing conversation UUID to reply into")
     .option("--text <text>", "Message body")
+    .option("--idempotency-key <key>", "Reuse this key when retrying the same message")
     .option("--media-url <url>", "MMS media URL; repeat for multiple", collect, [])
     .action(
       withErrorHandler(async function (

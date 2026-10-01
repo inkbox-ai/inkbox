@@ -341,6 +341,13 @@ confirms the teardown asynchronously, so the printed call can still show
 its live status for a moment; a call that has already ended (or has no
 active carrier leg yet) surfaces the server's 409.
 
+For keypad input on a live client-driven call, the agent sends
+`{"event": "dtmf", "digits": "1"}` through the call's media WebSocket. Each event
+accepts one to 30 keys from `0-9`, `*`, and `#`, in order. At most 20 bursts per
+call can be outstanding, including the one being sent; further bursts are ignored.
+No acknowledgment is sent; wait for the menu's response before another burst.
+Do not retry blindly.
+
 ## Text Messages
 
 All text commands are identity-scoped and require `-i <handle>`.
@@ -592,7 +599,7 @@ inkbox mailbox get <email-address>               # includes storageUsedBytes / s
 inkbox mailbox update <email-address> [--filter-mode whitelist|blacklist]
 inkbox mailbox client-settings <email-address>   # IMAP/SMTP settings for a mail client
 # To attach a webhook receiver, use `inkbox webhook subscription create
-# --mailbox-id <id> --url <url> --event-type message.received ...`.
+# --agent-identity-id <id> --url <url> --event-type message.received ...`.
 ```
 
 `mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `mailbox update --filter-mode` is the **deprecated** channel path (admin-only; prints a stderr change note when the value actually changes). Prefer `inkbox identity update <handle> --mail-filter-mode whitelist|blacklist`, which sets the mode on the identity and prints no change note.
@@ -767,6 +774,17 @@ inkbox notes access revoke <note-id> <identity-id>
 
 ## Whoami, Signing Keys, Webhooks
 
+**Availability:** Mixed-event identity subscriptions and explicit identity scope
+require SDK/CLI **0.7.8 or later** and `GET /webhooks/catalog` returning
+`supports_identity_subscriptions: true`. Until then, use separate mail, text, and
+identity-event subscriptions with their existing mailbox, phone, and identity selectors;
+omit the scope option. The examples in this section that combine families or create
+mail/text subscriptions by identity assume that capability is available. Explicit
+identity-wide listing fails clearly when the capability is missing; it does not fall
+back to a partial list. Updating or deleting a mixed subscription requires CLI 0.7.8
+or later and `--scope identity`; never omit scope to work around an older CLI.
+
+
 Each agent identity has its own webhook signing key. Manage it with the
 per-identity commands; the org-level `inkbox signing-key create` is deprecated
 (with an agent-scoped key it still rotates that identity's key; with an admin key
@@ -780,29 +798,31 @@ inkbox signing-key create                     # DEPRECATED — use the per-ident
 inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
 
 # Webhook subscriptions (fan-out per (owner, url, event_types)):
-inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>]
-inkbox webhook subscription create --mailbox-id <id> --url <url> --event-type message.received
-inkbox webhook subscription create --phone-number-id <id> --url <url> \
+inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>] [--scope identity]
+inkbox webhook subscription create --agent-identity-id <id> --url <url> --event-type message.received
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type imessage.received --event-type imessage.reaction_received
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type call.ended
 # Opt into per-class conversation context on received events (count:N | window:H):
-inkbox webhook subscription create --mailbox-id <id> --url <url> \
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
 # Bearer token sent as Authorization on every delivery (returned by reads):
-inkbox webhook subscription create --mailbox-id <id> --url <url> \
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type message.received --auth-token-stdin   # token read from stdin
-inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
+inkbox webhook subscription update <sub-id> --scope identity [--url <url>] [--event-type <type>...] \
   [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context] \
   [--auth-token-stdin] [--clear-auth-token]
-inkbox webhook subscription delete <sub-id>
+inkbox webhook subscription delete <sub-id> --scope identity
 ```
+
+Owner-filtered lists retain single-family views unless `--scope identity` is supplied. Use `--agent-identity-id <id> --scope identity` to include mixed subscriptions and every notification family.
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 
-The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
+The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. Only received mail, text and iMessage events include context; other selected events ignore it. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
 `--auth-token-stdin` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the token: `get` and `--json` output include `authToken`, while list tables show only the `hasAuthToken` flag. The token is only ever read from stdin via `--auth-token-stdin`, so it never lands in argv or shell history. On `update` it replaces the stored token and `--clear-auth-token` removes it (mutually exclusive).
 
@@ -815,13 +835,13 @@ any of:
 - **Mail** (envelope): `message.received`, `message.sent`,
   `message.forwarded`, `message.delivered`, `message.bounced`,
   `message.failed`. Subscribe via `inkbox webhook subscription create
-  --mailbox-id ...`. On `message.received`, `data.message` carries the
+  --agent-identity-id ...`. On `message.received`, `data.message` carries the
   plain-text `body` (whole under a size cap, else a prefix with
   `body_truncated: true`); when truncated, fetch the full message by its
   `id` (via the API/SDK) — not `message_id` (the RFC 5322 header).
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
-  `inkbox webhook subscription create --phone-number-id ...`.
+  `inkbox webhook subscription create --agent-identity-id ...`.
 - **iMessage** (envelope): `imessage.received`,
   `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`,
   `imessage.delivery_failed`. Subscribe via `inkbox webhook
@@ -838,11 +858,9 @@ any of:
   `failed`; `null` iff the call was client-driven) and
   `data.post_call_action_items` (open items only, `seq`-ascending).
   Voice AI calls fire `call.ended` on every terminal state, not just
-  connected calls. One subscription carries a single channel, so an
-  identity sub cannot mix `imessage.*` with `call.ended`.
+  connected calls. Notification families can share one identity subscription.
 - **Inbound call** (flat, no envelope; response controls call routing).
-  Not subscribable; URL stays on the phone-number resource as
-  `incomingCallWebhookUrl` (contrast the replayable `call.ended` above).
+  Not subscribable; configure the identity incoming-call action (contrast the replayable `call.ended` above).
 
 Mail and text payloads carry `data.contacts` and
 `data.agent_identities` (both always-present lists; mail entries also
@@ -864,6 +882,12 @@ SDK skills (`inkbox-ts`, `inkbox-python`).
 - Prefer `--json` for anything that needs stable parsing.
 - Use the identity handle, not mailbox address or phone number, for identity-scoped commands.
 - If a command fails because the identity lacks a mailbox or phone number, inspect it first with `inkbox identity get <handle>`.
+
+
+Subscriptions are identity-owned and may combine all notification event families
+without configured channels. Update replaces the entire
+event selection, and delete removes the whole subscription. Legacy mailbox/phone
+selectors remain accepted for compatibility; prefer `--agent-identity-id`.
 
 ## Custom email signatures
 
@@ -901,7 +925,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
+expiry, transfer, and recovery rules. These methods require version 0.7.12 or later.
 
 ```bash
 inkbox organization-domain create example.com
@@ -918,3 +942,84 @@ by checking DNS. `identity domain-affiliation set` requires `--visibility public
 or `--visibility hidden`. Use `remove <handle>` to stop all affiliation assertions.
 Use `--json` to inspect the complete response. Public search also accepts `--query`,
 `--cursor`, and `--limit`; preserve the same filters on every page.
+
+## Message retries
+
+Send commands generate a key and preserve it during bounded request retries.
+Use `--idempotency-key` on email, text, or iMessage sends for a workflow that repeats
+the same intended message across command invocations. Preserve the exact input.
+`inkbox send-lookup --help` describes read-only ID recovery. Check current delivery
+through the existing get commands, including `imessage get`. Request retries do
+not guarantee delivery retries. Errors print the original request key. Do not
+submit a new message solely because confirmation is missing.
+
+## Slack
+
+Identity-scoped Slack commands accept `-i/--identity <handle>` or
+`--identity-id <uuid>` (exactly one when supplied). Search can omit both with
+agent credentials; other identity-scoped commands require one. Live workspace
+operations require `--connection-id`; search accepts it only as an optional filter.
+
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/cli/README.md#slack) for implemented SDK/CLI methods.
+Use an existing identity. Select a workspace explicitly for live reads and mutations.
+Organization-member sessions, organization admin API keys, and claimed agent keys can
+save and list setup workspaces in their organization. Claimed agent keys can prepare
+and install only their own identity’s app; organization credentials can select an
+identity in their organization. Installation availability does not imply preparation
+is ready. Save both app-configuration tokens for the target workspace, then prepare
+the identity’s app using that saved provisioning-workspace UUID.
+Use `save_provisioning_workspace` / `saveProvisioningWorkspace` or CLI
+`slack provisioning-workspace save --credentials-file <path>` (use `-` for stdin).
+Reuse safe metadata from `list_provisioning_workspaces` / `listProvisioningWorkspaces`.
+Tokens are write-only; never put them in command arguments or output.
+Pass the saved ID to `start_setup` (Python/Rust), `startSetup` (TypeScript), or
+`slack setup start --provisioning-workspace-id <uuid>`.
+Poll connection reads until `setup.status` is `ready`, with a bounded wait and a few
+seconds between reads. For `needs_credentials`, update workspace credentials first.
+Do not blindly retry an unknown setup outcome. Start installation only when ready.
+Open the returned URL in a browser; treat the full URL as a secret. After approval,
+list connections again to confirm the expected workspace is connected. The app is
+bound to its chosen workspace; no client-invitation workflow is supported.
+Join accessible
+public channels or invite the agent to selected private channels. Slack Connect is
+supported when the selected connection has access.
+
+Use explicit connection IDs and stable caller-provided idempotency keys for sends and
+utility mutations (reactions, pins, own-message edits/deletions, join/leave, uploads,
+and native processing status). Poll sends only while sending and operations only while
+in_progress. Unknown is terminal uncertainty and must not be blindly repeated.
+Recover lost send responses with `get_action_by_key` / `getActionByKey` or CLI
+`slack action get-by-key --connection-id <uuid> --idempotency-key <key>`.
+A 404 does not prove no send occurred; never use missing lookup data to justify a
+new key. Fresh failed rate-limited sends may include `retry_after` / `retryAfter`
+seconds; honor that delay before a deliberate new attempt. Stored action reads and
+same-key replays do not retain this hint. A recorded terminal action is never resent
+by replaying its key. Send
+and utility keys use independent per-connection namespaces; utilities emit no outcome
+webhook, so read their status through operation lookup. Inspect
+capabilities for missing scopes; native processing support remains workspace-dependent.
+General file uploads accept standard base64 for 1 byte..10 MiB (CLI: a local --file).
+
+Retained history is separate from bounded live reads and webhook diagnostics. Capture
+is automatic for observed messages in accessible conversations, with no time-based
+retention limit. Organization-member sessions and organization admin API keys can
+disconnect connections, set retention, or purge retained history; claimed agent keys
+cannot. Purging history does not stop capture. Omitted retention resets to no time limit.
+For search, start with `inkbox slack search --q "release notes"` across the identity's workspace connections.
+Do not loop over connections or require a connection ID for a general search.
+Agent credentials infer the identity; other credentials require an explicit identity.
+Use a connection filter only to narrow the search. Results include connection IDs.
+Use plain English keywords, ranked by relevance then recency; not Slack query
+operators or semantic search. Attachment bodies are not indexed. Follow the returned
+cursor with the same filters even for short or empty pages, until no cursor remains.
+Search errors are not evidence of no matches.
+Use archive listing, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
+from one page or a completed channel import. Purge deletes retained history without stopping new capture. Archive reads require current connection/conversation access.
+Slack webhooks select incoming messages with `slack.dm_received`,
+`slack.group_dm_received`, `slack.channel_message_received`, `slack.mention_received`,
+and `slack.thread_reply_received`. Overlapping selections produce one logical delivery per subscription,
+choosing the first selected match in mention, thread, DM, group DM, channel priority.
+Subscriptions cover all accessible conversations across connected workspaces.
+There are no Slack-specific filters. Context applies only to received mail, text,
+and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
+watched threads, and its own memory. Webhook delivery order is not guaranteed.

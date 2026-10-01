@@ -85,9 +85,11 @@ class HttpTransport:
         *,
         params: dict[str, Any] | None = None,
         timeout: float | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
         cleaned = {k: v for k, v in (params or {}).items() if v is not None}
-        resp = self._send("GET", path, params=cleaned, timeout=timeout)
+        resp = self._send("GET", path, params=cleaned, timeout=timeout,
+                          **({"headers": headers} if headers is not None else {}))
         _raise_for_status(resp)
         return resp.json()
 

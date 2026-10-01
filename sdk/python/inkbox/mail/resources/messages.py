@@ -9,20 +9,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
-from inkbox.imessage.types import _validate_idempotency_key
+from inkbox._message_requests import post_message
 from inkbox.mail.types import ForwardMode, Message, MessageDetail, MessageDirection
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 _DEFAULT_PAGE_SIZE = 50
-
-
-def _idempotency_headers(key: str | None) -> dict[str, Any]:
-    """``post`` kwargs carrying an idempotency key, or nothing when unset."""
-    if key is None:
-        return {}
-    return {"headers": {"Idempotency-Key": _validate_idempotency_key(key)}}
 
 
 class MessagesResource:
@@ -166,16 +159,13 @@ class MessagesResource:
                 debounce collapses repeats), so prefer ``first_opened_at``
                 as the reliable open signal. Note: pixels can raise spam
                 scores.
-            idempotency_key: Makes this send safe to retry after a lost or
-                timed-out response — a retry under the same key cannot put a
-                second copy of the email on the wire. At-most-once, not a
-                replay: a repeat under a key that already sent raises 409
-                rather than returning the original message, and 503 when the
-                earlier attempt's outcome is unresolved. Keys are scoped per
-                organization and per method, last 7 days, and do not cover the
-                request body, so use a fresh key for each distinct email.
-                Always retry with the *same* key: a new key is a new send, so
-                minting one after a failure is what duplicates the email.
+            idempotency_key: Optional stable key for retries across calls. A key
+                is generated automatically for each call and preserved during
+                bounded request retries. The same key and input replay the
+                original response for seven days; changed input returns 409.
+                Keys are scoped to the organization, mailbox, and operation.
+                Read the message for current delivery status. A new key is a
+                new message, even when the content is unchanged.
 
         Returns:
             The sent message metadata.
@@ -213,10 +203,10 @@ class MessagesResource:
         if track_opens:
             body["track_opens"] = True
 
-        data = self._http.post(
+        data = post_message(self._http,
             f"/mailboxes/{email_address}/messages",
             json=body,
-            **_idempotency_headers(idempotency_key),
+            idempotency_key=idempotency_key,
         )
         return Message._from_dict(data)
 
@@ -271,10 +261,10 @@ class MessagesResource:
         if reply_to is not None:
             body["reply_to"] = reply_to
 
-        data = self._http.post(
+        data = post_message(self._http,
             f"/mailboxes/{email_address}/messages/{message_id}/reply-all",
             json=body,
-            **_idempotency_headers(idempotency_key),
+            idempotency_key=idempotency_key,
         )
         return Message._from_dict(data)
 
@@ -376,10 +366,10 @@ class MessagesResource:
         if track_opens:
             body["track_opens"] = True
 
-        data = self._http.post(
+        data = post_message(self._http,
             f"/mailboxes/{email_address}/messages/{message_id}/forward",
             json=body,
-            **_idempotency_headers(idempotency_key),
+            idempotency_key=idempotency_key,
         )
         return Message._from_dict(data)
 

@@ -121,18 +121,7 @@ describe("WebhookSubscriptionsResource.create", () => {
     }));
   });
 
-  it("rejects contextConfig for A2A subscriptions", async () => {
-    const { resource, http } = makeResource();
-    await expect(
-      resource.create({
-        agentIdentityId: "identity",
-        url: "https://x/y",
-        eventTypes: ["a2a.task.created"],
-        contextConfig: { email: { mode: "count", count: 1 } },
-      }),
-    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
-    expect(http.post).not.toHaveBeenCalled();
-  });
+
 
   it("rejects when both FKs are provided", async () => {
     const { resource } = makeResource();
@@ -208,30 +197,12 @@ describe("WebhookSubscriptionsResource.create", () => {
         url: "https://x/y",
         eventTypes: ["phone.incoming_call"],
       }),
-    ).rejects.toThrow(/incomingCallWebhookUrl/);
+    ).rejects.toThrow(/incoming-call action/);
   });
 
-  it("rejects channel mismatch — mailbox with text.*", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        mailboxId: "m",
-        url: "https://x/y",
-        eventTypes: ["text.received"],
-      }),
-    ).rejects.toThrow(/does not belong/);
-  });
 
-  it("rejects channel mismatch — phone with message.*", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        phoneNumberId: "p",
-        url: "https://x/y",
-        eventTypes: ["message.received"],
-      }),
-    ).rejects.toThrow(/does not belong/);
-  });
+
+
 
   it("rejects null url", async () => {
     const { resource } = makeResource();
@@ -497,7 +468,7 @@ describe("WebhookSubscriptionsResource.update", () => {
     const { resource } = makeResource();
     await expect(
       resource.update("subid", { eventTypes: ["phone.incoming_call"] }),
-    ).rejects.toThrow(/incomingCallWebhookUrl/);
+    ).rejects.toThrow(/incoming-call action/);
   });
 
   it("rejects null url on update", async () => {
@@ -523,24 +494,9 @@ describe("WebhookSubscriptionsResource.update", () => {
     ).rejects.toThrow(/integer in 1\.\.168/);
   });
 
-  it("rejects mixed event channels on update", async () => {
-    const { resource, http } = makeResource();
-    await expect(
-      resource.update("subid", { eventTypes: ["message.received", "text.received"] }),
-    ).rejects.toThrow(/one channel/);
-    expect(http.patch).not.toHaveBeenCalled();
-  });
 
-  it("rejects contextConfig with A2A events on update", async () => {
-    const { resource, http } = makeResource();
-    await expect(
-      resource.update("subid", {
-        eventTypes: ["a2a.task.message"],
-        contextConfig: { texts: { mode: "count", count: 1 } },
-      }),
-    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
-    expect(http.patch).not.toHaveBeenCalled();
-  });
+
+
 });
 
 describe("WebhookSubscriptionsResource.list", () => {
@@ -639,27 +595,9 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     expect(sub.phoneNumberId).toBeNull();
   });
 
-  it("rejects imessage events on a mailbox owner", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        mailboxId: "22222222-2222-2222-2222-222222222222",
-        url: "https://x.example.com/hook",
-        eventTypes: ["imessage.received"],
-      }),
-    ).rejects.toThrow(/agent_identity/);
-  });
 
-  it("rejects text events on an agent identity owner", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        agentIdentityId: IDENTITY_ID,
-        url: "https://x.example.com/hook",
-        eventTypes: ["text.received"],
-      }),
-    ).rejects.toThrow(/phone_number/);
-  });
+
+
 
   it("accepts call.ended on an agent identity owner", async () => {
     const { resource, http } = makeResource();
@@ -682,20 +620,7 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     expect(sub.agentIdentityId).toBe(IDENTITY_ID);
   });
 
-  it("rejects mixed identity-owned events on one subscription", async () => {
-    const { resource, http } = makeResource();
-    const eventTypes = [
-      "imessage.received",
-      "call.ended",
-      "a2a.sent_task.updated",
-    ];
-    await expect(resource.create({
-      agentIdentityId: IDENTITY_ID,
-      url: "https://x.example.com/hook",
-      eventTypes,
-    })).rejects.toThrow(/one channel/);
-    expect(http.post).not.toHaveBeenCalled();
-  });
+
 
   it("accepts A2A events on an identity subscription", async () => {
     const { resource, http } = makeResource();
@@ -714,16 +639,7 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     expect(sub.eventTypes).toEqual(eventTypes);
   });
 
-  it("rejects call.ended on a mailbox owner", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        mailboxId: "22222222-2222-2222-2222-222222222222",
-        url: "https://x.example.com/hook",
-        eventTypes: ["call.ended"],
-      }),
-    ).rejects.toThrow(/agent_identity/);
-  });
+
 
   it("rejects multiple owners including the identity", async () => {
     const { resource } = makeResource();
@@ -747,6 +663,40 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
       agent_identity_id: IDENTITY_ID,
     });
     expect(rows[0].agentIdentityId).toBe(IDENTITY_ID);
+    expect(http.get).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["agentIdentityId", "agent_identity_id"],
+    ["mailboxId", "mailbox_id"],
+    ["phoneNumberId", "phone_number_id"],
+  ] as const)("explicitly broadens the %s view", async (filter, wireKey) => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValueOnce({ supports_identity_subscriptions: true })
+      .mockResolvedValueOnce({ subscriptions: [] });
+    await resource.list({ [filter]: IDENTITY_ID, scope: "identity" });
+    expect(http.get.mock.calls).toEqual([
+      ["/webhooks/catalog"],
+      ["/webhooks/subscriptions", { [wireKey]: IDENTITY_ID, scope: "identity" }],
+    ]);
+  });
+
+  it.each([{}, { supports_identity_subscriptions: false }, { supports_identity_subscriptions: "true" }])(
+    "rejects unsupported identity scope without returning a partial list: %j", async (catalog) => {
+      const { resource, http } = makeResource();
+      http.get.mockResolvedValue(catalog);
+      await expect(resource.list({ scope: "identity" })).rejects.toThrow("channel-filtered lists without scope");
+      expect(http.get.mock.calls).toEqual([["/webhooks/catalog"]]);
+    },
+  );
+
+  it("checks availability again after activation", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValueOnce({}).mockResolvedValueOnce({ supports_identity_subscriptions: true })
+      .mockResolvedValueOnce({ subscriptions: [] });
+    await expect(resource.list({ scope: "identity" })).rejects.toThrow("not supported");
+    expect(await resource.list({ scope: "identity" })).toEqual([]);
+    expect(http.get).toHaveBeenCalledTimes(3);
   });
 
   it("defaults a missing agent_identity_id to null when parsing", async () => {
@@ -757,4 +707,66 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
 
     expect(rows[0].agentIdentityId).toBeNull();
   });
+});
+
+
+const ALL_NOTIFICATION_EVENTS = [
+  "message.received", "message.sent", "message.forwarded", "message.delivered",
+  "message.bounced", "message.failed", "text.received", "text.sent", "text.delivered",
+  "text.delivery_failed", "text.delivery_unconfirmed", "imessage.received",
+  "imessage.reaction_received", "imessage.sent", "imessage.delivered",
+  "imessage.delivery_failed", "call.ended", "a2a.task.created", "a2a.task.message",
+  "a2a.task.canceled", "a2a.sent_task.updated",
+];
+
+describe("identity-owned mixed notifications", () => {
+  it.each(["agentIdentityId", "mailboxId", "phoneNumberId"] as const)(
+    "accepts all events plus context through %s without looking up channels", async (selector) => {
+      const { resource, http } = makeResource();
+      const contextConfig = { email: { mode: "count" as const, count: 2 } };
+      http.post.mockResolvedValue({ ...RAW_SUBSCRIPTION, mailbox_id: null,
+        phone_number_id: null, agent_identity_id: IDENTITY_ID,
+        event_types: ALL_NOTIFICATION_EVENTS });
+      const row = await resource.create({ [selector]: IDENTITY_ID,
+        url: "https://example.com/hook", eventTypes: ALL_NOTIFICATION_EVENTS, contextConfig });
+      const wireSelector = { agentIdentityId: "agent_identity_id", mailboxId: "mailbox_id",
+        phoneNumberId: "phone_number_id" }[selector];
+      expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+        [wireSelector]: IDENTITY_ID, url: "https://example.com/hook",
+        event_types: ALL_NOTIFICATION_EVENTS, context_config: contextConfig });
+      expect(http.get).not.toHaveBeenCalled();
+      expect(row.eventTypes).toEqual(ALL_NOTIFICATION_EVENTS);
+    });
+
+  it("sends full event replacement and direct subscription deletion", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, event_types: ALL_NOTIFICATION_EVENTS });
+    const row = await resource.update(RAW_SUBSCRIPTION.id, { eventTypes: ALL_NOTIFICATION_EVENTS,
+      contextConfig: { email: { mode: "count", count: 2 } } });
+    expect(http.patch).toHaveBeenCalledWith(`/webhooks/subscriptions/${RAW_SUBSCRIPTION.id}`, {
+      event_types: ALL_NOTIFICATION_EVENTS,
+      context_config: { email: { mode: "count", count: 2 } } });
+    expect(row.eventTypes).toEqual(ALL_NOTIFICATION_EVENTS);
+    await resource.delete(row.id);
+    expect(http.delete).toHaveBeenCalledWith(`/webhooks/subscriptions/${row.id}`);
+  });
+
+  it("preserves overlap conflicts without retrying", async () => {
+    const { resource, http } = makeResource();
+    const error = new Error("Subscription events overlap an existing destination");
+    http.patch.mockRejectedValue(error);
+    await expect(resource.update(RAW_SUBSCRIPTION.id, { eventTypes: ["message.received"] })).rejects.toBe(error);
+    expect(http.patch).toHaveBeenCalledTimes(1);
+  });
+});
+
+it.each([undefined, "identity"] as const)("keeps mutation scope explicit (%s) without a catalog request", async (scope) => {
+  const { resource, http } = makeResource();
+  http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
+  await resource.update("subid", { url: "https://example.com/new", scope });
+  await resource.delete("subid", { scope });
+  const suffix = scope ? "?scope=identity" : "";
+  expect(http.patch).toHaveBeenCalledWith(`/webhooks/subscriptions/subid${suffix}`, { url: "https://example.com/new" });
+  expect(http.delete).toHaveBeenCalledWith(`/webhooks/subscriptions/subid${suffix}`);
+  expect(http.get).not.toHaveBeenCalled();
 });

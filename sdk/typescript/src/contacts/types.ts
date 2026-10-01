@@ -38,6 +38,11 @@ export interface ContactCustomField {
   label: string;
   value: string;
 }
+export interface ContactSlackAccount {
+  workspaceId: string;
+  userId: string;
+  workspaceName: string | null;
+}
 
 /**
  * Deprecated read-only compatibility metadata.
@@ -86,6 +91,7 @@ export interface Contact {
   dates: ContactDate[];
   addresses: ContactAddress[];
   customFields: ContactCustomField[];
+  slackAccounts?: ContactSlackAccount[];
   access: ContactAccess[];
   creationSource: ContactCreationSource;
   reviewStatus: ContactReviewStatus;
@@ -219,6 +225,7 @@ export interface RawContact {
   dates: RawContactDate[] | null;
   addresses: RawContactAddress[] | null;
   custom_fields: RawContactCustomField[] | null;
+  slack_accounts?: { workspace_id: string; user_id: string; workspace_name?: string | null }[] | null;
   access: RawContactAccess[] | null;
   creation_source?: ContactCreationSource;
   review_status?: ContactReviewStatus;
@@ -346,6 +353,11 @@ export function parseContact(r: RawContact): Contact {
     dates: (r.dates ?? []).map(parseContactDate),
     addresses: (r.addresses ?? []).map(parseContactAddress),
     customFields: (r.custom_fields ?? []).map(parseContactCustomField),
+    slackAccounts: (r.slack_accounts ?? []).map((account) => ({
+      workspaceId: account.workspace_id,
+      userId: account.user_id,
+      workspaceName: account.workspace_name ?? null,
+    })),
     access: (r.access ?? []).map(parseContactAccess),
     creationSource: r.creation_source ?? "backfill",
     reviewStatus: r.review_status ?? "confirmed",

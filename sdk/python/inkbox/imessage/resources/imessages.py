@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from inkbox._message_requests import post_message
 from inkbox.imessage.types import (
     IMessage,
     IMessageAssignment,
@@ -108,6 +109,12 @@ class IMessagesResource:
         )
         return IMessageNumber._from_dict(data)
 
+    def get(self, message_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> IMessage:
+        """Read one visible message and its current delivery status."""
+        params = {"agent_identity_id": str(agent_identity_id)} if agent_identity_id is not None else None
+        data = self._http.get(f"/messages/{message_id}", params=params)
+        return IMessage._from_dict(data)
+
     def send(
         self,
         *,
@@ -117,6 +124,7 @@ class IMessagesResource:
         media_urls: list[str] | None = None,
         send_style: IMessageSendStyle | str | None = None,
         agent_identity_id: UUID | str | None = None,
+        idempotency_key: str | None = None,
     ) -> IMessage:
         """Send an outbound iMessage.
 
@@ -140,6 +148,8 @@ class IMessagesResource:
             agent_identity_id: Identity to send as. Required for
                 org-wide API keys when sending by ``to``; ignored for
                 identity-scoped keys (the key's identity wins).
+            idempotency_key: Optional key to reuse across calls with identical input.
+                Omitted keys are generated per call and preserved during retries.
 
         Returns:
             The queued ``IMessage`` row. Inbound replies and reactions
@@ -175,7 +185,7 @@ class IMessagesResource:
         params: dict[str, Any] | None = None
         if agent_identity_id is not None:
             params = {"agent_identity_id": str(agent_identity_id)}
-        data = self._http.post("/messages", json=body, params=params)
+        data = post_message(self._http, "/messages", json=body, params=params, idempotency_key=idempotency_key)
         return IMessage._from_dict(data["message"])
 
     def list(

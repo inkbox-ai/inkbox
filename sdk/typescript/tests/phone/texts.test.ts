@@ -40,6 +40,7 @@ describe("TextsResource.send", () => {
     expect(http.post).toHaveBeenCalledWith(
       `/numbers/${NUM_ID}/texts`,
       { to: "+15551234567", text: "Hello" },
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
   });
 
@@ -82,6 +83,7 @@ describe("TextsResource.send", () => {
         text: "Hello group",
         media_urls: ["https://example.com/photo.jpg"],
       },
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
     expect(msg.remotePhoneNumber).toBeNull();
     expect(msg.recipients).toHaveLength(2);
@@ -98,6 +100,7 @@ describe("TextsResource.send", () => {
     expect(http.post).toHaveBeenCalledWith(
       `/numbers/${NUM_ID}/texts`,
       { conversation_id: conversationId, text: "Reply all" },
+      { headers: { "Idempotency-Key": expect.stringMatching(/^[0-9a-f-]{36}$/), "Prefer": "idempotency-replay" } },
     );
   });
 });

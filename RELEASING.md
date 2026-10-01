@@ -37,6 +37,31 @@ many commits land, so it moves with the same number as everything else.
 
 Add the release section to `CHANGELOG.md` (newest on top), then commit the bump + changelog.
 
+## Availability gate for bundled skills and documentation
+
+The marketplace installs this repository's `main` branch; it does not wait for a
+package registry release. A plugin version bump does not prevent a fresh install
+from receiving new instructions early.
+
+For a release that adds SDK or CLI features:
+
+1. Choose the next unused version and update all four packages and the bundled
+   plugin together. Do not reuse a version that is already published.
+2. Verify the matching public API is available and all package checks pass for the
+   exact release commit. Leave feature documentation and skills unmerged until the
+   packages implementing their examples are available.
+3. With publication approval, publish from that reviewed release commit in the
+   order below. Verify registry propagation by installing each exact version in a
+   clean environment and exercising its documented imports and command help.
+4. Update affected integration-plugin dependency pins and validate their install
+   and invocation paths. Inventory both runtime manifests and CI install commands.
+5. Only then merge the matching skills and publish the feature documentation. If
+   any package is unavailable, keep those instructions off `main`; do not rely on
+   users already having a cached plugin installation.
+
+Keep the root changelog canonical. Package changelogs should link to it instead
+of maintaining duplicate feature lists.
+
 ## 3. Publish — order matters
 
 Publish the **TypeScript SDK before the CLI** (the CLI depends on it; its `publish.sh` runs `npm install`, which resolves the just-published `@inkbox/sdk`). Python and Rust have no cross-deps and can go anytime.

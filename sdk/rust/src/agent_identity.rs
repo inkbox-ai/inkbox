@@ -1126,6 +1126,25 @@ impl AgentIdentity {
             .send(&number_id, to, conversation_id, text, media_urls)
     }
 
+    /// Submit or retry one text with a caller-preserved request key.
+    pub fn send_text_with_idempotency_key(
+        &self,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        key: &str,
+    ) -> Result<TextMessage> {
+        self.inkbox.texts().send_with_idempotency_key(
+            &self.require_phone_id()?,
+            to,
+            conversation_id,
+            text,
+            media_urls,
+            key,
+        )
+    }
+
     /// List text messages for this identity's phone number.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
@@ -1305,6 +1324,29 @@ impl AgentIdentity {
             .send(to, conversation_id, text, media_urls, send_style, Some(&id))
     }
 
+    /// Submit or retry one iMessage with a caller-preserved request key.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_imessage_with_idempotency_key(
+        &self,
+        to: Option<&str>,
+        conversation_id: Option<&Uuid>,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        key: &str,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_with_idempotency_key(
+            to,
+            conversation_id,
+            text,
+            media_urls,
+            send_style,
+            Some(&self.id()),
+            key,
+        )
+    }
+
     /// Send to 2–8 distinct recipients as a dedicated iMessage group.
     ///
     /// `send_style` accepts the same [`IMessageSendStyle`] values as one-to-one
@@ -1321,6 +1363,26 @@ impl AgentIdentity {
         self.inkbox
             .imessages()
             .send_group(to, text, media_urls, send_style, Some(&id))
+    }
+
+    /// Submit or retry one group message with a caller-preserved request key.
+    pub fn send_imessage_group_with_idempotency_key(
+        &self,
+        to: &[String],
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        key: &str,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_group_with_idempotency_key(
+            to,
+            text,
+            media_urls,
+            send_style,
+            Some(&self.id()),
+            key,
+        )
     }
 
     /// List this identity's iMessages, newest first.

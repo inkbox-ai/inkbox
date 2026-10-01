@@ -315,9 +315,7 @@ export type {
   IMessageRecipient,
   IMessageTriageNumber,
 } from "./imessage/types.js";
-export type {
-  IMessagesResource,
-} from "./imessage/resources/imessages.js";
+export type { IMessagesResource } from "./imessage/resources/imessages.js";
 export type {
   IMessageContactRulesResource,
   CreateIMessageContactRuleOptions,
@@ -352,6 +350,7 @@ export type {
   ContactBulkDeleteResultItem,
   ContactBulkDeleteStatus,
   ContactCustomField,
+  ContactSlackAccount,
   ContactDate,
   ContactEmail,
   ContactImportResult,
@@ -439,20 +438,12 @@ export {
 } from "./vault/crypto.js";
 
 // API keys
-export type {
-  ApiKey,
-  ApiKeyStatus,
-  CreatedApiKey,
-} from "./api_keys/types.js";
+export type { ApiKey, ApiKeyStatus, CreatedApiKey } from "./api_keys/types.js";
 export type { CreateApiKeyOptions } from "./api_keys/resources/apiKeys.js";
 
 // Tunnels
 export { TLSMode, TunnelStatus } from "./tunnels/types.js";
-export type {
-  SignedCert,
-  Tunnel,
-  TunnelSummary,
-} from "./tunnels/types.js";
+export type { SignedCert, Tunnel, TunnelSummary } from "./tunnels/types.js";
 export type { UpdateTunnelOptions } from "./tunnels/resources/tunnels.js";
 export {
   TunnelCSRStateConflict,
@@ -471,3 +462,55 @@ export type { SenderAccess } from "./sender_access.js";
 export { OrganizationDomainsResource } from "./organization_domains/resource.js";
 export type { DomainAffiliation, DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, SetDomainAffiliationOptions } from "./organization_domains/types.js";
 export type { A2APublicDirectoryListOptions } from "./a2a/types.js";
+export { MessageSendsResource, getMessageRequestKey, type MessageSendLookupOptions } from "./message_sends.js";
+
+
+export { SlackResource } from "./slack.js";
+export type {
+  SlackMessageKind,
+  SlackConnection,
+  SlackConnectionsResponse,
+  SlackSetupStatus,
+  SlackProvisioningWorkspace,
+  SlackInstallation,
+  SlackAction,
+  SlackConversationsResponse,
+  SlackMessagesResponse,
+  SlackFile,
+  SlackSendMessageOptions,
+  SlackPageOptions,
+  SlackMessagesOptions,
+} from "./slack.js";
+export type {
+  SlackWebhookEventType,
+  SlackWebhookData,
+  SlackActorProfile,
+  SlackUserProfile,
+  SlackWebhookPayload,
+} from "./webhooks/types.js";
+
+export type {
+  SlackProcessingStatus,
+  SlackOperationKind,
+  SlackOperation,
+  SlackCapability,
+  SlackCapabilitiesResponse,
+  SlackUsersResponse,
+  SlackMembersResponse,
+  SlackPinsResponse,
+  SlackReactionsResponse,
+  SlackMessageContextResponse,
+  SlackPermalinkResponse,
+  SlackArchiveSettings,
+  SlackArchiveSettingsOptions,
+  SlackArchivedMessage,
+  SlackArchivePageBoundary,
+  SlackArchiveMessagesResponse,
+  SlackArchiveCoverage,
+  SlackArchiveCoverageResponse,
+  SlackArchiveMessagesOptions,
+  SlackArchiveSearchOptions,
+  SlackSearchMessagesOptions,
+  SlackUploadFileOptions,
+  SlackMutationOptions,
+} from "./slack-operations.js";

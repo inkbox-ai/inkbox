@@ -580,6 +580,77 @@ await inkbox.mailboxes.update("alex@example.com", {
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
 
+## Webhook subscriptions
+
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+Subscriptions belong to an identity and can combine mail, text, iMessage,
+call-lifecycle, A2A, and Slack notifications, even before channels are configured.
+Existing list calls keep their single-family views. Explicitly pass
+`scope="identity"` (Python), `scope: "identity"` (TypeScript), or use Rust's
+`list_with_scope` to include every family and mixed subscription. The CLI supports
+`inkbox webhook subscription list --agent-identity-id <id> --scope identity`.
+Mixed subscriptions also require explicit identity scope for updates and deletion:
+pass `scope="identity"` in Python, `{ scope: "identity" }` in TypeScript, use Rust's
+`update_with_scope` / `delete_with_scope`, or CLI `--scope identity`. Omitted scope
+preserves legacy behavior and receives 409 when targeting a mixed subscription.
+Event-list updates replace the complete selection. Incoming-call actions remain
+separate identity settings.
+
+## Safe message retries
+
+SDK send methods automatically include `Prefer: idempotency-replay`. Raw HTTP
+callers use this preference with `Idempotency-Key`. Older requests keep their
+existing behavior. Email and SMS continue waiting for send acceptance; iMessage
+continues returning its queued acknowledgement.
+
+Email, SMS/MMS, and iMessage send calls generate a request key and reuse it during
+bounded request retries. Pass an explicit `idempotency_key` (Python) or
+`idempotencyKey` (TypeScript) when your workflow retries across separate calls.
+Rust provides `send_with_idempotency_key` variants without changing existing methods.
+
+After a failed send, recover its generated key with `get_message_request_key(error)`
+(Python, imported from `inkbox`) or `getMessageRequestKey(error)` (TypeScript,
+imported from `@inkbox/sdk`). Both handle transport and API errors. The CLI prints
+the key in its error output. Rust errors do not expose automatically generated
+keys: preserve your own key and use an explicit-key variant for cross-call recovery.
+
+A completed retry returns the original response, not current delivery status.
+Read the message or use webhooks for delivery updates. A queued response confirms
+acceptance, not delivery or a guarantee of delivery retries. Use `message_sends.lookup` (Python),
+`messageSends.lookup` (TypeScript), or `inkbox send-lookup` to recover an original ID.
+See [message send retries](https://inkbox.ai/docs/api/message-sends).
+
+Read an iMessage by ID with `imessages.get(...)`, Rust's `imessages().get(...)`,
+or `inkbox imessage get <message-id> --identity <handle>`.
+
+## Slack workspace connections
+
+Slack SDK and CLI methods require version **0.7.11 or later**.
+
+Connect an existing Inkbox identity to your Slack workspace. The
+[Python SDK](sdk/python/README.md#slack), [TypeScript SDK](sdk/typescript/README.md#slack),
+[Rust SDK](sdk/rust/README.md#slack), and [CLI](cli/README.md#slack) support reusable organization-owned workspace setup
+and direct browser handoffs, live conversations/history, durable message
+and utility actions, general file uploads/downloads, and identity-owned Slack
+webhooks with five selectable incoming-message events. Identity-wide message search spans workspace connections by default.
+Prepare the identity’s Slack app in a saved workspace before installing it;
+no identity toggle is required. Organization-member sessions, organization admin API
+keys, and claimed agent keys can save setup workspaces; claimed agent keys prepare
+and install only their own identity’s app.
+Accessible observed messages are captured automatically, independently of webhook
+subscriptions. Searchable retained history, bounded imports, and coverage are separate
+from live reads. Retention has no time limit by default; organization management
+can set a retention limit or delete existing history without stopping new capture.
+Pausing the identity stops live operations and webhook delivery while preserving
+its connections and history. Workspace approval, connection ownership, and current
+conversation access remain required.
+
 ## License
 
 MIT

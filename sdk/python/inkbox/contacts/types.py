@@ -325,6 +325,13 @@ class ContactMemorySummary:
 
 
 @dataclass
+class ContactSlackAccount:
+    workspace_id: str
+    user_id: str
+    workspace_name: str | None = None
+
+
+@dataclass
 class Contact:
     """A contact (address-book entry) owned by your organisation."""
 
@@ -362,6 +369,7 @@ class Contact:
     created_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0))
     updated_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0))
     latest_memory: ContactMemorySummary | None = None
+    slack_accounts: list[ContactSlackAccount] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Contact:
@@ -386,6 +394,10 @@ class Contact:
                 ContactCustomField._from_dict(c) for c in d.get("custom_fields") or []
             ],
             access=[ContactAccess._from_dict(a) for a in d.get("access") or []],
+            slack_accounts=[ContactSlackAccount(
+                workspace_id=a["workspace_id"], user_id=a["user_id"],
+                workspace_name=a.get("workspace_name"),
+            ) for a in d.get("slack_accounts") or []],
             creation_source=ContactCreationSource(d.get("creation_source", "backfill")),
             review_status=ContactReviewStatus(d.get("review_status", "confirmed")),
             reviewed_at=_opt_datetime(d.get("reviewed_at")),

@@ -793,3 +793,74 @@ export interface A2AWebhookPayload {
   timestamp: string;
   data: A2AWebhookData;
 }
+
+export type SlackWebhookEventType =
+  | "slack.dm_received"
+  | "slack.group_dm_received"
+  | "slack.channel_message_received"
+  | "slack.mention_received"
+  | "slack.thread_reply_received"
+  | "slack.message_updated"
+  | "slack.message_deleted"
+  | "slack.reaction_added"
+  | "slack.reaction_removed"
+  | "slack.member_joined"
+  | "slack.member_left"
+  | "slack.channel_updated"
+  | "slack.file_shared"
+  | "slack.file_changed"
+  | "slack.file_deleted"
+  | "slack.pin_added"
+  | "slack.pin_removed"
+  | "slack.connection_changed"
+  | "slack.message_sent"
+  | "slack.message_send_failed"
+  | "slack.message_send_unknown"
+  | "slack.interaction"
+  | "slack.session_stopped";
+export interface SlackUserProfile {
+  display_name?: string | null;
+  real_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  title?: string | null;
+  status_text?: string | null;
+  status_emoji?: string | null;
+  image_48?: string | null;
+  image_72?: string | null;
+  image_192?: string | null;
+}
+export interface SlackActorProfile {
+  id: string;
+  name?: string | null;
+  real_name?: string | null;
+  tz?: string | null;
+  tz_label?: string | null;
+  team_id?: string | null;
+  is_bot?: boolean | null;
+  is_app_user?: boolean | null;
+  deleted?: boolean | null;
+  tz_offset?: number | null;
+  profile?: SlackUserProfile | null;
+}
+export interface SlackWebhookData {
+  identity_id: string;
+  connection_id: string;
+  workspace_id: string;
+  conversation_id?: string | null;
+  message_ts?: string | null;
+  thread_ts?: string | null;
+  actor_id?: string | null;
+  actor_profile?: SlackActorProfile | null;
+  contact_id?: string | null;
+  message_kinds: import("../slack.js").SlackMessageKind[];
+  event: Record<string, unknown>;
+}
+export interface SlackWebhookPayload {
+  id: string;
+  event_type: SlackWebhookEventType;
+  timestamp: string;
+  data: SlackWebhookData;
+}

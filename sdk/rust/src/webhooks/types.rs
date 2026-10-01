@@ -1489,3 +1489,134 @@ mod tests {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Rejects unrecognized event names; update the SDK to parse new event types.
+pub enum SlackWebhookEventType {
+    #[serde(rename = "slack.dm_received")]
+    DmReceived,
+    #[serde(rename = "slack.group_dm_received")]
+    GroupDmReceived,
+    #[serde(rename = "slack.channel_message_received")]
+    ChannelMessageReceived,
+    #[serde(rename = "slack.mention_received")]
+    MentionReceived,
+    #[serde(rename = "slack.thread_reply_received")]
+    ThreadReplyReceived,
+    #[serde(rename = "slack.message_updated")]
+    MessageUpdated,
+    #[serde(rename = "slack.message_deleted")]
+    MessageDeleted,
+    #[serde(rename = "slack.reaction_added")]
+    ReactionAdded,
+    #[serde(rename = "slack.reaction_removed")]
+    ReactionRemoved,
+    #[serde(rename = "slack.member_joined")]
+    MemberJoined,
+    #[serde(rename = "slack.member_left")]
+    MemberLeft,
+    #[serde(rename = "slack.channel_updated")]
+    ChannelUpdated,
+    #[serde(rename = "slack.file_shared")]
+    FileShared,
+    #[serde(rename = "slack.file_changed")]
+    FileChanged,
+    #[serde(rename = "slack.file_deleted")]
+    FileDeleted,
+    #[serde(rename = "slack.pin_added")]
+    PinAdded,
+    #[serde(rename = "slack.pin_removed")]
+    PinRemoved,
+    #[serde(rename = "slack.connection_changed")]
+    ConnectionChanged,
+    #[serde(rename = "slack.message_sent")]
+    MessageSent,
+    #[serde(rename = "slack.message_send_failed")]
+    MessageSendFailed,
+    #[serde(rename = "slack.message_send_unknown")]
+    MessageSendUnknown,
+    #[serde(rename = "slack.interaction")]
+    Interaction,
+    #[serde(rename = "slack.session_stopped")]
+    SessionStopped,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackUserProfile {
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub real_name: Option<String>,
+    #[serde(default)]
+    pub first_name: Option<String>,
+    #[serde(default)]
+    pub last_name: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub phone: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub status_text: Option<String>,
+    #[serde(default)]
+    pub status_emoji: Option<String>,
+    #[serde(default)]
+    pub image_48: Option<String>,
+    #[serde(default)]
+    pub image_72: Option<String>,
+    #[serde(default)]
+    pub image_192: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackActorProfile {
+    pub id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub real_name: Option<String>,
+    #[serde(default)]
+    pub tz: Option<String>,
+    #[serde(default)]
+    pub tz_label: Option<String>,
+    #[serde(default)]
+    pub team_id: Option<String>,
+    #[serde(default)]
+    pub is_bot: Option<bool>,
+    #[serde(default)]
+    pub is_app_user: Option<bool>,
+    #[serde(default)]
+    pub deleted: Option<bool>,
+    #[serde(default)]
+    pub tz_offset: Option<i64>,
+    #[serde(default)]
+    pub profile: Option<SlackUserProfile>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackWebhookData {
+    pub identity_id: String,
+    pub connection_id: String,
+    pub workspace_id: String,
+    #[serde(default)]
+    pub conversation_id: Option<String>,
+    #[serde(default)]
+    pub message_ts: Option<String>,
+    #[serde(default)]
+    pub thread_ts: Option<String>,
+    #[serde(default)]
+    pub actor_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_profile: Option<SlackActorProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contact_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub message_kinds: Vec<crate::slack::SlackMessageKind>,
+    #[serde(default)]
+    pub event: serde_json::Map<String, serde_json::Value>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackWebhookPayload {
+    pub id: String,
+    pub event_type: SlackWebhookEventType,
+    pub timestamp: String,
+    pub data: SlackWebhookData,
+}

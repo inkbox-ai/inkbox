@@ -190,8 +190,12 @@ unread email and recent SMS, iMessage, calls, and A2A tasks; fetch only the
 bounded conversation context needed; then persist a cursor or last-success time
 so the next run does not reply twice.
 
-Use webhooks when the agent needs prompt delivery. Subscribe to only the event
-types and identity resources the agent needs, verify every signature against the
+Use webhooks when the agent needs prompt delivery. With SDK/CLI 0.7.8 or later and
+`GET /webhooks/catalog` advertising `supports_identity_subscriptions: true`, one
+identity-owned subscription can combine notification families even before optional
+channels are configured. Until then, keep separate subscriptions using mailbox
+selectors for mail, phone selectors for text, and identity selectors for identity events.
+Subscribe to only the event types and identities the agent needs, verify every signature against the
 raw request body, return quickly, and process idempotently. Use an Inkbox tunnel
 when the receiver runs locally; see `inkbox-tunnels` for setup and recovery.
 
@@ -209,3 +213,61 @@ scope. A safe default instruction is:
 
 Do not create a schedule or authorize automatic replies without the user's
 approval.
+
+## Slack
+
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/README.md#slack-workspace-connections) for implemented SDK/CLI methods.
+Use an existing identity and select the intended connected workspace explicitly.
+Organization-member sessions, organization admin API keys, and claimed agent keys can
+save and list setup workspaces in their organization. Claimed agent keys can prepare
+and install only their own identity’s app; organization credentials can select an
+identity in their organization. Installation availability does not imply preparation
+is ready. Save both app-configuration tokens for the target workspace, then prepare
+the identity’s app using that saved provisioning-workspace UUID.
+Use `save_provisioning_workspace` / `saveProvisioningWorkspace` or CLI
+`slack provisioning-workspace save --credentials-file <path>` (use `-` for stdin).
+Reuse safe metadata from `list_provisioning_workspaces` / `listProvisioningWorkspaces`.
+Tokens are write-only; never put them in command arguments or output.
+Pass the saved ID to `start_setup` (Python/Rust), `startSetup` (TypeScript), or
+`slack setup start --provisioning-workspace-id <uuid>`.
+Poll connection reads until `setup.status` is `ready`, with a bounded wait and a few
+seconds between reads. For `needs_credentials`, update workspace credentials first.
+Do not blindly retry an unknown setup outcome. Start installation only when ready.
+Open the returned URL in a browser; treat the full URL as a secret. After approval,
+list connections again to confirm the expected workspace is connected. The app is
+bound to its chosen workspace; no client-invitation workflow is supported.
+Join accessible
+public channels or invite the agent to selected private channels. Slack Connect is
+supported when the selected connection has access.
+
+Use explicit connection IDs and stable caller-provided idempotency keys for sends and
+utility mutations (reactions, pins, own-message edits/deletions, join/leave, uploads,
+and native processing status). Poll sends only while sending and operations only while
+in_progress. Unknown is terminal uncertainty and must not be blindly repeated.
+Recover lost send responses with `get_action_by_key` / `getActionByKey` or CLI
+`slack action get-by-key --connection-id <uuid> --idempotency-key <key>`.
+A 404 does not prove no send occurred; never use missing lookup data to justify a
+new key. Fresh failed rate-limited sends may include `retry_after` / `retryAfter`
+seconds; honor that delay before a deliberate new attempt. Stored action reads and
+same-key replays do not retain this hint. A recorded terminal action is never resent
+by replaying its key. Send
+and utility keys use independent per-connection namespaces; utilities emit no outcome
+webhook, so read their status through operation lookup. Inspect
+capabilities for missing scopes; native processing support remains workspace-dependent.
+General file uploads accept standard base64 for 1 byte..10 MiB (CLI: a local --file).
+
+Retained history is separate from bounded live reads and webhook diagnostics. Capture
+is automatic for observed messages in accessible conversations, with no time-based
+retention limit. Organization-member sessions and organization admin API keys can
+disconnect connections, set retention, or purge retained history; claimed agent keys
+cannot. Purging history does not stop capture. Omitted retention resets to no time limit.
+Use archive listing/search, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
+from one page or a completed channel import. Purge deletes retained history without stopping new capture. Archive reads require current connection/conversation access.
+Slack webhooks select incoming messages with `slack.dm_received`,
+`slack.group_dm_received`, `slack.channel_message_received`, `slack.mention_received`,
+and `slack.thread_reply_received`. Overlapping selections produce one logical delivery per subscription,
+choosing the first selected match in mention, thread, DM, group DM, channel priority.
+Subscriptions cover all accessible conversations across connected workspaces.
+There are no Slack-specific filters. Context applies only to received mail, text,
+and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
+watched threads, and its own memory. Webhook delivery order is not guaranteed.

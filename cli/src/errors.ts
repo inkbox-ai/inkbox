@@ -40,10 +40,13 @@ function wantsJson(command: unknown): boolean {
 }
 
 function renderJsonError(err: unknown): void {
+  const requestKey = err instanceof Error && "idempotencyKey" in err && typeof err.idempotencyKey === "string"
+    ? { idempotencyKey: err.idempotencyKey } : {};
   if (err instanceof InkboxAPIError) {
     console.error(diagnosticJson({
       ...noticeFields(),
       error: {
+        ...requestKey,
         type: err.name,
         message: renderDetail(err.detail),
         statusCode: err.statusCode,
@@ -55,7 +58,7 @@ function renderJsonError(err: unknown): void {
     return;
   }
   if (err instanceof Error) {
-    console.error(diagnosticJson({ error: { type: err.name, message: err.message }, ...noticeFields() }));
+    console.error(diagnosticJson({ error: { type: err.name, message: err.message, ...requestKey }, ...noticeFields() }));
     return;
   }
   console.error(diagnosticJson({ error: { type: "UnknownError", message: "An unknown error occurred." }, ...noticeFields() }));
@@ -125,6 +128,9 @@ export function withErrorHandler<T extends unknown[]>(
           console.error("An unknown error occurred.");
         }
         if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
+        if (!wantsJson(this) && err instanceof Error && "idempotencyKey" in err && typeof err.idempotencyKey === "string") {
+          console.error(`Request key: ${err.idempotencyKey}. Keep this key when retrying this message.`);
+        }
         if (!wantsJson(this)) renderNotices();
         // Allow piped stderr to drain before exiting, including large JSON errors.
         process.exitCode = 1;

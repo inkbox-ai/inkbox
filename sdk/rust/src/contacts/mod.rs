@@ -32,5 +32,6 @@ pub use types::{
     ContactFactCitationAvailability, ContactFactCitationDetail, ContactFactDeleteResult,
     ContactFactKind, ContactFactOrigin, ContactImportResult, ContactImportResultItem,
     ContactImportStatus, ContactMemorySummary, ContactNameSource, ContactPhone,
-    ContactReviewStatus, ContactVCardExportResult, ContactWebsite, UpdateContactAccess,
+    ContactReviewStatus, ContactSlackAccount, ContactVCardExportResult, ContactWebsite,
+    UpdateContactAccess,
 };
