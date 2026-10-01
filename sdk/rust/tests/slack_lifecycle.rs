@@ -1,5 +1,7 @@
 use httpmock::prelude::*;
-use inkbox::{Inkbox, SlackAppDeletionStatus, SlackHistoryMessagesOptions, SlackPageOptions};
+use inkbox::{
+    Inkbox, SlackAppDeletionStatus, SlackAppDeletionsOptions, SlackHistoryMessagesOptions,
+};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -47,15 +49,17 @@ fn lifecycle_and_history_preserve_pending_outcomes_and_scope() {
         when.method(GET)
             .path("/api/v1/slack/application-deletions")
             .query_param("cursor", job.to_string())
+            .query_param("unresolved_only", "true")
             .query_param("limit", "2");
         then.json_body(f["deletions"].clone());
     });
     assert_eq!(
         client
             .slack()
-            .list_application_deletions(&SlackPageOptions {
+            .list_application_deletions(&SlackAppDeletionsOptions {
                 cursor: Some(job.to_string()),
-                limit: Some(2)
+                limit: Some(2),
+                unresolved_only: true,
             })
             .unwrap()
             .next_cursor,

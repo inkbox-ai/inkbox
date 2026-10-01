@@ -20,8 +20,9 @@ it("keeps asynchronous deletion honest and preserves retained-history filters an
   expect((await client.slack.deleteApplication(f.deletion.application_id)).status).toBe("pending");
   expect(fetch.mock.calls.at(-1)?.[1]?.method).toBe("DELETE");
   reply(f.deletions);
-  expect((await client.slack.listApplicationDeletions({ cursor: f.deletion.id, limit: 2 })).nextCursor).toBe(f.deletion.id);
+  expect((await client.slack.listApplicationDeletions({ cursor: f.deletion.id, limit: 2, unresolvedOnly: true })).nextCursor).toBe(f.deletion.id);
   expect(new URL(String(fetch.mock.calls.at(-1)?.[0])).searchParams.get("cursor")).toBe(f.deletion.id);
+  expect(new URL(String(fetch.mock.calls.at(-1)?.[0])).searchParams.get("unresolved_only")).toBe("true");
   reply(f.deletion);
   await client.slack.retryApplicationDeletion(f.deletion.id);
   expect(new URL(String(fetch.mock.calls.at(-1)?.[0])).pathname).toBe(`/api/v1/slack/application-deletions/${f.deletion.id}/retry`);

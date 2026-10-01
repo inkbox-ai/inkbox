@@ -26,9 +26,9 @@ def test_app_and_cleanup_contracts_keep_pending_honest(wire):  # noqa: F811
     assert accepted.status == "pending"
     assert requests[-1].method == "DELETE"
     assert requests[-1].url.path.endswith(f"/applications/{APP}")
-    page = client.slack.list_application_deletions(cursor=JOB, limit=2)
+    page = client.slack.list_application_deletions(cursor=JOB, limit=2, unresolved_only=True)
     assert page.next_cursor == UUID(JOB)
-    assert dict(requests[-1].url.params) == {"cursor": JOB, "limit": "2"}
+    assert dict(requests[-1].url.params) == {"cursor": JOB, "limit": "2", "unresolved_only": "true"}
     assert client.slack.retry_application_deletion(JOB).status == "pending"
     assert requests[-1].method == "POST"
     assert requests[-1].url.path.endswith(f"/application-deletions/{JOB}/retry")

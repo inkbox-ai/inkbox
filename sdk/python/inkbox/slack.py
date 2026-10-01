@@ -183,11 +183,12 @@ class SlackResource(SlackOperationsMixin):
             f"/slack/applications/{quote(str(application_id), safe='')}"))
 
     def list_application_deletions(
-        self, *, cursor: UUID | str | None = None, limit: int = 50,
+        self, *, cursor: UUID | str | None = None, limit: int = 50, unresolved_only: bool = False,
     ) -> SlackAppDeletionsResponse:
         """One cleanup page, including deleted identities; requires a human JWT."""
         raw = self._http.get("/slack/application-deletions", params={
             "cursor": str(cursor) if cursor is not None else None, "limit": limit,
+            "unresolved_only": unresolved_only,
         })
         return SlackAppDeletionsResponse(
             [_parse(SlackAppDeletion, row) for row in raw["deletions"]],

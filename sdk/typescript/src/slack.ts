@@ -132,6 +132,9 @@ export interface SlackPageOptions {
   limit?: number;
   cursor?: string | null;
 }
+export interface SlackAppDeletionsOptions extends SlackPageOptions {
+  unresolvedOnly?: boolean;
+}
 export interface SlackMessagesOptions extends SlackPageOptions {
   threadTs?: string | null;
 }
@@ -251,9 +254,9 @@ export class SlackResource extends SlackOperationsResource {
       `/slack/applications/${encodeURIComponent(applicationId)}`));
   }
   /** One cleanup page including deleted identities; requires a human organization JWT. */
-  async listApplicationDeletions(options: SlackPageOptions = {}): Promise<SlackAppDeletionsResponse> {
+  async listApplicationDeletions(options: SlackAppDeletionsOptions = {}): Promise<SlackAppDeletionsResponse> {
     const r = await this.http.get<{ deletions: RawAppDeletion[]; next_cursor: string | null }>(
-      "/slack/application-deletions", { cursor: options.cursor, limit: options.limit ?? 50 });
+      "/slack/application-deletions", { cursor: options.cursor, limit: options.limit ?? 50, unresolved_only: options.unresolvedOnly ?? false });
     return { deletions: r.deletions.map(appDeletion), nextCursor: r.next_cursor };
   }
   /** Retry after credential repair or manual removal; requires a human organization JWT. */

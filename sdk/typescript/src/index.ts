@@ -480,6 +480,7 @@ export type {
   SlackFile,
   SlackSendMessageOptions,
   SlackPageOptions,
+  SlackAppDeletionsOptions,
   SlackMessagesOptions,
 } from "./slack.js";
 export type {

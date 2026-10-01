@@ -202,6 +202,12 @@ pub struct SlackPageOptions {
     pub cursor: Option<String>,
 }
 #[derive(Debug, Clone, Default)]
+pub struct SlackAppDeletionsOptions {
+    pub limit: Option<u32>,
+    pub cursor: Option<String>,
+    pub unresolved_only: bool,
+}
+#[derive(Debug, Clone, Default)]
 pub struct SlackMessagesOptions {
     pub limit: Option<u32>,
     pub cursor: Option<String>,
@@ -245,9 +251,12 @@ impl SlackResource {
     /// One cleanup page including deleted identities; requires a human organization JWT.
     pub fn list_application_deletions(
         &self,
-        options: &SlackPageOptions,
+        options: &SlackAppDeletionsOptions,
     ) -> Result<SlackAppDeletionsResponse> {
-        let mut params = vec![("limit", options.limit.unwrap_or(50).to_string())];
+        let mut params = vec![
+            ("limit", options.limit.unwrap_or(50).to_string()),
+            ("unresolved_only", options.unresolved_only.to_string()),
+        ];
         if let Some(cursor) = &options.cursor {
             params.push(("cursor", cursor.clone()));
         }
