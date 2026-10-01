@@ -92,3 +92,6 @@ pub use webhooks::types::{
     SlackActorProfile, SlackUserProfile, SlackWebhookData, SlackWebhookEventType,
     SlackWebhookPayload,
 };
+
+pub mod slack_contact_rules;
+pub use slack_contact_rules::*;

@@ -1,4 +1,4 @@
-export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls";
+export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack";
 export type CorrespondenceContentMode = "metadata" | "preview" | "full";
 export type CorrespondenceTranscriptMode = "none" | "abridged" | "full";
 export type CorrespondenceOrder = "asc" | "desc";
@@ -72,6 +72,13 @@ export interface IMessageCorrespondenceItem extends CorrespondenceItemBase {
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface SlackCorrespondenceItem extends CorrespondenceItemBase {
+  channel: "slack";
+  connectionId: string; workspaceId: string; conversationId: string; messageTs: string;
+  threadTs: string | null; senderWorkspaceId: string | null; senderUserId: string | null;
+  text: string | null; contentTruncated: boolean; media: CorrespondenceMediaMetadata | null;
+}
+
 export interface CallCorrespondenceItem extends CorrespondenceItemBase {
   channel: "calls";
   remotePhoneNumber: string;
@@ -88,7 +95,8 @@ export type CorrespondenceItem =
   | EmailCorrespondenceItem
   | SmsCorrespondenceItem
   | IMessageCorrespondenceItem
-  | CallCorrespondenceItem;
+  | CallCorrespondenceItem
+  | SlackCorrespondenceItem;
 
 export interface CorrespondenceChannelResult {
   channel: CorrespondenceChannel;
@@ -154,6 +162,13 @@ export interface RawIMessageCorrespondenceItem extends RawCorrespondenceItemBase
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface RawSlackCorrespondenceItem extends RawCorrespondenceItemBase {
+  channel: "slack";
+  connection_id: string; workspace_id: string; conversation_id: string; message_ts: string;
+  thread_ts?: string | null; sender_workspace_id?: string | null; sender_user_id?: string | null;
+  text?: string | null; content_truncated?: boolean; media?: CorrespondenceMediaMetadata | null;
+}
+
 export interface RawCallCorrespondenceItem extends RawCorrespondenceItemBase {
   channel: "calls";
   remote_phone_number: string;
@@ -179,7 +194,8 @@ export type RawCorrespondenceItem =
   | RawEmailCorrespondenceItem
   | RawSmsCorrespondenceItem
   | RawIMessageCorrespondenceItem
-  | RawCallCorrespondenceItem;
+  | RawCallCorrespondenceItem
+  | RawSlackCorrespondenceItem;
 
 export interface RawContactCorrespondence {
   contact_id: string;
@@ -207,6 +223,12 @@ function parseBase(r: RawCorrespondenceItemBase): CorrespondenceItemBase {
 export function parseCorrespondenceItem(r: RawCorrespondenceItem): CorrespondenceItem {
   const base = parseBase(r);
   switch (r.channel) {
+    case "slack":
+      return { ...base, channel: r.channel, connectionId: r.connection_id,
+        workspaceId: r.workspace_id, conversationId: r.conversation_id, messageTs: r.message_ts,
+        threadTs: r.thread_ts ?? null, senderWorkspaceId: r.sender_workspace_id ?? null,
+        senderUserId: r.sender_user_id ?? null, text: r.text ?? null,
+        contentTruncated: r.content_truncated ?? false, media: r.media ?? null };
     case "email":
       return {
         ...base,

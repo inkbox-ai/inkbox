@@ -390,6 +390,7 @@ export type {
   SmsCorrespondenceItem,
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
+  SlackCorrespondenceItem,
   CreateContactOptions,
   ContactCreatePermissions,
   ContactCreateAddressPermissions,
@@ -511,3 +512,5 @@ export type {
   SlackUploadFileOptions,
   SlackMutationOptions,
 } from "./slack-operations.js";
+
+export * from "./slack-contact-rules.js";

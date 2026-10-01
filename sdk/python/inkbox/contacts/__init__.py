@@ -10,6 +10,7 @@ from inkbox.contacts.resources.communication_policy import (
 )
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
+    SlackCorrespondenceItem,
     Contact,
     ContactSlackAccount,
     ContactCreatePermissions,
@@ -60,6 +61,7 @@ __all__ = [
     "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
     "ContactPermissionSummary", "ContactPermissionVisibility", "ContactPermissionEffective", "ContactPermissionEntry", "ContactPermissionPage", "IdentifierPermission",
     "CallCorrespondenceItem",
+    "SlackCorrespondenceItem",
     "Contact",
     "ContactSlackAccount",
     "ContactCreatePermissions",

@@ -654,3 +654,7 @@ conversation access remain required.
 ## License
 
 MIT
+
+Slack now supports directional contact policy, explicit Slack contact correspondence,
+and Companion reply routing across all SDKs and the CLI. See the package READMEs
+for typed examples.

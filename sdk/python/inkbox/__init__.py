@@ -259,6 +259,7 @@ from inkbox.contacts import (
 )
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
+    SlackCorrespondenceItem,
     Contact,
     ContactSlackAccount,
     ContactAccess,
@@ -773,6 +774,7 @@ __all__ = [
     "IMessageCorrespondenceItem",
     "SmsCorrespondenceItem",
     "CallCorrespondenceItem",
+    "SlackCorrespondenceItem",
     # Notes types
     "Note",
     "NoteAccess",
@@ -925,3 +927,8 @@ __all__ = [
     "ApiKeyStatus",
     "CreatedApiKey",
 ]
+
+from inkbox.slack_contact_rules import (
+    SlackContactRule, SlackContactRuleSettings, SlackContactRulesResource, SlackRuleAction, SlackRuleMatchType,
+)
+__all__ += ["SlackContactRule", "SlackContactRuleSettings", "SlackContactRulesResource", "SlackRuleAction", "SlackRuleMatchType"]

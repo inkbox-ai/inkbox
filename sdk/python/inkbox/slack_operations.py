@@ -118,6 +118,7 @@ class SlackArchivedMessage:
     mentioned: bool
     source: Literal["event", "backfill", "action"]
     captured_at: datetime
+    sender_access: Literal["direct", "sponsored"] | None = None
 
 
 @dataclass

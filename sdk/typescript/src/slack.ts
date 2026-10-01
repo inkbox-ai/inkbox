@@ -1,5 +1,6 @@
 /** Slack workspace setup, live reads, and durable sends. */
 import type { HttpTransport } from "./_http.js";
+import { SlackContactRulesResource } from "./slack-contact-rules.js";
 import { SlackOperationsResource } from "./slack-operations.js";
 
 export type SlackMessageKind =
@@ -159,8 +160,10 @@ const base = (id: string): string =>
   `/slack/connections/${encodeURIComponent(id)}`;
 
 export class SlackResource extends SlackOperationsResource {
+  readonly contactRules: SlackContactRulesResource;
   constructor(http: HttpTransport) {
     super(http);
+    this.contactRules = new SlackContactRulesResource(http);
   }
   /**
    * Claimed agent keys can install only their own identity.

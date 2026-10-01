@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.12
+
+- Add Slack directional contact rules and independent incoming/outgoing defaults
+  across Python, TypeScript, Rust and CLI. Existing shared directional edit
+  semantics are preserved; agent keys can read their own policy, not modify it.
+- Add explicit `slack` contact correspondence with durable message citations.
+  Omitted correspondence channels retain the legacy four-channel selection.
+- Support Slack Companion activation, native reply coordinates, and receipt-time
+  `sender_access` metadata. Slack webhook Companion metadata stays top-level,
+  matching the other channels.
+
+
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.

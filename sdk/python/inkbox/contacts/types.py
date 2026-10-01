@@ -428,6 +428,7 @@ class CorrespondenceChannel(StrEnum):
     SMS = "sms"
     IMESSAGE = "imessage"
     CALLS = "calls"
+    SLACK = "slack"
 
 
 class CorrespondenceContentMode(StrEnum):
@@ -682,6 +683,21 @@ class IMessageCorrespondenceItem(CorrespondenceItem):
 
 
 @dataclass
+class SlackCorrespondenceItem(CorrespondenceItem):
+    """Retained Slack source; native Slack IDs are not Inkbox UUIDs."""
+    connection_id: UUID
+    workspace_id: str
+    conversation_id: str
+    message_ts: str
+    thread_ts: str | None = None
+    sender_workspace_id: str | None = None
+    sender_user_id: str | None = None
+    text: str | None = None
+    content_truncated: bool = False
+    media: CorrespondenceMediaMetadata | None = None
+
+
+@dataclass
 class CallCorrespondenceItem(CorrespondenceItem):
     remote_phone_number: str
     local_phone_number: str | None = None
@@ -782,6 +798,14 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
             service=d["service"],
             text=d.get("text"),
             media=parsed_media,
+        )
+    if channel is CorrespondenceChannel.SLACK:
+        return SlackCorrespondenceItem(
+            **common, connection_id=UUID(d["connection_id"]), workspace_id=d["workspace_id"],
+            conversation_id=d["conversation_id"], message_ts=d["message_ts"],
+            thread_ts=d.get("thread_ts"), sender_workspace_id=d.get("sender_workspace_id"),
+            sender_user_id=d.get("sender_user_id"), text=d.get("text"),
+            content_truncated=bool(d.get("content_truncated", False)), media=parsed_media,
         )
     transcript = d.get("transcript")
     return CallCorrespondenceItem(

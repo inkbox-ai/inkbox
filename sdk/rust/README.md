@@ -1091,3 +1091,37 @@ backfill, coverage, and purge use exported `SlackArchive*` response and option t
 ## License
 
 MIT
+
+### Slack policy and contact memories
+
+Slack rules use verified home-workspace IDs, not email addresses. An exact person
+rule uses `TEXAMPLE:UEXAMPLE`; a workspace rule uses `TEXAMPLE`. Person rules take
+precedence over workspace rules. Inbound and outbound defaults are independent.
+Rules follow the existing shared `direction` and one-sided `apply_to` convention.
+A claimed agent key can read its own policy; changing policy requires a human
+JWT in the organization or an organization-management API key.
+
+Slack contact correspondence is opt-in: request `channels=["slack"]` (or the
+language's equivalent). Omitting channels preserves email/SMS/iMessage/calls.
+Only authorized retained messages are returned, with connection ID, native Slack
+conversation/timestamp references, and an Inkbox source UUID. Memory citations
+use `source_type="slack_message"`; their `source_id` is the retained-message UUID,
+not a Slack timestamp. Source reads recheck authorization and can be unavailable
+after deletion or access changes. Do not reconstruct citation content from a URL.
+
+Companion supports `channel="slack"`. Its `conversation_id` remains the shared
+Inkbox scope UUID; Slack replies instead use `connection_id`,
+`slack_conversation_id`, and optional `thread_ts` from `reply_context`.
+Receipt-time `sender_access` is `direct` or `sponsored`, not authorization for a
+future send. Slack webhook `companion` metadata is at the payload's top level.
+
+```rust,no_run
+# fn example(client: &inkbox::Inkbox) -> inkbox::Result<()> {
+use inkbox::{CreateSlackContactRuleOptions, SlackRuleAction, SlackRuleMatchType, ContactRuleDirection};
+let rules = client.slack().contact_rules();
+rules.create("assistant", &CreateSlackContactRuleOptions {
+    action: SlackRuleAction::Allow, match_type: SlackRuleMatchType::Workspace,
+    match_target: "TEXAMPLE".into(), direction: Some(ContactRuleDirection::Inbound),
+})?;
+# Ok(()) }
+```

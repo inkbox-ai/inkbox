@@ -170,6 +170,10 @@ pub struct SlackResource {
     pub(crate) http: Arc<HttpTransport>,
 }
 impl SlackResource {
+    /// Read or manage this identity's Slack contact policy.
+    pub fn contact_rules(&self) -> crate::slack_contact_rules::SlackContactRulesResource {
+        crate::slack_contact_rules::SlackContactRulesResource::new(self.http.clone())
+    }
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }

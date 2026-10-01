@@ -844,6 +844,7 @@ export interface SlackActorProfile {
   profile?: SlackUserProfile | null;
 }
 export interface SlackWebhookData {
+  sender_access?: SenderAccess | null;
   identity_id: string;
   connection_id: string;
   workspace_id: string;
@@ -857,6 +858,7 @@ export interface SlackWebhookData {
   event: Record<string, unknown>;
 }
 export interface SlackWebhookPayload {
+  companion?: CompanionMetadata | null;
   id: string;
   event_type: SlackWebhookEventType;
   timestamp: string;

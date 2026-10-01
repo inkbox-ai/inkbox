@@ -89,6 +89,7 @@ export interface SlackArchivedMessage {
   mentioned: boolean;
   source: "event" | "backfill" | "action";
   capturedAt: Date;
+  senderAccess?: "direct" | "sponsored" | null;
 }
 /** Inclusive oldest scanned list position; not necessarily a returned message. */
 export interface SlackArchivePageBoundary {
@@ -202,6 +203,7 @@ const archivedMessage = (
   mentioned: r.mentioned,
   source: r.source,
   capturedAt: new Date(r.captured_at),
+  senderAccess: r.sender_access ?? null,
 });
 const coverage = (r: Wire<SlackArchiveCoverage>): SlackArchiveCoverage => ({
   conversationId: r.conversation_id,

@@ -886,6 +886,7 @@ class SlackActorProfile(TypedDict):
 
 
 class SlackWebhookData(TypedDict):
+    sender_access: NotRequired[SenderAccess | None]
     identity_id: str
     connection_id: str
     workspace_id: str
@@ -900,6 +901,7 @@ class SlackWebhookData(TypedDict):
 
 
 class SlackWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata | None]
     id: str
     event_type: SlackWebhookEventType
     timestamp: str

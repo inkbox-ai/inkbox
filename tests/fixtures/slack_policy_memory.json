@@ -1,0 +1,101 @@
+{
+  "rule": {
+    "id": "44444444-4444-4444-8444-444444444444",
+    "agent_identity_id": "22222222-2222-4222-8222-222222222222",
+    "action": "allow",
+    "match_type": "exact_user",
+    "match_target": "TEXAMPLE:UEXAMPLE",
+    "direction": "both",
+    "status": "active",
+    "created_at": "2026-01-01T00:00:00+00:00",
+    "updated_at": "2026-01-01T00:00:00+00:00"
+  },
+  "settings": {
+    "inbound_filter_mode": "whitelist",
+    "outbound_filter_mode": "blacklist"
+  },
+  "correspondence": {
+    "channel": "slack",
+    "source_id": "55555555-5555-4555-8555-555555555555",
+    "identity_id": "22222222-2222-4222-8222-222222222222",
+    "direction": "inbound",
+    "occurred_at": "2026-01-01T00:00:00+00:00",
+    "status": "received",
+    "detail_url": null,
+    "connection_id": "11111111-1111-4111-8111-111111111111",
+    "workspace_id": "TEXAMPLE",
+    "conversation_id": "CEXAMPLE",
+    "message_ts": "1780000000.000001",
+    "thread_ts": null,
+    "sender_workspace_id": "TEXAMPLE",
+    "sender_user_id": "UEXAMPLE",
+    "text": "Please remember my preference.",
+    "content_truncated": false,
+    "media": {
+      "count": 1
+    }
+  },
+  "citation": {
+    "source_type": "slack_message",
+    "source_id": "55555555-5555-4555-8555-555555555555",
+    "availability": "available",
+    "source_url": null,
+    "source_locator": {
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "version": 1
+    }
+  },
+  "activation": {
+    "scope_id": "a1111111-1111-4111-8111-111111111111",
+    "activation_id": "b2222222-2222-4222-8222-222222222222",
+    "conversation_id": "c3333333-3333-4333-8333-333333333333",
+    "channel": "slack",
+    "items": [
+      {
+        "id": "d4444444-4444-4444-8444-444444444444",
+        "author": "fred@example.com",
+        "sender_access": "sponsored",
+        "occurred_at": "2026-09-01T10:00:00Z",
+        "text": "/clear\nCan you review this?",
+        "historical": true,
+        "is_trigger": false,
+        "attachments": [
+          {
+            "source_message_id": "d4444444-4444-4444-8444-444444444444",
+            "index": 0,
+            "content_type": "text/plain",
+            "size": 12
+          }
+        ]
+      },
+      {
+        "id": "e5555555-5555-4555-8555-555555555555",
+        "author": "nancy@example.com",
+        "occurred_at": "2026-09-01T10:01:00Z",
+        "text": "YES\nHere is my answer: caf\u00e9.",
+        "historical": true,
+        "is_trigger": false,
+        "attachments": []
+      }
+    ],
+    "history_complete": true,
+    "next_cursor": null,
+    "reply_context": {
+      "channel": "slack",
+      "conversation_id": "c3333333-3333-4333-8333-333333333333",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "slack_conversation_id": "CEXAMPLE",
+      "thread_ts": "1780000000.000001"
+    },
+    "notices": [
+      {
+        "code": "future_history_notice",
+        "level": "future_level",
+        "message": "Only available authorized history is included."
+      }
+    ]
+  }
+}

@@ -138,6 +138,8 @@ pub struct SlackArchivedMessage {
     pub mentioned: bool,
     pub source: SlackArchiveSource,
     pub captured_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_access: Option<crate::SenderAccess>,
 }
 /// Inclusive oldest scanned list position; not necessarily a returned message.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -11,6 +11,7 @@ from uuid import UUID
 
 from inkbox._http import HttpTransport
 from inkbox.slack_operations import SlackOperationsMixin
+from inkbox.slack_contact_rules import SlackContactRulesResource
 
 SlackMessageKind = Literal["dm", "group_dm", "mention", "channel", "thread"]
 
@@ -121,6 +122,7 @@ class SlackResource(SlackOperationsMixin):
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+        self.contact_rules = SlackContactRulesResource(http)
 
     def list_connections(self, identity_id: UUID | str) -> SlackConnectionsResponse:
         data = self._http.get(

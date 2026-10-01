@@ -18,6 +18,7 @@ pub enum CompanionChannel {
     Mail,
     Phone,
     Imessage,
+    Slack,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +32,8 @@ pub struct CompanionChannelReadiness {
     pub mail: CompanionReadiness,
     pub phone: CompanionReadiness,
     pub imessage: CompanionReadiness,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack: Option<CompanionReadiness>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +99,12 @@ pub struct CompanionReplyContext {
     pub to: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cc: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_conversation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_ts: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -269,6 +278,7 @@ impl CompanionResource {
                 CompanionChannel::Mail => "mail",
                 CompanionChannel::Phone => "phone",
                 CompanionChannel::Imessage => "imessage",
+                CompanionChannel::Slack => "slack",
             };
             query.push(("channel", name.into()));
         }
@@ -320,6 +330,12 @@ impl CompanionResource {
                 .chain(reply.cc.iter())
                 .flatten()
                 .any(String::is_empty)
+            || (page.channel == CompanionChannel::Slack
+                && (reply.connection_id.is_none()
+                    || reply
+                        .slack_conversation_id
+                        .as_ref()
+                        .map_or(true, String::is_empty)))
             || (page.channel == CompanionChannel::Mail
                 && (reply.reply_to_message_id.is_none()
                     || reply.to.as_ref().map_or(0, Vec::len)
