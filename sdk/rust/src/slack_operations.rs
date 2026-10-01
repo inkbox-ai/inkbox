@@ -138,7 +138,7 @@ pub struct SlackArchivedMessage {
     pub mentioned: bool,
     pub source: SlackArchiveSource,
     pub captured_at: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
