@@ -22,3 +22,7 @@ contains all 23 event envelopes. Both files contain synthetic identifiers and da
 search, and browser-handoff operations with shared synthetic requests and responses.
 Search cases include optional filters, multiple workspace connections, precise
 timestamps, Unicode queries, and an empty page with a continuation cursor.
+
+`slack_lifecycle.json` covers app status, workspace-owned retained history, and
+observation provenance. SDK/CLI fixtures contain read operations only; app removal
+and cleanup recovery belong to human Console or JWT-authenticated HTTP flows.

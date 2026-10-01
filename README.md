@@ -651,7 +651,7 @@ Pausing the identity stops live operations and webhook delivery while preserving
 its connections and history. Workspace approval, connection ownership, and current
 conversation access remain required.
 
-App removal and identity/workspace-owned retained-history methods require **0.7.12**.
+App-status and identity/workspace-owned retained-history reads require **0.7.12**.
 Human members remove apps in the Console; deletion is asynchronous. The SDKs and
 CLI can browse retained history without treating a retired connection as writable.
 
