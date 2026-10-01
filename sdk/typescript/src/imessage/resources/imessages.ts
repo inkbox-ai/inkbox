@@ -162,6 +162,9 @@ export class IMessagesResource {
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.replyToMessageId - Message to reply to in that conversation. Requires
    *   `conversationId` and cannot be combined with `to`.
+   * @param options.plainReplyFallback - Allow an ordinary message in the same
+   *   conversation when native threading is unsupported (default true). False
+   *   requires a native reply. Ignored without `replyToMessageId`.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadMedia} to turn raw bytes into a sendable URL first.
@@ -182,6 +185,7 @@ export class IMessagesResource {
     to?: string | string[] | null;
     conversationId?: string | null;
     replyToMessageId?: string | null;
+    plainReplyFallback?: boolean;
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
@@ -195,11 +199,15 @@ export class IMessagesResource {
       to?: string | string[];
       conversation_id?: string;
       reply_to_message_id?: string;
+      plain_reply_fallback?: boolean;
       text?: string;
       media_urls?: string[];
       send_style?: string;
     } = {};
-    if (options.replyToMessageId != null) body.reply_to_message_id = options.replyToMessageId;
+    if (options.replyToMessageId != null) {
+      body.reply_to_message_id = options.replyToMessageId;
+      body.plain_reply_fallback = options.plainReplyFallback ?? true;
+    }
     if (options.to != null) {
       body.to = options.to;
     }

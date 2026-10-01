@@ -155,6 +155,7 @@ class IMessagesResource:
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
         reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage.
 
@@ -169,6 +170,9 @@ class IMessagesResource:
             conversation_id: Existing conversation UUID to reply into.
             reply_to_message_id: Message to reply to in that conversation.
                 Requires ``conversation_id`` and cannot be used with ``to``.
+            plain_reply_fallback: Allow an ordinary message in the same conversation
+                when native threading is unsupported (default True). False requires
+                a native reply. Ignored without ``reply_to_message_id``.
             text: Message body.
             media_urls: Media URLs (at most one). Pass with ``text`` or
                 by themselves. Use :meth:`upload_media` to turn raw
@@ -205,6 +209,7 @@ class IMessagesResource:
         body: dict[str, Any] = {}
         if reply_to_message_id is not None:
             body["reply_to_message_id"] = str(reply_to_message_id)
+            body["plain_reply_fallback"] = plain_reply_fallback
         if to is not None:
             body["to"] = to
         if conversation_id is not None:

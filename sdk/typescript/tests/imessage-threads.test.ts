@@ -38,13 +38,13 @@ describe("iMessage threads", () => {
   it("sends a reply with exact wire keys and preserves its request key", async () => {
     const { fetch, resource } = setup({ message: threaded });
     const reply = await resource.send({ conversationId: conversation, replyToMessageId: message, text: "Agreed", agentIdentityId: identity, idempotencyKey: "reply-one" });
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ conversation_id: conversation, reply_to_message_id: message, text: "Agreed" });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ conversation_id: conversation, reply_to_message_id: message, plain_reply_fallback: true, text: "Agreed" });
     expect(new URL(fetch.mock.calls[0][0]).searchParams.get("agent_identity_id")).toBe(identity);
     expect(reply.threadId).toBe(thread);
   });
-  it("omits the new target for ordinary sends", async () => {
+  it.each([undefined, true, false])("omits reply options for ordinary sends (fallback %s)", async (plainReplyFallback) => {
     const { fetch, resource } = setup({ message: row });
-    await resource.send({ conversationId: conversation, text: "Hello" });
+    await resource.send({ conversationId: conversation, text: "Hello", plainReplyFallback });
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ conversation_id: conversation, text: "Hello" });
   });
   it("rejects reply targets without a conversation or with a recipient", async () => {
@@ -93,6 +93,8 @@ it("identity helpers scope every threaded operation", async () => {
   expect(resource.getConversationThread).toHaveBeenCalledWith(conversation, thread, { limit: 2, agentIdentityId: agent.id });
   await agent.sendIMessage({ conversationId: conversation, replyToMessageId: message, text: "Agreed" });
   expect(resource.send).toHaveBeenCalledWith({ conversationId: conversation, replyToMessageId: message, text: "Agreed", agentIdentityId: agent.id });
+  await agent.sendIMessage({ conversationId: conversation, replyToMessageId: message, text: "Strict", plainReplyFallback: false });
+  expect(resource.send).toHaveBeenLastCalledWith({ conversationId: conversation, replyToMessageId: message, text: "Strict", plainReplyFallback: false, agentIdentityId: agent.id });
   await agent.listIMessages({ conversationId: conversation, threadId: thread });
   expect(resource.list).toHaveBeenCalledWith({ conversationId: conversation, threadId: thread, agentIdentityId: agent.id });
 });
@@ -113,4 +115,22 @@ it("reply retries preserve the exact target, body, and request key", async () =>
     expect(second.headers).toEqual(first.headers);
     expect(first.headers["Idempotency-Key"]).toBe("reply-one");
   } finally { vi.useRealTimers(); }
+});
+
+
+it.each([true, false])("preserves fallback %s and an ordinary result without invented metadata", async (plainReplyFallback) => {
+  const { fetch, resource } = setup({ message: row });
+  const result = await resource.send({ conversationId: conversation, replyToMessageId: message, text: "Agreed", plainReplyFallback });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ conversation_id: conversation, reply_to_message_id: message, plain_reply_fallback: plainReplyFallback, text: "Agreed" });
+  expect(result.replyToMessageId).toBeNull();
+  expect(result.threadId).toBeNull();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it.each([400, 403, 404, 422])("does not convert HTTP %s into a client-side plain fallback", async (status) => {
+  const { fetch, resource } = setup(null);
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify({ detail: { error: "imessage_reply_target_unavailable" } }), { status, headers: { "Content-Type": "application/json" } }));
+  await expect(resource.send({ conversationId: conversation, replyToMessageId: message, text: "Agreed", plainReplyFallback: true })).rejects.toMatchObject({ statusCode: status });
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(fetch.mock.calls[0][1].body).reply_to_message_id).toBe(message);
 });

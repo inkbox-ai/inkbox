@@ -132,7 +132,7 @@ impl IMessagesResource {
         )?)
     }
 
-    /// Reply to a specific message in an existing one-to-one or group conversation.
+    /// Reply to a message, allowing an ordinary send when native threading is unsupported.
     #[allow(clippy::too_many_arguments)]
     pub fn send_reply(
         &self,
@@ -144,9 +144,36 @@ impl IMessagesResource {
         agent_identity_id: Option<&Uuid>,
         idempotency_key: Option<&str>,
     ) -> Result<ThreadedIMessage> {
+        self.send_reply_with_fallback(
+            conversation_id,
+            reply_to_message_id,
+            text,
+            media_urls,
+            send_style,
+            agent_identity_id,
+            idempotency_key,
+            true,
+        )
+    }
+
+    /// Reply with explicit fallback behavior. False requires a native reply.
+    /// Fallback stays in the same conversation and is handled by the API.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_reply_with_fallback(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: Option<&str>,
+        plain_reply_fallback: bool,
+    ) -> Result<ThreadedIMessage> {
         let mut body = serde_json::Map::new();
         body.insert("conversation_id".into(), json!(conversation_id));
         body.insert("reply_to_message_id".into(), json!(reply_to_message_id));
+        body.insert("plain_reply_fallback".into(), json!(plain_reply_fallback));
         if let Some(text) = text {
             body.insert("text".into(), json!(text));
         }
@@ -806,7 +833,7 @@ mod tests {
             when.method(POST).path("/api/v1/imessage/messages")
                 .query_param("agent_identity_id", identity.to_string())
                 .header("Idempotency-Key", "reply-one")
-                .json_body(json!({"conversation_id":conversation,"reply_to_message_id":message,"text":"Agreed"}));
+                .json_body(json!({"conversation_id":conversation,"reply_to_message_id":message,"plain_reply_fallback":true,"text":"Agreed"}));
             then.status(200).json_body(json!({"message":page["messages"][0]}));
         });
         let by_message = server.mock(|when, then| {
@@ -878,6 +905,80 @@ mod tests {
             sdk.imessages().list_with_threads(&invalid),
             Err(InkboxError::InvalidArgument(_))
         ));
+    }
+
+    #[test]
+    fn reply_fallback_is_explicit_and_plain_results_keep_no_parent() {
+        let server = MockServer::start();
+        let conversation = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        let sdk = client(&server);
+        for plain_reply_fallback in [true, false] {
+            let send = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/imessage/messages")
+                    .json_body(json!({
+                        "conversation_id": conversation, "reply_to_message_id": target,
+                        "plain_reply_fallback": plain_reply_fallback, "text": "Agreed"
+                    }));
+                then.status(200)
+                    .json_body(json!({"message": group_message_json()}));
+            });
+            let result = sdk
+                .imessages()
+                .send_reply_with_fallback(
+                    &conversation,
+                    &target,
+                    Some("Agreed"),
+                    None,
+                    None,
+                    None,
+                    None,
+                    plain_reply_fallback,
+                )
+                .unwrap();
+            assert_eq!(result.reply_to_message_id, None);
+            assert_eq!(result.thread_id, None);
+            send.assert_hits(1);
+        }
+    }
+
+    #[test]
+    fn reply_errors_do_not_trigger_client_plain_fallback() {
+        for status in [400, 403, 404, 422] {
+            let server = MockServer::start();
+            let conversation = Uuid::new_v4();
+            let target = Uuid::new_v4();
+            let send = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/imessage/messages")
+                    .json_body(json!({
+                        "conversation_id": conversation, "reply_to_message_id": target,
+                        "plain_reply_fallback": true, "text": "Agreed"
+                    }));
+                then.status(status)
+                    .json_body(json!({"detail": {"error": "imessage_reply_target_unavailable"}}));
+            });
+            let any_send = server.mock(|when, then| {
+                when.method(POST).path("/api/v1/imessage/messages");
+                then.status(200)
+                    .json_body(json!({"message": group_message_json()}));
+            });
+            let result = client(&server).imessages().send_reply(
+                &conversation,
+                &target,
+                Some("Agreed"),
+                None,
+                None,
+                None,
+                None,
+            );
+            assert!(
+                matches!(result, Err(InkboxError::Api { status_code, .. }) if status_code == status)
+            );
+            send.assert_hits(1);
+            any_send.assert_hits(0);
+        }
     }
 
     #[test]

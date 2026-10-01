@@ -87,6 +87,7 @@ export interface IMessageSendCommandOptions {
   to?: string;
   conversationId?: string;
   replyToMessageId?: string;
+  plainReplyFallback?: boolean;
   text?: string;
   mediaUrl?: string;
   sendStyle?: string;
@@ -116,7 +117,10 @@ export function buildIMessageSendOptions(
     return { error: "--reply-to-message-id requires --conversation-id." };
   }
   const sendOptions: SendIMessageOptions = {};
-  if (cmdOpts.replyToMessageId !== undefined) sendOptions.replyToMessageId = cmdOpts.replyToMessageId;
+  if (cmdOpts.replyToMessageId !== undefined) {
+    sendOptions.replyToMessageId = cmdOpts.replyToMessageId;
+    sendOptions.plainReplyFallback = cmdOpts.plainReplyFallback ?? true;
+  }
   if (cmdOpts.idempotencyKey !== undefined) sendOptions.idempotencyKey = cmdOpts.idempotencyKey;
   if (recipients.length > 0) {
     sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
@@ -298,6 +302,7 @@ export function registerIMessageCommands(program: Command): void {
     .option("--to <numbers>", "One E.164 recipient or a comma-separated group")
     .option("--conversation-id <id>", "Existing conversation UUID to reply into")
     .option("--reply-to-message-id <id>", "Reply to this message within the conversation")
+    .option("--no-plain-reply-fallback", "Require native threading; fail instead of sending an ordinary message")
     .option("--text <text>", "Message body")
     .option("--media-url <url>", "Media URL (at most one)")
     .option(
@@ -312,6 +317,7 @@ export function registerIMessageCommands(program: Command): void {
           to?: string;
           conversationId?: string;
           replyToMessageId?: string;
+          plainReplyFallback?: boolean;
           text?: string;
           mediaUrl?: string;
           sendStyle?: string;

@@ -1305,6 +1305,7 @@ class AgentIdentity:
         send_style: IMessageSendStyle | str | None = None,
         idempotency_key: str | None = None,
         reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
@@ -1319,6 +1320,9 @@ class AgentIdentity:
             conversation_id: Existing conversation UUID to reply into.
             reply_to_message_id: Message to reply to in that conversation.
                 Requires ``conversation_id`` and cannot be used with ``to``.
+            plain_reply_fallback: Allow an ordinary message in the same conversation
+                when native threading is unsupported (default True). False requires
+                a native reply. Ignored without ``reply_to_message_id``.
             text: Message body.
             media_urls: Media URLs (at most one). Use
                 :meth:`upload_imessage_media` to create one from bytes.
@@ -1340,7 +1344,10 @@ class AgentIdentity:
             media_urls=media_urls,
             send_style=send_style,
             agent_identity_id=self.id,
-            **({"reply_to_message_id": reply_to_message_id} if reply_to_message_id is not None else {}),
+            **({
+                "reply_to_message_id": reply_to_message_id,
+                "plain_reply_fallback": plain_reply_fallback,
+            } if reply_to_message_id is not None else {}),
             **({"idempotency_key": idempotency_key} if idempotency_key is not None else {}),
         )
 

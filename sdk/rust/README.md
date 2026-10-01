@@ -1131,9 +1131,20 @@ or direct parent can be unavailable. Conversation message lists remain flat and
 newest-first. A thread filter requires its conversation ID; it uses the existing
 limit/offset pagination, unlike the chronological thread endpoints.
 
-Replies work in supported one-to-one and group iMessage conversations. Use a
-message from the same conversation. An unsupported reply is rejected rather
-than sent as a plain message. Omitting the target preserves ordinary sending.
+Native replies work in supported one-to-one and group iMessage conversations.
+Use a message from the same conversation. With plain fallback enabled (the
+default), the API sends an ordinary message in that conversation when native
+threading is unsupported: the target is known to use SMS/RCS or was downgraded.
+This does not force a particular transport. An ordinary fallback has no reply
+parent and does not join the target's native thread. Invalid or inaccessible
+targets, unsettled messages, and missing reply metadata still fail. Delivery
+errors are not retried as new ordinary messages. Omitting the target preserves
+ordinary sending.
+
+Use `send_reply_with_fallback` or `send_imessage_reply_with_fallback` with a
+final `false` argument to require a native reply instead. These accept the same
+arguments as `send_reply` / `send_imessage_reply`, followed by
+`plain_reply_fallback: bool`; existing methods use `true`.
 
 ## License
 

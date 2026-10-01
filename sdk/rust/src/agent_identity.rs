@@ -1346,7 +1346,7 @@ impl AgentIdentity {
         self.inkbox.imessages().list_with_threads(&scoped)
     }
 
-    /// Reply to a specific message in an existing one-to-one or group conversation.
+    /// Reply to a message, allowing an ordinary send when native threading is unsupported.
     #[allow(clippy::too_many_arguments)]
     pub fn send_imessage_reply(
         &self,
@@ -1357,8 +1357,32 @@ impl AgentIdentity {
         send_style: Option<IMessageSendStyle>,
         idempotency_key: Option<&str>,
     ) -> Result<ThreadedIMessage> {
+        self.send_imessage_reply_with_fallback(
+            conversation_id,
+            reply_to_message_id,
+            text,
+            media_urls,
+            send_style,
+            idempotency_key,
+            true,
+        )
+    }
+
+    /// Reply with explicit fallback behavior. False requires a native reply.
+    /// Fallback stays in the same conversation and is handled by the API.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_imessage_reply_with_fallback(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        idempotency_key: Option<&str>,
+        plain_reply_fallback: bool,
+    ) -> Result<ThreadedIMessage> {
         self.require_imessage()?;
-        self.inkbox.imessages().send_reply(
+        self.inkbox.imessages().send_reply_with_fallback(
             conversation_id,
             reply_to_message_id,
             text,
@@ -1366,6 +1390,7 @@ impl AgentIdentity {
             send_style,
             Some(&self.id()),
             idempotency_key,
+            plain_reply_fallback,
         )
     }
 
@@ -2248,6 +2273,55 @@ mod tests {
         let identity = identity_at(base_url, false);
         identity.data.borrow_mut().summary.imessage_enabled = true;
         identity
+    }
+
+    #[test]
+    fn imessage_reply_fallback_delegates_with_identity_and_request_key() {
+        let server = MockServer::start();
+        let identity = imessage_identity_at(&server.base_url());
+        let conversation = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        for plain_reply_fallback in [true, false] {
+            let send = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/imessage/messages")
+                    .query_param("agent_identity_id", IDENTITY_ID)
+                    .header("Idempotency-Key", "reply-one")
+                    .json_body(json!({"conversation_id": conversation,
+                        "reply_to_message_id": target, "plain_reply_fallback": plain_reply_fallback,
+                        "text": "Agreed"}));
+                then.status(422)
+                    .json_body(json!({"detail": {"error": "imessage_reply_target_unavailable"}}));
+            });
+            let result = if plain_reply_fallback {
+                identity.send_imessage_reply(
+                    &conversation,
+                    &target,
+                    Some("Agreed"),
+                    None,
+                    None,
+                    Some("reply-one"),
+                )
+            } else {
+                identity.send_imessage_reply_with_fallback(
+                    &conversation,
+                    &target,
+                    Some("Agreed"),
+                    None,
+                    None,
+                    Some("reply-one"),
+                    false,
+                )
+            };
+            assert!(matches!(
+                result,
+                Err(InkboxError::Api {
+                    status_code: 422,
+                    ..
+                })
+            ));
+            send.assert_hits(1);
+        }
     }
 
     /// Build a phoneless identity backed by a client pointed at an unreachable

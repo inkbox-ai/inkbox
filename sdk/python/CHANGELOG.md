@@ -5,6 +5,8 @@
 ## 0.7.12 — Threaded iMessage replies
 
 - Reply to a specific message in existing one-to-one and group conversations.
+- Allow server-owned ordinary-message fallback by default when native threading
+  is unsupported; expose `plain_reply_fallback`.
 - Read chronological, cursor-paginated threads by message or by conversation and
   opaque thread ID; filter conversation message lists by thread.
 - Expose nullable parent, thread, and root-message metadata in reads and webhooks.

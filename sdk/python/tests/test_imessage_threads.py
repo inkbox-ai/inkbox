@@ -29,15 +29,16 @@ def test_send_thread_reply_exact_wire(client, transport):
     msg = client.imessages.send(conversation_id=UUID(CONVO_ID), reply_to_message_id=UUID(MSG_ID),
                                 text="Agreed", agent_identity_id=IDENTITY_ID, idempotency_key="reply-one")
     transport.post.assert_called_once_with("/messages", json={"conversation_id": CONVO_ID,
-        "reply_to_message_id": MSG_ID, "text": "Agreed"}, params={"agent_identity_id": IDENTITY_ID},
+        "reply_to_message_id": MSG_ID, "plain_reply_fallback": True, "text": "Agreed"}, params={"agent_identity_id": IDENTITY_ID},
         headers={"Idempotency-Key": "reply-one", "Prefer": "idempotency-replay"})
     assert msg.thread_root_message_id == UUID(MSG_ID)
 
 
-def test_plain_send_omits_thread_target(client, transport):
+@pytest.mark.parametrize("plain_reply_fallback", [True, False])
+def test_plain_send_omits_thread_target(client, transport, plain_reply_fallback):
     transport.post.return_value = {"message": IMESSAGE_DICT}
-    client.imessages.send(conversation_id=CONVO_ID, text="Hello")
-    assert "reply_to_message_id" not in transport.post.call_args.kwargs["json"]
+    client.imessages.send(conversation_id=CONVO_ID, text="Hello", plain_reply_fallback=plain_reply_fallback)
+    assert transport.post.call_args.kwargs["json"] == {"conversation_id": CONVO_ID, "text": "Hello"}
 
 
 @pytest.mark.parametrize("kwargs", [{}, {"to": "+15550100101"}, {"to": "+15550100101", "conversation_id": CONVO_ID}])
@@ -95,6 +96,9 @@ def test_identity_helpers_scope_every_thread_operation():
     identity.send_imessage(conversation_id=CONVO_ID, reply_to_message_id=MSG_ID, text="Agreed")
     assert sdk._imessages.send.call_args.kwargs["reply_to_message_id"] == MSG_ID
     assert sdk._imessages.send.call_args.kwargs["agent_identity_id"] == identity.id
+    assert sdk._imessages.send.call_args.kwargs["plain_reply_fallback"] is True
+    identity.send_imessage(conversation_id=CONVO_ID, reply_to_message_id=MSG_ID, text="Strict", plain_reply_fallback=False)
+    assert sdk._imessages.send.call_args.kwargs["plain_reply_fallback"] is False
     identity.list_imessages(conversation_id=CONVO_ID, thread_id=THREAD_ID)
     assert sdk._imessages.list.call_args.kwargs["thread_id"] == THREAD_ID
     assert sdk._imessages.list.call_args.kwargs["agent_identity_id"] == identity.id
@@ -113,3 +117,31 @@ def test_reply_retry_preserves_exact_target_body_and_key(client, transport, monk
     assert first == second
     assert first.kwargs["json"]["reply_to_message_id"] == MSG_ID
     assert first.kwargs["headers"]["Idempotency-Key"] == "reply-one"
+
+
+@pytest.mark.parametrize("plain_reply_fallback", [True, False])
+def test_reply_fallback_option_and_plain_result_are_preserved(client, transport, plain_reply_fallback):
+    transport.post.return_value = {"message": IMESSAGE_DICT}
+    result = client.imessages.send(conversation_id=CONVO_ID, reply_to_message_id=MSG_ID,
+                                   text="Agreed", plain_reply_fallback=plain_reply_fallback)
+    assert transport.post.call_args.kwargs["json"] == {
+        "conversation_id": CONVO_ID, "reply_to_message_id": MSG_ID,
+        "plain_reply_fallback": plain_reply_fallback, "text": "Agreed",
+    }
+    assert result.reply_to_message_id is None
+    assert result.thread_id is None
+    transport.post.assert_called_once()
+
+
+@pytest.mark.parametrize("status", [400, 403, 404, 422])
+def test_reply_error_does_not_trigger_client_plain_fallback(client, transport, status):
+    from inkbox.exceptions import InkboxAPIError
+
+    error = InkboxAPIError(status, {"error": "imessage_reply_target_unavailable"})
+    transport.post.side_effect = error
+    with pytest.raises(InkboxAPIError) as raised:
+        client.imessages.send(conversation_id=CONVO_ID, reply_to_message_id=MSG_ID,
+                              text="Agreed", plain_reply_fallback=True)
+    assert raised.value is error
+    transport.post.assert_called_once()
+    assert transport.post.call_args.kwargs["json"]["reply_to_message_id"] == MSG_ID

@@ -104,7 +104,7 @@ test("buildIMessageSendOptions rejects missing destination or content", () => {
 
 test("threaded replies require a conversation and retain the message target", () => {
   assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", replyToMessageId: "message", text: "Agreed" }), {
-    sendOptions: { conversationId: "conversation", replyToMessageId: "message", text: "Agreed" },
+    sendOptions: { conversationId: "conversation", replyToMessageId: "message", plainReplyFallback: true, text: "Agreed" },
   });
   assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", to: "+15550100101", replyToMessageId: "message", text: "Agreed" }), {
     error: "--reply-to-message-id requires --conversation-id.",
@@ -132,4 +132,28 @@ test("an empty explicit reply target never becomes an ordinary message", () => {
   assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", replyToMessageId: "", text: "Agreed" }), {
     error: "--reply-to-message-id must not be empty.",
   });
+});
+
+
+test("plain fallback flag defaults on and can require native threading", () => {
+  for (const strict of [false, true]) {
+    const program = new Command();
+    registerIMessageCommands(program);
+    const send = program.commands.find((command) => command.name() === "imessage")
+      .commands.find((command) => command.name() === "send");
+    let parsed;
+    send.action((options) => { parsed = buildIMessageSendOptions(options); });
+    send.parse(["--identity", "support-bot", "--conversation-id", "conversation",
+      "--reply-to-message-id", "message", "--text", "Agreed", ...(strict ? ["--no-plain-reply-fallback"] : [])], { from: "user" });
+    assert.deepEqual(parsed, { sendOptions: { conversationId: "conversation",
+      replyToMessageId: "message", plainReplyFallback: !strict, text: "Agreed" } });
+  }
+});
+
+test("plain fallback option does not change sends without a reply target", () => {
+  for (const plainReplyFallback of [true, false]) {
+    assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", text: "Hello", plainReplyFallback }), {
+      sendOptions: { conversationId: "conversation", text: "Hello" },
+    });
+  }
 });

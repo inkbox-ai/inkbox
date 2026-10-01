@@ -11,6 +11,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Advance SDK, CLI, and bundled Claude plugin versions to `0.7.12`, with bundled
   Codex plugin version `0.1.11`.
 - Reply to a specific message in existing one-to-one and group conversations.
+- Allow server-owned ordinary-message fallback by default when native threading
+  is unsupported; expose `plain_reply_fallback` / `plainReplyFallback`.
 - Read chronological, cursor-paginated threads by message or by conversation and
   opaque thread ID; filter conversation message lists by thread.
 - Expose nullable parent, thread, and root-message metadata in reads and webhooks.

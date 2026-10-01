@@ -670,3 +670,14 @@ TypeScript `imessages.getThread`, Rust `imessages().get_thread`, or CLI
 Follow the returned cursor for more; existing message lists remain flat and
 newest-first with optional conversation-scoped thread filtering. See each
 language's README for complete examples and Rust's additive wrapper types.
+
+Reply sends allow an ordinary message in the same conversation when native
+threading is unsupported, including SMS/RCS targets. Set Python
+`plain_reply_fallback=False`, TypeScript `plainReplyFallback: false`, or CLI
+`--no-plain-reply-fallback` to require native threading. Rust offers
+`send_reply_with_fallback` / `send_imessage_reply_with_fallback` with a final
+boolean argument. The API owns fallback; clients do not resend failed replies
+as ordinary messages. Invalid or inaccessible targets still fail. Keep agent
+memory tied to the conversation; a native thread is optional context, and an
+ordinary fallback has no reply parent and does not join the target's native
+thread. Unsettled targets or missing reply metadata still fail.

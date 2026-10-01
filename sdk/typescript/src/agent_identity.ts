@@ -813,8 +813,6 @@ export class AgentIdentity {
    * @param options.to - E.164 destination number, or numbers for a group send.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
-   * @param options.replyToMessageId - Message to reply to in that conversation. Requires
-   *   `conversationId` and cannot be combined with `to`.
    *   The server resolves it to that conversation's participants.
    * @param options.text - Message body.
    * @param options.mediaUrls - MMS media URLs.
@@ -989,6 +987,11 @@ export class AgentIdentity {
    *   or more recipients select or create a dedicated-line group.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
+   * @param options.replyToMessageId - Message to reply to in that conversation. Requires
+   *   `conversationId` and cannot be combined with `to`.
+   * @param options.plainReplyFallback - Allow an ordinary message in the same
+   *   conversation when native threading is unsupported (default true). False
+   *   requires a native reply. Ignored without `replyToMessageId`.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadIMessageMedia} to create one from bytes.
@@ -1004,6 +1007,7 @@ export class AgentIdentity {
     to?: string | string[] | null;
     conversationId?: string | null;
     replyToMessageId?: string | null;
+    plainReplyFallback?: boolean;
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
