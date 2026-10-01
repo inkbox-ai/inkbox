@@ -61,3 +61,16 @@ def test_filtered_iterator_preserves_filter_and_raw_card_extension():
     assert http.get.call_args_list[1].kwargs["params"]["cursor"] == "next"
     assert parse_domain_affiliation(None) is None
     assert parse_domain_affiliation(FIXTURE["affiliation"]).domain == "example.com"
+
+
+@pytest.mark.parametrize("scope", ["public", "organization"])
+def test_domain_query_uses_shared_search_without_adding_an_exact_filter(scope):
+    http = MagicMock()
+    item = {"card_url": "https://inkbox.ai/a2a/helper/card", "visibility": "public", "card": {"name": "@helper"}}
+    http.get.side_effect = [{"items": [item], "next_cursor": "next"}, {"items": [item], "next_cursor": None}]
+    resource = A2AResource(http, http)
+    assert len(list(getattr(resource, f"iter_{scope}_directory")(q="bücher.example.com", limit=1))) == 2
+    for call in http.get.call_args_list:
+        assert call.kwargs["params"]["q"] == "bücher.example.com"
+        assert "verified_domain" not in call.kwargs["params"]
+    assert http.get.call_args_list[1].kwargs["params"]["cursor"] == "next"

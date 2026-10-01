@@ -1114,7 +1114,7 @@ if claim.state == "verified" {
     client.identities().set_domain_affiliation("helper", &claim.id, false)?;
 }
 let page = client.a2a().public_directory(&inkbox::a2a::A2ADirectoryListOptions {
-    verified_domain: Some("example.com".into()),
+    q: Some("example.com".into()),
     ..Default::default()
 })?;
 ```
@@ -1123,3 +1123,8 @@ Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
 Identity resources expose `get_domain_affiliation`, `set_domain_affiliation`, and
 `remove_domain_affiliation`. The boolean publication argument is required.
 A2A participants and messages expose optional `affiliation` values.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Set `verified_domain` to require an exact current domain in public results.
+Preserve the query and filters when following a cursor.

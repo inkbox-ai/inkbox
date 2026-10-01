@@ -1490,7 +1490,7 @@ if (claim.state === "verified") {
     domainClaimId: claim.id, publishPublicly: false,
   });
 }
-for await (const item of client.a2a.iterPublicDirectory({ verifiedDomain: "example.com" })) {
+for await (const item of client.a2a.iterPublicDirectory({ q: "example.com" })) {
   console.log(item.card.name);
 }
 ```
@@ -1500,6 +1500,11 @@ Use `client.identities.getDomainAffiliation(handle)` for saved settings,
 `setDomainAffiliation(handle, { domainClaimId, publishPublicly: true })` to publish
 explicitly, and `removeDomainAffiliation(handle)` to remove it. A2A participants
 and messages expose optional `.affiliation`. Webhook types retain wire casing.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Use `verifiedDomain: "example.com"` to require an exact current domain in public
+results. Preserve the query and filters when following a cursor.
 
 ## Message retries
 

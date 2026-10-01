@@ -227,6 +227,40 @@ mod tests {
     }
 
     #[test]
+    fn domain_queries_use_shared_directory_search() {
+        let server = MockServer::start();
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        for public in [true, false] {
+            let request = server.mock(|when, then| {
+                when.method(GET)
+                    .path(if public {
+                        "/a2a/directory"
+                    } else {
+                        "/api/v1/identities/a2a/directory"
+                    })
+                    .query_param("q", "bücher.example.com")
+                    .query_param("cursor", "next");
+                then.status(200)
+                    .json_body(json!({"items":[], "next_cursor":null}));
+            });
+            let options = A2ADirectoryListOptions {
+                q: Some("bücher.example.com".into()),
+                cursor: Some("next".into()),
+                ..Default::default()
+            };
+            if public {
+                client.a2a().public_directory(&options).unwrap();
+            } else {
+                client.a2a().organization_directory(&options).unwrap();
+            }
+            request.assert();
+        }
+    }
+
+    #[test]
     fn public_filter_is_sent_and_rejected_for_organization_directory() {
         let server = MockServer::start();
         let request = server.mock(|when, then| {

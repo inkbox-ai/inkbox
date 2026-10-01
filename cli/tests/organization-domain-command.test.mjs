@@ -50,4 +50,8 @@ test("claim commands, explicit publication, and filtered directory use the inten
   assert.equal(directory.url.searchParams.get("verified_domain"), "example.com");
   assert.equal(directory.url.searchParams.get("cursor"), "next");
   assert.equal(directory.url.searchParams.get("q"), "helper");
+  await run("a2a", "directory", "--public", "--query", "bücher.example.com", "--cursor", "query-next");
+  assert.equal(calls.at(-1).url.searchParams.get("q"), "bücher.example.com");
+  assert.equal(calls.at(-1).url.searchParams.get("cursor"), "query-next");
+  assert.equal(calls.at(-1).url.searchParams.has("verified_domain"), false);
 });

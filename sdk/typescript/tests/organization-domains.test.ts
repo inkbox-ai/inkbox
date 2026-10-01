@@ -9,6 +9,21 @@ import type { HttpTransport } from "../src/_http.js";
 const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/domain-certification.json", import.meta.url), "utf8"));
 
 describe("organization domains", () => {
+  it.each(["public", "organization"])("preserves a domain query across %s pages without adding an exact filter", async (scope) => {
+    const item = { card_url: "https://inkbox.ai/a2a/helper/card", visibility: "public", card: { name: "@helper" } };
+    const http = { get: vi.fn().mockResolvedValueOnce({ items: [item], next_cursor: "next" }).mockResolvedValueOnce({ items: [item], next_cursor: null }) };
+    const resource = new A2AResource(http as unknown as HttpTransport, http as unknown as HttpTransport);
+    const iterator = scope === "public" ? resource.iterPublicDirectory({ q: "bücher.example.com", limit: 1 }) : resource.iterOrganizationDirectory({ q: "bücher.example.com", limit: 1 });
+    const items = [];
+    for await (const item of iterator) items.push(item);
+    expect(items).toHaveLength(2);
+    for (const [, parameters] of http.get.mock.calls) {
+      expect(parameters.q).toBe("bücher.example.com");
+      expect(parameters).not.toHaveProperty("verified_domain");
+    }
+    expect(http.get.mock.calls[1][1].cursor).toBe("next");
+  });
+
   it("preserves unknown states and uses encoded management paths", async () => {
     const http = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
     http.get.mockResolvedValue(fixture.claim);

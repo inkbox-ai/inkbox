@@ -13,6 +13,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Manage organization domain claims, TXT verification, explicit transfer, and release from Python, TypeScript, Rust, and the CLI.
 - Select an agent domain with an explicit public-display choice while retaining authorized A2A visibility for hidden affiliations.
 - Filter public A2A directory results by exact verified domain and read optional affiliation assertions on A2A participants, messages, and webhooks.
+- Search handles, descriptions, skills, and published verified domains with the existing directory `q` parameter or CLI `--query`; domain fragments are supported and exact domain filters remain available.
 
 ### Changed
 

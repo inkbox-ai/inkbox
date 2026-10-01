@@ -321,7 +321,7 @@ export function registerA2ACommands(program: Command): void {
     .description("Search the organization or public A2A directory")
     .option("--public", "Search the public directory")
     .option("--verified-domain <domain>", "Exact verified domain (requires --public)")
-    .option("-q, --query <query>", "Search handles, descriptions, and skills")
+    .option("-q, --query <query>", "Search handles, descriptions, skills, and verified domains")
     .option("--cursor <cursor>", "Pagination cursor")
     .option("--limit <n>", "Results per page (1-100)", "50")
     .action(withErrorHandler(async function (

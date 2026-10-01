@@ -1254,7 +1254,7 @@ inkbox organization-domain create example.com
 inkbox organization-domain verify OrganizationDomainClaim_YOUR_ID
 inkbox identity domain-affiliation set helper OrganizationDomainClaim_YOUR_ID --visibility hidden
 inkbox identity domain-affiliation get helper
-inkbox a2a directory --public --verified-domain example.com
+inkbox a2a directory --public --query example.com
 ```
 
 `organization-domain` provides `create`, `list`, `get`, `verify`, `transfer`, and
@@ -1263,3 +1263,8 @@ by checking DNS. `identity domain-affiliation set` requires `--visibility public
 or `--visibility hidden`. Use `remove <handle>` to stop all affiliation assertions.
 Use `--json` to inspect the complete response. Public search also accepts `--query`,
 `--cursor`, and `--limit`; preserve the same filters on every page.
+
+`--query` searches handles, descriptions, skills, and published verified domains,
+including domain fragments. Text matches can include agents without a verified
+domain. Add `--verified-domain example.com` to require an exact, current domain
+affiliation in public results.

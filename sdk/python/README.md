@@ -2125,7 +2125,7 @@ print(claim.dns_record.name, claim.dns_record.value)
 claim = client.organization_domains.verify(claim.id)
 if claim.state == "verified":
     client.identities.set_domain_affiliation("helper", claim.id, publish_publicly=False)
-for item in client.a2a.iter_public_directory(verified_domain="example.com"):
+for item in client.a2a.iter_public_directory(q="example.com"):
     print(item.card.name)
 ```
 
@@ -2134,3 +2134,8 @@ Use `client.identities.get_domain_affiliation(handle)` to inspect saved settings
 `set_domain_affiliation(..., publish_publicly=True)` to publish explicitly, and
 `remove_domain_affiliation(handle)` to remove the selection. Task and context
 participants expose optional `.affiliation`; message assertions identify the author.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Use `verified_domain="example.com"` to require an exact current domain in public
+results. Preserve the query and filters when following a cursor.
