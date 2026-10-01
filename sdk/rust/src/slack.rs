@@ -259,7 +259,8 @@ impl SlackResource {
     pub fn retry_application_deletion(&self, deletion_id: Uuid) -> Result<SlackAppDeletion> {
         Ok(serde_json::from_value(self.http.post(
             &format!("/slack/application-deletions/{deletion_id}/retry"),
-            &json!({}),
+            Some(&json!({})),
+            NO_QUERY,
         )?)?)
     }
     /// Human attestation for unknown creation after quarantine, not provider verification.
@@ -270,7 +271,8 @@ impl SlackResource {
     ) -> Result<SlackAppDeletion> {
         Ok(serde_json::from_value(self.http.post(
             &format!("/slack/application-deletions/{deletion_id}/confirm-manual-removal"),
-            &json!({"confirmation": confirmation}),
+            Some(&json!({"confirmation": confirmation})),
+            NO_QUERY,
         )?)?)
     }
     pub fn list_connections(&self, identity_id: Uuid) -> Result<SlackConnectionsResponse> {
