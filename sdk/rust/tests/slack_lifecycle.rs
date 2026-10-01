@@ -1,6 +1,6 @@
 use httpmock::prelude::*;
 use inkbox::{Inkbox, SlackAppDeletionStatus, SlackHistoryMessagesOptions};
-use serde_json::Value;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 #[test]
