@@ -8,9 +8,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## 0.7.12 - Slack app lifecycle and retained history (unreleased)
 
-- Add typed app status and asynchronous deletion/recovery responses in Python,
-  TypeScript, and Rust. Permanent app deletion, recovery, and organization cleanup
-  listing require a human organization JWT; API keys do not gain these permissions.
+- Add typed app and cleanup status reads in Python, TypeScript, and Rust.
+  Permanent deletion, recovery and organization cleanup listing stay in the Console
+  and human-JWT HTTP API; API-key SDKs do not expose unusable human-only methods.
 - Browse or search retained Slack history across replacement apps, and inspect
   installation provenance without treating historical connection IDs as live
   write targets. Empty result pages can still carry a continuation cursor.

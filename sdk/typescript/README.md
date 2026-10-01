@@ -2008,6 +2008,9 @@ await client.webhooks.subscriptions.update(subscription.id, {
 
 ### Slack app lifecycle and retained history
 
+The API-key SDK exposes status and retained-history reads. Removal and recovery
+are human-only Console/HTTP actions, not SDK methods.
+
 Requires version **0.7.12 or later**. Removing a Slack app is different from
 disconnecting one installation: it stops every installation of that app and
 schedules provider deletion. Accepted deletion is not completed deletion. Only a

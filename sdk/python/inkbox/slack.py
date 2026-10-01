@@ -53,12 +53,6 @@ class SlackApplicationState:
 
 
 @dataclass
-class SlackAppDeletionsResponse:
-    deletions: list[SlackAppDeletion]
-    next_cursor: UUID | None = None
-
-
-@dataclass
 class SlackConnection:
     id: UUID
     identity_id: UUID
@@ -172,47 +166,6 @@ class SlackResource(SlackOperationsMixin):
             _parse(SlackApplication, raw["application"]) if raw.get("application") else None,
             _parse(SlackAppDeletion, raw["deletion"]) if raw.get("deletion") else None,
         )
-
-    def delete_application(self, application_id: UUID | str) -> SlackAppDeletion:
-        """Permanently remove the app from every installation; retain saved history.
-
-        Requires a human organization JWT. Agent and management API keys cannot
-        perform this action. A returned pending state is not confirmed deletion.
-        """
-        return _parse(SlackAppDeletion, self._http.delete_with_response(
-            f"/slack/applications/{quote(str(application_id), safe='')}"))
-
-    def list_application_deletions(
-        self, *, cursor: UUID | str | None = None, limit: int = 50, unresolved_only: bool = False,
-    ) -> SlackAppDeletionsResponse:
-        """One cleanup page, including deleted identities; requires a human JWT."""
-        raw = self._http.get("/slack/application-deletions", params={
-            "cursor": str(cursor) if cursor is not None else None, "limit": limit,
-            "unresolved_only": unresolved_only,
-        })
-        return SlackAppDeletionsResponse(
-            [_parse(SlackAppDeletion, row) for row in raw["deletions"]],
-            UUID(raw["next_cursor"]) if raw.get("next_cursor") else None,
-        )
-
-    def retry_application_deletion(self, deletion_id: UUID | str) -> SlackAppDeletion:
-        """Retry after credential repair or manual removal; requires a human JWT."""
-        return _parse(SlackAppDeletion, self._http.post(
-            f"/slack/application-deletions/{quote(str(deletion_id), safe='')}/retry"))
-
-    def confirm_manual_app_removal(
-        self, deletion_id: UUID | str, *, confirmation: str,
-    ) -> SlackAppDeletion:
-        """Attest to removing an unknown-created app; human organization JWT only.
-
-        The server requires the exact confirmation text and a quarantine period.
-        ``manually_confirmed`` is human attestation, not provider verification.
-        Known application IDs cannot use this exceptional recovery path.
-        """
-        return _parse(SlackAppDeletion, self._http.post(
-            f"/slack/application-deletions/{quote(str(deletion_id), safe='')}/confirm-manual-removal",
-            json={"confirmation": confirmation},
-        ))
 
     def list_connections(self, identity_id: UUID | str) -> SlackConnectionsResponse:
         data = self._http.get(

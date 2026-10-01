@@ -58,11 +58,6 @@ pub struct SlackApplicationState {
     pub application: Option<SlackApplication>,
     pub deletion: Option<SlackAppDeletion>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlackAppDeletionsResponse {
-    pub deletions: Vec<SlackAppDeletion>,
-    pub next_cursor: Option<Uuid>,
-}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SlackMessageKind {
@@ -202,12 +197,6 @@ pub struct SlackPageOptions {
     pub cursor: Option<String>,
 }
 #[derive(Debug, Clone, Default)]
-pub struct SlackAppDeletionsOptions {
-    pub limit: Option<u32>,
-    pub cursor: Option<String>,
-    pub unresolved_only: bool,
-}
-#[derive(Debug, Clone, Default)]
 pub struct SlackMessagesOptions {
     pub limit: Option<u32>,
     pub cursor: Option<String>,
@@ -239,49 +228,6 @@ impl SlackResource {
         Ok(serde_json::from_value(self.http.get(
             "/slack/applications",
             &[("identity_id", identity_id.to_string())],
-        )?)?)
-    }
-    /// Permanently remove every installation, retaining saved history. Requires a human organization JWT.
-    /// Agent and management API keys cannot perform this action. Pending is not confirmed deletion.
-    pub fn delete_application(&self, application_id: Uuid) -> Result<SlackAppDeletion> {
-        Ok(serde_json::from_value(self.http.delete_with_response(
-            &format!("/slack/applications/{application_id}"),
-        )?)?)
-    }
-    /// One cleanup page including deleted identities; requires a human organization JWT.
-    pub fn list_application_deletions(
-        &self,
-        options: &SlackAppDeletionsOptions,
-    ) -> Result<SlackAppDeletionsResponse> {
-        let mut params = vec![
-            ("limit", options.limit.unwrap_or(50).to_string()),
-            ("unresolved_only", options.unresolved_only.to_string()),
-        ];
-        if let Some(cursor) = &options.cursor {
-            params.push(("cursor", cursor.clone()));
-        }
-        Ok(serde_json::from_value(
-            self.http.get("/slack/application-deletions", &params)?,
-        )?)
-    }
-    /// Retry after credential repair or manual removal; requires a human organization JWT.
-    pub fn retry_application_deletion(&self, deletion_id: Uuid) -> Result<SlackAppDeletion> {
-        Ok(serde_json::from_value(self.http.post(
-            &format!("/slack/application-deletions/{deletion_id}/retry"),
-            Some(&json!({})),
-            NO_QUERY,
-        )?)?)
-    }
-    /// Human attestation for unknown creation after quarantine, not provider verification.
-    pub fn confirm_manual_app_removal(
-        &self,
-        deletion_id: Uuid,
-        confirmation: &str,
-    ) -> Result<SlackAppDeletion> {
-        Ok(serde_json::from_value(self.http.post(
-            &format!("/slack/application-deletions/{deletion_id}/confirm-manual-removal"),
-            Some(&json!({"confirmation": confirmation})),
-            NO_QUERY,
         )?)?)
     }
     pub fn list_connections(&self, identity_id: Uuid) -> Result<SlackConnectionsResponse> {

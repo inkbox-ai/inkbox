@@ -468,7 +468,6 @@ export type {
   SlackApplication,
   SlackApplicationState,
   SlackAppDeletion,
-  SlackAppDeletionsResponse,
   SlackConnection,
   SlackConnectionsResponse,
   SlackSetupStatus,
@@ -480,7 +479,6 @@ export type {
   SlackFile,
   SlackSendMessageOptions,
   SlackPageOptions,
-  SlackAppDeletionsOptions,
   SlackMessagesOptions,
 } from "./slack.js";
 export type {

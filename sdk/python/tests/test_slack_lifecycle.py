@@ -15,23 +15,13 @@ JOB = FIXTURE["deletion"]["id"]
 
 def test_app_and_cleanup_contracts_keep_pending_honest(wire):  # noqa: F811
     client, requests, replies = wire
-    replies.extend([FIXTURE["application_state"], FIXTURE["deletion"], FIXTURE["deletions"], FIXTURE["deletion"]])
+    replies.append(FIXTURE["application_state"])
     state = client.slack.get_application(IDENTITY)
     assert state.application.id == UUID(APP)
     assert state.application.status == "deleting"
     assert state.deletion.status == "pending"
     assert isinstance(state.deletion.retry_at, datetime)
     assert requests[-1].url.params["identity_id"] == IDENTITY
-    accepted = client.slack.delete_application(APP)
-    assert accepted.status == "pending"
-    assert requests[-1].method == "DELETE"
-    assert requests[-1].url.path.endswith(f"/applications/{APP}")
-    page = client.slack.list_application_deletions(cursor=JOB, limit=2, unresolved_only=True)
-    assert page.next_cursor == UUID(JOB)
-    assert dict(requests[-1].url.params) == {"cursor": JOB, "limit": "2", "unresolved_only": "true"}
-    assert client.slack.retry_application_deletion(JOB).status == "pending"
-    assert requests[-1].method == "POST"
-    assert requests[-1].url.path.endswith(f"/application-deletions/{JOB}/retry")
 
 
 def test_history_filters_empty_cursor_and_provenance_are_preserved(wire):  # noqa: F811
@@ -62,11 +52,8 @@ def test_absent_current_app_is_a_valid_state(wire):  # noqa: F811
 
 def test_unknown_creation_manual_attestation_is_not_provider_deletion(wire):  # noqa: F811
     client, requests, replies = wire
-    replies.append({**FIXTURE["deletion"], "app_id": None, "status": "manually_confirmed"})
-    result = client.slack.confirm_manual_app_removal(
-        JOB, confirmation="I removed the unknown Slack app",
-    )
+    replies.append({"application": None, "deletion": {**FIXTURE["deletion"], "app_id": None, "status": "manually_confirmed"}})
+    result = client.slack.get_application(IDENTITY).deletion
     assert result.status == "manually_confirmed"
     assert result.app_id is None
-    assert requests[-1].url.path.endswith(f"/application-deletions/{JOB}/confirm-manual-removal")
-    assert json.loads(requests[-1].content) == {"confirmation": "I removed the unknown Slack app"}
+    assert requests[-1].url.path.endswith("/slack/applications")
