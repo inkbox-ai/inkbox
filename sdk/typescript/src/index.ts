@@ -465,6 +465,9 @@ export { MessageSendsResource, getMessageRequestKey, type MessageSendLookupOptio
 export { SlackResource } from "./slack.js";
 export type {
   SlackMessageKind,
+  SlackApplication,
+  SlackApplicationState,
+  SlackAppDeletion,
   SlackConnection,
   SlackConnectionsResponse,
   SlackSetupStatus,
@@ -499,6 +502,9 @@ export type {
   SlackMessageContextResponse,
   SlackPermalinkResponse,
   SlackArchiveSettings,
+  SlackHistoryWorkspace,
+  SlackMessageSource,
+  SlackHistoryMessagesOptions,
   SlackArchiveSettingsOptions,
   SlackArchivedMessage,
   SlackArchivePageBoundary,

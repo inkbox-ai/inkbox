@@ -1465,6 +1465,19 @@ result as proof that submitting a second message is safe.
 
 ## Slack
 
+Lifecycle/history methods require SDK/CLI 0.7.12. Read app state with
+`get_application` / `getApplication` or `slack app status`. For retained history across
+app replacements use `list_history_workspaces` / `listHistoryWorkspaces`,
+`list_history_messages` / `listHistoryMessages`, and `list_message_sources` /
+`listMessageSources`; CLI equivalents are `slack history workspaces`, `messages`,
+and `sources`. Select the identity explicitly. Workspace filtering is optional for
+history messages; follow cursors without changing filters. A null live connection
+means read-only history. Source connection IDs are provenance, not permission to
+send. Never silently route an old write to a replacement app. App deletion, cleanup
+inspection and retry require a human organization-member session, not an API key;
+use the Console. Accepted cleanup is not proof that the app is deleted.
+
+
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/python/README.md#slack) for implemented SDK/CLI methods.
 Use an existing identity. Select a workspace explicitly for live reads and mutations.
 Organization-member sessions, organization admin API keys, and claimed agent keys can

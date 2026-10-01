@@ -79,6 +79,49 @@ export function registerSlackCommands(program: Command): void {
     .description(
       "Slack workspace connections, live conversations, messages, and files",
     );
+  const app = slack.command("app").description("Read Slack app status; permanent deletion is a human Console action");
+  identity(app.command("status"))
+    .description("Show current app and latest cleanup status without changing either")
+    .action(withErrorHandler(async function (this: Command, o: IdentityOptions) {
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.getApplication(await resolveIdentityId(client, o)), { json: !!opts.json });
+    }));
+  const history = slack.command("history").description("Retained workspace history across app replacements");
+  identity(history.command("workspaces"))
+    .description("List saved workspace histories and optional live connection IDs")
+    .action(withErrorHandler(async function (this: Command, o: IdentityOptions) {
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.listHistoryWorkspaces(await resolveIdentityId(client, o)), { json: !!opts.json });
+    }));
+  page(identity(history.command("messages")))
+    .description("Browse or search one retained page; captured connection IDs are provenance, not write targets")
+    .option("--workspace-id <id>", "Slack workspace ID; omit for all retained workspaces")
+    .option("--q <text>", "Search retained message text")
+    .option("--conversation-id <id>", "Slack conversation ID")
+    .option("--thread-ts <timestamp>", "Exact thread; requires --conversation-id")
+    .option("--user-id <id>", "Slack author user ID")
+    .option("--after-ts <timestamp>", "Messages after this Slack timestamp")
+    .option("--before-ts <timestamp>", "Messages before this Slack timestamp")
+    .option("--latest-per-conversation", "Return the latest matching message per conversation")
+    .action(withErrorHandler(async function (this: Command, o: IdentityOptions & {
+      workspaceId?: string; q?: string; conversationId?: string; threadTs?: string; userId?: string;
+      afterTs?: string; beforeTs?: string; cursor?: string; limit?: number; latestPerConversation?: boolean;
+    }) {
+      if (o.threadTs && !o.conversationId) throw new InvalidArgumentError("--thread-ts requires --conversation-id");
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.listHistoryMessages(await resolveIdentityId(client, o), o), { json: !!opts.json });
+    }));
+  identity(history.command("sources"))
+    .description("Show the source installations of an authorized retained message")
+    .requiredOption("--message-id <id>", "Retained Inkbox message UUID")
+    .action(withErrorHandler(async function (this: Command, o: IdentityOptions & { messageId: string }) {
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.listMessageSources(await resolveIdentityId(client, o), o.messageId), { json: !!opts.json });
+    }));
   const workspaces = slack.command("provisioning-workspace")
     .description("Manage saved app-configuration workspaces for your organization");
   workspaces.command("list")

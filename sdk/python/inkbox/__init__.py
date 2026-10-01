@@ -13,6 +13,8 @@ from inkbox.slack_operations import (
     SlackMessageContextResponse,
     SlackPermalinkResponse,
     SlackArchiveSettings,
+    SlackHistoryWorkspace,
+    SlackMessageSource,
     SlackArchivedMessage,
     SlackArchivePageBoundary,
     SlackArchiveMessagesResponse,
@@ -26,6 +28,9 @@ from inkbox.slack_operations import (
 
 from inkbox.slack import (
     SlackResource,
+    SlackApplication,
+    SlackApplicationState,
+    SlackAppDeletion,
     SlackConnection,
     SlackConnectionsResponse,
     SlackSetupStatus,
@@ -530,6 +535,11 @@ __all__ = [
     "SlackOperationKind",
     # Slack
     "SlackResource",
+    "SlackApplication",
+    "SlackApplicationState",
+    "SlackAppDeletion",
+    "SlackHistoryWorkspace",
+    "SlackMessageSource",
     "SlackConnection",
     "SlackConnectionsResponse",
     "SlackSetupStatus",

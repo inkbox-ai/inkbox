@@ -118,6 +118,24 @@ class SlackArchivedMessage:
     mentioned: bool
     source: Literal["event", "backfill", "action"]
     captured_at: datetime
+    workspace_id: str | None = None
+
+
+@dataclass
+class SlackHistoryWorkspace:
+    workspace_id: str
+    workspace_name: str
+    archive_available: bool
+    live_connection_id: UUID | None = None
+    reconnect_connection_id: UUID | None = None
+
+
+@dataclass
+class SlackMessageSource:
+    connection_id: UUID
+    application_id: UUID
+    app_id: str | None
+    observed_at: datetime
 
 
 @dataclass
@@ -165,10 +183,10 @@ def _parse(cls, raw):
     values = {
         key: value for key, value in raw.items() if key in cls.__dataclass_fields__
     }
-    for key in ("id", "connection_id"):
-        if key in values:
+    for key in ("id", "connection_id", "application_id", "live_connection_id", "reconnect_connection_id"):
+        if values.get(key) is not None:
             values[key] = UUID(values[key])
-    for key in ("captured_at", "updated_at"):
+    for key in ("captured_at", "updated_at", "observed_at"):
         if key in values:
             values[key] = datetime.fromisoformat(values[key])
     return cls(**values)
@@ -514,6 +532,35 @@ class SlackOperationsMixin:
         if raw.get("page_boundary") is not None:
             raw["page_boundary"] = _parse(SlackArchivePageBoundary, raw["page_boundary"])
         return _parse(SlackArchiveMessagesResponse, raw)
+
+    def list_history_workspaces(self, identity_id: UUID | str) -> list[SlackHistoryWorkspace]:
+        """List consolidated saved workspace histories and optional live transports."""
+        raw = self._http.get("/slack/history/workspaces", params={"identity_id": str(identity_id)})
+        return [_parse(SlackHistoryWorkspace, row) for row in raw["workspaces"]]
+
+    def list_history_messages(
+        self, identity_id: UUID | str, *, workspace_id: str | None = None,
+        q: str | None = None, conversation_id: str | None = None, thread_ts: str | None = None,
+        user_id: str | None = None, after_ts: str | None = None, before_ts: str | None = None,
+        cursor: str | None = None, limit: int = 50, latest_per_conversation: bool | None = None,
+    ) -> SlackArchiveMessagesResponse:
+        """Browse/search retained history across app replacements, without routing writes.
+
+        Follow next_cursor even on a short or empty page. Use live_connection_id
+        from list_history_workspaces for new writes; message connection_id is provenance.
+        """
+        return self._archive_messages("/slack/history/messages", {
+            "identity_id": str(identity_id), "workspace_id": workspace_id, "q": q,
+            "conversation_id": conversation_id, "thread_ts": thread_ts, "user_id": user_id,
+            "after_ts": after_ts, "before_ts": before_ts, "cursor": cursor, "limit": limit,
+            "latest_per_conversation": latest_per_conversation,
+        })
+
+    def list_message_sources(self, identity_id: UUID | str, message_id: UUID | str) -> list[SlackMessageSource]:
+        """Read authorized installation provenance; source IDs do not grant live access."""
+        raw = self._http.get(f"/slack/history/messages/{quote(str(message_id), safe='')}/sources",
+                             params={"identity_id": str(identity_id)})
+        return [_parse(SlackMessageSource, row) for row in raw["sources"]]
 
     def list_archived_messages(
         self,

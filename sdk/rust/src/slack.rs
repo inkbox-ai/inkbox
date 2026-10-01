@@ -10,6 +10,56 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum SlackApplicationStatus {
+    Provisioning,
+    Ready,
+    Failed,
+    Deleting,
+    DeleteFailed,
+    Deleted,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplication {
+    pub id: Uuid,
+    pub identity_id: Uuid,
+    pub app_id: Option<String>,
+    pub status: SlackApplicationStatus,
+    pub provisioning_workspace_id: Uuid,
+    pub created_at: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackAppDeletionStatus {
+    WaitingForCreation,
+    Pending,
+    Running,
+    Failed,
+    Deleted,
+    ManuallyConfirmed,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackAppDeletion {
+    pub id: Uuid,
+    pub identity_id: Uuid,
+    pub application_id: Uuid,
+    pub app_id: Option<String>,
+    pub app_name: String,
+    pub provisioning_workspace_id: Uuid,
+    pub status: SlackAppDeletionStatus,
+    pub attempts: u32,
+    pub retry_at: Option<String>,
+    pub error_code: Option<String>,
+    pub management_url: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplicationState {
+    pub application: Option<SlackApplication>,
+    pub deletion: Option<SlackAppDeletion>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SlackMessageKind {
     Dm,
     GroupDm,
@@ -172,6 +222,13 @@ pub struct SlackResource {
 impl SlackResource {
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+    /// Read app and cleanup status without creating an app or polling.
+    pub fn get_application(&self, identity_id: Uuid) -> Result<SlackApplicationState> {
+        Ok(serde_json::from_value(self.http.get(
+            "/slack/applications",
+            &[("identity_id", identity_id.to_string())],
+        )?)?)
     }
     pub fn list_connections(&self, identity_id: Uuid) -> Result<SlackConnectionsResponse> {
         Ok(serde_json::from_value(self.http.get(

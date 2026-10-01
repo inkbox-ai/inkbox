@@ -138,6 +138,36 @@ pub struct SlackArchivedMessage {
     pub mentioned: bool,
     pub source: SlackArchiveSource,
     pub captured_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackHistoryWorkspace {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub archive_available: bool,
+    pub live_connection_id: Option<Uuid>,
+    pub reconnect_connection_id: Option<Uuid>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackMessageSource {
+    pub connection_id: Uuid,
+    pub application_id: Uuid,
+    pub app_id: Option<String>,
+    pub observed_at: String,
+}
+#[derive(Debug, Clone, Default)]
+pub struct SlackHistoryMessagesOptions {
+    pub workspace_id: Option<String>,
+    pub q: Option<String>,
+    pub conversation_id: Option<String>,
+    pub thread_ts: Option<String>,
+    pub user_id: Option<String>,
+    pub after_ts: Option<String>,
+    pub before_ts: Option<String>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+    pub latest_per_conversation: Option<bool>,
 }
 /// Inclusive oldest scanned list position; not necessarily a returned message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -517,6 +547,66 @@ impl SlackResource {
             &format!("{}/archive/settings", base(id)),
             options,
         )?)?)
+    }
+    /// Consolidated saved workspace histories and optional live transports.
+    pub fn list_history_workspaces(&self, identity_id: Uuid) -> Result<Vec<SlackHistoryWorkspace>> {
+        #[derive(Deserialize)]
+        struct Response {
+            workspaces: Vec<SlackHistoryWorkspace>,
+        }
+        let response: Response = serde_json::from_value(self.http.get(
+            "/slack/history/workspaces",
+            &[("identity_id", identity_id.to_string())],
+        )?)?;
+        Ok(response.workspaces)
+    }
+    /// Retained history across app replacements. Message connection_id is provenance, not a write target.
+    /// Follow next_cursor even on a short or empty page.
+    pub fn list_history_messages(
+        &self,
+        identity_id: Uuid,
+        options: &SlackHistoryMessagesOptions,
+    ) -> Result<SlackArchiveMessagesResponse> {
+        let mut params = vec![
+            ("identity_id", identity_id.to_string()),
+            ("limit", options.limit.unwrap_or(50).to_string()),
+        ];
+        for (key, value) in [
+            ("workspace_id", &options.workspace_id),
+            ("q", &options.q),
+            ("conversation_id", &options.conversation_id),
+            ("thread_ts", &options.thread_ts),
+            ("user_id", &options.user_id),
+            ("after_ts", &options.after_ts),
+            ("before_ts", &options.before_ts),
+            ("cursor", &options.cursor),
+        ] {
+            if let Some(value) = value {
+                params.push((key, value.clone()));
+            }
+        }
+        if let Some(value) = options.latest_per_conversation {
+            params.push(("latest_per_conversation", value.to_string()));
+        }
+        Ok(serde_json::from_value(
+            self.http.get("/slack/history/messages", &params)?,
+        )?)
+    }
+    /// Authorized installation provenance; source IDs do not grant live access.
+    pub fn list_message_sources(
+        &self,
+        identity_id: Uuid,
+        message_id: Uuid,
+    ) -> Result<Vec<SlackMessageSource>> {
+        #[derive(Deserialize)]
+        struct Response {
+            sources: Vec<SlackMessageSource>,
+        }
+        let response: Response = serde_json::from_value(self.http.get(
+            &format!("/slack/history/messages/{message_id}/sources"),
+            &[("identity_id", identity_id.to_string())],
+        )?)?;
+        Ok(response.sources)
     }
     pub fn list_archived_messages(
         &self,

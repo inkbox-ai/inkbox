@@ -16,6 +16,43 @@ SlackMessageKind = Literal["dm", "group_dm", "mention", "channel", "thread"]
 
 
 @dataclass
+class SlackApplication:
+    """One app incarnation. Deleted apps are never reused for replacements."""
+
+    id: UUID
+    identity_id: UUID
+    app_id: str | None
+    status: Literal["provisioning", "ready", "failed", "deleting", "delete_failed", "deleted"]
+    provisioning_workspace_id: UUID
+    created_at: datetime
+
+
+@dataclass
+class SlackAppDeletion:
+    """Accepted cleanup is distinct from confirmed provider deletion."""
+
+    id: UUID
+    identity_id: UUID
+    application_id: UUID
+    app_id: str | None
+    app_name: str
+    provisioning_workspace_id: UUID
+    status: Literal["waiting_for_creation", "pending", "running", "failed", "deleted", "manually_confirmed"]
+    attempts: int
+    retry_at: datetime | None
+    error_code: str | None
+    management_url: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class SlackApplicationState:
+    application: SlackApplication | None = None
+    deletion: SlackAppDeletion | None = None
+
+
+@dataclass
 class SlackConnection:
     id: UUID
     identity_id: UUID
@@ -31,7 +68,7 @@ class SlackConnection:
 class SlackSetupStatus:
     status: Literal["not_started", "pending", "ready", "failed", "unavailable", "needs_credentials"]
     retry_at: datetime | None = None
-    error_code: Literal["setup_failed", "outcome_unknown", "quota_exceeded", "credentials_required"] | None = None
+    error_code: Literal["setup_failed", "outcome_unknown", "quota_exceeded", "credentials_required", "application_deleting"] | None = None
     provisioning_workspace_id: UUID | None = None
 
 
@@ -101,7 +138,7 @@ class SlackFile:
 
 def _parse(cls, raw):
     data = {k: v for k, v in raw.items() if k in cls.__dataclass_fields__}
-    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id"):
+    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id", "application_id"):
         if data.get(key) is not None and cls is not SlackFile:
             data[key] = UUID(data[key])
     for key in ("created_at", "updated_at", "expires_at", "token_expires_at"):
@@ -121,6 +158,14 @@ class SlackResource(SlackOperationsMixin):
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+
+    def get_application(self, identity_id: UUID | str) -> SlackApplicationState:
+        """Read app and cleanup status without creating an app or polling."""
+        raw = self._http.get("/slack/applications", params={"identity_id": str(identity_id)})
+        return SlackApplicationState(
+            _parse(SlackApplication, raw["application"]) if raw.get("application") else None,
+            _parse(SlackAppDeletion, raw["deletion"]) if raw.get("deletion") else None,
+        )
 
     def list_connections(self, identity_id: UUID | str) -> SlackConnectionsResponse:
         data = self._http.get(

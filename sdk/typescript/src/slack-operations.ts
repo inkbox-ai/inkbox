@@ -89,6 +89,25 @@ export interface SlackArchivedMessage {
   mentioned: boolean;
   source: "event" | "backfill" | "action";
   capturedAt: Date;
+  workspaceId?: string | null;
+}
+export interface SlackHistoryWorkspace {
+  workspaceId: string;
+  workspaceName: string;
+  archiveAvailable: boolean;
+  liveConnectionId: string | null;
+  reconnectConnectionId: string | null;
+}
+export interface SlackMessageSource {
+  connectionId: string;
+  applicationId: string;
+  appId: string | null;
+  observedAt: Date;
+}
+export interface SlackHistoryMessagesOptions extends SlackArchiveMessagesOptions {
+  workspaceId?: string;
+  q?: string;
+  userId?: string;
 }
 /** Inclusive oldest scanned list position; not necessarily a returned message. */
 export interface SlackArchivePageBoundary {
@@ -202,6 +221,7 @@ const archivedMessage = (
   mentioned: r.mentioned,
   source: r.source,
   capturedAt: new Date(r.captured_at),
+  workspaceId: r.workspace_id ?? null,
 });
 const coverage = (r: Wire<SlackArchiveCoverage>): SlackArchiveCoverage => ({
   conversationId: r.conversation_id,
@@ -547,6 +567,30 @@ export class SlackOperationsResource {
         ? { messageTs: r.page_boundary.message_ts, id: r.page_boundary.id }
         : null,
     };
+  }
+  /** Consolidated saved workspace histories and optional live transports. */
+  async listHistoryWorkspaces(identityId: string): Promise<SlackHistoryWorkspace[]> {
+    const r = await this.http.get<{ workspaces: Wire<SlackHistoryWorkspace>[] }>(
+      "/slack/history/workspaces", { identity_id: identityId });
+    return r.workspaces.map(w => ({ workspaceId: w.workspace_id, workspaceName: w.workspace_name,
+      archiveAvailable: w.archive_available, liveConnectionId: w.live_connection_id,
+      reconnectConnectionId: w.reconnect_connection_id }));
+  }
+  /** Retained history across app replacements. Message connectionId is provenance, not a write target.
+   * Follow nextCursor even on a short or empty page.
+   */
+  async listHistoryMessages(identityId: string, options: SlackHistoryMessagesOptions = {}): Promise<SlackArchiveMessagesResponse> {
+    return this.archiveMessages("/slack/history/messages", options, {
+      identity_id: identityId, workspace_id: options.workspaceId, q: options.q,
+      user_id: options.userId, latest_per_conversation: options.latestPerConversation,
+    });
+  }
+  /** Authorized installation provenance; source IDs do not grant live access. */
+  async listMessageSources(identityId: string, messageId: string): Promise<SlackMessageSource[]> {
+    const r = await this.http.get<{ sources: Wire<SlackMessageSource>[] }>(
+      `/slack/history/messages/${encodeURIComponent(messageId)}/sources`, { identity_id: identityId });
+    return r.sources.map(s => ({ connectionId: s.connection_id, applicationId: s.application_id,
+      appId: s.app_id, observedAt: new Date(s.observed_at) }));
   }
   async listArchivedMessages(
     connectionId: string,

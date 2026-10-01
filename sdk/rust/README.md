@@ -958,6 +958,55 @@ Rust Slack enums parse strictly: an unrecognized response or webhook value fails
 deserialization and may require an SDK update. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 
+### Slack app lifecycle and retained history
+
+The API-key SDK exposes status and retained-history reads. Removal and recovery
+are human-only Console/HTTP actions, not SDK methods.
+
+Requires version **0.7.12 or later**. Removing a Slack app is different from
+disconnecting one installation: it stops every installation of that app and
+schedules provider deletion. Accepted deletion is not completed deletion. Only a
+human organization-member session can delete an app, inspect deletion jobs, or
+retry cleanup; agent and organization API keys cannot perform those actions.
+Use the Console for that human workflow. Deleting an identity also schedules its
+Slack app for cleanup. A replacement can be prepared after the previous app's
+cleanup is resolved. A `manually_confirmed` outcome is explicit human attestation
+for an unknown-created app after quarantine, not proof of provider deletion. Known
+apps still require provider verification.
+
+Retained history belongs to the identity and Slack workspace, not a replaceable
+app. These history methods include authorized read-only history retained after
+owner-requested disconnect or app deletion. Provider-revoked access is not restored
+by a retained record. Reconnecting the same workspace does not duplicate its
+messages. Keep a returned cursor and filters unchanged until no cursor remains.
+
+```rust,no_run
+# use inkbox::{Inkbox, SlackHistoryMessagesOptions};
+# use uuid::Uuid;
+# fn example(client: &Inkbox, identity_id: Uuid) -> inkbox::Result<()> {
+let workspaces = client.slack().list_history_workspaces(identity_id)?;
+let page = client.slack().list_history_messages(
+    identity_id,
+    &SlackHistoryMessagesOptions {
+        workspace_id: Some("TEXAMPLE".into()),
+        q: Some("release notes".into()),
+        ..Default::default()
+    },
+)?;
+for message in page.messages {
+    let sources = client.slack().list_message_sources(identity_id, message.id)?;
+}
+# Ok(())
+# }
+```
+
+A message's `connection_id` / `connectionId` identifies its provenance, not a
+promise that the connection still accepts writes. Use the history workspace's
+`live_connection_id` / `liveConnectionId` for new live operations. A null live
+connection means read-only history. Message sources identify the application and
+connection that observed the authorized record; do not redirect old write references
+to a new app. File bytes remain in Slack and may be unavailable after disconnection.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
