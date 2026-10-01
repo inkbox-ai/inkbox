@@ -1105,6 +1105,39 @@ inkbox webhook subscription update SUBSCRIPTION_ID \
 Repeat `--event-type` to select incoming Slack message categories. On update,
 the supplied event types replace the subscription's full event list.
 
+### Slack app lifecycle and retained history
+
+Requires version **0.7.12 or later**. Removing a Slack app is different from
+disconnecting one installation: it stops every installation of that app and
+schedules provider deletion. Accepted deletion is not completed deletion. Only a
+human organization-member session can delete an app, inspect deletion jobs, or
+retry cleanup; agent and organization API keys cannot perform those actions.
+Use the Console for that human workflow. Deleting an identity also schedules its
+Slack app for cleanup. A replacement can be prepared after the previous app's
+cleanup is resolved. A `manually_confirmed` outcome is explicit human attestation
+for an unknown-created app after quarantine, not proof of provider deletion. Known
+apps still require provider verification.
+
+Retained history belongs to the identity and Slack workspace, not a replaceable
+app. These history methods include authorized read-only history retained after
+owner-requested disconnect or app deletion. Provider-revoked access is not restored
+by a retained record. Reconnecting the same workspace does not duplicate its
+messages. Keep a returned cursor and filters unchanged until no cursor remains.
+
+```bash
+inkbox slack app status --identity my-agent
+inkbox slack history workspaces --identity my-agent
+inkbox slack history messages --identity my-agent --workspace-id TEXAMPLE --q "release notes"
+inkbox slack history sources --identity my-agent --message-id MESSAGE_UUID
+```
+
+A message's `connection_id` / `connectionId` identifies its provenance, not a
+promise that the connection still accepts writes. Use the history workspace's
+`live_connection_id` / `liveConnectionId` for new live operations. A null live
+connection means read-only history. Message sources identify the application and
+connection that observed the authorized record; do not redirect old write references
+to a new app. File bytes remain in Slack and may be unavailable after disconnection.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install

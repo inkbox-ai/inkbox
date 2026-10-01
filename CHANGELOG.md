@@ -6,6 +6,21 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
+## 0.7.12 - Slack app lifecycle and retained history (unreleased)
+
+- Add typed app status and asynchronous deletion/recovery responses in Python,
+  TypeScript, and Rust. Permanent app deletion, recovery, and organization cleanup
+  listing require a human organization JWT; API keys do not gain these permissions.
+- Browse or search retained Slack history across replacement apps, and inspect
+  installation provenance without treating historical connection IDs as live
+  write targets. Empty result pages can still carry a continuation cursor.
+- Add `slack app status` and `slack history workspaces|messages|sources` to the CLI.
+  Delete apps through the Console; a pending cleanup is not confirmed deletion.
+- Archived messages expose optional `workspace_id` / `workspaceId`. Rust struct
+  literals for `SlackArchivedMessage` need `workspace_id: None` when unavailable.
+- Publish all four packages before merging feature skills or publishing matching
+  documentation. No registry publication is performed by this change.
+
 ## 0.7.11 - Slack workspace connections (unreleased)
 
 - Avoid competing tunnel reconnect attempts when the initial handshake closes early.

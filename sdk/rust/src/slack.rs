@@ -10,6 +10,61 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum SlackApplicationStatus {
+    Provisioning,
+    Ready,
+    Failed,
+    Deleting,
+    DeleteFailed,
+    Deleted,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplication {
+    pub id: Uuid,
+    pub identity_id: Uuid,
+    pub app_id: Option<String>,
+    pub status: SlackApplicationStatus,
+    pub provisioning_workspace_id: Uuid,
+    pub created_at: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackAppDeletionStatus {
+    WaitingForCreation,
+    Pending,
+    Running,
+    Failed,
+    Deleted,
+    ManuallyConfirmed,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackAppDeletion {
+    pub id: Uuid,
+    pub identity_id: Uuid,
+    pub application_id: Uuid,
+    pub app_id: Option<String>,
+    pub app_name: String,
+    pub provisioning_workspace_id: Uuid,
+    pub status: SlackAppDeletionStatus,
+    pub attempts: u32,
+    pub retry_at: Option<String>,
+    pub error_code: Option<String>,
+    pub management_url: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplicationState {
+    pub application: Option<SlackApplication>,
+    pub deletion: Option<SlackAppDeletion>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackAppDeletionsResponse {
+    pub deletions: Vec<SlackAppDeletion>,
+    pub next_cursor: Option<Uuid>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SlackMessageKind {
     Dm,
     GroupDm,
@@ -172,6 +227,51 @@ pub struct SlackResource {
 impl SlackResource {
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+    /// Read app and cleanup status without creating an app or polling.
+    pub fn get_application(&self, identity_id: Uuid) -> Result<SlackApplicationState> {
+        Ok(serde_json::from_value(self.http.get(
+            "/slack/applications",
+            &[("identity_id", identity_id.to_string())],
+        )?)?)
+    }
+    /// Permanently remove every installation, retaining saved history. Requires a human organization JWT.
+    /// Agent and management API keys cannot perform this action. Pending is not confirmed deletion.
+    pub fn delete_application(&self, application_id: Uuid) -> Result<SlackAppDeletion> {
+        Ok(serde_json::from_value(self.http.delete_with_response(
+            &format!("/slack/applications/{application_id}"),
+        )?)?)
+    }
+    /// One cleanup page including deleted identities; requires a human organization JWT.
+    pub fn list_application_deletions(
+        &self,
+        options: &SlackPageOptions,
+    ) -> Result<SlackAppDeletionsResponse> {
+        let mut params = vec![("limit", options.limit.unwrap_or(50).to_string())];
+        if let Some(cursor) = &options.cursor {
+            params.push(("cursor", cursor.clone()));
+        }
+        Ok(serde_json::from_value(
+            self.http.get("/slack/application-deletions", &params)?,
+        )?)
+    }
+    /// Retry after credential repair or manual removal; requires a human organization JWT.
+    pub fn retry_application_deletion(&self, deletion_id: Uuid) -> Result<SlackAppDeletion> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("/slack/application-deletions/{deletion_id}/retry"),
+            &json!({}),
+        )?)?)
+    }
+    /// Human attestation for unknown creation after quarantine, not provider verification.
+    pub fn confirm_manual_app_removal(
+        &self,
+        deletion_id: Uuid,
+        confirmation: &str,
+    ) -> Result<SlackAppDeletion> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("/slack/application-deletions/{deletion_id}/confirm-manual-removal"),
+            &json!({"confirmation": confirmation}),
+        )?)?)
     }
     pub fn list_connections(&self, identity_id: Uuid) -> Result<SlackConnectionsResponse> {
         Ok(serde_json::from_value(self.http.get(

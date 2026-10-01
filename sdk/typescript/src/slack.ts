@@ -4,6 +4,58 @@ import { SlackOperationsResource } from "./slack-operations.js";
 
 export type SlackMessageKind =
   "dm" | "group_dm" | "mention" | "channel" | "thread";
+export interface SlackApplication {
+  id: string;
+  identityId: string;
+  appId: string | null;
+  status: "provisioning" | "ready" | "failed" | "deleting" | "delete_failed" | "deleted";
+  provisioningWorkspaceId: string;
+  createdAt: Date;
+}
+export interface SlackAppDeletion {
+  id: string;
+  identityId: string;
+  applicationId: string;
+  appId: string | null;
+  appName: string;
+  provisioningWorkspaceId: string;
+  status: "waiting_for_creation" | "pending" | "running" | "failed" | "deleted" | "manually_confirmed";
+  attempts: number;
+  retryAt: Date | null;
+  errorCode: string | null;
+  managementUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface SlackApplicationState {
+  application: SlackApplication | null;
+  deletion: SlackAppDeletion | null;
+}
+export interface SlackAppDeletionsResponse {
+  deletions: SlackAppDeletion[];
+  nextCursor: string | null;
+}
+interface RawApplication {
+  id: string; identity_id: string; app_id: string | null;
+  status: SlackApplication["status"]; provisioning_workspace_id: string; created_at: string;
+}
+interface RawAppDeletion {
+  id: string; identity_id: string; application_id: string; app_id: string | null; app_name: string;
+  provisioning_workspace_id: string; status: SlackAppDeletion["status"]; attempts: number;
+  retry_at: string | null; error_code: string | null; management_url: string;
+  created_at: string; updated_at: string;
+}
+const application = (r: RawApplication): SlackApplication => ({
+  id: r.id, identityId: r.identity_id, appId: r.app_id, status: r.status,
+  provisioningWorkspaceId: r.provisioning_workspace_id, createdAt: new Date(r.created_at),
+});
+const appDeletion = (r: RawAppDeletion): SlackAppDeletion => ({
+  id: r.id, identityId: r.identity_id, applicationId: r.application_id, appId: r.app_id,
+  appName: r.app_name, provisioningWorkspaceId: r.provisioning_workspace_id,
+  status: r.status, attempts: r.attempts, retryAt: r.retry_at ? new Date(r.retry_at) : null,
+  errorCode: r.error_code, managementUrl: r.management_url,
+  createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at),
+});
 export interface SlackConnection {
   id: string;
   identityId: string;
@@ -25,7 +77,7 @@ export interface SlackConnectionsResponse {
 export interface SlackSetupStatus {
   status: "not_started" | "pending" | "ready" | "failed" | "unavailable" | "needs_credentials";
   retryAt: Date | null;
-  errorCode: "setup_failed" | "outcome_unknown" | "quota_exceeded" | "credentials_required" | null;
+  errorCode: "setup_failed" | "outcome_unknown" | "quota_exceeded" | "credentials_required" | "application_deleting" | null;
   provisioningWorkspaceId: string | null;
 }
 export interface SlackProvisioningWorkspace {
@@ -183,6 +235,37 @@ export class SlackResource extends SlackOperationsResource {
       authorizationUrl: r.authorization_url,
       expiresAt: new Date(r.expires_at),
     };
+  }
+  /** Read app and cleanup status without creating an app or polling. */
+  async getApplication(identityId: string): Promise<SlackApplicationState> {
+    const r = await this.http.get<{ application: RawApplication | null; deletion: RawAppDeletion | null }>(
+      "/slack/applications", { identity_id: identityId });
+    return { application: r.application ? application(r.application) : null,
+      deletion: r.deletion ? appDeletion(r.deletion) : null };
+  }
+  /** Permanently remove every installation, retaining saved history. Requires a human organization JWT.
+   * Agent and management API keys cannot perform this action. Pending is not confirmed deletion.
+   */
+  async deleteApplication(applicationId: string): Promise<SlackAppDeletion> {
+    return appDeletion(await this.http.deleteWithResponse<RawAppDeletion>(
+      `/slack/applications/${encodeURIComponent(applicationId)}`));
+  }
+  /** One cleanup page including deleted identities; requires a human organization JWT. */
+  async listApplicationDeletions(options: SlackPageOptions = {}): Promise<SlackAppDeletionsResponse> {
+    const r = await this.http.get<{ deletions: RawAppDeletion[]; next_cursor: string | null }>(
+      "/slack/application-deletions", { cursor: options.cursor, limit: options.limit ?? 50 });
+    return { deletions: r.deletions.map(appDeletion), nextCursor: r.next_cursor };
+  }
+  /** Retry after credential repair or manual removal; requires a human organization JWT. */
+  async retryApplicationDeletion(deletionId: string): Promise<SlackAppDeletion> {
+    return appDeletion(await this.http.post<RawAppDeletion>(
+      `/slack/application-deletions/${encodeURIComponent(deletionId)}/retry`));
+  }
+  /** Human attestation for unknown creation after quarantine, not provider verification. */
+  async confirmManualAppRemoval(deletionId: string, confirmation: string): Promise<SlackAppDeletion> {
+    return appDeletion(await this.http.post<RawAppDeletion>(
+      `/slack/application-deletions/${encodeURIComponent(deletionId)}/confirm-manual-removal`,
+      { confirmation }));
   }
   async listConnections(identityId: string): Promise<SlackConnectionsResponse> {
     const r = await this.http.get<{
