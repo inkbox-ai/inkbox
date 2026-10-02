@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.7.12 — Threaded iMessage replies
+## 0.7.13 — Threaded iMessage replies
 
 - Reply to a specific message in existing one-to-one and group conversations.
 - Allow server-owned ordinary-message fallback by default when native threading

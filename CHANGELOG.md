@@ -6,10 +6,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
-## 0.7.12 — Threaded iMessage replies
+## 0.7.13 — Threaded iMessage replies
 
-- Advance SDK, CLI, and bundled Claude plugin versions to `0.7.12`, with bundled
-  Codex plugin version `0.1.11`.
+- Advance SDK, CLI, and bundled Claude plugin versions to `0.7.13`, with bundled
+  Codex plugin version `0.1.12`.
 - Reply to a specific message in existing one-to-one and group conversations.
 - Allow server-owned ordinary-message fallback by default when native threading
   is unsupported; expose `plain_reply_fallback` / `plainReplyFallback`.

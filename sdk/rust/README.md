@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.12"
+inkbox = "0.7.13"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.12", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.13", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
