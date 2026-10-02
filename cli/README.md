@@ -1246,7 +1246,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.12 or later.
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
 
 ```bash
 inkbox organization-domain create example.com
@@ -1257,9 +1257,8 @@ inkbox identity domain-affiliation get helper
 inkbox a2a directory --public --query example.com
 ```
 
-`organization-domain` provides `create`, `list`, `get`, `verify`, `transfer`, and
-`delete`. Transfer is explicit and requires fresh proof; it never happens merely
-by checking DNS. `identity domain-affiliation set` attaches a claim to an agent.
+`organization-domain` provides `create`, `list`, `get`, `verify`, and `delete`.
+`identity domain-affiliation set` attaches a claim to an agent.
 Use `remove <handle>` to stop all affiliation assertions.
 Use `--json` to inspect the complete response. Public search also accepts `--query`,
 `--cursor`, and `--limit`; preserve the same filters on every page.

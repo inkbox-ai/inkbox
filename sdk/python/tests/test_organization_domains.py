@@ -20,9 +20,8 @@ def test_claim_methods_encoding_and_unknown_state():
     http.post.assert_called_with("/organization-domains", json={"domain": "example.com"})
     assert resource.get("claim/id").dns_record.name == "_inkbox.example.com"
     http.get.assert_called_with("/organization-domains/claim%2Fid")
-    for action in ("verify", "transfer"):
-        getattr(resource, action)("claim/id")
-        http.post.assert_called_with(f"/organization-domains/claim%2Fid/{action}")
+    resource.verify("claim/id")
+    http.post.assert_called_with("/organization-domains/claim%2Fid/verify")
     resource.delete("claim/id")
     http.delete.assert_called_once_with("/organization-domains/claim%2Fid")
     http.get.return_value = {"items": [FIXTURE["claim"]], "next_cursor": "next"}

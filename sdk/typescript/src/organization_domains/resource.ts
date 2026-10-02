@@ -24,10 +24,6 @@ export class OrganizationDomainsResource {
     return parseOrganizationDomain(await this.http.post<Raw>(`/organization-domains/${encodeURIComponent(claimId)}/verify`));
   }
 
-  async transfer(claimId: string): Promise<OrganizationDomain> {
-    return parseOrganizationDomain(await this.http.post<Raw>(`/organization-domains/${encodeURIComponent(claimId)}/transfer`));
-  }
-
   async delete(claimId: string): Promise<void> {
     await this.http.delete(`/organization-domains/${encodeURIComponent(claimId)}`);
   }

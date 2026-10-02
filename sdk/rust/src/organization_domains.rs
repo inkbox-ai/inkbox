@@ -37,8 +37,6 @@ pub struct OrganizationDomain {
     pub last_check_result: Option<String>,
     #[serde(default)]
     pub ownership_conflict: bool,
-    #[serde(default)]
-    pub transfer_eligible: bool,
     pub recovery_action: Option<String>,
     pub created_at: String,
 }
@@ -117,14 +115,6 @@ impl OrganizationDomainsResource {
         )?)?)
     }
 
-    pub fn transfer(&self, claim_id: &str) -> Result<OrganizationDomain> {
-        Ok(serde_json::from_value(self.http.post::<Value>(
-            &format!("/organization-domains/{}/transfer", path_segment(claim_id)),
-            None,
-            NO_QUERY,
-        )?)?)
-    }
-
     pub fn delete(&self, claim_id: &str) -> Result<()> {
         self.http
             .delete(&format!("/organization-domains/{}", path_segment(claim_id)))
@@ -138,7 +128,7 @@ mod tests {
     use httpmock::prelude::*;
 
     fn claim() -> Value {
-        serde_json::from_str(r#"{"id": "OrganizationDomainClaim_00000000-0000-4000-8000-000000000001", "domain": "example.com", "state": "verified", "dns_record": {"type": "TXT", "name": "_inkbox.example.com", "value": "inkbox-domain-verification=example-proof"}, "verified_at": "2026-09-10T00:00:00Z", "last_checked_at": "2026-09-10T00:00:00Z", "last_success_at": "2026-09-10T00:00:00Z", "valid_until": "2026-09-11T00:00:00Z", "pending_expires_at": null, "next_check_at": "2026-09-10T01:00:00Z", "last_check_result": "present", "ownership_conflict": false, "transfer_eligible": false, "recovery_action": null, "created_at": "2026-09-10T00:00:00Z"}"#).unwrap()
+        serde_json::from_str(r#"{"id": "OrganizationDomainClaim_00000000-0000-4000-8000-000000000001", "domain": "example.com", "state": "verified", "dns_record": {"type": "TXT", "name": "_inkbox.example.com", "value": "inkbox-domain-verification=example-proof"}, "verified_at": "2026-09-10T00:00:00Z", "last_checked_at": "2026-09-10T00:00:00Z", "last_success_at": "2026-09-10T00:00:00Z", "valid_until": "2026-09-11T00:00:00Z", "pending_expires_at": null, "next_check_at": "2026-09-10T01:00:00Z", "last_check_result": "present", "ownership_conflict": false, "recovery_action": null, "created_at": "2026-09-10T00:00:00Z"}"#).unwrap()
     }
 
     #[test]
@@ -163,7 +153,7 @@ mod tests {
             "example.com"
         );
         create.assert();
-        for action in ["get", "verify", "transfer"] {
+        for action in ["get", "verify"] {
             let path = format!(
                 "/api/v1/organization-domains/claim%2Fid{}",
                 if action == "get" {
@@ -179,8 +169,7 @@ mod tests {
             });
             let result = match action {
                 "get" => client.organization_domains().get("claim/id"),
-                "verify" => client.organization_domains().verify("claim/id"),
-                _ => client.organization_domains().transfer("claim/id"),
+                _ => client.organization_domains().verify("claim/id"),
             };
             assert_eq!(result.unwrap().dns_record.record_type, "TXT");
             expected.assert();

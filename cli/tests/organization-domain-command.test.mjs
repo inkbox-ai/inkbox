@@ -35,7 +35,10 @@ test("claim commands, attachment, and filtered directory use the intended contra
   const run = (...args) => exec(process.execPath, [cli, ...args], { env });
   const claim = JSON.parse((await run("--json", "organization-domain", "create", "example.com")).stdout);
   assert.equal(claim.dnsRecord.name, "_inkbox.example.com");
-  for (const action of ["get", "verify", "transfer", "delete"]) await run("--json", "organization-domain", action, "claim");
+  for (const action of ["get", "verify", "delete"]) await run("--json", "organization-domain", action, "claim");
+  const beforeRemovedCommand = calls.length;
+  await assert.rejects(run("organization-domain", "transfer", "claim"), /unknown command/);
+  assert.equal(calls.length, beforeRemovedCommand);
   await run("organization-domain", "list", "--cursor", "before");
   await run("--json", "identity", "domain-affiliation", "set", "@helper", "claim");
   await assert.rejects(run("identity", "domain-affiliation", "set", "helper", "claim", "--visibility", "hidden"), /unknown option/);

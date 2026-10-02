@@ -28,7 +28,6 @@ export function registerOrganizationDomainCommands(program: Command): void {
   for (const [name, description] of [
     ["get", "Show a claim and its exact TXT instructions"],
     ["verify", "Recheck DNS proof for a claim"],
-    ["transfer", "Explicitly request ownership transfer using fresh DNS proof"],
   ] as const) {
     domains.command(`${name} <claim-id>`).description(description)
       .action(withErrorHandler(async function (this: Command, claimId: string) {

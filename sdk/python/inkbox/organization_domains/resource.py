@@ -24,8 +24,5 @@ class OrganizationDomainsResource:
     def verify(self, claim_id: str) -> OrganizationDomain:
         return parse_organization_domain(self._http.post(f"/organization-domains/{quote(claim_id, safe='')}/verify"))
 
-    def transfer(self, claim_id: str) -> OrganizationDomain:
-        return parse_organization_domain(self._http.post(f"/organization-domains/{quote(claim_id, safe='')}/transfer"))
-
     def delete(self, claim_id: str) -> None:
         self._http.delete(f"/organization-domains/{quote(claim_id, safe='')}")

@@ -26,7 +26,6 @@ export interface OrganizationDomain {
   nextCheckAt: string | null;
   lastCheckResult: string | null;
   ownershipConflict: boolean;
-  transferEligible: boolean;
   recoveryAction: string | null;
   createdAt: string;
 }
@@ -60,7 +59,7 @@ export function parseOrganizationDomain(raw: Raw): OrganizationDomain {
     lastSuccessAt: raw.last_success_at ?? null, validUntil: raw.valid_until ?? null,
     pendingExpiresAt: raw.pending_expires_at ?? null, nextCheckAt: raw.next_check_at ?? null,
     lastCheckResult: raw.last_check_result ?? null, ownershipConflict: raw.ownership_conflict ?? false,
-    transferEligible: raw.transfer_eligible ?? false, recoveryAction: raw.recovery_action ?? null,
+    recoveryAction: raw.recovery_action ?? null,
     createdAt: raw.created_at,
   };
 }

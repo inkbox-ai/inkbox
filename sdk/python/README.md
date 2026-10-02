@@ -2113,7 +2113,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.12 or later.
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
 
 ```python
 from inkbox import Inkbox
@@ -2129,7 +2129,7 @@ for item in client.a2a.iter_public_directory(q="example.com"):
     print(item.card.name)
 ```
 
-Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
+Claim methods: `create`, `list`, `get`, `verify`, `delete`.
 Use `client.identities.get_domain_affiliation(handle)` to inspect saved settings,
 `set_domain_affiliation(handle, claim_id)` to attach a domain, and
 `remove_domain_affiliation(handle)` to remove the selection. Task and context

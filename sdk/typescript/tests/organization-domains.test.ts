@@ -33,10 +33,8 @@ describe("organization domains", () => {
     expect(http.post).toHaveBeenCalledWith("/organization-domains", { domain: "example.com" });
     expect((await resource.get("claim/id")).dnsRecord.name).toBe("_inkbox.example.com");
     expect(http.get).toHaveBeenCalledWith("/organization-domains/claim%2Fid");
-    for (const action of ["verify", "transfer"] as const) {
-      await resource[action]("claim/id");
-      expect(http.post).toHaveBeenCalledWith(`/organization-domains/claim%2Fid/${action}`);
-    }
+    await resource.verify("claim/id");
+    expect(http.post).toHaveBeenCalledWith("/organization-domains/claim%2Fid/verify");
     await resource.delete("claim/id");
     expect(http.delete).toHaveBeenCalledWith("/organization-domains/claim%2Fid");
     http.get.mockResolvedValue({ items: [fixture.claim], next_cursor: "next" });

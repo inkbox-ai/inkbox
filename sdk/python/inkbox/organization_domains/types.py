@@ -38,7 +38,6 @@ class OrganizationDomain:
     next_check_at: datetime | None
     last_check_result: str | None
     ownership_conflict: bool
-    transfer_eligible: bool
     recovery_action: str | None
     created_at: datetime
 
@@ -66,7 +65,7 @@ def parse_organization_domain(data: dict[str, Any]) -> OrganizationDomain:
         valid_until=parse_datetime(data.get("valid_until")),
         pending_expires_at=parse_datetime(data.get("pending_expires_at")),
         next_check_at=parse_datetime(data.get("next_check_at")), last_check_result=data.get("last_check_result"),
-        ownership_conflict=data.get("ownership_conflict", False), transfer_eligible=data.get("transfer_eligible", False),
+        ownership_conflict=data.get("ownership_conflict", False),
         recovery_action=data.get("recovery_action"),
         created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
     )
