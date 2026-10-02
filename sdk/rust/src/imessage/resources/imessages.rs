@@ -827,6 +827,7 @@ mod tests {
         let page = thread_page_json();
         let conversation = Uuid::parse_str(page["conversation_id"].as_str().unwrap()).unwrap();
         let message = Uuid::parse_str(page["thread_root_message_id"].as_str().unwrap()).unwrap();
+        let reply_id = Uuid::parse_str(page["messages"][0]["id"].as_str().unwrap()).unwrap();
         let thread = Uuid::parse_str(page["thread_id"].as_str().unwrap()).unwrap();
         let identity = Uuid::new_v4();
         let send = server.mock(|when, then| {
@@ -835,6 +836,12 @@ mod tests {
                 .header("Idempotency-Key", "reply-one")
                 .json_body(json!({"conversation_id":conversation,"reply_to_message_id":message,"plain_reply_fallback":true,"text":"Agreed"}));
             then.status(200).json_body(json!({"message":page["messages"][0]}));
+        });
+        let read = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/imessage/messages/{reply_id}"))
+                .query_param("agent_identity_id", identity.to_string());
+            then.status(200).json_body(page["messages"][0].clone());
         });
         let by_message = server.mock(|when, then| {
             when.method(GET)
@@ -875,6 +882,13 @@ mod tests {
             )
             .unwrap();
         assert_eq!(reply.thread_id, Some(thread));
+        let read_result = sdk
+            .imessages()
+            .get_with_thread(&reply_id, Some(&identity))
+            .unwrap();
+        assert_eq!(read_result.message.id, reply_id);
+        assert_eq!(read_result.thread_id, Some(thread));
+        assert_eq!(read_result.reply_to_message_id, Some(message));
         let result = sdk
             .imessages()
             .get_thread(&message, Some(&identity), 2, Some("prior+/="))
@@ -894,7 +908,7 @@ mod tests {
             sdk.imessages().list_with_threads(&options).unwrap()[0].thread_id,
             Some(thread)
         );
-        for mock in [send, by_message, by_conversation, list] {
+        for mock in [send, read, by_message, by_conversation, list] {
             mock.assert();
         }
         let invalid = crate::imessage::IMessageThreadListOptions {

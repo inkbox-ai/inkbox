@@ -651,17 +651,17 @@ Pausing the identity stops live operations and webhook delivery while preserving
 its connections and history. Workspace approval, connection ownership, and current
 conversation access remain required.
 
-## License
-
-MIT
-
 ## Threaded iMessage replies
+
+Requires SDK/CLI **0.7.13 or later**.
 
 Reply to a specific message in an existing one-to-one or group conversation with
 Python `reply_to_message_id`, TypeScript `replyToMessageId`, Rust `send_reply`, or
 CLI `--reply-to-message-id`. Supply its conversation ID too; do not use `to`.
 Messages expose nullable direct-parent, thread, and root-message IDs. A thread ID
-is opaque and distinct from its root message ID.
+is opaque and distinct from its root message ID. Standalone messages can have a
+thread ID before anyone replies, with their own message ID as the root. A non-null
+reply-parent ID identifies a visible parent; a thread ID does not prove there are replies.
 
 Read a chronological page by any message using Python `imessages.get_thread`,
 TypeScript `imessages.getThread`, Rust `imessages().get_thread`, or CLI
@@ -680,4 +680,11 @@ boolean argument. The API owns fallback; clients do not resend failed replies
 as ordinary messages. Invalid or inaccessible targets still fail. Keep agent
 memory tied to the conversation; a native thread is optional context, and an
 ordinary fallback has no reply parent and does not join the target's native
-thread. Unsettled targets or missing reply metadata still fail.
+thread. Unsettled targets or missing reply metadata still fail. A previously
+supported target can still fail if native delivery becomes unavailable; fallback
+does not resend rejected replies. Read the queued message status and error fields
+because delivery webhooks do not cover every failure before dispatch.
+
+## License
+
+MIT

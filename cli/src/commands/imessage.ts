@@ -116,6 +116,9 @@ export function buildIMessageSendOptions(
   if (cmdOpts.replyToMessageId !== undefined && !cmdOpts.conversationId) {
     return { error: "--reply-to-message-id requires --conversation-id." };
   }
+  if (cmdOpts.plainReplyFallback === false && cmdOpts.replyToMessageId === undefined) {
+    return { error: "--no-plain-reply-fallback requires --reply-to-message-id." };
+  }
   const sendOptions: SendIMessageOptions = {};
   if (cmdOpts.replyToMessageId !== undefined) {
     sendOptions.replyToMessageId = cmdOpts.replyToMessageId;
@@ -384,6 +387,9 @@ export function registerIMessageCommands(program: Command): void {
           tz?: string;
         },
       ) {
+        if (cmdOpts.threadId !== undefined && !cmdOpts.conversationId) {
+          throw new Error("--thread-id requires --conversation-id.");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
