@@ -1465,6 +1465,47 @@ await inkbox.mailboxes.update("alex@example.com", {
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
 
+## Verified domains
+
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
+
+```typescript
+import { Inkbox } from "@inkbox/sdk";
+
+const client = new Inkbox();
+let claim = await client.organizationDomains.create("example.com");
+console.log(claim.dnsRecord.name, claim.dnsRecord.value);
+// Add the exact TXT record before verifying.
+claim = await client.organizationDomains.verify(claim.id);
+if (claim.state === "verified") {
+  await client.identities.setDomainAffiliation("helper", {
+    domainClaimId: claim.id,
+  });
+}
+for await (const item of client.a2a.iterPublicDirectory({ q: "example.com" })) {
+  console.log(item.card.name);
+}
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `delete`.
+Use `client.identities.getDomainAffiliation(handle)` for saved settings,
+`setDomainAffiliation(handle, { domainClaimId })` to attach a domain,
+and `removeDomainAffiliation(handle)` to remove it. A2A participants
+and messages expose optional `.affiliation`. Webhook types retain wire casing.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Use `verifiedDomain: "example.com"` to require an exact current domain in public
+results. Preserve the query and filters when following a cursor.
+
 ## Message retries
 
 Send methods generate a key and preserve it during bounded request retries.

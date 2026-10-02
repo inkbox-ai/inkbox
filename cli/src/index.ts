@@ -22,6 +22,7 @@ import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
+import { registerOrganizationDomainCommands } from "./commands/organization-domain.js";
 import { registerSlackCommands } from "./commands/slack.js";
 import { registerA2ACommands } from "./commands/a2a.js";
 
@@ -69,6 +70,7 @@ registerWebhookCommands(program);
 registerContactsCommands(program);
 registerNotesCommands(program);
 registerDomainCommands(program);
+registerOrganizationDomainCommands(program);
 registerA2ACommands(program);
 registerSlackCommands(program);
 

@@ -2102,3 +2102,40 @@ Archive methods include `get_archive_settings`, `update_archive_settings`,
 ## License
 
 MIT
+
+## Verified domains
+
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
+
+```python
+from inkbox import Inkbox
+
+client = Inkbox()
+claim = client.organization_domains.create("example.com")
+print(claim.dns_record.name, claim.dns_record.value)
+# Add the exact TXT record before verifying.
+claim = client.organization_domains.verify(claim.id)
+if claim.state == "verified":
+    client.identities.set_domain_affiliation("helper", claim.id)
+for item in client.a2a.iter_public_directory(q="example.com"):
+    print(item.card.name)
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `delete`.
+Use `client.identities.get_domain_affiliation(handle)` to inspect saved settings,
+`set_domain_affiliation(handle, claim_id)` to attach a domain, and
+`remove_domain_affiliation(handle)` to remove the selection. Task and context
+participants expose optional `.affiliation`; message assertions identify the author.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Use `verified_domain="example.com"` to require an exact current domain in public
+results. Preserve the query and filters when following a cursor.

@@ -1091,3 +1091,40 @@ backfill, coverage, and purge use exported `SlackArchive*` response and option t
 ## License
 
 MIT
+
+## Verified domains
+
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
+
+```rust
+let client = inkbox::Inkbox::from_env()?;
+let claim = client.organization_domains().create("example.com")?;
+println!("{} {}", claim.dns_record.name, claim.dns_record.value);
+// Add the exact TXT record before verifying.
+let claim = client.organization_domains().verify(&claim.id)?;
+if claim.state == "verified" {
+    client.identities().set_domain_affiliation("helper", &claim.id)?;
+}
+let page = client.a2a().public_directory(&inkbox::a2a::A2ADirectoryListOptions {
+    q: Some("example.com".into()),
+    ..Default::default()
+})?;
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `delete`.
+Identity resources expose `get_domain_affiliation`, `set_domain_affiliation`, and
+`remove_domain_affiliation`. Attaching requires only the handle and claim ID.
+A2A participants and messages expose optional `affiliation` values.
+
+Directory `q` searches handles, descriptions, skills, and published verified
+domains, including domain fragments. Text matches can include unverified agents.
+Set `verified_domain` to require an exact current domain in public results.
+Preserve the query and filters when following a cursor.

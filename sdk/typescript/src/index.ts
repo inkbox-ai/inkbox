@@ -459,6 +459,9 @@ export type { ResponseNotice, ResponseMetadata, ResponseObserver, APIResponse } 
 export * from "./companion.js";
 
 export type { SenderAccess } from "./sender_access.js";
+export { OrganizationDomainsResource } from "./organization_domains/resource.js";
+export type { DomainAffiliation, DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, SetDomainAffiliationOptions } from "./organization_domains/types.js";
+export type { A2APublicDirectoryListOptions } from "./a2a/types.js";
 export { MessageSendsResource, getMessageRequestKey, type MessageSendLookupOptions } from "./message_sends.js";
 
 

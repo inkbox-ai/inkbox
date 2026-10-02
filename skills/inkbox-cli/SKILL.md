@@ -915,6 +915,38 @@ inkbox mailbox get alex@example.com --json
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
 
+## Verified domains
+
+An organization admin can prove DNS control and attach a domain to an agent.
+The domain follows the agent's visibility: public agents show it publicly;
+private agents show it to their organization and authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, ownership, and recovery rules. These methods require version 0.7.12 or later.
+
+```bash
+inkbox organization-domain create example.com
+# Add the returned TXT record, then use its claim ID.
+inkbox organization-domain verify OrganizationDomainClaim_YOUR_ID
+inkbox identity domain-affiliation set helper OrganizationDomainClaim_YOUR_ID
+inkbox identity domain-affiliation get helper
+inkbox a2a directory --public --query example.com
+```
+
+`organization-domain` provides `create`, `list`, `get`, `verify`, and `delete`.
+`identity domain-affiliation set` attaches a claim to an agent.
+Use `remove <handle>` to stop all affiliation assertions.
+Use `--json` to inspect the complete response. Public search also accepts `--query`,
+`--cursor`, and `--limit`; preserve the same filters on every page.
+
+`--query` searches handles, descriptions, skills, and published verified domains,
+including domain fragments. Text matches can include agents without a verified
+domain. Add `--verified-domain example.com` to require an exact, current domain
+affiliation in public results.
+
 ## Message retries
 
 Send commands generate a key and preserve it during bounded request retries.
