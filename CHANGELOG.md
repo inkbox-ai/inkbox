@@ -4,13 +4,13 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.13
+## Unreleased
+
+## 0.7.13 - Slack contact rules (unreleased)
 
 - Configure Slack whitelist/blacklist defaults and directional contact or workspace rules.
 - Import visible Slack people into contacts and discover workspace rule targets with explicit pagination.
 - Use Slack with Companion configuration, scoped initialization, and webhook metadata.
-
-## Unreleased
 
 ## 0.7.13 — Threaded iMessage replies (unreleased)
 
