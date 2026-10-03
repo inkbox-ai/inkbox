@@ -11,6 +11,7 @@ from uuid import UUID
 
 from inkbox._http import HttpTransport
 from inkbox.slack_operations import SlackOperationsMixin
+from inkbox.slack_rules import SlackContactRulesResource
 
 SlackMessageKind = Literal["dm", "group_dm", "mention", "channel", "thread"]
 
@@ -99,6 +100,28 @@ class SlackFile:
     downloadable: bool = False
 
 
+@dataclass
+class SlackDiscoveredWorkspace:
+    workspace_id: str
+    workspace_name: str | None
+    source: Literal["connection", "contact", "shared_channel", "enterprise"]
+
+
+@dataclass
+class SlackWorkspaceDiscoveryResponse:
+    workspaces: list[SlackDiscoveredWorkspace]
+    next_cursor: str | None = None
+    unavailable_reason: str | None = None
+
+
+@dataclass
+class SlackContactImportResponse:
+    imported_count: int
+    skipped_count: int
+    contact_ids: list[UUID]
+    next_cursor: str | None = None
+
+
 def _parse(cls, raw):
     data = {k: v for k, v in raw.items() if k in cls.__dataclass_fields__}
     for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id"):
@@ -121,6 +144,36 @@ class SlackResource(SlackOperationsMixin):
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+        self.contact_rules = SlackContactRulesResource(http)
+
+    def discover_workspaces(
+        self, connection_id: UUID | str, *,
+        source: Literal["known", "conversations", "enterprise"] = "known",
+        limit: int = 20, cursor: str | None = None,
+    ) -> SlackWorkspaceDiscoveryResponse:
+        """Read one discovery page (organization admin API key or Console session required).
+
+        Known contact workspaces need not be connected."""
+        data = self._http.get(f"{_connection(connection_id)}/workspaces",
+                              params={"source": source, "limit": limit, "cursor": cursor})
+        return SlackWorkspaceDiscoveryResponse(
+            [_parse(SlackDiscoveredWorkspace, row) for row in data["workspaces"]],
+            data.get("next_cursor"), data.get("unavailable_reason"),
+        )
+
+    def import_contacts(
+        self, connection_id: UUID | str, *, limit: int = 100,
+        cursor: str | None = None, conversation_id: str | None = None,
+    ) -> SlackContactImportResponse:
+        """Import one page of visible humans; does not create contact rules.
+
+        Requires an organization admin API key or Console session."""
+        data = self._http.post(f"{_connection(connection_id)}/contacts/import", json={
+            "limit": limit, **({"cursor": cursor} if cursor is not None else {}),
+            **({"conversation_id": conversation_id} if conversation_id is not None else {}),
+        })
+        return SlackContactImportResponse(data["imported_count"], data["skipped_count"],
+                                          [UUID(value) for value in data["contact_ids"]], data.get("next_cursor"))
 
     def list_connections(self, identity_id: UUID | str) -> SlackConnectionsResponse:
         data = self._http.get(

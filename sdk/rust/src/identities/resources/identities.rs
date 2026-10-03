@@ -48,11 +48,31 @@ impl IdentitiesResource {
         options: &crate::identities::IdentityFilterModeOptions,
     ) -> Result<crate::identities::DirectionalAgentIdentityData> {
         options.validate()?;
-        Ok(serde_json::from_value(
-            self.http
-                .patch(&format!("/{agent_handle}"), options)
-                .map_err(map_identity_conflict_error)?,
-        )?)
+        let data = self
+            .http
+            .patch(&format!("/{agent_handle}"), options)
+            .map_err(map_identity_conflict_error)?;
+        let serialized = serde_json::to_value(options)?;
+        let mut expected = serialized
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(key, _)| key.starts_with("slack_"))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect::<Map<_, _>>();
+        if let Some(shared) = expected.get("slack_filter_mode").cloned() {
+            expected.insert("slack_inbound_filter_mode".into(), shared.clone());
+            expected.insert("slack_outbound_filter_mode".into(), shared);
+        }
+        if expected
+            .iter()
+            .any(|(key, value)| data.get(key) != Some(value))
+        {
+            return Err(crate::InkboxError::InvalidArgument(
+                "Slack filter mode update was not confirmed by the API; ensure Slack contact rules are available before retrying".into(),
+            ));
+        }
+        Ok(serde_json::from_value(data)?)
     }
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }

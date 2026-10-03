@@ -1636,6 +1636,8 @@ pub struct SlackActorProfile {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackWebhookData {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_access: Option<crate::SenderAccess>,
     pub identity_id: String,
     pub connection_id: String,
     pub workspace_id: String,
@@ -1658,6 +1660,8 @@ pub struct SlackWebhookData {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackWebhookPayload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion: Option<crate::companion::CompanionMetadata>,
     pub id: String,
     pub event_type: SlackWebhookEventType,
     pub timestamp: String,

@@ -6,7 +6,36 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
-## 0.7.13 — Threaded iMessage replies (unreleased)
+## 0.7.14 - Slack contact rules (unreleased)
+
+### Added
+
+- Configure Slack whitelist/blacklist defaults and directional contact or workspace rules.
+- Import visible Slack people into contacts and discover workspace rule targets with explicit pagination.
+- Use Slack with Companion configuration, scoped initialization, and webhook metadata.
+- Advance SDK, CLI, and bundled Claude plugin versions to `0.7.14`, with the Codex plugin at `0.1.13`.
+
+### Changed
+
+- **Source compatibility:** Rust `CompanionChannel` adds `Slack`, so exhaustive
+  matches must handle the new variant. Slack fields are also added to existing
+  `CompanionChannelReadiness`, `CompanionReplyContext`,
+  `DirectionalAgentIdentitySummary`, `IdentityFilterModeOptions`,
+  `SlackWebhookPayload`, and `SlackWebhookData` structs;
+  downstream struct literals must supply the added fields (or use `Default`
+  where supported). These changes can break compilation even for Cargo's
+  `inkbox = "0.7"` dependency range. Review and adapt before upgrading; pin an
+  exact previous version until ready. Existing legacy identity models and
+  method signatures remain unchanged.
+- TypeScript `CompanionChannel` now includes `"slack"`; exhaustive switches and
+  channel-keyed records may need a Slack case.
+- Python, TypeScript, and Rust Slack mode updates raise an error when the API
+  response does not confirm the requested modes. Other fields in the same
+  update may already have been saved.
+- Workspace discovery tolerates additional response fields and unknown source
+  values. Directory discovery and import require organization admin authority.
+
+## 0.7.13 — Threaded iMessage replies (2026-10-03)
 
 ### Added
 
@@ -26,7 +55,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Validate CLI thread filters and strict-reply flags before requesting messages.
 - Preserve ordinary sends and existing list pagination when new options are omitted.
 
-## 0.7.12 - Verified domains (unreleased)
+## 0.7.12 - Verified domains (2026-10-02)
 
 ### Added
 
@@ -43,7 +72,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Bump the bundled Codex and Cursor plugin manifests to 0.1.11 and 1.0.5.
 - Rust directory options and A2A response/webhook structs gain additive fields; exhaustive struct literals must include them, while directory options can use `..Default::default()`.
 
-## 0.7.11 - Slack workspace connections (unreleased)
+## 0.7.11 - Slack workspace connections (2026-09-30)
 
 - Avoid competing tunnel reconnect attempts when the initial handshake closes early.
 - Support setup and installation with claimed agent keys for their own identity;

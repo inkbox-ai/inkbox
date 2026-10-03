@@ -1,5 +1,6 @@
 /** Slack workspace setup, live reads, and durable sends. */
 import type { HttpTransport } from "./_http.js";
+import { SlackContactRulesResource } from "./slack-rules.js";
 import { SlackOperationsResource } from "./slack-operations.js";
 
 export type SlackMessageKind =
@@ -158,9 +159,59 @@ const action = (r: RawAction): SlackAction => ({
 const base = (id: string): string =>
   `/slack/connections/${encodeURIComponent(id)}`;
 
+export interface SlackDiscoveredWorkspace {
+  workspaceId: string;
+  workspaceName: string | null;
+  source: "connection" | "contact" | "shared_channel" | "enterprise";
+}
+export interface SlackWorkspaceDiscoveryResponse {
+  workspaces: SlackDiscoveredWorkspace[];
+  nextCursor: string | null;
+  unavailableReason: string | null;
+}
+export interface SlackWorkspaceDiscoveryOptions {
+  source?: "known" | "conversations" | "enterprise";
+  limit?: number;
+  cursor?: string | null;
+}
+export interface SlackContactImportOptions extends SlackPageOptions { conversationId?: string | null }
+export interface SlackContactImportResponse {
+  importedCount: number;
+  skippedCount: number;
+  contactIds: string[];
+  nextCursor: string | null;
+}
+
 export class SlackResource extends SlackOperationsResource {
+  readonly contactRules: SlackContactRulesResource;
   constructor(http: HttpTransport) {
     super(http);
+    this.contactRules = new SlackContactRulesResource(http);
+  }
+  /** Read one page; requires an organization admin API key or Console session.
+   * Known contact workspaces need not be connected to this connection. */
+  async discoverWorkspaces(connectionId: string, options: SlackWorkspaceDiscoveryOptions = {}): Promise<SlackWorkspaceDiscoveryResponse> {
+    const r = await this.http.get<{
+      workspaces: { workspace_id: string; workspace_name: string | null; source: SlackDiscoveredWorkspace["source"] }[];
+      next_cursor: string | null; unavailable_reason: string | null;
+    }>(`${base(connectionId)}/workspaces`, {
+      source: options.source ?? "known", limit: options.limit ?? 20, cursor: options.cursor,
+    });
+    return { workspaces: r.workspaces.map((w) => ({ workspaceId: w.workspace_id,
+      workspaceName: w.workspace_name, source: w.source })), nextCursor: r.next_cursor,
+      unavailableReason: r.unavailable_reason };
+  }
+  /** Import one page of visible humans without creating contact rules.
+   * Requires an organization admin API key or Console session. */
+  async importContacts(connectionId: string, options: SlackContactImportOptions = {}): Promise<SlackContactImportResponse> {
+    const r = await this.http.post<{
+      imported_count: number; skipped_count: number; contact_ids: string[]; next_cursor: string | null;
+    }>(`${base(connectionId)}/contacts/import`, {
+      limit: options.limit ?? 100, cursor: options.cursor ?? undefined,
+      conversation_id: options.conversationId ?? undefined,
+    });
+    return { importedCount: r.imported_count, skippedCount: r.skipped_count,
+      contactIds: r.contact_ids, nextCursor: r.next_cursor };
   }
   /**
    * Claimed agent keys can install only their own identity.

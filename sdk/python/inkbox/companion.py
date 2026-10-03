@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal, NotRequired, TypedDict
 from urllib.parse import quote
@@ -12,7 +13,7 @@ from inkbox._http import HttpTransport
 from inkbox.sender_access import SenderAccess
 from inkbox.response_metadata import ResponseNotice, _parse_notices
 
-CompanionChannel = Literal["mail", "phone", "imessage"]
+CompanionChannel = Literal["mail", "phone", "imessage", "slack"]
 DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024
 _UNSET = object()
 
@@ -34,6 +35,9 @@ class CompanionReplyContextWire(TypedDict):
     reply_to_message_id: NotRequired[str | None]
     to: NotRequired[list[str] | None]
     cc: NotRequired[list[str] | None]
+    connection_id: NotRequired[str | None]
+    slack_conversation_id: NotRequired[str | None]
+    thread_ts: NotRequired[str | None]
 
 
 class CompanionMetadata(TypedDict):
@@ -99,6 +103,9 @@ class CompanionReplyContext:
     reply_to_message_id: str | None = None
     to: list[str] | None = None
     cc: list[str] | None = None
+    connection_id: str | None = None
+    slack_conversation_id: str | None = None
+    thread_ts: str | None = None
 
 
 @dataclass
@@ -148,7 +155,7 @@ def _path(handle: str) -> str:
 def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
     try:
         ids = {key: str(UUID(data[key])) for key in ("scope_id", "activation_id", "conversation_id")}
-        if ids["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage"):
+        if ids["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage", "slack"):
             raise ValueError()
         reply = dict(data["reply_context"])
         reply["conversation_id"] = str(UUID(reply["conversation_id"]))
@@ -159,6 +166,14 @@ def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
         if data["channel"] == "mail":
             UUID(reply["reply_to_message_id"])
             if not reply.get("to") and not reply.get("cc"):
+                raise ValueError()
+        if data["channel"] == "slack":
+            reply["connection_id"] = str(UUID(reply["connection_id"]))
+            if not isinstance(reply.get("slack_conversation_id"), str) or not re.fullmatch(r"[CGD][A-Z0-9]+", reply["slack_conversation_id"]):
+                raise ValueError()
+            if reply.get("thread_ts") is not None and (
+                not isinstance(reply["thread_ts"], str) or not re.fullmatch(r"[0-9]+\.[0-9]+", reply["thread_ts"])
+            ):
                 raise ValueError()
         for key in ("to", "cc"):
             if reply.get(key) is not None and (
@@ -227,7 +242,7 @@ class CompanionResource:
         _positive(limit, "limit", 200)
         if type(offset) is not int or not 0 <= offset <= 10000:
             raise ValueError("offset must be an integer between 0 and 10000")
-        if channel is not None and channel not in ("mail", "phone", "imessage"):
+        if channel is not None and channel not in ("mail", "phone", "imessage", "slack"):
             raise ValueError("Invalid Companion channel")
         data = self._http.get(f"{_path(handle)}/conversations", params={"channel": channel, "limit": limit, "offset": offset})
         return CompanionConversationPage([

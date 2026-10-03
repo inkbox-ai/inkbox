@@ -1082,6 +1082,9 @@ lookup; the UUID form avoids that lookup.
 | --- | --- |
 | `slack setup` | `start` (preparation status is returned by `connection list`) |
 | `slack search` | Search retained messages across an identity's workspace connections |
+| `slack contact-rule` | `list`, `list-all`, `get`, `create`, `update`, `delete` |
+| `slack workspace-discovery` | Discover one page of known, shared-channel, or supported Enterprise workspaces; organization admin API key required |
+| `slack contacts-import` | Import one page of directory or selected conversation members into contact cards; organization admin API key required |
 | `slack connection` | `list`, `disconnect` |
 | `slack provisioning-workspace` | `list`, `save --credentials-file <path>` |
 | `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
@@ -1312,3 +1315,24 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Add `--no-plain-reply-fallback` to `imessage send` to require a native reply
 instead.
+
+## Slack contact rules
+
+Use `inkbox identity update HANDLE --slack-filter-mode whitelist` for a shared
+default, or `--slack-inbound-filter-mode` / `--slack-outbound-filter-mode` for
+separate directions. Do not combine the shared and directional flags.
+
+`slack contacts-import` and `slack workspace-discovery` require an organization
+admin API key; agent-scoped keys cannot run either command.
+
+```bash
+inkbox slack contact-rule create example-agent --action allow \
+  --match-type exact_user --match-target TEXAMPLE:UEXAMPLE
+inkbox slack contacts-import --connection-id 11111111-1111-4111-8111-111111111111
+inkbox slack workspace-discovery --connection-id 11111111-1111-4111-8111-111111111111 --source conversations
+inkbox identity companion update example-agent --enabled true
+```
+
+Import and discovery fetch one page. Follow `nextCursor`, including after an empty
+page, to continue. Import does not create allow rules. Workspace rules match a
+person's verified home workspace; they do not sponsor Companion conversations.

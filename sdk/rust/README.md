@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.13"
+inkbox = "0.7.14"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.13", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.14", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -882,6 +882,14 @@ top-level block, deserialize `CompanionMailWebhookPayload`,
 authority and must not trigger history loading.
 
 ## Slack
+
+Slack contact rules support exact people and home workspaces, with whitelist or
+blacklist defaults and optional per-direction settings. Import visible people
+into real contact cards, discover workspace rule targets page by page, and use
+Slack with Companion mode. Importing a contact does not allow communication.
+See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
+[discovery and import](https://inkbox.ai/docs/api/slack/discovery) for version
+`0.7.14` examples.
 
 ```rust,no_run
 use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};

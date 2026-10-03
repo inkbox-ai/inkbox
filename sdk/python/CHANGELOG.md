@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.14 - Slack contact rules (unreleased)
+
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0714---slack-contact-rules-unreleased) for the complete upcoming release.
+
 ## 0.7.13 — Threaded iMessage replies (unreleased)
 
 See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0713--threaded-imessage-replies-unreleased) for the complete upcoming release.
