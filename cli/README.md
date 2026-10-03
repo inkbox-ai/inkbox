@@ -1083,8 +1083,8 @@ lookup; the UUID form avoids that lookup.
 | `slack setup` | `start` (preparation status is returned by `connection list`) |
 | `slack search` | Search retained messages across an identity's workspace connections |
 | `slack contact-rule` | `list`, `list-all`, `get`, `create`, `update`, `delete` |
-| `slack workspace-discovery` | Discover one page of known, shared-channel, or supported Enterprise workspaces |
-| `slack contacts-import` | Import one page of directory or selected conversation members into contact cards |
+| `slack workspace-discovery` | Discover one page of known, shared-channel, or supported Enterprise workspaces; organization admin API key required |
+| `slack contacts-import` | Import one page of directory or selected conversation members into contact cards; organization admin API key required |
 | `slack connection` | `list`, `disconnect` |
 | `slack provisioning-workspace` | `list`, `save --credentials-file <path>` |
 | `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
@@ -1321,6 +1321,9 @@ instead.
 Use `inkbox identity update HANDLE --slack-filter-mode whitelist` for a shared
 default, or `--slack-inbound-filter-mode` / `--slack-outbound-filter-mode` for
 separate directions. Do not combine the shared and directional flags.
+
+`slack contacts-import` and `slack workspace-discovery` require an organization
+admin API key; agent-scoped keys cannot run either command.
 
 ```bash
 inkbox slack contact-rule create example-agent --action allow \

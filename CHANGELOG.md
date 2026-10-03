@@ -21,7 +21,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   matches must handle the new variant. Slack fields are also added to existing
   `CompanionChannelReadiness`, `CompanionReplyContext`,
   `DirectionalAgentIdentitySummary`, `IdentityFilterModeOptions`,
-  `SlackActorProfile`, and `SlackWebhookData` structs;
+  `SlackWebhookPayload`, and `SlackWebhookData` structs;
   downstream struct literals must supply the added fields (or use `Default`
   where supported). These changes can break compilation even for Cargo's
   `inkbox = "0.7"` dependency range. Review and adapt before upgrading; pin an
@@ -72,7 +72,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Bump the bundled Codex and Cursor plugin manifests to 0.1.11 and 1.0.5.
 - Rust directory options and A2A response/webhook structs gain additive fields; exhaustive struct literals must include them, while directory options can use `..Default::default()`.
 
-## 0.7.11 - Slack workspace connections (unreleased)
+## 0.7.11 - Slack workspace connections (2026-09-30)
 
 - Avoid competing tunnel reconnect attempts when the initial handshake closes early.
 - Support setup and installation with claimed agent keys for their own identity;
