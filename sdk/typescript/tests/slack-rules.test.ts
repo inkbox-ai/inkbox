@@ -63,8 +63,14 @@ it("updates identity modes with sibling omission and conflict rules", async () =
   const agent = await client.getIdentity("project-agent");
   expect(agent.slackInboundFilterMode).toBe("whitelist");
   expect(agent.slackOutboundFilterMode).toBe("blacklist");
-  reply(identity); await agent.update({ slackInboundFilterMode: "blacklist" });
+  reply({ ...identity, slack_inbound_filter_mode: "blacklist" }); await agent.update({ slackInboundFilterMode: "blacklist" });
   expect(JSON.parse(request().init.body as string)).toEqual({ slack_inbound_filter_mode: "blacklist" });
   await expect(agent.update({ slackFilterMode: "blacklist", slackInboundFilterMode: "whitelist" })).rejects.toThrow("cannot be combined");
   await expect(agent.update({ slackOutboundFilterMode: null } as never)).rejects.toThrow("null");
+});
+
+it.each([{}, { slack_filter_mode: "blacklist" }, { slack_filter_mode: "whitelist", slack_inbound_filter_mode: "whitelist", slack_outbound_filter_mode: "blacklist" }])("does not report an ignored or partially applied Slack mode update as saved", async (response) => {
+  const { client, reply } = wire();
+  reply(response);
+  await expect(client.identities.update("project-agent", { slackFilterMode: "whitelist" })).rejects.toThrow("not confirmed");
 });

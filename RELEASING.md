@@ -97,3 +97,16 @@ git tag v<version> && git push --tags
 
 - crates.io and npm/PyPI versions are **immutable** — a published version can't be overwritten, only yanked/deprecated. Get the dry run right.
 - crate/package names are claimed by the first publisher; the first `--prod` for a new package claims the name on that registry.
+
+### Slack contact-rules release gate
+
+The 0.7.14 candidate is not a standalone client release. Before publication or
+merging its feature instructions, verify that the public API supports rule CRUD,
+Slack mode updates, discovery/import authorization, and Companion routing, and
+that Slack is configured and usable for the intended customers. Check returned
+mode fields after updates; HTTP 200 alone is not proof that older APIs accepted
+new fields. Publish the coordinated packages before enabling dependent Console
+UI or publishing linked feature documentation. Verify the linked documentation
+pages are available before merging README links. The Rust and TypeScript source
+compatibility changes listed in the changelog must be accepted as part of release
+review; this candidate does not authorize publication or a version-policy exception.

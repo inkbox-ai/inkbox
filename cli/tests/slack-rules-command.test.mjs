@@ -34,3 +34,22 @@ test("Slack rule/import/discovery commands use canonical SDK wire and preserve c
     assert.deepEqual(JSON.parse(requests.at(-1).body), { limit: 100, cursor: "previous", conversation_id: "CEXAMPLE" });
   } finally { await new Promise((resolve) => server.close(resolve)); }
 });
+
+
+test("identity update rejects a successful older API response that ignored Slack mode", async () => {
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ id, agent_handle: "project-agent", organization_id: "example-org", created_at: rule.created_at, updated_at: rule.updated_at }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const result = await new Promise((resolve) => execFile(process.execPath, [cli,
+      "--api-key", "synthetic", "--base-url", `http://127.0.0.1:${server.address().port}`,
+      "identity", "update", "project-agent", "--slack-filter-mode", "whitelist"],
+      { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 15000 },
+      (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+    assert.ok(result.error, "unsupported updates must exit unsuccessfully");
+    assert.match(result.stderr, /not confirmed/);
+    assert.doesNotMatch(result.stdout, /updated successfully/i);
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});

@@ -166,6 +166,9 @@ pub enum SlackWorkspaceSource {
     Contact,
     SharedChannel,
     Enterprise,
+    /// An additional discovery source introduced by the API.
+    #[serde(other)]
+    Unknown,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackDiscoveredWorkspace {
@@ -227,6 +230,7 @@ impl SlackResource {
             http,
         }
     }
+    /// Read one page. Requires an organization admin API key or Console session.
     pub fn discover_workspaces(
         &self,
         connection_id: Uuid,
@@ -250,6 +254,7 @@ impl SlackResource {
             &query,
         )?)?)
     }
+    /// Import one page without allowing communication. Requires organization admin authority.
     pub fn import_contacts(
         &self,
         connection_id: Uuid,

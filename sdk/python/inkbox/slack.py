@@ -151,11 +151,13 @@ class SlackResource(SlackOperationsMixin):
         source: Literal["known", "conversations", "enterprise"] = "known",
         limit: int = 20, cursor: str | None = None,
     ) -> SlackWorkspaceDiscoveryResponse:
-        """Read one discovery page. Known contact workspaces need not be connected."""
+        """Read one discovery page (organization admin API key or Console session required).
+
+        Known contact workspaces need not be connected."""
         data = self._http.get(f"{_connection(connection_id)}/workspaces",
                               params={"source": source, "limit": limit, "cursor": cursor})
         return SlackWorkspaceDiscoveryResponse(
-            [SlackDiscoveredWorkspace(**row) for row in data["workspaces"]],
+            [_parse(SlackDiscoveredWorkspace, row) for row in data["workspaces"]],
             data.get("next_cursor"), data.get("unavailable_reason"),
         )
 
@@ -163,7 +165,9 @@ class SlackResource(SlackOperationsMixin):
         self, connection_id: UUID | str, *, limit: int = 100,
         cursor: str | None = None, conversation_id: str | None = None,
     ) -> SlackContactImportResponse:
-        """Import one page of visible humans; does not create contact rules."""
+        """Import one page of visible humans; does not create contact rules.
+
+        Requires an organization admin API key or Console session."""
         data = self._http.post(f"{_connection(connection_id)}/contacts/import", json={
             "limit": limit, **({"cursor": cursor} if cursor is not None else {}),
             **({"conversation_id": conversation_id} if conversation_id is not None else {}),

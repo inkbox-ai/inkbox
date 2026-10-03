@@ -133,3 +133,89 @@ fn slack_rules_discovery_and_import_wire_contract() {
     );
     import.assert();
 }
+
+#[test]
+fn slack_rule_get_delete_and_future_discovery_source() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let id = Uuid::parse_str(ID).unwrap();
+    let rule = json!({"id":ID,"agent_identity_id":ID,"action":"allow","match_type":"exact_user","match_target":"TEXAMPLE:UEXAMPLE",
+        "direction":"both","status":"active","created_at":"2026-10-02T00:00:00Z","updated_at":"2026-10-02T00:00:00Z","contact":null});
+    let get = server.mock(|when, then| {
+        when.method(GET).path(format!(
+            "/api/v1/identities/project-agent/slack-contact-rules/{ID}"
+        ));
+        then.status(200).json_body(rule);
+    });
+    assert_eq!(
+        client
+            .slack()
+            .contact_rules
+            .get("project-agent", id)
+            .unwrap()
+            .id,
+        id
+    );
+    get.assert();
+    let delete = server.mock(|when, then| {
+        when.method(DELETE).path(format!(
+            "/api/v1/identities/project-agent/slack-contact-rules/{ID}"
+        ));
+        then.status(204);
+    });
+    client
+        .slack()
+        .contact_rules
+        .delete("project-agent", id)
+        .unwrap();
+    delete.assert();
+    let source: SlackDiscoveredWorkspace = serde_json::from_value(json!({"workspace_id":"TEXAMPLE","workspace_name":null,"source":"future_source","future_field":true})).unwrap();
+    assert!(matches!(source.source, SlackWorkspaceSource::Unknown));
+}
+
+#[test]
+fn slack_filter_modes_require_confirmed_raw_response_and_parse_directions() {
+    for confirmed in [false, true] {
+        let server = MockServer::start();
+        let client = Inkbox::builder("synthetic")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let mut response = json!({"id":ID,"organization_id":"example-org","agent_handle":"project-agent","created_at":"2026-10-02T00:00:00Z","updated_at":"2026-10-02T00:00:00Z"});
+        if confirmed {
+            response["slack_filter_mode"] = json!("blacklist");
+            response["slack_inbound_filter_mode"] = json!("whitelist");
+            response["slack_outbound_filter_mode"] = json!("blacklist");
+        }
+        let update = server.mock(|when, then| {
+            when.method(PATCH)
+                .path("/api/v1/identities/project-agent")
+                .json_body(json!({"slack_inbound_filter_mode":"whitelist"}));
+            then.status(200).json_body(response);
+        });
+        let result = client.identities().update_filter_modes(
+            "project-agent",
+            &identities::IdentityFilterModeOptions {
+                slack_inbound_filter_mode: Some(mail::types::FilterMode::Whitelist),
+                ..Default::default()
+            },
+        );
+        if confirmed {
+            let saved = result.unwrap();
+            assert_eq!(
+                saved.slack_inbound_filter_mode,
+                mail::types::FilterMode::Whitelist
+            );
+            assert_eq!(
+                saved.slack_outbound_filter_mode,
+                mail::types::FilterMode::Blacklist
+            );
+        } else {
+            assert!(result.unwrap_err().to_string().contains("not confirmed"));
+        }
+        update.assert();
+    }
+}

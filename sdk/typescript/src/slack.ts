@@ -188,7 +188,8 @@ export class SlackResource extends SlackOperationsResource {
     super(http);
     this.contactRules = new SlackContactRulesResource(http);
   }
-  /** Read one page; known contact workspaces need not be connected to this connection. */
+  /** Read one page; requires an organization admin API key or Console session.
+   * Known contact workspaces need not be connected to this connection. */
   async discoverWorkspaces(connectionId: string, options: SlackWorkspaceDiscoveryOptions = {}): Promise<SlackWorkspaceDiscoveryResponse> {
     const r = await this.http.get<{
       workspaces: { workspace_id: string; workspace_name: string | null; source: SlackDiscoveredWorkspace["source"] }[];
@@ -200,7 +201,8 @@ export class SlackResource extends SlackOperationsResource {
       workspaceName: w.workspace_name, source: w.source })), nextCursor: r.next_cursor,
       unavailableReason: r.unavailable_reason };
   }
-  /** Import one page of visible humans without creating contact rules. */
+  /** Import one page of visible humans without creating contact rules.
+   * Requires an organization admin API key or Console session. */
   async importContacts(connectionId: string, options: SlackContactImportOptions = {}): Promise<SlackContactImportResponse> {
     const r = await this.http.post<{
       imported_count: number; skipped_count: number; contact_ids: string[]; next_cursor: string | null;

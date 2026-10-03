@@ -91,7 +91,7 @@ def test_slack_identity_modes_match_shared_directional_contract():
                 "slack_filter_mode": "whitelist", "slack_outbound_filter_mode": "blacklist"}
     def receive(request):
         requests.append(request)
-        return httpx.Response(200, json=response)
+        return httpx.Response(200, json={**response, **(json.loads(request.content) if request.method == "PATCH" else {})})
     with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(receive)):
         client = Inkbox(api_key="synthetic", base_url="https://example.com")
     with client:
@@ -104,3 +104,19 @@ def test_slack_identity_modes_match_shared_directional_contract():
             agent.update(slack_filter_mode="blacklist", slack_inbound_filter_mode="whitelist")
         with pytest.raises(ValueError):
             agent.update(slack_outbound_filter_mode=None)
+
+
+def test_discovery_tolerates_new_fields(wire):
+    client, _, replies = wire
+    replies.append({"workspaces": [{"workspace_id": "TEXAMPLE", "workspace_name": "Example", "source": "future_source", "extra": True}], "next_cursor": None})
+    assert client.slack.discover_workspaces(ID).workspaces[0].source == "future_source"
+
+
+@pytest.mark.parametrize("response", [{}, {"slack_filter_mode": "blacklist"}, {"slack_filter_mode": "whitelist", "slack_inbound_filter_mode": "whitelist", "slack_outbound_filter_mode": "blacklist"}])
+def test_slack_update_rejects_ignored_or_partial_fields(response):
+    from unittest.mock import Mock
+    from inkbox.identities.resources.identities import IdentitiesResource
+    http = Mock()
+    http.patch.return_value = response
+    with pytest.raises(ValueError, match="not confirmed"):
+        IdentitiesResource(http).update("project-agent", slack_filter_mode="whitelist")
