@@ -6,11 +6,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
-## 0.7.13 - Slack contact rules (unreleased)
+## 0.7.14 - Slack contact rules (unreleased)
 
 - Configure Slack whitelist/blacklist defaults and directional contact or workspace rules.
 - Import visible Slack people into contacts and discover workspace rule targets with explicit pagination.
 - Use Slack with Companion configuration, scoped initialization, and webhook metadata.
+- Advance SDK, CLI, and bundled Claude plugin versions to `0.7.14`, with the Codex plugin at `0.1.13`.
 
 ## 0.7.13 — Threaded iMessage replies (unreleased)
 

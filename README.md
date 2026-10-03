@@ -637,7 +637,7 @@ into real contact cards, discover workspace rule targets page by page, and use
 Slack with Companion mode. Importing a contact does not allow communication.
 See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
 [discovery and import](https://inkbox.ai/docs/api/slack/discovery) for version
-`0.7.13` examples.
+`0.7.14` examples.
 
 Slack SDK and CLI methods require version **0.7.11 or later**.
 
