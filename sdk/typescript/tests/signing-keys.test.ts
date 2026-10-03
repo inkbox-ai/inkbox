@@ -84,6 +84,22 @@ describe("verifyWebhook", () => {
   it("returns false when headers are missing", () => {
     expect(verifyWebhook({ payload: TEST_BODY, headers: {}, secret: TEST_KEY })).toBe(false);
   });
+
+  it("returns false for a truncated digest instead of throwing", () => {
+    expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders("sha256=abcd"), secret: TEST_KEY })).toBe(false);
+  });
+
+  it("returns false for an empty digest instead of throwing", () => {
+    expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders("sha256="), secret: TEST_KEY })).toBe(false);
+  });
+
+  it("returns false for an over-long digest instead of throwing", () => {
+    expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders(`sha256=${"a".repeat(65)}`), secret: TEST_KEY })).toBe(false);
+  });
+
+  it("returns false for an odd-length digest instead of throwing", () => {
+    expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders(`sha256=${"a".repeat(63)}`), secret: TEST_KEY })).toBe(false);
+  });
 });
 
 describe("SigningKeysResource", () => {
