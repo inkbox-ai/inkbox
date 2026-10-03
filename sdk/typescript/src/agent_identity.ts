@@ -153,6 +153,9 @@ export class AgentIdentity {
   get mailFilterMode(): FilterMode { return this._data.mailFilterMode; }
 
   /** Whitelist/blacklist mode for this identity's phone contact rules. */
+  get slackFilterMode(): FilterMode { return (this._data.slackFilterMode ?? "blacklist") as FilterMode; }
+  get slackInboundFilterMode(): FilterMode { return this._data.slackInboundFilterMode ?? this.slackFilterMode; }
+  get slackOutboundFilterMode(): FilterMode { return this._data.slackOutboundFilterMode ?? this.slackFilterMode; }
   get phoneFilterMode(): FilterMode { return this._data.phoneFilterMode; }
   get mailInboundFilterMode(): FilterMode { return this._data.mailInboundFilterMode ?? this.mailFilterMode; }
   get mailOutboundFilterMode(): FilterMode { return this._data.mailOutboundFilterMode ?? this.mailFilterMode; }

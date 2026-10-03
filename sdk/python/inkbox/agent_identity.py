@@ -188,6 +188,18 @@ class AgentIdentity:
         return self._data.mail_filter_mode
 
     @property
+    def slack_filter_mode(self) -> FilterMode:
+        return self._data.slack_filter_mode
+
+    @property
+    def slack_inbound_filter_mode(self) -> FilterMode:
+        return self._data.slack_inbound_filter_mode
+
+    @property
+    def slack_outbound_filter_mode(self) -> FilterMode:
+        return self._data.slack_outbound_filter_mode
+
+    @property
     def phone_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's phone contact rules."""
         return self._data.phone_filter_mode
@@ -2089,6 +2101,9 @@ class AgentIdentity:
         phone_filter_mode: FilterMode | str | None = None,
         mail_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         mail_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        slack_filter_mode: FilterMode | str | None = None,
+        slack_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        slack_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         phone_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         phone_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> None:
@@ -2163,7 +2178,11 @@ class AgentIdentity:
                 if isinstance(phone_filter_mode, FilterMode)
                 else phone_filter_mode
             )
+        if slack_filter_mode is not None:
+            update_kwargs["slack_filter_mode"] = FilterMode(slack_filter_mode).value
         for name, value in (
+            ("slack_inbound_filter_mode", slack_inbound_filter_mode),
+            ("slack_outbound_filter_mode", slack_outbound_filter_mode),
             ("mail_inbound_filter_mode", mail_inbound_filter_mode),
             ("mail_outbound_filter_mode", mail_outbound_filter_mode),
             ("phone_inbound_filter_mode", phone_inbound_filter_mode),

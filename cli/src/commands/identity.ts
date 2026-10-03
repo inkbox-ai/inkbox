@@ -409,6 +409,9 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            slackFilterMode: id.slackFilterMode,
+            slackInboundFilterMode: id.slackInboundFilterMode,
+            slackOutboundFilterMode: id.slackOutboundFilterMode,
             mailInboundFilterMode: id.mailInboundFilterMode,
             mailOutboundFilterMode: id.mailOutboundFilterMode,
             phoneInboundFilterMode: id.phoneInboundFilterMode,
@@ -574,6 +577,9 @@ export function registerIdentityCommands(program: Command): void {
     .option("--imessage-filter-mode <mode>", "Alias for the shared phone and iMessage contact-rule mode (admin API key required)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Shared phone and iMessage contact-rule mode: whitelist or blacklist (admin API key required)")
+    .option("--slack-filter-mode <mode>", "Slack contact-rule mode: whitelist or blacklist (admin-only)")
+    .option("--slack-inbound-filter-mode <mode>", "Inbound Slack mode: whitelist or blacklist")
+    .option("--slack-outbound-filter-mode <mode>", "Outbound Slack mode: whitelist or blacklist")
     .option("--mail-inbound-filter-mode <mode>", "Inbound mail mode: whitelist or blacklist")
     .option("--mail-outbound-filter-mode <mode>", "Outbound mail mode: whitelist or blacklist")
     .option("--phone-inbound-filter-mode <mode>", "Inbound phone and iMessage mode: whitelist or blacklist")
@@ -592,6 +598,9 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: string;
           mailFilterMode?: string;
           phoneFilterMode?: string;
+          slackFilterMode?: string;
+          slackInboundFilterMode?: string;
+          slackOutboundFilterMode?: string;
           mailInboundFilterMode?: string;
           mailOutboundFilterMode?: string;
           phoneInboundFilterMode?: string;
@@ -611,6 +620,9 @@ export function registerIdentityCommands(program: Command): void {
           ["--imessage-filter-mode", cmdOpts.imessageFilterMode],
           ["--mail-filter-mode", cmdOpts.mailFilterMode],
           ["--phone-filter-mode", cmdOpts.phoneFilterMode],
+          ["--slack-filter-mode", cmdOpts.slackFilterMode],
+          ["--slack-inbound-filter-mode", cmdOpts.slackInboundFilterMode],
+          ["--slack-outbound-filter-mode", cmdOpts.slackOutboundFilterMode],
           ["--mail-inbound-filter-mode", cmdOpts.mailInboundFilterMode],
           ["--mail-outbound-filter-mode", cmdOpts.mailOutboundFilterMode],
           ["--phone-inbound-filter-mode", cmdOpts.phoneInboundFilterMode],
@@ -620,7 +632,7 @@ export function registerIdentityCommands(program: Command): void {
             throw new Error(`${flag} must be 'whitelist' or 'blacklist'`);
           }
         }
-        for (const channel of ["mail", "phone"] as const) {
+        for (const channel of ["mail", "phone", "slack"] as const) {
           if ((cmdOpts[`${channel}FilterMode`] !== undefined || (channel === "phone" && cmdOpts.imessageFilterMode !== undefined))
             && (cmdOpts[`${channel}InboundFilterMode`] !== undefined || cmdOpts[`${channel}OutboundFilterMode`] !== undefined)) {
             throw new Error(`Shared and directional ${channel} filter modes cannot be combined`);
@@ -642,8 +654,11 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: "whitelist" | "blacklist";
           mailFilterMode?: "whitelist" | "blacklist";
           phoneFilterMode?: "whitelist" | "blacklist";
+          slackFilterMode?: "whitelist" | "blacklist";
+          slackInboundFilterMode?: "whitelist" | "blacklist";
+          slackOutboundFilterMode?: "whitelist" | "blacklist";
         } = {};
-        for (const key of ["mailInboundFilterMode", "mailOutboundFilterMode", "phoneInboundFilterMode", "phoneOutboundFilterMode"] as const) {
+        for (const key of ["slackFilterMode", "slackInboundFilterMode", "slackOutboundFilterMode", "mailInboundFilterMode", "mailOutboundFilterMode", "phoneInboundFilterMode", "phoneOutboundFilterMode"] as const) {
           if (cmdOpts[key] !== undefined) updateOpts[key] = cmdOpts[key] as "whitelist" | "blacklist";
         }
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
@@ -699,6 +714,9 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            slackFilterMode: id.slackFilterMode,
+            slackInboundFilterMode: id.slackInboundFilterMode,
+            slackOutboundFilterMode: id.slackOutboundFilterMode,
             mailInboundFilterMode: id.mailInboundFilterMode,
             mailOutboundFilterMode: id.mailOutboundFilterMode,
             phoneInboundFilterMode: id.phoneInboundFilterMode,

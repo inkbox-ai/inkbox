@@ -159,6 +159,56 @@ pub struct SlackSendMessageOptions {
     pub idempotency_key: String,
     pub thread_ts: Option<String>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackWorkspaceSource {
+    Connection,
+    Contact,
+    SharedChannel,
+    Enterprise,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackDiscoveredWorkspace {
+    pub workspace_id: String,
+    pub workspace_name: Option<String>,
+    pub source: SlackWorkspaceSource,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackWorkspaceDiscoveryResponse {
+    pub workspaces: Vec<SlackDiscoveredWorkspace>,
+    pub next_cursor: Option<String>,
+    pub unavailable_reason: Option<String>,
+}
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackWorkspaceDiscoverySource {
+    #[default]
+    Known,
+    Conversations,
+    Enterprise,
+}
+#[derive(Debug, Clone, Default)]
+pub struct SlackWorkspaceDiscoveryOptions {
+    pub source: SlackWorkspaceDiscoverySource,
+    pub limit: Option<u32>,
+    pub cursor: Option<String>,
+}
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SlackContactImportOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackContactImportResponse {
+    pub imported_count: u64,
+    pub skipped_count: u64,
+    pub contact_ids: Vec<Uuid>,
+    pub next_cursor: Option<String>,
+}
 pub(crate) fn base(id: Uuid) -> String {
     format!("/slack/connections/{id}")
 }
@@ -168,10 +218,48 @@ pub(crate) fn segment(value: &str) -> String {
 #[derive(Clone)]
 pub struct SlackResource {
     pub(crate) http: Arc<HttpTransport>,
+    pub contact_rules: crate::slack_rules::SlackContactRulesResource,
 }
 impl SlackResource {
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
-        Self { http }
+        Self {
+            contact_rules: crate::slack_rules::SlackContactRulesResource::new(http.clone()),
+            http,
+        }
+    }
+    pub fn discover_workspaces(
+        &self,
+        connection_id: Uuid,
+        options: &SlackWorkspaceDiscoveryOptions,
+    ) -> Result<SlackWorkspaceDiscoveryResponse> {
+        let mut query = vec![
+            (
+                "source",
+                serde_json::to_value(&options.source)?
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            ),
+            ("limit", options.limit.unwrap_or(20).to_string()),
+        ];
+        if let Some(cursor) = &options.cursor {
+            query.push(("cursor", cursor.clone()));
+        }
+        Ok(serde_json::from_value(self.http.get(
+            &format!("{}/workspaces", base(connection_id)),
+            &query,
+        )?)?)
+    }
+    pub fn import_contacts(
+        &self,
+        connection_id: Uuid,
+        options: &SlackContactImportOptions,
+    ) -> Result<SlackContactImportResponse> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("{}/contacts/import", base(connection_id)),
+            Some(options),
+            NO_QUERY,
+        )?)?)
     }
     pub fn list_connections(&self, identity_id: Uuid) -> Result<SlackConnectionsResponse> {
         Ok(serde_json::from_value(self.http.get(

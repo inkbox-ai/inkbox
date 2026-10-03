@@ -194,7 +194,8 @@ export class IdentitiesResource {
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
-    for (const channel of ["mail", "phone"] as const) {
+    if (options.slackFilterMode !== undefined) body["slack_filter_mode"] = options.slackFilterMode;
+    for (const channel of ["mail", "phone", "slack"] as const) {
       const inbound = options[`${channel}InboundFilterMode`];
       const outbound = options[`${channel}OutboundFilterMode`];
       const shared = options[`${channel}FilterMode`] !== undefined

@@ -32,12 +32,12 @@ export function registerCompanionCommands(identity: Command): void {
       output(result as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
   companion.command("conversations <handle>").alias("state").description("Read one page of visible conversation states")
-    .option("--channel <channel>", "mail, phone, or imessage")
+    .option("--channel <channel>", "mail, phone, imessage, or slack")
     .option("--limit <number>", "Page size (1-200)", "50")
     .option("--offset <number>", "Page offset", "0")
     .action(withErrorHandler(async function (this: Command, handle: string, options: { channel?: string; limit: string; offset: string }) {
-      if (options.channel !== undefined && !["mail", "phone", "imessage"].includes(options.channel)) {
-        throw new Error("--channel must be mail, phone, or imessage");
+      if (options.channel !== undefined && !["mail", "phone", "imessage", "slack"].includes(options.channel)) {
+        throw new Error("--channel must be mail, phone, imessage, or slack");
       }
       const query = { channel: options.channel as CompanionChannel | undefined,
         limit: integer(options.limit, "--limit", 1, 200), offset: integer(options.offset, "--offset", 0, 10000) };

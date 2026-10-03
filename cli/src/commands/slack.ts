@@ -1,3 +1,4 @@
+import { registerSlackRuleCommands } from "./slack-rules.js";
 import { registerSlackOperationCommands } from "./slack-operations.js";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { Command, InvalidArgumentError } from "commander";
@@ -385,5 +386,6 @@ export function registerSlackCommands(program: Command): void {
         output({ path: o.output, bytes: bytes.length }, { json: !!opts.json });
       }),
     );
+  registerSlackRuleCommands(slack);
   registerSlackOperationCommands(slack, { conversations, messages, files });
 }

@@ -883,6 +883,14 @@ authority and must not trigger history loading.
 
 ## Slack
 
+Slack contact rules support exact people and home workspaces, with whitelist or
+blacklist defaults and optional per-direction settings. Import visible people
+into real contact cards, discover workspace rule targets page by page, and use
+Slack with Companion mode. Importing a contact does not allow communication.
+See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
+[discovery and import](https://inkbox.ai/docs/api/slack/discovery) for version
+`0.7.13` examples.
+
 ```rust,no_run
 use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};
 use uuid::Uuid;

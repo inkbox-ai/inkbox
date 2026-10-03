@@ -84,6 +84,9 @@ export interface CreateIdentityOptions {
 export interface UpdateIdentityOptions {
   mailInboundFilterMode?: "whitelist" | "blacklist";
   mailOutboundFilterMode?: "whitelist" | "blacklist";
+  slackFilterMode?: "whitelist" | "blacklist";
+  slackInboundFilterMode?: "whitelist" | "blacklist";
+  slackOutboundFilterMode?: "whitelist" | "blacklist";
   phoneInboundFilterMode?: "whitelist" | "blacklist";
   phoneOutboundFilterMode?: "whitelist" | "blacklist";
   newHandle?: string;
@@ -175,6 +178,9 @@ export interface IdentityPhoneNumber {
 export interface AgentIdentitySummary {
   mailInboundFilterMode?: FilterMode;
   mailOutboundFilterMode?: FilterMode;
+  slackFilterMode?: "whitelist" | "blacklist";
+  slackInboundFilterMode?: FilterMode;
+  slackOutboundFilterMode?: FilterMode;
   phoneInboundFilterMode?: FilterMode;
   phoneOutboundFilterMode?: FilterMode;
   id: string;
@@ -283,6 +289,9 @@ export interface RawIdentityPhoneNumber {
 export interface RawAgentIdentitySummary {
   mail_inbound_filter_mode?: string;
   mail_outbound_filter_mode?: string;
+  slack_filter_mode?: string | null;
+  slack_inbound_filter_mode?: string | null;
+  slack_outbound_filter_mode?: string | null;
   phone_inbound_filter_mode?: string;
   phone_outbound_filter_mode?: string;
   id: string;
@@ -369,6 +378,9 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
   return {
     mailInboundFilterMode: (r.mail_inbound_filter_mode ?? r.mail_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     mailOutboundFilterMode: (r.mail_outbound_filter_mode ?? r.mail_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    slackFilterMode: (r.slack_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    slackInboundFilterMode: (r.slack_inbound_filter_mode ?? r.slack_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    slackOutboundFilterMode: (r.slack_outbound_filter_mode ?? r.slack_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     phoneInboundFilterMode: (r.phone_inbound_filter_mode ?? r.phone_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     phoneOutboundFilterMode: (r.phone_outbound_filter_mode ?? r.phone_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     id: r.id,
