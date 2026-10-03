@@ -47,7 +47,8 @@ use crate::identities::types::{AgentIdentityData, IdentityMailbox, IdentityPhone
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
     IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction, IMessageReactionType,
-    IMessageSendStyle, IdentityIMessageNumber,
+    IMessageSendStyle, IMessageThread, IMessageThreadListOptions, IdentityIMessageNumber,
+    ThreadedIMessage,
 };
 use crate::mail::types::{
     DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
@@ -1295,6 +1296,104 @@ impl AgentIdentity {
     // iMessage helpers
     // -----------------------------------------------------------------------
 
+    /// Read one iMessage including thread metadata, scoped to this identity.
+    pub fn get_imessage_with_thread(&self, message_id: &Uuid) -> Result<ThreadedIMessage> {
+        self.require_imessage()?;
+        self.inkbox
+            .imessages()
+            .get_with_thread(message_id, Some(&self.id()))
+    }
+
+    /// Read a chronological thread page using any message in it.
+    pub fn get_imessage_thread(
+        &self,
+        message_id: &Uuid,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.require_imessage()?;
+        self.inkbox
+            .imessages()
+            .get_thread(message_id, Some(&self.id()), limit, cursor)
+    }
+
+    /// Read a thread by its opaque ID within a conversation.
+    pub fn get_imessage_conversation_thread(
+        &self,
+        conversation_id: &Uuid,
+        thread_id: &Uuid,
+        limit: i64,
+        cursor: Option<&str>,
+    ) -> Result<IMessageThread> {
+        self.require_imessage()?;
+        self.inkbox.imessages().get_conversation_thread(
+            conversation_id,
+            thread_id,
+            Some(&self.id()),
+            limit,
+            cursor,
+        )
+    }
+
+    /// List this identity's messages with nullable thread metadata.
+    pub fn list_imessages_with_threads(
+        &self,
+        options: &IMessageThreadListOptions,
+    ) -> Result<Vec<ThreadedIMessage>> {
+        self.require_imessage()?;
+        let mut scoped = options.clone();
+        scoped.agent_identity_id = Some(self.id());
+        self.inkbox.imessages().list_with_threads(&scoped)
+    }
+
+    /// Reply to a message, allowing an ordinary send when native threading is unsupported.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_imessage_reply(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        idempotency_key: Option<&str>,
+    ) -> Result<ThreadedIMessage> {
+        self.send_imessage_reply_with_fallback(
+            conversation_id,
+            reply_to_message_id,
+            text,
+            media_urls,
+            send_style,
+            idempotency_key,
+            true,
+        )
+    }
+
+    /// Reply with explicit fallback behavior. False requires a native reply.
+    /// Fallback stays in the same conversation and is handled by the API.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_imessage_reply_with_fallback(
+        &self,
+        conversation_id: &Uuid,
+        reply_to_message_id: &Uuid,
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        idempotency_key: Option<&str>,
+        plain_reply_fallback: bool,
+    ) -> Result<ThreadedIMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_reply_with_fallback(
+            conversation_id,
+            reply_to_message_id,
+            text,
+            media_urls,
+            send_style,
+            Some(&self.id()),
+            idempotency_key,
+            plain_reply_fallback,
+        )
+    }
+
     /// Send an outbound iMessage as this identity.
     ///
     /// Shared service requires the recipient to connect first. A dedicated
@@ -2174,6 +2273,201 @@ mod tests {
         let identity = identity_at(base_url, false);
         identity.data.borrow_mut().summary.imessage_enabled = true;
         identity
+    }
+
+    #[test]
+    fn imessage_thread_reads_preserve_identity_scope_and_pagination() {
+        let server = MockServer::start();
+        let identity = imessage_identity_at(&server.base_url());
+        let message_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let conversation_id = Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap();
+        let thread_id = Uuid::parse_str("44444444-4444-4444-4444-444444444444").unwrap();
+        let message = json!({
+            "id": message_id, "conversation_id": conversation_id, "direction": "inbound",
+            "message_type": "message", "service": "imessage", "is_read": false,
+            "created_at": "2026-06-01T00:00:00Z", "updated_at": "2026-06-01T00:00:00Z",
+            "thread_id": thread_id, "thread_root_message_id": message_id,
+            "reply_to_message_id": null
+        });
+        let page = json!({
+            "thread_id": thread_id, "conversation_id": conversation_id,
+            "thread_root_message_id": message_id, "messages": [message],
+            "next_cursor": "next+/="
+        });
+        let read = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/imessage/messages/{message_id}"))
+                .query_param("agent_identity_id", IDENTITY_ID);
+            then.status(200).json_body(message.clone());
+        });
+        let by_message = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/imessage/messages/{message_id}/thread"))
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("limit", "2")
+                .query_param("cursor", "prior+/=");
+            then.status(200).json_body(page.clone());
+        });
+        let by_conversation = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!(
+                    "/api/v1/imessage/conversations/{conversation_id}/threads/{thread_id}"
+                ))
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("limit", "3")
+                .query_param("cursor", "next+/=");
+            then.status(200).json_body(page.clone());
+        });
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/messages")
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("conversation_id", conversation_id.to_string())
+                .query_param("thread_id", thread_id.to_string())
+                .query_param("limit", "4")
+                .query_param("offset", "8")
+                .query_param("is_read", "false")
+                .query_param("is_blocked", "false")
+                .query_param("include_groups", "true")
+                .query_param("start_datetime", "2026-06-01")
+                .query_param("end_datetime", "2026-06-02")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([message]));
+        });
+        let read_result = identity.get_imessage_with_thread(&message_id).unwrap();
+        assert_eq!(read_result.message.id, message_id);
+        assert_eq!(read_result.thread_id, Some(thread_id));
+        assert_eq!(read_result.reply_to_message_id, None);
+        let page_result = identity
+            .get_imessage_thread(&message_id, 2, Some("prior+/="))
+            .unwrap();
+        assert_eq!(
+            page_result.messages[0].thread_root_message_id,
+            Some(message_id)
+        );
+        assert_eq!(page_result.next_cursor.as_deref(), Some("next+/="));
+        let conversation_result = identity
+            .get_imessage_conversation_thread(
+                &conversation_id,
+                &thread_id,
+                3,
+                page_result.next_cursor.as_deref(),
+            )
+            .unwrap();
+        assert_eq!(conversation_result.thread_id, Some(thread_id));
+        assert_eq!(conversation_result.conversation_id, conversation_id);
+        let other_identity = Uuid::new_v4();
+        let options = IMessageThreadListOptions {
+            agent_identity_id: Some(other_identity),
+            conversation_id: Some(conversation_id),
+            thread_id: Some(thread_id),
+            limit: 4,
+            offset: 8,
+            is_read: Some(false),
+            is_blocked: Some(false),
+            include_groups: true,
+            date_range: DateRangeFilter {
+                start_datetime: Some("2026-06-01".into()),
+                end_datetime: Some("2026-06-02".into()),
+                tz: Some("America/New_York".into()),
+            },
+        };
+        let messages = identity.list_imessages_with_threads(&options).unwrap();
+        assert_eq!(messages[0].thread_id, Some(thread_id));
+        assert_eq!(options.agent_identity_id, Some(other_identity));
+        for request in [read, by_message, by_conversation, list] {
+            request.assert_hits(1);
+        }
+    }
+
+    #[test]
+    fn imessage_thread_helpers_reject_disabled_identity_before_http() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET);
+            then.status(500);
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let id = Uuid::new_v4();
+        let errors = [
+            identity.get_imessage_with_thread(&id).err(),
+            identity.get_imessage_thread(&id, 50, None).err(),
+            identity
+                .get_imessage_conversation_thread(&id, &id, 50, None)
+                .err(),
+            identity
+                .list_imessages_with_threads(&IMessageThreadListOptions::default())
+                .err(),
+        ];
+        for error in errors {
+            assert!(matches!(error, Some(InkboxError::InvalidArgument(_))));
+        }
+        request.assert_hits(0);
+    }
+
+    #[test]
+    fn imessage_thread_identity_filter_requires_conversation_before_http() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET);
+            then.status(500);
+        });
+        let identity = imessage_identity_at(&server.base_url());
+        let result = identity.list_imessages_with_threads(&IMessageThreadListOptions {
+            thread_id: Some(Uuid::new_v4()),
+            ..Default::default()
+        });
+        assert!(matches!(result, Err(InkboxError::InvalidArgument(_))));
+        request.assert_hits(0);
+    }
+
+    #[test]
+    fn imessage_reply_fallback_delegates_with_identity_and_request_key() {
+        let server = MockServer::start();
+        let identity = imessage_identity_at(&server.base_url());
+        let conversation = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        for plain_reply_fallback in [true, false] {
+            let send = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/imessage/messages")
+                    .query_param("agent_identity_id", IDENTITY_ID)
+                    .header("Idempotency-Key", "reply-one")
+                    .json_body(json!({"conversation_id": conversation,
+                        "reply_to_message_id": target, "plain_reply_fallback": plain_reply_fallback,
+                        "text": "Agreed"}));
+                then.status(422)
+                    .json_body(json!({"detail": {"error": "imessage_reply_target_unavailable"}}));
+            });
+            let result = if plain_reply_fallback {
+                identity.send_imessage_reply(
+                    &conversation,
+                    &target,
+                    Some("Agreed"),
+                    None,
+                    None,
+                    Some("reply-one"),
+                )
+            } else {
+                identity.send_imessage_reply_with_fallback(
+                    &conversation,
+                    &target,
+                    Some("Agreed"),
+                    None,
+                    None,
+                    Some("reply-one"),
+                    false,
+                )
+            };
+            assert!(matches!(
+                result,
+                Err(InkboxError::Api {
+                    status_code: 422,
+                    ..
+                })
+            ));
+            send.assert_hits(1);
+        }
     }
 
     /// Build a phoneless identity backed by a client pointed at an unreachable

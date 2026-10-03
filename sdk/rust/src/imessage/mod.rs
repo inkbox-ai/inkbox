@@ -15,5 +15,6 @@ pub use types::{
     IMessageGroupCreationStatus, IMessageMarkReadResult, IMessageMediaItem, IMessageMediaUpload,
     IMessageMessageReaction, IMessageNumber, IMessageNumberStatus, IMessageReaction,
     IMessageReactionType, IMessageRecipient, IMessageRuleAction, IMessageRuleMatchType,
-    IMessageSendStyle, IMessageService, IMessageTriageNumber, IdentityIMessageNumber,
+    IMessageSendStyle, IMessageService, IMessageThread, IMessageThreadListOptions,
+    IMessageTriageNumber, IdentityIMessageNumber, ThreadedIMessage, WithIMessageThread,
 };

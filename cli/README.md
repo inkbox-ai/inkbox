@@ -1267,3 +1267,48 @@ Use `--json` to inspect the complete response. Public search also accepts `--que
 including domain fragments. Text matches can include agents without a verified
 domain. Add `--verified-domain example.com` to require an exact, current domain
 affiliation in public results.
+
+## Threaded iMessage replies
+
+Requires SDK/CLI **0.7.13 or later**. `--no-plain-reply-fallback` requires
+`--reply-to-message-id`; `--thread-id` on `imessage list` requires `--conversation-id`.
+
+```bash
+inkbox imessage send -i support-bot --conversation-id <conversation-id> --reply-to-message-id <message-id> --text "Agreed"
+inkbox --json imessage thread <message-id> -i support-bot --limit 50
+inkbox --json imessage thread <message-id> -i support-bot --cursor <next-cursor>
+inkbox --json imessage conversation-thread <conversation-id> <thread-id> -i support-bot
+inkbox imessage conversation <conversation-id> -i support-bot --thread-id <thread-id>
+inkbox imessage list -i support-bot --conversation-id <conversation-id> --thread-id <thread-id>
+```
+
+`--reply-to-message-id` requires `--conversation-id` and cannot be combined
+with `--to`. Thread commands return `threadId`, `conversationId`,
+`threadRootMessageId`, `messages`, and `nextCursor`; use `--json` to preserve
+the complete page. Messages include `replyToMessageId`, `threadId`, and
+`threadRootMessageId` when available.
+
+Thread IDs are opaque and distinct from message IDs. Thread pages include the
+root and its replies in chronological order; follow `next_cursor` (Python/Rust)
+or `nextCursor` (TypeScript/CLI) until null. A standalone message can have its own
+thread ID and use its own message ID as the root, even before anyone replies.
+A non-null `reply_to_message_id` / `replyToMessageId` identifies a visible reply
+parent; a thread ID alone does not mean the message has replies. Thread metadata
+may be null for pending or older messages, and the root or direct parent can be
+unavailable. Conversation message lists remain flat and newest-first. A thread filter requires its conversation ID; it uses the existing
+limit/offset pagination, unlike the chronological thread endpoints.
+
+Native replies work in supported one-to-one and group iMessage conversations.
+Use a message from the same conversation. With plain fallback enabled (the
+default), the API sends an ordinary message in that conversation when native
+threading is unsupported: the target is known to use SMS/RCS or was downgraded.
+This does not force a particular transport. An ordinary fallback has no reply
+parent and does not join the target's native thread. Invalid or inaccessible
+targets, unsettled messages, and missing reply metadata still fail. Delivery
+errors are not retried as new ordinary messages. If a previously supported target
+can no longer receive a native reply, that send may fail even with fallback enabled.
+Read the message status and error fields after queueing; delivery webhooks do not
+cover every failure before dispatch. Omitting the target preserves ordinary sending.
+
+Add `--no-plain-reply-fallback` to `imessage send` to require a native reply
+instead.

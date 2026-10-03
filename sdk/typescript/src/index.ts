@@ -301,6 +301,7 @@ export {
 } from "./imessage/types.js";
 export type {
   IMessage,
+  IMessageThread,
   IMessageAssignment,
   IMessageContactRule,
   IMessageConversation,

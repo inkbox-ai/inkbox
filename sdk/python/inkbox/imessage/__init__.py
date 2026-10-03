@@ -5,6 +5,7 @@ inkbox.imessage — iMessage types.
 from inkbox.contact_rules import ContactRuleDirection
 from inkbox.imessage.types import (
     IMessage,
+    IMessageThread,
     IMessageAssignment,
     IMessageAssignmentStatus,
     IMessageContactRule,
@@ -31,6 +32,7 @@ from inkbox.imessage.types import (
 __all__ = [
     "ContactRuleDirection",
     "IMessage",
+    "IMessageThread",
     "IMessageAssignment",
     "IMessageAssignmentStatus",
     "IMessageContactRule",

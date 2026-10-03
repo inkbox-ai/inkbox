@@ -274,6 +274,9 @@ class IMessage:
     sender_number: str | None = None
     participants: list[str] | None = None
     is_group: bool = False
+    reply_to_message_id: UUID | None = None
+    thread_id: UUID | None = None
+    thread_root_message_id: UUID | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessage:
@@ -291,6 +294,9 @@ class IMessage:
             sender_number=d.get("sender_number"),
             participants=d.get("participants"),
             is_group=d.get("is_group", False),
+            reply_to_message_id=UUID(d["reply_to_message_id"]) if d.get("reply_to_message_id") else None,
+            thread_id=UUID(d["thread_id"]) if d.get("thread_id") else None,
+            thread_root_message_id=UUID(d["thread_root_message_id"]) if d.get("thread_root_message_id") else None,
             content=d.get("content"),
             message_type=d["message_type"],
             service=IMessageService(d["service"]),
@@ -317,6 +323,27 @@ class IMessage:
                 [IMessageMessageReaction._from_dict(r) for r in raw_reactions]
                 if raw_reactions else None
             ),
+        )
+
+
+@dataclass
+class IMessageThread:
+    """A chronological page of a message thread. Pass next_cursor for more."""
+
+    thread_id: UUID | None
+    conversation_id: UUID
+    thread_root_message_id: UUID | None
+    messages: list[IMessage]
+    next_cursor: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageThread:
+        return cls(
+            thread_id=UUID(d["thread_id"]) if d.get("thread_id") else None,
+            conversation_id=UUID(d["conversation_id"]),
+            thread_root_message_id=UUID(d["thread_root_message_id"]) if d.get("thread_root_message_id") else None,
+            messages=[IMessage._from_dict(m) for m in d["messages"]],
+            next_cursor=d.get("next_cursor"),
         )
 
 

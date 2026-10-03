@@ -523,6 +523,9 @@ export interface IMessageMessageReactionWire {
  * include sender/participant fields.
  */
 export interface IMessageWebhookMessage {
+  reply_to_message_id?: string | null;
+  thread_id?: string | null;
+  thread_root_message_id?: string | null;
   /** Receipt-time admission; absent for unknown, system, and outbound messages. */
   sender_access?: SenderAccess;
   id: string;

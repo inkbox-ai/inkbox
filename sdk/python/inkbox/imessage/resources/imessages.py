@@ -18,6 +18,7 @@ from uuid import UUID
 from inkbox._message_requests import post_message
 from inkbox.imessage.types import (
     IMessage,
+    IMessageThread,
     IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
@@ -115,6 +116,34 @@ class IMessagesResource:
         data = self._http.get(f"/messages/{message_id}", params=params)
         return IMessage._from_dict(data)
 
+    def get_thread(
+        self, message_id: UUID | str, *, limit: int = 50,
+        cursor: str | None = None, agent_identity_id: UUID | str | None = None,
+    ) -> IMessageThread:
+        """Get a chronological thread page using any visible message in it."""
+        return self._get_thread_page(f"/messages/{message_id}/thread", limit, cursor, agent_identity_id)
+
+    def get_conversation_thread(
+        self, conversation_id: UUID | str, thread_id: UUID | str, *,
+        limit: int = 50, cursor: str | None = None,
+        agent_identity_id: UUID | str | None = None,
+    ) -> IMessageThread:
+        """Get a thread by its opaque ID within a conversation."""
+        return self._get_thread_page(
+            f"/conversations/{conversation_id}/threads/{thread_id}", limit, cursor, agent_identity_id,
+        )
+
+    def _get_thread_page(
+        self, path: str, limit: int, cursor: str | None,
+        agent_identity_id: UUID | str | None,
+    ) -> IMessageThread:
+        params: dict[str, Any] = {"limit": limit}
+        if cursor is not None:
+            params["cursor"] = cursor
+        if agent_identity_id is not None:
+            params["agent_identity_id"] = str(agent_identity_id)
+        return IMessageThread._from_dict(self._http.get(path, params=params))
+
     def send(
         self,
         *,
@@ -125,6 +154,8 @@ class IMessagesResource:
         send_style: IMessageSendStyle | str | None = None,
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
+        reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage.
 
@@ -137,6 +168,11 @@ class IMessagesResource:
                 recipients select or create a dedicated-line group.
                 Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
+            reply_to_message_id: Message to reply to in that conversation.
+                Requires ``conversation_id`` and cannot be used with ``to``.
+            plain_reply_fallback: Allow an ordinary message in the same conversation
+                when native threading is unsupported (default True). False requires
+                a native reply. Ignored without ``reply_to_message_id``.
             text: Message body.
             media_urls: Media URLs (at most one). Pass with ``text`` or
                 by themselves. Use :meth:`upload_media` to turn raw
@@ -168,7 +204,12 @@ class IMessagesResource:
             RecipientBlockedError: 403 when the recipient is blocked by a
                 contact rule.
         """
+        if reply_to_message_id is not None and (conversation_id is None or to is not None):
+            raise ValueError("reply_to_message_id requires conversation_id and cannot be used with to")
         body: dict[str, Any] = {}
+        if reply_to_message_id is not None:
+            body["reply_to_message_id"] = str(reply_to_message_id)
+            body["plain_reply_fallback"] = plain_reply_fallback
         if to is not None:
             body["to"] = to
         if conversation_id is not None:
@@ -201,6 +242,7 @@ class IMessagesResource:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        thread_id: UUID | str | None = None,
     ) -> list[IMessage]:
         """List iMessages visible to the caller, newest first.
 
@@ -213,6 +255,7 @@ class IMessagesResource:
             agent_identity_id: Narrow to one agent identity. Ignored
                 for identity-scoped keys (always their own identity).
             conversation_id: Narrow to one conversation.
+            thread_id: Narrow to a thread; requires ``conversation_id``.
             limit: Max results to return (1–200).
             offset: Pagination offset.
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
@@ -230,7 +273,11 @@ class IMessagesResource:
             tz: IANA timezone name (str) governing zone-less values;
                 ``None`` means UTC.
         """
+        if thread_id is not None and conversation_id is None:
+            raise ValueError("thread_id requires conversation_id")
         params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if thread_id is not None:
+            params["thread_id"] = str(thread_id)
         if agent_identity_id is not None:
             params["agent_identity_id"] = str(agent_identity_id)
         if conversation_id is not None:

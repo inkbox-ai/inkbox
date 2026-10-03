@@ -570,6 +570,9 @@ class IMessageWebhookMessage(TypedDict):
     sender_number: NotRequired[str | None]
     participants: NotRequired[list[str] | None]
     is_group: NotRequired[bool]
+    reply_to_message_id: NotRequired[str | None]
+    thread_id: NotRequired[str | None]
+    thread_root_message_id: NotRequired[str | None]
     content: str | None
     message_type: IMessageTypeWire
     service: IMessageServiceWire

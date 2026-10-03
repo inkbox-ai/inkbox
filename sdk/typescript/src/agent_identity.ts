@@ -56,6 +56,7 @@ import type {
 import type { SigningKey, SigningKeyStatus } from "./signing_keys.js";
 import type {
   IMessage,
+  IMessageThread,
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
@@ -951,6 +952,27 @@ export class AgentIdentity {
   // iMessage helpers
   // ------------------------------------------------------------------
 
+  async getIMessage(messageId: string): Promise<IMessage> {
+    this._requireIMessage();
+    return this._inkbox._imessages.get(messageId, { agentIdentityId: this.id });
+  }
+
+  /** Read a chronological thread page using any message belonging to this identity. */
+  async getIMessageThread(messageId: string, options?: { limit?: number; cursor?: string }): Promise<IMessageThread> {
+    this._requireIMessage();
+    return this._inkbox._imessages.getThread(messageId, { ...options, agentIdentityId: this.id });
+  }
+
+  /** Read a thread by its opaque ID within this identity's conversation. */
+  async getIMessageConversationThread(conversationId: string, threadId: string, options?: {
+    limit?: number; cursor?: string;
+  }): Promise<IMessageThread> {
+    this._requireIMessage();
+    return this._inkbox._imessages.getConversationThread(conversationId, threadId, {
+      ...options, agentIdentityId: this.id,
+    });
+  }
+
   /**
    * Send an outbound iMessage as this identity.
    *
@@ -965,6 +987,11 @@ export class AgentIdentity {
    *   or more recipients select or create a dedicated-line group.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
+   * @param options.replyToMessageId - Message to reply to in that conversation. Requires
+   *   `conversationId` and cannot be combined with `to`.
+   * @param options.plainReplyFallback - Allow an ordinary message in the same
+   *   conversation when native threading is unsupported (default true). False
+   *   requires a native reply. Ignored without `replyToMessageId`.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadIMessageMedia} to create one from bytes.
@@ -979,6 +1006,8 @@ export class AgentIdentity {
   async sendIMessage(options: {
     to?: string | string[] | null;
     conversationId?: string | null;
+    replyToMessageId?: string | null;
+    plainReplyFallback?: boolean;
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
@@ -998,6 +1027,7 @@ export class AgentIdentity {
    * regardless of `isBlocked` (server-side access policy).
    *
    * @param options.conversationId - Narrow to one conversation.
+   * @param options.threadId - Narrow to a thread; requires `conversationId`.
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isRead - Filter by read state.
@@ -1007,6 +1037,7 @@ export class AgentIdentity {
   async listIMessages(
     options?: {
       conversationId?: string;
+      threadId?: string;
       limit?: number;
       offset?: number;
       isRead?: boolean;

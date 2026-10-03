@@ -13,6 +13,7 @@ import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import { postMessage } from "../../message_sends.js";
 import {
   IMessage,
+  IMessageThread,
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
@@ -24,6 +25,8 @@ import {
   IMessageSendStyle,
   IMessageTriageNumber,
   RawIMessage,
+  RawIMessageThread,
+  parseIMessageThread,
   RawIMessageAssignment,
   RawIMessageConversation,
   RawIMessageConversationSummary,
@@ -60,6 +63,29 @@ function validateSendableReaction(reaction: IMessageReactionType | string): stri
 
 export class IMessagesResource {
   constructor(private readonly http: HttpTransport) {}
+
+  /** Read a chronological thread page using any visible message in it. */
+  async getThread(messageId: string, options?: {
+    agentIdentityId?: string; limit?: number; cursor?: string;
+  }): Promise<IMessageThread> {
+    return this.getThreadPage(`/messages/${messageId}/thread`, options);
+  }
+
+  /** Read a thread by its opaque ID within a conversation. */
+  async getConversationThread(conversationId: string, threadId: string, options?: {
+    agentIdentityId?: string; limit?: number; cursor?: string;
+  }): Promise<IMessageThread> {
+    return this.getThreadPage(`/conversations/${conversationId}/threads/${threadId}`, options);
+  }
+
+  private async getThreadPage(path: string, options?: {
+    agentIdentityId?: string; limit?: number; cursor?: string;
+  }): Promise<IMessageThread> {
+    const params: Record<string, string | number> = { limit: options?.limit ?? 50 };
+    if (options?.agentIdentityId !== undefined) params.agent_identity_id = options.agentIdentityId;
+    if (options?.cursor !== undefined) params.cursor = options.cursor;
+    return parseIMessageThread(await this.http.get<RawIMessageThread>(path, params));
+  }
 
   /** Read a visible message and its current delivery status. */
   async get(messageId: string, options?: { agentIdentityId?: string }): Promise<IMessage> {
@@ -134,6 +160,11 @@ export class IMessagesResource {
    *   or more recipients select or create a dedicated-line group.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
+   * @param options.replyToMessageId - Message to reply to in that conversation. Requires
+   *   `conversationId` and cannot be combined with `to`.
+   * @param options.plainReplyFallback - Allow an ordinary message in the same
+   *   conversation when native threading is unsupported (default true). False
+   *   requires a native reply. Ignored without `replyToMessageId`.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadMedia} to turn raw bytes into a sendable URL first.
@@ -153,19 +184,30 @@ export class IMessagesResource {
   async send(options: {
     to?: string | string[] | null;
     conversationId?: string | null;
+    replyToMessageId?: string | null;
+    plainReplyFallback?: boolean;
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
     agentIdentityId?: string | null;
     idempotencyKey?: string;
   }): Promise<IMessage> {
+    if (options.replyToMessageId != null && (options.conversationId == null || options.to != null)) {
+      throw new Error("replyToMessageId requires conversationId and cannot be used with to");
+    }
     const body: {
       to?: string | string[];
       conversation_id?: string;
+      reply_to_message_id?: string;
+      plain_reply_fallback?: boolean;
       text?: string;
       media_urls?: string[];
       send_style?: string;
     } = {};
+    if (options.replyToMessageId != null) {
+      body.reply_to_message_id = options.replyToMessageId;
+      body.plain_reply_fallback = options.plainReplyFallback ?? true;
+    }
     if (options.to != null) {
       body.to = options.to;
     }
@@ -204,6 +246,7 @@ export class IMessagesResource {
    * @param options.agentIdentityId - Narrow to one agent identity.
    *   Ignored for identity-scoped keys (always their own identity).
    * @param options.conversationId - Narrow to one conversation.
+   * @param options.threadId - Narrow to a thread; requires `conversationId`.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isRead - Filter by read state.
@@ -214,6 +257,7 @@ export class IMessagesResource {
     options?: {
       agentIdentityId?: string;
       conversationId?: string;
+      threadId?: string;
       limit?: number;
       offset?: number;
       isRead?: boolean;
@@ -224,10 +268,14 @@ export class IMessagesResource {
       tz?: string;
     },
   ): Promise<IMessage[]> {
+    if (options?.threadId !== undefined && options.conversationId === undefined) {
+      throw new Error("threadId requires conversationId");
+    }
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
       offset: options?.offset ?? 0,
     };
+    if (options?.threadId !== undefined) params["thread_id"] = options.threadId;
     if (options?.agentIdentityId !== undefined) {
       params["agent_identity_id"] = options.agentIdentityId;
     }

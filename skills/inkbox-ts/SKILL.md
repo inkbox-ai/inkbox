@@ -1581,3 +1581,54 @@ Subscriptions cover all accessible conversations across connected workspaces.
 There are no Slack-specific filters. Context applies only to received mail, text,
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
+
+## Threaded iMessage replies
+
+Requires SDK/CLI **0.7.13 or later**.
+
+```typescript
+const message = await identity.getIMessage(messageId);
+const reply = await identity.sendIMessage({
+  conversationId: message.conversationId,
+  replyToMessageId: message.id,
+  text: "Agreed — let's use that option.",
+});
+const page = await identity.getIMessageThread(message.id, { limit: 50 });
+if (page.nextCursor) {
+  const nextPage = await identity.getIMessageThread(message.id, { cursor: page.nextCursor });
+}
+if (message.threadId) {
+  const thread = await identity.getIMessageConversationThread(message.conversationId, message.threadId);
+  const rows = await identity.listIMessages({ conversationId: message.conversationId, threadId: message.threadId });
+}
+```
+
+`IMessage` exposes optional-nullable `replyToMessageId`, `threadId`, and
+`threadRootMessageId`; webhook message fields use their snake_case equivalents.
+Resource-level equivalents are `imessages.get`, `getThread`,
+`getConversationThread`, `send`, and `list`; these also accept `agentIdentityId`.
+
+Thread IDs are opaque and distinct from message IDs. Thread pages include the
+root and its replies in chronological order; follow `next_cursor` (Python/Rust)
+or `nextCursor` (TypeScript/CLI) until null. A standalone message can have its own
+thread ID and use its own message ID as the root, even before anyone replies.
+A non-null `reply_to_message_id` / `replyToMessageId` identifies a visible reply
+parent; a thread ID alone does not mean the message has replies. Thread metadata
+may be null for pending or older messages, and the root or direct parent can be
+unavailable. Conversation message lists remain flat and newest-first. A thread filter requires its conversation ID; it uses the existing
+limit/offset pagination, unlike the chronological thread endpoints.
+
+Native replies work in supported one-to-one and group iMessage conversations.
+Use a message from the same conversation. With plain fallback enabled (the
+default), the API sends an ordinary message in that conversation when native
+threading is unsupported: the target is known to use SMS/RCS or was downgraded.
+This does not force a particular transport. An ordinary fallback has no reply
+parent and does not join the target's native thread. Invalid or inaccessible
+targets, unsettled messages, and missing reply metadata still fail. Delivery
+errors are not retried as new ordinary messages. If a previously supported target
+can no longer receive a native reply, that send may fail even with fallback enabled.
+Read the message status and error fields after queueing; delivery webhooks do not
+cover every failure before dispatch. Omitting the target preserves ordinary sending.
+
+Set `plainReplyFallback: false` on `sendIMessage` or `imessages.send` to
+require a native reply instead.

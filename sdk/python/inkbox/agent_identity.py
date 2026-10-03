@@ -50,6 +50,7 @@ from inkbox.tunnels.types import TunnelSummary
 from inkbox.exceptions import InkboxError
 from inkbox.imessage.types import (
     IMessage,
+    IMessageThread,
     IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
@@ -1270,6 +1271,30 @@ class AgentIdentity:
 
     ## iMessage helpers
 
+    def get_imessage(self, message_id: UUID | str) -> IMessage:
+        """Read one message belonging to this identity."""
+        self._require_imessage()
+        return self._inkbox._imessages.get(message_id, agent_identity_id=self.id)
+
+    def get_imessage_thread(
+        self, message_id: UUID | str, *, limit: int = 50, cursor: str | None = None,
+    ) -> IMessageThread:
+        """Read a chronological thread page using any message in it."""
+        self._require_imessage()
+        return self._inkbox._imessages.get_thread(
+            message_id, limit=limit, cursor=cursor, agent_identity_id=self.id,
+        )
+
+    def get_imessage_conversation_thread(
+        self, conversation_id: UUID | str, thread_id: UUID | str, *,
+        limit: int = 50, cursor: str | None = None,
+    ) -> IMessageThread:
+        """Read a thread by its opaque ID within this identity's conversation."""
+        self._require_imessage()
+        return self._inkbox._imessages.get_conversation_thread(
+            conversation_id, thread_id, limit=limit, cursor=cursor, agent_identity_id=self.id,
+        )
+
     def send_imessage(
         self,
         *,
@@ -1279,6 +1304,8 @@ class AgentIdentity:
         media_urls: list[str] | None = None,
         send_style: IMessageSendStyle | str | None = None,
         idempotency_key: str | None = None,
+        reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
@@ -1291,6 +1318,11 @@ class AgentIdentity:
                 recipients select or create a dedicated-line group.
                 Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
+            reply_to_message_id: Message to reply to in that conversation.
+                Requires ``conversation_id`` and cannot be used with ``to``.
+            plain_reply_fallback: Allow an ordinary message in the same conversation
+                when native threading is unsupported (default True). False requires
+                a native reply. Ignored without ``reply_to_message_id``.
             text: Message body.
             media_urls: Media URLs (at most one). Use
                 :meth:`upload_imessage_media` to create one from bytes.
@@ -1312,6 +1344,10 @@ class AgentIdentity:
             media_urls=media_urls,
             send_style=send_style,
             agent_identity_id=self.id,
+            **({
+                "reply_to_message_id": reply_to_message_id,
+                "plain_reply_fallback": plain_reply_fallback,
+            } if reply_to_message_id is not None else {}),
             **({"idempotency_key": idempotency_key} if idempotency_key is not None else {}),
         )
 
@@ -1327,6 +1363,7 @@ class AgentIdentity:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        thread_id: UUID | str | None = None,
     ) -> list[IMessage]:
         """List this identity's iMessages, newest first.
 
@@ -1335,6 +1372,7 @@ class AgentIdentity:
 
         Args:
             conversation_id: Narrow to one conversation.
+            thread_id: Narrow to a thread; requires ``conversation_id``.
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
@@ -1359,6 +1397,7 @@ class AgentIdentity:
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
+            **({"thread_id": thread_id} if thread_id is not None else {}),
         )
 
     def list_imessage_assignments(

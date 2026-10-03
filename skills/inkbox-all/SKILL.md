@@ -210,3 +210,31 @@ Subscriptions cover all accessible conversations across connected workspaces.
 There are no Slack-specific filters. Context applies only to received mail, text,
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
+
+## Threaded iMessages
+
+Requires SDK/CLI **0.7.13 or later**.
+
+Native replies target a specific message within an existing conversation.
+Python/TypeScript send helpers accept `reply_to_message_id` / `replyToMessageId`
+with the conversation ID; the CLI accepts `--reply-to-message-id`. Read threads
+by any message or by conversation plus opaque thread ID. Follow thread-page
+cursors; ordinary conversation lists remain flat and use offset pagination.
+Thread IDs are distinct from message IDs. Standalone messages can have their own
+thread ID and use their message ID as the root before anyone replies; a thread ID
+does not prove replies exist. See the language and CLI skills for methods, nullable
+metadata, and examples.
+
+Reply sends allow an ordinary message in the same conversation when native
+threading is unsupported, including SMS/RCS targets. Set Python
+`plain_reply_fallback=False`, TypeScript `plainReplyFallback: false`, or CLI
+`--no-plain-reply-fallback` to require native threading. Rust offers
+`send_reply_with_fallback` / `send_imessage_reply_with_fallback` with a final
+boolean argument. The API owns fallback; clients do not resend failed replies
+as ordinary messages. Invalid or inaccessible targets still fail. Keep agent
+memory tied to the conversation; a native thread is optional context, and an
+ordinary fallback has no reply parent and does not join the target's native
+thread. Unsettled targets or missing reply metadata still fail. A previously
+supported target may still fail after native delivery becomes unavailable; fallback
+does not resend rejected replies. Read queued message status and error fields,
+because delivery webhooks do not cover every failure before dispatch.

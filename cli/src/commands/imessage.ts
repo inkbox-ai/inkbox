@@ -86,6 +86,8 @@ export interface IMessageSendCommandOptions {
   identity: string;
   to?: string;
   conversationId?: string;
+  replyToMessageId?: string;
+  plainReplyFallback?: boolean;
   text?: string;
   mediaUrl?: string;
   sendStyle?: string;
@@ -108,7 +110,20 @@ export function buildIMessageSendOptions(
   if (!cmdOpts.text && !cmdOpts.mediaUrl) {
     return { error: "Pass --text, --media-url, or both." };
   }
+  if (cmdOpts.replyToMessageId !== undefined && !cmdOpts.replyToMessageId.trim()) {
+    return { error: "--reply-to-message-id must not be empty." };
+  }
+  if (cmdOpts.replyToMessageId !== undefined && !cmdOpts.conversationId) {
+    return { error: "--reply-to-message-id requires --conversation-id." };
+  }
+  if (cmdOpts.plainReplyFallback === false && cmdOpts.replyToMessageId === undefined) {
+    return { error: "--no-plain-reply-fallback requires --reply-to-message-id." };
+  }
   const sendOptions: SendIMessageOptions = {};
+  if (cmdOpts.replyToMessageId !== undefined) {
+    sendOptions.replyToMessageId = cmdOpts.replyToMessageId;
+    sendOptions.plainReplyFallback = cmdOpts.plainReplyFallback ?? true;
+  }
   if (cmdOpts.idempotencyKey !== undefined) sendOptions.idempotencyKey = cmdOpts.idempotencyKey;
   if (recipients.length > 0) {
     sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
@@ -289,6 +304,8 @@ export function registerIMessageCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--to <numbers>", "One E.164 recipient or a comma-separated group")
     .option("--conversation-id <id>", "Existing conversation UUID to reply into")
+    .option("--reply-to-message-id <id>", "Reply to this message within the conversation")
+    .option("--no-plain-reply-fallback", "Require native threading; fail instead of sending an ordinary message")
     .option("--text <text>", "Message body")
     .option("--media-url <url>", "Media URL (at most one)")
     .option(
@@ -302,6 +319,8 @@ export function registerIMessageCommands(program: Command): void {
           identity: string;
           to?: string;
           conversationId?: string;
+          replyToMessageId?: string;
+          plainReplyFallback?: boolean;
           text?: string;
           mediaUrl?: string;
           sendStyle?: string;
@@ -326,6 +345,9 @@ export function registerIMessageCommands(program: Command): void {
             participants: msg.participants,
             isGroup: msg.isGroup,
             conversationId: msg.conversationId,
+            replyToMessageId: msg.replyToMessageId,
+            threadId: msg.threadId,
+            threadRootMessageId: msg.threadRootMessageId,
             service: msg.service,
             content: msg.content,
             status: msg.status,
@@ -341,6 +363,7 @@ export function registerIMessageCommands(program: Command): void {
     .description("List iMessages")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--conversation-id <id>", "Narrow to one conversation")
+    .option("--thread-id <id>", "Narrow to a thread (requires --conversation-id)")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--unread-only", "Show only unread messages")
@@ -354,6 +377,7 @@ export function registerIMessageCommands(program: Command): void {
         cmdOpts: {
           identity: string;
           conversationId?: string;
+          threadId?: string;
           limit: string;
           offset: string;
           unreadOnly?: boolean;
@@ -363,11 +387,15 @@ export function registerIMessageCommands(program: Command): void {
           tz?: string;
         },
       ) {
+        if (cmdOpts.threadId !== undefined && !cmdOpts.conversationId) {
+          throw new Error("--thread-id requires --conversation-id.");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const msgs = await identity.listIMessages({
           conversationId: cmdOpts.conversationId,
+          threadId: cmdOpts.threadId,
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
           isRead: cmdOpts.unreadOnly ? false : undefined,
@@ -469,19 +497,21 @@ export function registerIMessageCommands(program: Command): void {
     .command("conversation <conversation-id>")
     .description("Get messages in an iMessage conversation")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--thread-id <id>", "Narrow to one thread")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(
       withErrorHandler(async function (
         this: Command,
         conversationId: string,
-        cmdOpts: { identity: string; limit: string; offset: string },
+        cmdOpts: { identity: string; limit: string; offset: string; threadId?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const msgs = await identity.listIMessages({
           conversationId,
+          threadId: cmdOpts.threadId,
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
@@ -493,6 +523,34 @@ export function registerIMessageCommands(program: Command): void {
         });
       }),
     );
+
+  imessage
+    .command("thread <message-id>")
+    .description("Get a chronological thread page using any message in it")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--limit <n>", "Max results (1–200)", "50")
+    .option("--cursor <cursor>", "Continue from the previous page's nextCursor")
+    .action(withErrorHandler(async function (this: Command, messageId: string, options: { identity: string; limit: string; cursor?: string }) {
+      const global = getGlobalOpts(this);
+      const identity = await createClient(global).getIdentity(options.identity);
+      output(await identity.getIMessageThread(messageId, {
+        limit: parseInt(options.limit, 10), cursor: options.cursor,
+      }), { json: !!global.json });
+    }));
+
+  imessage
+    .command("conversation-thread <conversation-id> <thread-id>")
+    .description("Get a chronological thread page by conversation and thread IDs")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--limit <n>", "Max results (1–200)", "50")
+    .option("--cursor <cursor>", "Continue from the previous page's nextCursor")
+    .action(withErrorHandler(async function (this: Command, conversationId: string, threadId: string, options: { identity: string; limit: string; cursor?: string }) {
+      const global = getGlobalOpts(this);
+      const identity = await createClient(global).getIdentity(options.identity);
+      output(await identity.getIMessageConversationThread(conversationId, threadId, {
+        limit: parseInt(options.limit, 10), cursor: options.cursor,
+      }), { json: !!global.json });
+    }));
 
   imessage
     .command("react <message-id>")

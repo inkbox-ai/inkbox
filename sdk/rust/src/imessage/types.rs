@@ -326,6 +326,62 @@ pub struct IMessage {
     pub reactions: Option<Vec<IMessageMessageReaction>>,
 }
 
+/// Thread metadata added without changing the wrapped public message type.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WithIMessageThread<T> {
+    #[serde(flatten)]
+    pub message: T,
+    #[serde(default)]
+    pub reply_to_message_id: Option<Uuid>,
+    #[serde(default)]
+    pub thread_id: Option<Uuid>,
+    #[serde(default)]
+    pub thread_root_message_id: Option<Uuid>,
+}
+
+/// An iMessage with nullable threading metadata.
+pub type ThreadedIMessage = WithIMessageThread<IMessage>;
+
+/// A chronological page of a thread. Use `next_cursor` to retrieve more.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IMessageThread {
+    pub thread_id: Option<Uuid>,
+    pub conversation_id: Uuid,
+    pub thread_root_message_id: Option<Uuid>,
+    pub messages: Vec<ThreadedIMessage>,
+    pub next_cursor: Option<String>,
+}
+
+/// List options for messages with threading metadata. A thread requires a conversation.
+#[derive(Debug, Clone)]
+pub struct IMessageThreadListOptions {
+    pub agent_identity_id: Option<Uuid>,
+    pub conversation_id: Option<Uuid>,
+    pub thread_id: Option<Uuid>,
+    pub limit: i64,
+    pub offset: i64,
+    pub is_read: Option<bool>,
+    pub is_blocked: Option<bool>,
+    pub include_groups: bool,
+    pub date_range: crate::filters::DateRangeFilter,
+}
+
+impl Default for IMessageThreadListOptions {
+    fn default() -> Self {
+        Self {
+            agent_identity_id: None,
+            conversation_id: None,
+            thread_id: None,
+            limit: 50,
+            offset: 0,
+            is_read: None,
+            is_blocked: None,
+            include_groups: false,
+            date_range: crate::filters::DateRangeFilter::default(),
+        }
+    }
+}
+
 /// One iMessage conversation.
 ///
 /// One-to-one rows expose assignment state. Group rows have no assignment and

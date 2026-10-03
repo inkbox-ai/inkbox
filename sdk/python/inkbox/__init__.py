@@ -202,6 +202,7 @@ from inkbox.phone.types import (
 # iMessage types
 from inkbox.imessage.types import (
     IMessage,
+    IMessageThread,
     IMessageAssignment,
     IMessageAssignmentStatus,
     IMessageContactRule,
@@ -682,6 +683,7 @@ __all__ = [
     "TextMessageOrigin",
     # iMessage types
     "IMessage",
+    "IMessageThread",
     "IMessageAssignment",
     "IMessageAssignmentStatus",
     "IMessageContactRule",

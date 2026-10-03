@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.13 — Threaded iMessage replies (unreleased)
+
+See the [canonical SDK and CLI changelog](../CHANGELOG.md#0713--threaded-imessage-replies-unreleased) for the complete upcoming release.
+
 ## 0.7.11 - Slack workspace connections (unreleased)
 
 See the [canonical SDK and CLI changelog](../CHANGELOG.md#0711---slack-workspace-connections-unreleased) for the complete upcoming release.

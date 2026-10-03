@@ -651,6 +651,40 @@ Pausing the identity stops live operations and webhook delivery while preserving
 its connections and history. Workspace approval, connection ownership, and current
 conversation access remain required.
 
+## Threaded iMessage replies
+
+Requires SDK/CLI **0.7.13 or later**.
+
+Reply to a specific message in an existing one-to-one or group conversation with
+Python `reply_to_message_id`, TypeScript `replyToMessageId`, Rust `send_reply`, or
+CLI `--reply-to-message-id`. Supply its conversation ID too; do not use `to`.
+Messages expose nullable direct-parent, thread, and root-message IDs. A thread ID
+is opaque and distinct from its root message ID. Standalone messages can have a
+thread ID before anyone replies, with their own message ID as the root. A non-null
+reply-parent ID identifies a visible parent; a thread ID does not prove there are replies.
+
+Read a chronological page by any message using Python `imessages.get_thread`,
+TypeScript `imessages.getThread`, Rust `imessages().get_thread`, or CLI
+`imessage thread`. Read by conversation and thread IDs with the corresponding
+`get_conversation_thread` / `getConversationThread` / `conversation-thread` operation.
+Follow the returned cursor for more; existing message lists remain flat and
+newest-first with optional conversation-scoped thread filtering. See each
+language's README for complete examples and Rust's additive wrapper types.
+
+Reply sends allow an ordinary message in the same conversation when native
+threading is unsupported, including SMS/RCS targets. Set Python
+`plain_reply_fallback=False`, TypeScript `plainReplyFallback: false`, or CLI
+`--no-plain-reply-fallback` to require native threading. Rust offers
+`send_reply_with_fallback` / `send_imessage_reply_with_fallback` with a final
+boolean argument. The API owns fallback; clients do not resend failed replies
+as ordinary messages. Invalid or inaccessible targets still fail. Keep agent
+memory tied to the conversation; a native thread is optional context, and an
+ordinary fallback has no reply parent and does not join the target's native
+thread. Unsettled targets or missing reply metadata still fail. A previously
+supported target can still fail if native delivery becomes unavailable; fallback
+does not resend rejected replies. Read the queued message status and error fields
+because delivery webhooks do not cover every failure before dispatch.
+
 ## License
 
 MIT
