@@ -28,8 +28,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   exact previous version until ready. Existing legacy identity models and
   method signatures remain unchanged.
 - TypeScript `CompanionChannel` now includes `"slack"`; exhaustive switches and
-  channel-keyed records may need a Slack case. Python, TypeScript, and Rust mode
-  updates reject API responses that do not confirm the requested Slack modes.
+  channel-keyed records may need a Slack case.
+- Python, TypeScript, and Rust Slack mode updates raise an error when the API
+  response does not confirm the requested modes. Other fields in the same
+  update may already have been saved.
 - Workspace discovery tolerates additional response fields and unknown source
   values. Directory discovery and import require organization admin authority.
 
