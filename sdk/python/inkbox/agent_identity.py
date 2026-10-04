@@ -2140,6 +2140,9 @@ class AgentIdentity:
                 identity's phone contact rules (admin-only).
             mail_inbound_filter_mode: Effective receive mode for email.
             mail_outbound_filter_mode: Effective send mode for email.
+            slack_filter_mode: Set both Slack directions (admin-only).
+            slack_inbound_filter_mode: Effective receive mode for Slack.
+            slack_outbound_filter_mode: Effective send mode for Slack.
             phone_inbound_filter_mode: Effective receive mode for phone/iMessage.
             phone_outbound_filter_mode: Effective send mode for phone/iMessage.
         """

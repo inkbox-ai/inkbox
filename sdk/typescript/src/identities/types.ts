@@ -178,7 +178,7 @@ export interface IdentityPhoneNumber {
 export interface AgentIdentitySummary {
   mailInboundFilterMode?: FilterMode;
   mailOutboundFilterMode?: FilterMode;
-  slackFilterMode?: "whitelist" | "blacklist";
+  slackFilterMode?: FilterMode;
   slackInboundFilterMode?: FilterMode;
   slackOutboundFilterMode?: FilterMode;
   phoneInboundFilterMode?: FilterMode;

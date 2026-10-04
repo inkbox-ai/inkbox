@@ -6,13 +6,13 @@
 
 See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0714---slack-contact-rules-unreleased) for the complete upcoming release.
 
-## 0.7.13 — Threaded iMessage replies (unreleased)
+## 0.7.13 — Threaded iMessage replies (2026-10-03)
 
-See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0713--threaded-imessage-replies-unreleased) for the complete upcoming release.
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0713--threaded-imessage-replies-2026-10-03) for the complete release.
 
-## 0.7.11 - Slack workspace connections (unreleased)
+## 0.7.11 - Slack workspace connections (2026-09-30)
 
-See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0711---slack-workspace-connections-unreleased) for the complete upcoming release.
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0711---slack-workspace-connections-2026-09-30) for the complete release.
 
 ## 0.7.9 — Media WebSocket keypad guidance
 
