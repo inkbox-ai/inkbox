@@ -954,7 +954,11 @@ After browser approval, list connections again to confirm `connected`.
 
 `client.slack()` also provides `list_provisioning_workspaces`, `save_provisioning_workspace`, `disconnect`,
 `list_conversations`, `open_conversation`, `get_conversation`, `list_messages`,
-`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). Pass
+`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). In 0.7.14+,
+`contact_rules` provides directional person/workspace rule CRUD; `discover_workspaces`
+and `import_contacts` return one page per call. Rule writes, default changes,
+discovery and import require an organization admin key. Import grants no messaging
+or Companion access. Pass
 `SlackPageOptions` / `SlackMessagesOptions` for pagination. Connections, saved workspaces,
 actions, file metadata, pages, and send options are public typed exports.
 
@@ -962,8 +966,9 @@ For webhook subscriptions use `create` / `update` with ordinary event selection.
 For mixed subscriptions use `update_with_scope` with
 `Some(WebhookSubscriptionScope::Identity)`.
 
-Rust Slack enums parse strictly: an unrecognized response or webhook value fails
-deserialization and may require an SDK update. `Unknown` on action/operation status
+Most Rust Slack enums parse strictly: an unrecognized response or webhook value fails
+deserialization and may require an SDK update. Workspace discovery sources instead
+map unfamiliar values to `SlackWorkspaceSource::Unknown`. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 
 ### Slack behavior
