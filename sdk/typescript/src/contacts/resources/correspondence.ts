@@ -45,7 +45,7 @@ export class ContactCorrespondenceResource {
       string,
       string | number | boolean | readonly string[] | undefined
     > = {
-      channels: options.channels,
+      channels: options.channels ?? ["email", "sms", "imessage", "calls", "slack"],
       after: options.after === undefined ? undefined : serializeDate(options.after),
       before: options.before === undefined ? undefined : serializeDate(options.before),
       limit_per_channel: options.limitPerChannel,

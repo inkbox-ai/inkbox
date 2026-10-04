@@ -739,6 +739,10 @@ inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <j
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
 
+Correspondence includes all five channels by default. Use `--channels slack` for
+retained messages authored by the contact's saved Slack accounts; it does not
+include every message in their channels.
+
 `inkbox contacts create` saves a matching suggested contact instead of failing:
 when an email or phone in the payload already belongs to an unreviewed contact,
 that contact is confirmed and printed with its memories and existing identifiers.

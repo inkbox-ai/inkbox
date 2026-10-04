@@ -38,8 +38,8 @@ class ContactCorrespondenceOptions:
 
     def _to_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}
-        if self.channels is not None:
-            params["channels"] = ",".join(str(channel) for channel in self.channels)
+        channels = self.channels if self.channels is not None else list(CorrespondenceChannel)
+        params["channels"] = ",".join(str(channel) for channel in channels)
         for name in ("after", "before"):
             value = getattr(self, name)
             if value is not None:

@@ -587,3 +587,42 @@ test("contact fact deletion calls the API and prints remaining memory", async ()
     mock.server.close();
   }
 });
+
+test("contact correspondence selects all channels by default and preserves Slack filters", async () => {
+  const requests = [];
+  const mock = await listen((req, res) => {
+    requests.push(new URL(req.url, "http://localhost").searchParams.getAll("channels"));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      contact_id: "contact-1", identity_id: "identity-1", channels: [], next_cursor: null,
+      items: [{
+        channel: "slack", source_id: "source-1", identity_id: "identity-1",
+        direction: "inbound", occurred_at: "2026-07-20T12:00:00Z", status: null, detail_url: null,
+        connection_id: "00000000-0000-4000-8000-000000000001",
+        conversation_id: "C123", workspace_id: "T123", user_id: "U123",
+        message_ts: "1784548800.123456", text: "Hello", text_truncated: true,
+        sender_access: "sponsored",
+      }],
+    }));
+  });
+  try {
+    for (const filters of [[], ["--channels", "slack"], ["--channels", "email,sms"]]) {
+      const result = await runCli([
+        "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+        "--json", "contacts", "correspondence", "contact-1", ...filters,
+      ]);
+      assert.ifError(result.error);
+      const item = JSON.parse(result.stdout).items[0];
+      assert.equal(item.channel, "slack");
+      assert.equal(item.conversationId, "C123");
+      assert.equal(item.messageTs, "1784548800.123456");
+      assert.equal(item.textTruncated, true);
+      assert.equal(item.senderAccess, "sponsored");
+    }
+    assert.deepEqual(requests, [
+      ["email", "sms", "imessage", "calls", "slack"], ["slack"], ["email", "sms"],
+    ]);
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+  }
+});

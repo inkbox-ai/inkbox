@@ -1,4 +1,6 @@
-export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls";
+import type { SenderAccess } from "../sender_access.js";
+
+export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack";
 export type CorrespondenceContentMode = "metadata" | "preview" | "full";
 export type CorrespondenceTranscriptMode = "none" | "abridged" | "full";
 export type CorrespondenceOrder = "asc" | "desc";
@@ -72,6 +74,20 @@ export interface IMessageCorrespondenceItem extends CorrespondenceItemBase {
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface SlackCorrespondenceItem extends CorrespondenceItemBase {
+  channel: "slack";
+  connectionId: string;
+  conversationId: string;
+  workspaceId: string;
+  userId: string;
+  messageTs: string;
+  threadTs: string | null;
+  text: string | null;
+  textTruncated: boolean;
+  media: CorrespondenceMediaMetadata | null;
+  senderAccess: SenderAccess | null;
+}
+
 export interface CallCorrespondenceItem extends CorrespondenceItemBase {
   channel: "calls";
   remotePhoneNumber: string;
@@ -88,6 +104,7 @@ export type CorrespondenceItem =
   | EmailCorrespondenceItem
   | SmsCorrespondenceItem
   | IMessageCorrespondenceItem
+  | SlackCorrespondenceItem
   | CallCorrespondenceItem;
 
 export interface CorrespondenceChannelResult {
@@ -154,6 +171,20 @@ export interface RawIMessageCorrespondenceItem extends RawCorrespondenceItemBase
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface RawSlackCorrespondenceItem extends RawCorrespondenceItemBase {
+  channel: "slack";
+  connection_id: string;
+  conversation_id: string;
+  workspace_id: string;
+  user_id: string;
+  message_ts: string;
+  thread_ts?: string | null;
+  text?: string | null;
+  text_truncated?: boolean;
+  media?: CorrespondenceMediaMetadata | null;
+  sender_access?: SenderAccess | null;
+}
+
 export interface RawCallCorrespondenceItem extends RawCorrespondenceItemBase {
   channel: "calls";
   remote_phone_number: string;
@@ -179,6 +210,7 @@ export type RawCorrespondenceItem =
   | RawEmailCorrespondenceItem
   | RawSmsCorrespondenceItem
   | RawIMessageCorrespondenceItem
+  | RawSlackCorrespondenceItem
   | RawCallCorrespondenceItem;
 
 export interface RawContactCorrespondence {
@@ -250,6 +282,21 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
         service: r.service,
         text: r.text,
         media: r.media,
+      };
+    case "slack":
+      return {
+        ...base,
+        channel: r.channel,
+        connectionId: r.connection_id,
+        conversationId: r.conversation_id,
+        workspaceId: r.workspace_id,
+        userId: r.user_id,
+        messageTs: r.message_ts,
+        threadTs: r.thread_ts ?? null,
+        text: r.text ?? null,
+        textTruncated: r.text_truncated ?? false,
+        media: r.media ?? null,
+        senderAccess: r.sender_access ?? null,
       };
     case "calls":
       return {

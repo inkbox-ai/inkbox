@@ -765,6 +765,9 @@ are enforced.
 
 Organization-wide contacts, correspondence, and memory facts.
 
+Correspondence selects all five channels by default. Use `--channels slack` for
+retained messages authored by the contact's saved Slack accounts.
+
 ```bash
 inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
 inkbox contacts get <contact-id>

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 
@@ -17,6 +18,7 @@ from inkbox.contacts.types import (
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
     SmsCorrespondenceItem,
+    SlackCorrespondenceItem,
 )
 
 CONTACT_ID = "aaaaaaaa-0000-0000-0000-000000000001"
@@ -274,6 +276,20 @@ def test_correspondence_options_and_all_channels():
                 "started_at": NOW,
                 "transcript": [{"id": SOURCE_ID, "seq": 0, "text": "Hello"}],
             },
+            {
+                **common,
+                "channel": "slack",
+                "connection_id": SOURCE_ID,
+                "conversation_id": "C123",
+                "workspace_id": "T123",
+                "user_id": "U123",
+                "message_ts": "1784548800.123456",
+                "thread_ts": "1784548700.000001",
+                "text": "Hello",
+                "text_truncated": True,
+                "media": {"count": 2},
+                "sender_access": "sponsored",
+            },
         ],
         "channels": [{"channel": "email", "status": "available", "returned": 1}],
         "next_cursor": "next",
@@ -292,6 +308,16 @@ def test_correspondence_options_and_all_channels():
     assert isinstance(result.items[2], IMessageCorrespondenceItem)
     assert isinstance(result.items[3], CallCorrespondenceItem)
     assert result.items[3].transcript[0].text == "Hello"
+    slack = result.items[4]
+    assert isinstance(slack, SlackCorrespondenceItem)
+    assert slack.connection_id == UUID(SOURCE_ID)
+    assert slack.conversation_id == "C123"
+    assert (slack.workspace_id, slack.user_id) == ("T123", "U123")
+    assert (slack.message_ts, slack.thread_ts) == ("1784548800.123456", "1784548700.000001")
+    assert slack.occurred_at == datetime.fromisoformat(NOW)
+    assert slack.text == "Hello" and slack.text_truncated
+    assert slack.media.count == 2
+    assert slack.sender_access == "sponsored"
     assert transport.get.call_args.kwargs["params"]["channels"] == "email,calls"
 
 
@@ -387,3 +413,42 @@ def test_contact_result_types_are_publicly_importable():
 
     assert ExportedImportResult is ContactImportResult
     assert ExportedImportResultItem.__name__ == "ContactImportResultItem"
+
+
+@pytest.mark.parametrize("channels, expected", [
+    (None, "email,sms,imessage,calls,slack"),
+    ([CorrespondenceChannel.SLACK], "slack"),
+    (["email", "sms"], "email,sms"),
+])
+def test_correspondence_default_channels_and_explicit_subsets(channels, expected):
+    transport = MagicMock()
+    transport.get.return_value = {
+        "contact_id": CONTACT_ID, "identity_id": IDENTITY_ID,
+        "items": [], "channels": [], "next_cursor": None,
+    }
+    options = None if channels is None else ContactCorrespondenceOptions(channels=channels)
+    ContactsResource(transport).correspondence.get(CONTACT_ID, options)
+    assert transport.get.call_args.kwargs["params"]["channels"] == expected
+
+
+@pytest.mark.parametrize("optional", [{}, {
+    "thread_ts": None, "text": None, "media": None, "sender_access": None,
+}])
+def test_slack_correspondence_metadata_and_public_export(optional):
+    from inkbox import SlackCorrespondenceItem as ExportedItem
+    from inkbox.contacts.types import ContactCorrespondence
+
+    result = ContactCorrespondence._from_dict({
+        "contact_id": CONTACT_ID, "identity_id": IDENTITY_ID,
+        "items": [{
+            "channel": "slack", "source_id": SOURCE_ID, "identity_id": IDENTITY_ID,
+            "direction": "inbound", "occurred_at": NOW,
+            "connection_id": SOURCE_ID, "conversation_id": "D123",
+            "workspace_id": "T123", "user_id": "U123", "message_ts": "1784548800.123456",
+            **optional,
+        }],
+    })
+    item = result.items[0]
+    assert isinstance(item, ExportedItem)
+    assert item.text is item.thread_ts is item.media is item.sender_access is None
+    assert not item.text_truncated

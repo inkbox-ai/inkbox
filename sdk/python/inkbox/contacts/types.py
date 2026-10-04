@@ -13,6 +13,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 from inkbox.contact_rules import _UNSET
+from inkbox.sender_access import SenderAccess
 
 
 def _opt_uuid(value: Any) -> UUID | None:
@@ -428,6 +429,7 @@ class CorrespondenceChannel(StrEnum):
     SMS = "sms"
     IMESSAGE = "imessage"
     CALLS = "calls"
+    SLACK = "slack"
 
 
 class CorrespondenceContentMode(StrEnum):
@@ -682,6 +684,20 @@ class IMessageCorrespondenceItem(CorrespondenceItem):
 
 
 @dataclass
+class SlackCorrespondenceItem(CorrespondenceItem):
+    connection_id: UUID
+    conversation_id: str
+    workspace_id: str
+    user_id: str
+    message_ts: str
+    thread_ts: str | None = None
+    text: str | None = None
+    text_truncated: bool = False
+    media: CorrespondenceMediaMetadata | None = None
+    sender_access: SenderAccess | None = None
+
+
+@dataclass
 class CallCorrespondenceItem(CorrespondenceItem):
     remote_phone_number: str
     local_phone_number: str | None = None
@@ -782,6 +798,20 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
             service=d["service"],
             text=d.get("text"),
             media=parsed_media,
+        )
+    if channel is CorrespondenceChannel.SLACK:
+        return SlackCorrespondenceItem(
+            **common,
+            connection_id=UUID(d["connection_id"]),
+            conversation_id=d["conversation_id"],
+            workspace_id=d["workspace_id"],
+            user_id=d["user_id"],
+            message_ts=d["message_ts"],
+            thread_ts=d.get("thread_ts"),
+            text=d.get("text"),
+            text_truncated=bool(d.get("text_truncated", False)),
+            media=parsed_media,
+            sender_access=d.get("sender_access"),
         )
     transcript = d.get("transcript")
     return CallCorrespondenceItem(

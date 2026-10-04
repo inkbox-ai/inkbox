@@ -1171,7 +1171,7 @@ if facts:
     inkbox.contacts.facts.delete(str(contact.id), str(facts[0].id))  # admin only
 history = inkbox.contacts.correspondence.get(
     str(contact.id),
-    ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms"]),
+    ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms", "slack"]),
 )
 survivor = inkbox.contacts.merge(
     str(contact.id), losing_contact_ids=["duplicate-contact-uuid"]

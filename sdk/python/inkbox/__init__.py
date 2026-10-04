@@ -309,6 +309,7 @@ from inkbox.contacts.types import (
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
     SmsCorrespondenceItem,
+    SlackCorrespondenceItem,
 )
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceOptions
 
@@ -784,6 +785,7 @@ __all__ = [
     "EmailCorrespondenceItem",
     "IMessageCorrespondenceItem",
     "SmsCorrespondenceItem",
+    "SlackCorrespondenceItem",
     "CallCorrespondenceItem",
     # Notes types
     "Note",

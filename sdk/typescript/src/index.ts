@@ -389,6 +389,7 @@ export type {
   CorrespondenceTranscriptMode,
   EmailCorrespondenceItem,
   SmsCorrespondenceItem,
+  SlackCorrespondenceItem,
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,

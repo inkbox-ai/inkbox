@@ -10,6 +10,7 @@ pub enum CorrespondenceChannel {
     Sms,
     IMessage,
     Calls,
+    Slack,
 }
 
 impl CorrespondenceChannel {
@@ -19,6 +20,7 @@ impl CorrespondenceChannel {
             Self::Sms => "sms",
             Self::IMessage => "imessage",
             Self::Calls => "calls",
+            Self::Slack => "slack",
         }
     }
 }
@@ -203,6 +205,27 @@ pub struct IMessageCorrespondenceItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackCorrespondenceItem {
+    #[serde(flatten)]
+    pub common: CorrespondenceItemBase,
+    pub connection_id: Uuid,
+    pub conversation_id: String,
+    pub workspace_id: String,
+    pub user_id: String,
+    pub message_ts: String,
+    #[serde(default)]
+    pub thread_ts: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub text_truncated: bool,
+    #[serde(default)]
+    pub media: Option<CorrespondenceMediaMetadata>,
+    #[serde(default)]
+    pub sender_access: Option<crate::SenderAccess>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallCorrespondenceItem {
     #[serde(flatten)]
     pub common: CorrespondenceItemBase,
@@ -231,6 +254,7 @@ pub enum CorrespondenceItem {
     Sms(SmsCorrespondenceItem),
     IMessage(IMessageCorrespondenceItem),
     Calls(CallCorrespondenceItem),
+    Slack(SlackCorrespondenceItem),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -308,5 +332,59 @@ mod tests {
             serde_json::from_value(cases[3].clone()).unwrap(),
             CorrespondenceItem::Calls(_)
         ));
+    }
+
+    #[test]
+    fn parses_slack_native_ids_and_optional_content() {
+        for optional in [
+            json!({}),
+            json!({"thread_ts": null, "text": null, "media": null, "sender_access": null}),
+            json!({"thread_ts": "1784548700.000001", "text": "Hello", "text_truncated": true,
+                "media": {"count": 2}, "sender_access": "sponsored"}),
+        ] {
+            let mut value = item(
+                "slack",
+                json!({
+                    "connection_id": "33333333-3333-3333-3333-333333333333",
+                    "conversation_id": "C123", "workspace_id": "T123", "user_id": "U123",
+                    "message_ts": "1784548800.123456",
+                }),
+            );
+            value
+                .as_object_mut()
+                .unwrap()
+                .extend(optional.as_object().unwrap().clone());
+            let CorrespondenceItem::Slack(parsed) = serde_json::from_value(value).unwrap() else {
+                panic!("Expected Slack correspondence");
+            };
+            let parsed: crate::contacts::SlackCorrespondenceItem = parsed;
+            assert_eq!(
+                parsed.connection_id.to_string(),
+                "33333333-3333-3333-3333-333333333333"
+            );
+            assert_eq!(parsed.conversation_id, "C123");
+            assert_eq!(
+                (parsed.workspace_id.as_str(), parsed.user_id.as_str()),
+                ("T123", "U123")
+            );
+            assert_eq!(parsed.message_ts, "1784548800.123456");
+            assert_eq!(parsed.common.occurred_at, "2026-07-20T12:00:00Z");
+            assert_eq!(parsed.thread_ts.as_deref(), optional["thread_ts"].as_str());
+            assert_eq!(parsed.text.as_deref(), optional["text"].as_str());
+            assert_eq!(
+                parsed.text_truncated,
+                optional["text_truncated"].as_bool().unwrap_or(false)
+            );
+            assert_eq!(
+                parsed.media.map(|media| media.count),
+                optional["media"]["count"].as_u64()
+            );
+            assert_eq!(
+                parsed.sender_access,
+                optional["sender_access"]
+                    .as_str()
+                    .map(|_| crate::SenderAccess::Sponsored)
+            );
+        }
     }
 }

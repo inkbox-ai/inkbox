@@ -1166,7 +1166,7 @@ await inkbox.contacts.facts.update(contact.id, fact.id, { kind: "profile" });
 if (facts[0]) await inkbox.contacts.facts.delete(contact.id, facts[0].id);  // admin only
 const history = await inkbox.contacts.correspondence.get(contact.id, {
   identityId: "identity-uuid",
-  channels: ["email", "sms"],
+  channels: ["email", "sms", "slack"],
 });
 const survivor = await inkbox.contacts.merge(contact.id, {
   losingContactIds: ["duplicate-contact-uuid"],
