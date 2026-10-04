@@ -27,7 +27,7 @@ from inkbox.slack_operations import (
 
 from inkbox.slack import (
     SlackResource,
-    SlackDiscoveredWorkspace, SlackWorkspaceDiscoveryResponse, SlackContactImportResponse,
+    SlackContactImportResponse,
     SlackConnection,
     SlackConnectionsResponse,
     SlackSetupStatus,
@@ -540,7 +540,7 @@ __all__ = [
     "SlackOperationKind",
     # Slack
     "SlackResource",
-    "SlackDiscoveredWorkspace", "SlackWorkspaceDiscoveryResponse", "SlackContactImportResponse",
+    "SlackContactImportResponse",
     "SlackConnection",
     "SlackConnectionsResponse",
     "SlackSetupStatus",

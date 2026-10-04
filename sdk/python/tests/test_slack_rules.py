@@ -1,4 +1,4 @@
-"""Slack rule, discovery, and import wire contracts."""
+"""Slack rule and import wire contracts."""
 import json
 from uuid import UUID
 import httpx
@@ -54,13 +54,8 @@ def test_rule_crud_and_one_sided_edit(wire):
     assert len(requests) == count
 
 
-def test_discovery_and_import_keep_empty_page_cursors(wire):
+def test_import_keeps_empty_page_cursors(wire):
     client, requests, replies = wire
-    replies.append({"workspaces": [], "next_cursor": "next", "unavailable_reason": None})
-    page = client.slack.discover_workspaces(ID, source="conversations", cursor="previous", limit=10)
-    assert page.next_cursor == "next"
-    assert dict(requests[-1].url.params) == {"source": "conversations", "cursor": "previous", "limit": "10"}
-    assert requests[-1].url.path == f"/api/v1/slack/connections/{ID}/workspaces"
     replies.append({"imported_count": 0, "skipped_count": 2, "contact_ids": [], "next_cursor": "next"})
     page = client.slack.import_contacts(ID, conversation_id="CEXAMPLE", cursor="previous", limit=20)
     assert page.next_cursor == "next" and page.skipped_count == 2
@@ -104,12 +99,6 @@ def test_slack_identity_modes_match_shared_directional_contract():
             agent.update(slack_filter_mode="blacklist", slack_inbound_filter_mode="whitelist")
         with pytest.raises(ValueError):
             agent.update(slack_outbound_filter_mode=None)
-
-
-def test_discovery_tolerates_new_fields(wire):
-    client, _, replies = wire
-    replies.append({"workspaces": [{"workspace_id": "TEXAMPLE", "workspace_name": "Example", "source": "future_source", "extra": True}], "next_cursor": None})
-    assert client.slack.discover_workspaces(ID).workspaces[0].source == "future_source"
 
 
 @pytest.mark.parametrize("response", [{}, {"slack_filter_mode": "blacklist"}, {"slack_filter_mode": "whitelist", "slack_inbound_filter_mode": "whitelist", "slack_outbound_filter_mode": "blacklist"}])

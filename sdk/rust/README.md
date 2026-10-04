@@ -885,10 +885,9 @@ authority and must not trigger history loading.
 
 Slack contact rules support exact people and home workspaces, with whitelist or
 blacklist defaults and optional per-direction settings. Import visible people
-into real contact cards, discover workspace rule targets page by page, and use
-Slack with Companion mode. Importing a contact does not allow communication.
+into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.
 See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
-[discovery and import](https://inkbox.ai/docs/api/slack/discovery) for version
+[contact import](https://inkbox.ai/docs/api/slack/contact-import) for version
 `0.7.14` examples.
 
 ```rust,no_run
@@ -955,10 +954,9 @@ After browser approval, list connections again to confirm `connected`.
 `client.slack()` also provides `list_provisioning_workspaces`, `save_provisioning_workspace`, `disconnect`,
 `list_conversations`, `open_conversation`, `get_conversation`, `list_messages`,
 `get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). In 0.7.14+,
-`contact_rules` provides directional person/workspace rule CRUD; `discover_workspaces`
-and `import_contacts` return one page per call. Rule writes, default changes,
-discovery and import require an organization admin key. Import grants no messaging
-or Companion access. Pass
+`contact_rules` provides directional person/workspace rule CRUD; `import_contacts`
+returns one page per call. Rule writes, default changes, and import require an
+organization admin key. Import grants no messaging or Companion access. Pass
 `SlackPageOptions` / `SlackMessagesOptions` for pagination. Connections, saved workspaces,
 actions, file metadata, pages, and send options are public typed exports.
 
@@ -967,8 +965,7 @@ For mixed subscriptions use `update_with_scope` with
 `Some(WebhookSubscriptionScope::Identity)`.
 
 Most Rust Slack enums parse strictly: an unrecognized response or webhook value fails
-deserialization and may require an SDK update. Workspace discovery sources instead
-map unfamiliar values to `SlackWorkspaceSource::Unknown`. `Unknown` on action/operation status
+deserialization and may require an SDK update. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 
 ### Slack behavior

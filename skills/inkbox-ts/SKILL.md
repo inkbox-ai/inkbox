@@ -1520,9 +1520,9 @@ An unavailable result does not mean the original message was never sent.
 
 In 0.7.14+, `client.slack.contactRules` manages directional person and workspace rules.
 Use `slackFilterMode` or separate `slackInboundFilterMode` /
-`slackOutboundFilterMode` identity updates for defaults. `discoverWorkspaces`
-and `importContacts` read one page per call; follow their cursors. Rule writes,
-default changes, discovery, and import require an organization admin key. Claimed
+`slackOutboundFilterMode` identity updates for defaults. `importContacts` reads
+one page per call; follow its cursor. Rule writes,
+default changes and import require an organization admin key. Claimed
 agent keys can read their own rules. Import never grants messaging or Companion access.
 
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/typescript/README.md#slack) for implemented SDK/CLI methods.

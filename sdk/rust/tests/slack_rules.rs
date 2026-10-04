@@ -5,7 +5,7 @@ use serde_json::json;
 use uuid::Uuid;
 const ID: &str = "11111111-1111-4111-8111-111111111111";
 #[test]
-fn slack_rules_discovery_and_import_wire_contract() {
+fn slack_rules_and_import_wire_contract() {
     let server = MockServer::start();
     let client = Inkbox::builder("synthetic")
         .base_url(server.base_url())
@@ -82,31 +82,6 @@ fn slack_rules_discovery_and_import_wire_contract() {
         1
     );
     list.assert();
-    let discover = server.mock(|when, then| {
-        when.method(GET)
-            .path(format!("/api/v1/slack/connections/{ID}/workspaces"))
-            .query_param("source", "enterprise")
-            .query_param("limit", "20");
-        then.status(200).json_body(
-            json!({"workspaces":[],"next_cursor":null,"unavailable_reason":"missing_scope"}),
-        );
-    });
-    assert_eq!(
-        client
-            .slack()
-            .discover_workspaces(
-                id,
-                &SlackWorkspaceDiscoveryOptions {
-                    source: SlackWorkspaceDiscoverySource::Enterprise,
-                    ..Default::default()
-                }
-            )
-            .unwrap()
-            .unavailable_reason
-            .as_deref(),
-        Some("missing_scope")
-    );
-    discover.assert();
     let import = server.mock(|when, then| {
         when.method(POST)
             .path(format!("/api/v1/slack/connections/{ID}/contacts/import"))
@@ -135,7 +110,7 @@ fn slack_rules_discovery_and_import_wire_contract() {
 }
 
 #[test]
-fn slack_rule_get_delete_and_future_discovery_source() {
+fn slack_rule_get_delete() {
     let server = MockServer::start();
     let client = Inkbox::builder("synthetic")
         .base_url(server.base_url())
@@ -172,8 +147,6 @@ fn slack_rule_get_delete_and_future_discovery_source() {
         .delete("project-agent", id)
         .unwrap();
     delete.assert();
-    let source: SlackDiscoveredWorkspace = serde_json::from_value(json!({"workspace_id":"TEXAMPLE","workspace_name":null,"source":"future_source","future_field":true})).unwrap();
-    assert!(matches!(source.source, SlackWorkspaceSource::Unknown));
 }
 
 #[test]

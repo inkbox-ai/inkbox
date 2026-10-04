@@ -7,7 +7,7 @@ const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const id = "11111111-1111-4111-8111-111111111111";
 const rule = { id, agent_identity_id: id, action: "allow", match_type: "workspace", match_target: "TEXAMPLE",
   direction: "both", status: "active", created_at: "2026-10-02T00:00:00Z", updated_at: "2026-10-02T00:00:00Z" };
-test("Slack rule/import/discovery commands use canonical SDK wire and preserve continuation", async () => {
+test("Slack rule/import commands use canonical SDK wire and preserve continuation", async () => {
   let reply = rule;
   const requests = [];
   const server = http.createServer(async (req, res) => {
@@ -26,9 +26,6 @@ test("Slack rule/import/discovery commands use canonical SDK wire and preserve c
     await run(["contact-rule", "update", "project-agent", id, "--action", "block", "--apply-to", "outbound"]);
     assert.equal(requests.at(-1).method, "PATCH");
     assert.deepEqual(JSON.parse(requests.at(-1).body), { action: "block", apply_to: "outbound" });
-    reply = { workspaces: [], next_cursor: "next", unavailable_reason: null };
-    assert.equal((await run(["workspace-discovery", "--connection-id", id, "--source", "conversations"])).nextCursor, "next");
-    assert.equal(requests.at(-1).url, `/api/v1/slack/connections/${id}/workspaces?source=conversations&limit=20`);
     reply = { imported_count: 0, skipped_count: 1, contact_ids: [], next_cursor: "next" };
     assert.equal((await run(["contacts-import", "--connection-id", id, "--conversation-id", "CEXAMPLE", "--cursor", "previous"])).nextCursor, "next");
     assert.deepEqual(JSON.parse(requests.at(-1).body), { limit: 100, cursor: "previous", conversation_id: "CEXAMPLE" });

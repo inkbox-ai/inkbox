@@ -101,20 +101,6 @@ class SlackFile:
 
 
 @dataclass
-class SlackDiscoveredWorkspace:
-    workspace_id: str
-    workspace_name: str | None
-    source: Literal["connection", "contact", "shared_channel", "enterprise"]
-
-
-@dataclass
-class SlackWorkspaceDiscoveryResponse:
-    workspaces: list[SlackDiscoveredWorkspace]
-    next_cursor: str | None = None
-    unavailable_reason: str | None = None
-
-
-@dataclass
 class SlackContactImportResponse:
     imported_count: int
     skipped_count: int
@@ -145,21 +131,6 @@ class SlackResource(SlackOperationsMixin):
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
         self.contact_rules = SlackContactRulesResource(http)
-
-    def discover_workspaces(
-        self, connection_id: UUID | str, *,
-        source: Literal["known", "conversations", "enterprise"] = "known",
-        limit: int = 20, cursor: str | None = None,
-    ) -> SlackWorkspaceDiscoveryResponse:
-        """Read one discovery page (organization admin API key or Console session required).
-
-        Known contact workspaces need not be connected."""
-        data = self._http.get(f"{_connection(connection_id)}/workspaces",
-                              params={"source": source, "limit": limit, "cursor": cursor})
-        return SlackWorkspaceDiscoveryResponse(
-            [_parse(SlackDiscoveredWorkspace, row) for row in data["workspaces"]],
-            data.get("next_cursor"), data.get("unavailable_reason"),
-        )
 
     def import_contacts(
         self, connection_id: UUID | str, *, limit: int = 100,

@@ -1504,9 +1504,9 @@ result as proof that submitting a second message is safe.
 
 In 0.7.14+, `client.slack.contact_rules` manages directional person and workspace rules.
 Use `slack_filter_mode` or separate `slack_inbound_filter_mode` /
-`slack_outbound_filter_mode` identity updates for defaults. `discover_workspaces`
-and `import_contacts` read one page per call; follow their cursors. Rule writes,
-default changes, discovery, and import require an organization admin key. Claimed
+`slack_outbound_filter_mode` identity updates for defaults. `import_contacts` reads
+one page per call; follow its cursor. Rule writes,
+default changes and import require an organization admin key. Claimed
 agent keys can read their own rules. Import never grants messaging or Companion access.
 
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/python/README.md#slack) for implemented SDK/CLI methods.

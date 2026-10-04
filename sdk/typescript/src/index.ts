@@ -468,7 +468,6 @@ export { MessageSendsResource, getMessageRequestKey, type MessageSendLookupOptio
 
 export { SlackResource } from "./slack.js";
 export type {
-  SlackDiscoveredWorkspace, SlackWorkspaceDiscoveryResponse, SlackWorkspaceDiscoveryOptions,
   SlackContactImportOptions, SlackContactImportResponse,
   SlackMessageKind,
   SlackConnection,

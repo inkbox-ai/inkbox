@@ -959,11 +959,10 @@ submit a new message solely because confirmation is missing.
 
 ## Slack
 
-In 0.7.14+, use `slack contact-rule` for directional person/workspace rules,
-`slack workspace-discovery` for workspace targets, and `slack contacts-import`
-for one import page. Follow returned cursors. `identity update` accepts
+In 0.7.14+, use `slack contact-rule` for directional person/workspace rules
+and `slack contacts-import` for one import page. Follow returned cursors. `identity update` accepts
 `--slack-filter-mode` or separate `--slack-inbound-filter-mode` /
-`--slack-outbound-filter-mode`. Writes, default changes, discovery, and import
+`--slack-outbound-filter-mode`. Writes, default changes and import
 require an organization admin key; claimed agent keys can read their own rules.
 Import never grants messaging or Companion access.
 

@@ -57,14 +57,6 @@ export function registerSlackRuleCommands(slack: Command): void {
       await createClient(opts).slack.contactRules.delete(handle, id);
       output({ deleted: true }, { json: !!opts.json });
     }));
-  slack.command("workspace-discovery").description("Read one workspace discovery page (organization admin required)")
-    .requiredOption("--connection-id <id>", "Workspace connection UUID")
-    .addOption(new Option("--source <source>", "Discovery source").choices(["known", "conversations", "enterprise"]).default("known"))
-    .option("--limit <n>", "Page size", integer).option("--cursor <cursor>", "Continuation cursor")
-    .action(withErrorHandler(async function (this: Command, options: { connectionId: string; source: "known" | "conversations" | "enterprise"; limit?: number; cursor?: string }) {
-      const opts = getGlobalOpts(this);
-      output(await createClient(opts).slack.discoverWorkspaces(options.connectionId, options), { json: !!opts.json });
-    }));
   slack.command("contacts-import").description("Import one page of visible people (organization admin required); does not allow them")
     .requiredOption("--connection-id <id>", "Workspace connection UUID")
     .option("--conversation-id <id>", "Import visible members of this conversation instead of the workspace directory")

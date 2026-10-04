@@ -159,43 +159,6 @@ pub struct SlackSendMessageOptions {
     pub idempotency_key: String,
     pub thread_ts: Option<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SlackWorkspaceSource {
-    Connection,
-    Contact,
-    SharedChannel,
-    Enterprise,
-    /// An additional discovery source introduced by the API.
-    #[serde(other)]
-    Unknown,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlackDiscoveredWorkspace {
-    pub workspace_id: String,
-    pub workspace_name: Option<String>,
-    pub source: SlackWorkspaceSource,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlackWorkspaceDiscoveryResponse {
-    pub workspaces: Vec<SlackDiscoveredWorkspace>,
-    pub next_cursor: Option<String>,
-    pub unavailable_reason: Option<String>,
-}
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SlackWorkspaceDiscoverySource {
-    #[default]
-    Known,
-    Conversations,
-    Enterprise,
-}
-#[derive(Debug, Clone, Default)]
-pub struct SlackWorkspaceDiscoveryOptions {
-    pub source: SlackWorkspaceDiscoverySource,
-    pub limit: Option<u32>,
-    pub cursor: Option<String>,
-}
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SlackContactImportOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -229,30 +192,6 @@ impl SlackResource {
             contact_rules: crate::slack_rules::SlackContactRulesResource::new(http.clone()),
             http,
         }
-    }
-    /// Read one page. Requires an organization admin API key or Console session.
-    pub fn discover_workspaces(
-        &self,
-        connection_id: Uuid,
-        options: &SlackWorkspaceDiscoveryOptions,
-    ) -> Result<SlackWorkspaceDiscoveryResponse> {
-        let mut query = vec![
-            (
-                "source",
-                serde_json::to_value(&options.source)?
-                    .as_str()
-                    .unwrap()
-                    .to_owned(),
-            ),
-            ("limit", options.limit.unwrap_or(20).to_string()),
-        ];
-        if let Some(cursor) = &options.cursor {
-            query.push(("cursor", cursor.clone()));
-        }
-        Ok(serde_json::from_value(self.http.get(
-            &format!("{}/workspaces", base(connection_id)),
-            &query,
-        )?)?)
     }
     /// Import one page without allowing communication. Requires organization admin authority.
     pub fn import_contacts(

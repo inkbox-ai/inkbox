@@ -34,12 +34,8 @@ it("uses canonical rule paths and atomic directional edits", async () => {
   await expect(client.slack.contactRules.update("project-agent", id, { action: SlackRuleAction.BLOCK, direction: "both", applyTo: "outbound" })).rejects.toThrow();
   expect(fetch.mock.calls).toHaveLength(count);
 });
-it("preserves discovery availability and empty import continuation", async () => {
+it("preserves empty import continuation", async () => {
   const { client, reply, request } = wire();
-  reply({ workspaces: [], next_cursor: null, unavailable_reason: "missing_scope" });
-  const discovered = await client.slack.discoverWorkspaces(id, { source: "enterprise", cursor: "previous", limit: 2 });
-  expect(discovered.unavailableReason).toBe("missing_scope");
-  expect(Object.fromEntries(request().url.searchParams)).toEqual({ source: "enterprise", cursor: "previous", limit: "2" });
   reply({ imported_count: 0, skipped_count: 2, contact_ids: [], next_cursor: "next" });
   const imported = await client.slack.importContacts(id, { conversationId: "CEXAMPLE", cursor: "previous", limit: 20 });
   expect(imported.nextCursor).toBe("next");

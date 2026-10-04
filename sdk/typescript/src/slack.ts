@@ -159,21 +159,6 @@ const action = (r: RawAction): SlackAction => ({
 const base = (id: string): string =>
   `/slack/connections/${encodeURIComponent(id)}`;
 
-export interface SlackDiscoveredWorkspace {
-  workspaceId: string;
-  workspaceName: string | null;
-  source: "connection" | "contact" | "shared_channel" | "enterprise";
-}
-export interface SlackWorkspaceDiscoveryResponse {
-  workspaces: SlackDiscoveredWorkspace[];
-  nextCursor: string | null;
-  unavailableReason: string | null;
-}
-export interface SlackWorkspaceDiscoveryOptions {
-  source?: "known" | "conversations" | "enterprise";
-  limit?: number;
-  cursor?: string | null;
-}
 export interface SlackContactImportOptions extends SlackPageOptions { conversationId?: string | null }
 export interface SlackContactImportResponse {
   importedCount: number;
@@ -187,19 +172,6 @@ export class SlackResource extends SlackOperationsResource {
   constructor(http: HttpTransport) {
     super(http);
     this.contactRules = new SlackContactRulesResource(http);
-  }
-  /** Read one page; requires an organization admin API key or Console session.
-   * Known contact workspaces need not be connected to this connection. */
-  async discoverWorkspaces(connectionId: string, options: SlackWorkspaceDiscoveryOptions = {}): Promise<SlackWorkspaceDiscoveryResponse> {
-    const r = await this.http.get<{
-      workspaces: { workspace_id: string; workspace_name: string | null; source: SlackDiscoveredWorkspace["source"] }[];
-      next_cursor: string | null; unavailable_reason: string | null;
-    }>(`${base(connectionId)}/workspaces`, {
-      source: options.source ?? "known", limit: options.limit ?? 20, cursor: options.cursor,
-    });
-    return { workspaces: r.workspaces.map((w) => ({ workspaceId: w.workspace_id,
-      workspaceName: w.workspace_name, source: w.source })), nextCursor: r.next_cursor,
-      unavailableReason: r.unavailable_reason };
   }
   /** Import one page of visible humans without creating contact rules.
    * Requires an organization admin API key or Console session. */

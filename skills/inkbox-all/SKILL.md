@@ -150,8 +150,7 @@ available. The Inkbox watermark is separate from the custom signature.
 In 0.7.14+, Slack supports directional person and workspace contact rules via
 `client.slack.contact_rules` (Python), `client.slack.contactRules` (TypeScript),
 `client.slack().contact_rules` (Rust), and `slack contact-rule` (CLI).
-Rule writes, default changes, workspace discovery,
-and contact import require an organization admin key; claimed agent keys can read
+Rule writes, default changes, and contact import require an organization admin key; claimed agent keys can read
 their own rules. Import is paginated and never grants messaging or Companion access.
 Companion requires an exact human account allowed in both directions, not a workspace allow.
 

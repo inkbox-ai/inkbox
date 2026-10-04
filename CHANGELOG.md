@@ -11,7 +11,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Configure Slack whitelist/blacklist defaults and directional contact or workspace rules.
-- Import visible Slack people into contacts and discover workspace rule targets with explicit pagination.
+- Import visible Slack people into contacts with explicit pagination and organization admin authority.
 - Use Slack with Companion configuration, scoped initialization, and webhook metadata.
 - Advance SDK, CLI, and bundled Claude plugin versions to `0.7.14`, with the Codex plugin at `0.1.13`.
 
@@ -32,8 +32,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python, TypeScript, and Rust Slack mode updates raise an error when the API
   response does not confirm the requested modes. Other fields in the same
   update may already have been saved.
-- Workspace discovery tolerates additional response fields and unknown source
-  values. Directory discovery and import require organization admin authority.
 
 ## 0.7.13 — Threaded iMessage replies (2026-10-03)
 
