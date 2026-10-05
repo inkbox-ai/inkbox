@@ -1,10 +1,95 @@
 //! Optional cached context for retained Slack messages.
 use crate::error::Result;
 use crate::http::NO_QUERY;
-use crate::slack::{base, segment, SlackResource};
+use crate::slack::{
+    base, segment, SlackConnection, SlackProvisioningWorkspace, SlackResource, SlackSetupStatus,
+};
+use crate::slack_operations::{
+    SlackArchiveMessagesOptions, SlackArchivePageBoundary, SlackArchivedMessage,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Connection metadata plus the optional installation version used by display caches.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackEnrichedConnection {
+    #[serde(flatten)]
+    pub connection: SlackConnection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<u64>,
+}
+impl std::ops::Deref for SlackEnrichedConnection {
+    type Target = SlackConnection;
+    fn deref(&self) -> &Self::Target {
+        &self.connection
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackEnrichedConnectionsResponse {
+    pub connections: Vec<SlackEnrichedConnection>,
+    pub installation_available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup: Option<SlackSetupStatus>,
+    #[serde(default)]
+    pub application_created: bool,
+    #[serde(default)]
+    pub provisioning_workspace: Option<SlackProvisioningWorkspace>,
+}
+/// Retained message with optional display context, leaving legacy message literals unchanged.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackEnrichedArchivedMessage {
+    #[serde(flatten)]
+    pub message: SlackArchivedMessage,
+    #[serde(
+        default,
+        deserialize_with = "crate::sender_access::deserialize_optional",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sender_access: Option<crate::SenderAccess>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtype: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edited_ts: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_count: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocks: Option<Vec<Map<String, Value>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<Map<String, Value>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_reply: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reactions: Option<Vec<SlackCachedReaction>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reactions_complete: Option<bool>,
+}
+impl std::ops::Deref for SlackEnrichedArchivedMessage {
+    type Target = SlackArchivedMessage;
+    fn deref(&self) -> &Self::Target {
+        &self.message
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackEnrichedArchiveMessagesResponse {
+    pub messages: Vec<SlackEnrichedArchivedMessage>,
+    pub next_cursor: Option<String>,
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_boundary: Option<SlackArchivePageBoundary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included: Option<SlackArchiveIncluded>,
+}
+/// Opt-in archive context and root filtering, alongside the existing pagination options.
+#[derive(Debug, Clone, Default)]
+pub struct SlackEnrichedArchiveMessagesOptions {
+    pub archive: SlackArchiveMessagesOptions,
+    pub roots_only: Option<bool>,
+    pub include: Option<Vec<SlackArchiveInclude>>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -133,6 +218,57 @@ pub struct SlackCachedEmojiOptions {
     pub cursor: Option<String>,
 }
 impl SlackResource {
+    /// List connection metadata with optional installation generations.
+    /// Existing `list_connections` retains its original response types.
+    pub fn list_enriched_connections(
+        &self,
+        identity_id: Uuid,
+    ) -> Result<SlackEnrichedConnectionsResponse> {
+        Ok(serde_json::from_value(self.http.get(
+            "/slack/connections",
+            &[("identity_id", identity_id.to_string())],
+        )?)?)
+    }
+    /// Read retained messages with explicitly selected cached display context.
+    /// None leaves each new query option omitted, including for older API versions.
+    ///
+    /// ```no_run
+    /// # fn example(client: &inkbox::Inkbox, id: uuid::Uuid) -> inkbox::Result<()> {
+    /// use inkbox::{SlackArchiveInclude, SlackArchiveMessagesOptions, SlackEnrichedArchiveMessagesOptions};
+    /// let page = client.slack().list_enriched_archived_messages(id, &SlackEnrichedArchiveMessagesOptions {
+    ///     archive: SlackArchiveMessagesOptions {
+    ///         conversation_id: Some("CEXAMPLE".into()), ..Default::default()
+    ///     },
+    ///     roots_only: Some(true),
+    ///     include: Some(vec![SlackArchiveInclude::Sender, SlackArchiveInclude::Reactions]),
+    /// })?;
+    /// let first_body = page.messages.first().map(|entry| &entry.message.text);
+    /// # Ok(()) }
+    /// ```
+    pub fn list_enriched_archived_messages(
+        &self,
+        id: Uuid,
+        options: &SlackEnrichedArchiveMessagesOptions,
+    ) -> Result<SlackEnrichedArchiveMessagesResponse> {
+        let mut params = options.archive.query_params();
+        if let Some(roots) = options.roots_only {
+            params.push(("roots_only", roots.to_string()));
+        }
+        if let Some(include) = &options.include {
+            params.push((
+                "include",
+                include
+                    .iter()
+                    .map(|item| item.as_str())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ));
+        }
+        Ok(serde_json::from_value(self.http.get(
+            &format!("{}/archive/messages", base(id)),
+            &params,
+        )?)?)
+    }
     pub fn list_cached_emoji(
         &self,
         id: Uuid,

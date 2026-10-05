@@ -34,8 +34,6 @@ pub struct SlackConnection {
     pub status: SlackConnectionStatus,
     pub scopes: Vec<String>,
     pub created_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub generation: Option<u64>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackConnectionsResponse {

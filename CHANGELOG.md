@@ -20,9 +20,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Compatibility
 
 - Existing calls keep their query defaults and accept responses without new fields.
-- Rust response structs and `SlackArchiveMessagesOptions` add fields. Downstream
-  struct literals must supply them, or use `Default` for options. Existing methods
-  keep their signatures; pin the previous release until your source is updated.
+- Existing Rust structs, exhaustive literals, methods, and request defaults stay
+  unchanged. Use `list_enriched_connections` and `list_enriched_archived_messages`
+  with additive `SlackEnriched*` types to access installation generations and
+  cached archive context. Enriched archive options embed the existing
+  `SlackArchiveMessagesOptions` for filters and pagination.
 
 
 ## 0.7.14 - Slack contact rules (unreleased)

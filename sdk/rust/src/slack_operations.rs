@@ -4,7 +4,6 @@
 use crate::error::{InkboxError, Result};
 use crate::http::NO_QUERY;
 use crate::slack::{base, segment, SlackPageOptions, SlackResource};
-use crate::slack_cache::{SlackArchiveInclude, SlackArchiveIncluded, SlackCachedReaction};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -139,30 +138,6 @@ pub struct SlackArchivedMessage {
     pub mentioned: bool,
     pub source: SlackArchiveSource,
     pub captured_at: String,
-    #[serde(
-        default,
-        deserialize_with = "crate::sender_access::deserialize_optional",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub sender_access: Option<crate::SenderAccess>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bot_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subtype: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edited_ts: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reply_count: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blocks: Option<Vec<Map<String, Value>>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<Map<String, Value>>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub latest_reply: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reactions: Option<Vec<SlackCachedReaction>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reactions_complete: Option<bool>,
 }
 /// Inclusive oldest scanned list position; not necessarily a returned message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,8 +152,6 @@ pub struct SlackArchiveMessagesResponse {
     pub source: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_boundary: Option<SlackArchivePageBoundary>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub included: Option<SlackArchiveIncluded>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -214,14 +187,32 @@ pub struct SlackArchiveCoverageResponse {
 pub struct SlackArchiveMessagesOptions {
     /// Return the latest matching message per conversation; limit counts conversations.
     pub latest_per_conversation: Option<bool>,
-    pub roots_only: Option<bool>,
-    pub include: Option<Vec<SlackArchiveInclude>>,
     pub conversation_id: Option<String>,
     pub thread_ts: Option<String>,
     pub before_ts: Option<String>,
     pub after_ts: Option<String>,
     pub cursor: Option<String>,
     pub limit: Option<u32>,
+}
+impl SlackArchiveMessagesOptions {
+    pub(crate) fn query_params(&self) -> Vec<(&'static str, String)> {
+        let mut params = vec![("limit", self.limit.unwrap_or(50).to_string())];
+        if let Some(latest) = self.latest_per_conversation {
+            params.push(("latest_per_conversation", latest.to_string()));
+        }
+        for (key, value) in [
+            ("conversation_id", &self.conversation_id),
+            ("thread_ts", &self.thread_ts),
+            ("before_ts", &self.before_ts),
+            ("after_ts", &self.after_ts),
+            ("cursor", &self.cursor),
+        ] {
+            if let Some(v) = value {
+                params.push((key, v.clone()));
+            }
+        }
+        params
+    }
 }
 #[derive(Debug, Clone, Default)]
 pub struct SlackArchiveSearchOptions {
@@ -552,34 +543,7 @@ impl SlackResource {
         id: Uuid,
         options: &SlackArchiveMessagesOptions,
     ) -> Result<SlackArchiveMessagesResponse> {
-        let mut params = vec![("limit", options.limit.unwrap_or(50).to_string())];
-        if let Some(latest) = options.latest_per_conversation {
-            params.push(("latest_per_conversation", latest.to_string()));
-        }
-        if let Some(roots) = options.roots_only {
-            params.push(("roots_only", roots.to_string()));
-        }
-        if let Some(include) = &options.include {
-            params.push((
-                "include",
-                include
-                    .iter()
-                    .map(|item| item.as_str())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ));
-        }
-        for (key, value) in [
-            ("conversation_id", &options.conversation_id),
-            ("thread_ts", &options.thread_ts),
-            ("before_ts", &options.before_ts),
-            ("after_ts", &options.after_ts),
-            ("cursor", &options.cursor),
-        ] {
-            if let Some(v) = value {
-                params.push((key, v.clone()));
-            }
-        }
+        let params = options.query_params();
         Ok(serde_json::from_value(self.http.get(
             &format!("{}/archive/messages", base(id)),
             &params,

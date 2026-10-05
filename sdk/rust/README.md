@@ -976,13 +976,16 @@ means terminal uncertainty, never an arbitrary unrecognized value.
 ### Cached Slack display context
 
 ```rust,no_run
-use inkbox::{SlackArchiveInclude, SlackArchiveMessagesOptions, SlackCachedEmojiOptions, SlackCachedMediaKind};
+use inkbox::{SlackArchiveInclude, SlackArchiveMessagesOptions, SlackEnrichedArchiveMessagesOptions,
+    SlackCachedEmojiOptions, SlackCachedMediaKind};
 # fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
-let page = client.slack().list_archived_messages(connection_id, &SlackArchiveMessagesOptions {
-    conversation_id: Some("C0123456789".into()), roots_only: Some(true),
+let page = client.slack().list_enriched_archived_messages(connection_id, &SlackEnrichedArchiveMessagesOptions {
+    archive: SlackArchiveMessagesOptions {
+        conversation_id: Some("C0123456789".into()), ..Default::default()
+    },
+    roots_only: Some(true),
     include: Some(vec![SlackArchiveInclude::Conversation, SlackArchiveInclude::Sender,
         SlackArchiveInclude::Reactions, SlackArchiveInclude::Files]),
-    ..Default::default()
 })?;
 let emoji_page = client.slack().list_cached_emoji(connection_id, &SlackCachedEmojiOptions {
     q: Some("party".into()), ..Default::default()
@@ -991,6 +994,12 @@ let image = client.slack().download_cached_media(connection_id, SlackCachedMedia
 let preview = client.slack().download_file_preview(connection_id, "F0123456789")?;
 # Ok(()) }
 ```
+
+Use `list_enriched_connections(identity_id)` to read each connection’s optional
+`generation`. The enriched response wrappers retain the original connection under
+`connection` and message under `message`; these fields also remain readable through
+`Deref`. Existing `list_connections`, `list_archived_messages`, and search methods
+keep their original response types, struct literals, and request defaults.
 
 Cached context is optional and may be incomplete or temporarily stale. Unknown
 reaction and thread counts are not zero; a known count does not imply a complete
