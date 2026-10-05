@@ -1982,6 +1982,28 @@ client.webhooks.subscriptions.update(
 )
 ```
 
+### Cached Slack display context
+
+```python
+page = inkbox.slack.list_archived_messages(
+    connection_id, conversation_id="C0123456789", roots_only=True,
+    include=["conversation", "sender", "reactions", "files"],
+)
+if page.included:
+    print(page.included.conversations)
+emoji_page = inkbox.slack.list_cached_emoji(connection_id, q="party", limit=100)
+# Continue with cursor=emoji_page.next_cursor; one page is not the entire directory.
+image = inkbox.slack.download_cached_media(connection_id, "user", "U0123456789")
+preview = inkbox.slack.download_file_preview(connection_id, "F0123456789")
+```
+
+Cached context is optional and may be incomplete or temporarily stale. Unknown
+reaction and thread counts are not zero; a known count does not imply a complete
+list of reacting users. Keep display caches separate by connection and invalidate
+them when its optional `generation` changes. Emoji aliases name another definition.
+The byte methods authenticate against Inkbox; do not forward your API key to
+fallback image URLs. Existing live methods and mutation idempotency are unchanged.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
@@ -2002,7 +2024,8 @@ completion URL with the exact path `/console/slack/complete`, no query or fragme
 and at most 2048 characters.
 Omit it to use the default completion page.
 
-Conversation/history/file reads are live and scoped to the selected connection, not
+Conversation and live-history reads use the selected connection. File downloads
+can use retained copies but still check current access. These methods do not read
 an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
 page. Slack timestamp identifiers are strings, never floating-point numbers. Direct

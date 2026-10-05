@@ -1110,6 +1110,28 @@ inkbox webhook subscription update SUBSCRIPTION_ID \
 Repeat `--event-type` to select incoming Slack message categories. On update,
 the supplied event types replace the subscription's full event list.
 
+### Cached Slack display context
+
+```bash
+inkbox slack archive messages --connection-id CONNECTION_UUID \
+  --conversation-id C0123456789 --roots-only --include conversation,sender,reactions,files
+inkbox slack emoji list --connection-id CONNECTION_UUID --q party --limit 100
+inkbox slack cached-media-download --connection-id CONNECTION_UUID \
+  --kind user --resource-id U0123456789 --output avatar.png
+inkbox slack file preview --connection-id CONNECTION_UUID --file-id F0123456789 --output preview.png
+```
+
+Byte downloads require a new output path and never overwrite an existing file.
+Follow returned cursors explicitly. `--include` and `--roots-only` apply to archive
+message listing, not ranked search. Omit `--roots-only` when selecting a thread.
+
+Cached context is optional and may be incomplete or temporarily stale. Unknown
+reaction and thread counts are not zero; a known count does not imply a complete
+list of reacting users. Keep display caches separate by connection and invalidate
+them when its optional `generation` changes. Emoji aliases name another definition.
+The byte methods authenticate against Inkbox; do not forward your API key to
+fallback image URLs. Existing live methods and mutation idempotency are unchanged.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
@@ -1130,7 +1152,8 @@ completion URL with the exact path `/console/slack/complete`, no query or fragme
 and at most 2048 characters.
 Omit it to use the default completion page.
 
-Conversation/history/file reads are live and scoped to the selected connection, not
+Conversation and live-history reads use the selected connection. File downloads
+can use retained copies but still check current access. These methods do not read
 an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
 page. Slack timestamp identifiers are strings, never floating-point numbers. Direct

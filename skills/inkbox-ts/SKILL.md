@@ -1580,6 +1580,14 @@ cursor with the same filters even for short or empty pages, until no cursor rema
 Search errors are not evidence of no matches.
 Use archive listing, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
 from one page or a completed channel import. Purge deletes retained history without stopping new capture. Archive reads require current connection/conversation access.
+In 0.7.15+, use `listArchivedMessages(connectionId, { rootsOnly: true, include: ["conversation", "sender", "reactions", "files"] })` for a main timeline with cached display context.
+Use `listCachedEmoji`, `downloadCachedMedia`, and `downloadFilePreview` for cached media. Follow emoji cursors explicitly and inspect directory status;
+missing permissions or pending synchronization can leave an empty incomplete page.
+Unknown reaction/thread counts are not zero, and known reaction counts do not imply complete actor lists.
+Omit the roots-only option when reading a selected thread. Expansions do not apply to ranked search.
+Keep caches separate by connection and invalidate them when its generation changes. Never forward
+Inkbox credentials to fallback image URLs. Current message and file access checks still apply.
+
 Slack webhooks select incoming messages with `slack.dm_received`,
 `slack.group_dm_received`, `slack.channel_message_received`, `slack.mention_received`,
 and `slack.thread_reply_received`. Overlapping selections produce one logical delivery per subscription,

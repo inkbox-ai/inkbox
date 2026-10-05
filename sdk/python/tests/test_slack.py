@@ -32,7 +32,8 @@ def wire():
 
     client._api_http._client.close()
     client._api_http._client = httpx.Client(
-        base_url="https://example.com/api/v1", transport=httpx.MockTransport(handle)
+        base_url="https://example.com/api/v1", transport=httpx.MockTransport(handle),
+        headers=client._api_http._client.headers,
     )
     yield client, requests, replies
     client.close()

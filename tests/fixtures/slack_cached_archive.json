@@ -1,0 +1,145 @@
+{
+  "connection_id": "22222222-2222-4222-8222-222222222222",
+  "page": {
+    "messages": [
+      {
+        "id": "44444444-4444-4444-8444-444444444444",
+        "connection_id": "22222222-2222-4222-8222-222222222222",
+        "conversation_id": "C123",
+        "message_ts": "1789552800.000100",
+        "thread_ts": null,
+        "user_id": "U123",
+        "text": "Release :celebrate:",
+        "files": [
+          {
+            "id": "F123"
+          }
+        ],
+        "mentioned": false,
+        "source": "event",
+        "captured_at": "2026-09-16T10:00:00Z",
+        "bot_id": null,
+        "sender_access": "direct",
+        "subtype": null,
+        "edited_ts": null,
+        "reply_count": 3,
+        "latest_reply": "1789552801.000100",
+        "blocks": [
+          {
+            "type": "section",
+            "block_id": "keep_snake_case"
+          }
+        ],
+        "attachments": [
+          {
+            "title": "Release notes",
+            "image_url": "https://example.com/preview.png"
+          }
+        ],
+        "reactions": [
+          {
+            "name": "celebrate",
+            "count": null,
+            "users": [
+              "U123"
+            ],
+            "users_complete": false,
+            "reacted": null
+          },
+          {
+            "name": "eyes",
+            "count": 0,
+            "users": [],
+            "users_complete": true,
+            "reacted": false
+          }
+        ],
+        "reactions_complete": false
+      }
+    ],
+    "included": {
+      "conversations": {
+        "C123": {
+          "id": "C123",
+          "name": null,
+          "title": "Project team",
+          "type": "mpim",
+          "member_ids": [
+            "U123"
+          ],
+          "members_complete": false,
+          "status": "ready",
+          "fetched_at": "2026-09-16T10:00:00Z"
+        }
+      },
+      "actors": {
+        "U123": {
+          "id": "U123",
+          "kind": "user",
+          "name": "Taylor Example",
+          "avatar_url": "/api/v1/slack/connections/22222222-2222-4222-8222-222222222222/cached-media/user/U123?v=example",
+          "avatar_cached": true,
+          "status": "ready",
+          "fetched_at": "2026-09-16T10:00:00Z"
+        }
+      },
+      "emoji": {
+        "celebrate": {
+          "name": "celebrate",
+          "alias_of": "party",
+          "image_url": null,
+          "image_cached": false,
+          "status": "ready"
+        },
+        "party": {
+          "name": "party",
+          "alias_of": null,
+          "image_url": "/api/v1/slack/connections/22222222-2222-4222-8222-222222222222/cached-media/emoji/party?v=example",
+          "image_cached": true,
+          "status": "ready"
+        }
+      },
+      "files": {
+        "F123": {
+          "id": "F123",
+          "name": "notes.png",
+          "title": "Notes",
+          "mimetype": "image/png",
+          "size": 32,
+          "content_cached": true,
+          "preview_cached": true,
+          "preview_url": "/api/v1/slack/connections/22222222-2222-4222-8222-222222222222/files/F123/preview?v=example",
+          "status": "ready",
+          "error_code": null
+        }
+      }
+    },
+    "next_cursor": "opaque-next",
+    "source": "archive",
+    "page_boundary": {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "message_ts": "1789552800.000100"
+    }
+  },
+  "emoji_page": {
+    "emoji": [
+      {
+        "name": "celebrate",
+        "alias_of": "party",
+        "image_url": null,
+        "image_cached": false,
+        "status": "ready"
+      },
+      {
+        "name": "party",
+        "alias_of": null,
+        "image_url": "/api/v1/slack/connections/22222222-2222-4222-8222-222222222222/cached-media/emoji/party?v=example",
+        "image_cached": true,
+        "status": "ready"
+      }
+    ],
+    "next_cursor": "party",
+    "status": "pending",
+    "error_code": null
+  }
+}

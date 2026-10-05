@@ -1,7 +1,8 @@
 import { createReadStream } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { Command, InvalidArgumentError } from "commander";
-import type { SlackProcessingStatus, SlackResource } from "@inkbox/sdk";
+import type { SlackArchiveInclude, SlackCachedMediaKind, SlackProcessingStatus, SlackResource } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -29,6 +30,18 @@ interface Args {
   afterTs?: string;
   q: string;
   restart?: boolean;
+  rootsOnly?: boolean;
+  include?: SlackArchiveInclude[];
+  kind: SlackCachedMediaKind;
+  resourceId: string;
+  fileId: string;
+  output: string;
+}
+function includes(value: string): SlackArchiveInclude[] {
+  const names = value.split(",").map(name => name.trim());
+  if (!names.every(name => ["conversation", "sender", "reactions", "files"].includes(name)))
+    throw new InvalidArgumentError("Use conversation,sender,reactions,files for --include");
+  return names as SlackArchiveInclude[];
 }
 const connection = (c: Command): Command =>
   c.requiredOption("--connection-id <id>", "Slack workspace connection UUID");
@@ -269,9 +282,32 @@ export function registerSlackOperationCommands(
   action(
     filters(archive.command("messages"))
       .option("--thread-ts <timestamp>", "Thread filter (requires conversation)")
-      .option("--latest-per-conversation", "Return one latest message per conversation"),
+      .option("--latest-per-conversation", "Return one latest message per conversation")
+      .option("--roots-only", "Page roots and thread broadcasts without ordinary replies")
+      .option("--include <expansions>", "Comma-separated conversation,sender,reactions,files", includes),
     (s, o) => s.listArchivedMessages(o.connectionId, o),
   );
+  const emoji = slack.command("emoji").description("Search the cached workspace emoji directory");
+  action(page(connection(emoji.command("list"))).option("--q <query>", "Filter emoji names"),
+    (s, o) => s.listCachedEmoji(o.connectionId, o));
+  action(connection(slack.command("cached-media-download"))
+    .requiredOption("--kind <kind>", "user, bot, or emoji", value => {
+      if (!["user", "bot", "emoji"].includes(value)) throw new InvalidArgumentError("Expected user, bot, or emoji");
+      return value;
+    })
+    .requiredOption("--resource-id <id>", "User ID, bot ID, or emoji name")
+    .requiredOption("--output <path>", "New output path; never overwritten"), async (s, o) => {
+      const bytes = await s.downloadCachedMedia(o.connectionId, o.kind, o.resourceId);
+      await writeFile(o.output, bytes, { flag: "wx", mode: 0o600 });
+      return { path: o.output, bytes: bytes.length };
+    });
+  action(connection(groups.files.command("preview"))
+    .requiredOption("--file-id <id>", "Slack file ID")
+    .requiredOption("--output <path>", "New output path; never overwritten"), async (s, o) => {
+      const bytes = await s.downloadFilePreview(o.connectionId, o.fileId);
+      await writeFile(o.output, bytes, { flag: "wx", mode: 0o600 });
+      return { path: o.output, bytes: bytes.length };
+    });
   action(
     filters(archive.command("search"))
       .requiredOption("--q <query>", "Retained message text query")

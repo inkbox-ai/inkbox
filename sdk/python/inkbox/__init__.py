@@ -3,6 +3,17 @@ inkbox — Python SDK for the Inkbox APIs.
 """
 
 from inkbox.slack_rules import SlackContactRule, SlackContactRulesResource, SlackRuleAction, SlackRuleMatchType
+from inkbox.slack_cache import (
+    SlackArchiveInclude,
+    SlackArchiveIncluded,
+    SlackCachedActor,
+    SlackCachedConversation,
+    SlackCachedEmoji,
+    SlackCachedEmojiPage,
+    SlackCachedFile,
+    SlackCachedMediaKind,
+    SlackCachedReaction,
+)
 from inkbox.slack_operations import (
     SlackOperation,
     SlackCapability,
@@ -530,6 +541,15 @@ __all__ = [
     "SlackReactionsResponse",
     "SlackMessageContextResponse",
     "SlackPermalinkResponse",
+    "SlackArchiveInclude",
+    "SlackArchiveIncluded",
+    "SlackCachedActor",
+    "SlackCachedConversation",
+    "SlackCachedEmoji",
+    "SlackCachedEmojiPage",
+    "SlackCachedFile",
+    "SlackCachedMediaKind",
+    "SlackCachedReaction",
     "SlackArchiveSettings",
     "SlackArchivedMessage",
     "SlackArchivePageBoundary",

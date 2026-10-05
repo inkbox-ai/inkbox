@@ -973,6 +973,32 @@ Most Rust Slack enums parse strictly: an unrecognized response or webhook value 
 deserialization and may require an SDK update. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 
+### Cached Slack display context
+
+```rust,no_run
+use inkbox::{SlackArchiveInclude, SlackArchiveMessagesOptions, SlackCachedEmojiOptions, SlackCachedMediaKind};
+# fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
+let page = client.slack().list_archived_messages(connection_id, &SlackArchiveMessagesOptions {
+    conversation_id: Some("C0123456789".into()), roots_only: Some(true),
+    include: Some(vec![SlackArchiveInclude::Conversation, SlackArchiveInclude::Sender,
+        SlackArchiveInclude::Reactions, SlackArchiveInclude::Files]),
+    ..Default::default()
+})?;
+let emoji_page = client.slack().list_cached_emoji(connection_id, &SlackCachedEmojiOptions {
+    q: Some("party".into()), ..Default::default()
+})?;
+let image = client.slack().download_cached_media(connection_id, SlackCachedMediaKind::User, "U0123456789")?;
+let preview = client.slack().download_file_preview(connection_id, "F0123456789")?;
+# Ok(()) }
+```
+
+Cached context is optional and may be incomplete or temporarily stale. Unknown
+reaction and thread counts are not zero; a known count does not imply a complete
+list of reacting users. Keep display caches separate by connection and invalidate
+them when its optional `generation` changes. Emoji aliases name another definition.
+The byte methods authenticate against Inkbox; do not forward your API key to
+fallback image URLs. Existing live methods and mutation idempotency are unchanged.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
@@ -993,7 +1019,8 @@ an optional approved Console completion URL with the exact path `/console/slack/
 no query or fragment, and at most 2048 characters. `None`, or the existing `start_installation` method,
 uses the default completion page.
 
-Conversation/history/file reads are live and scoped to the selected connection, not
+Conversation and live-history reads use the selected connection. File downloads
+can use retained copies but still check current access. These methods do not read
 an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
 page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
