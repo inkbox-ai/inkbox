@@ -18,7 +18,7 @@ API-first communication infrastructure for AI agents — email (with custom send
 
 Companion mode is off by default and separate from whitelist/blacklist settings.
 An eligible sender can introduce the agent to a group by sending a qualifying
-message there. Eligibility requires active exact email/number allow rules for
+message there. Eligibility requires active exact email, number, or Slack-account allow rules for
 both inbound and outbound communication, either one Both rule or two applicable
 one-way allows. It is per normalized identifier and channel, not per saved contact;
 phone and iMessage share one policy. Domain allowances, default access, contact
@@ -630,6 +630,19 @@ Read an iMessage by ID with `imessages.get(...)`, Rust's `imessages().get(...)`,
 or `inkbox imessage get <message-id> --identity <handle>`.
 
 ## Slack workspace connections
+
+Slack contact rules support exact people and home workspaces, with whitelist or
+blacklist defaults and optional per-direction settings. Import visible people
+into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication. Contact import
+requires an organization admin API key or a human Console session.
+See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
+[contact import](https://inkbox.ai/docs/api/slack/contact-import) for version
+`0.7.14` examples.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `thread_ts` selects a reply thread; it does not limit sponsorship.
 
 Slack SDK and CLI methods require version **0.7.11 or later**.
 

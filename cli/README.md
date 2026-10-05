@@ -19,7 +19,7 @@ Requires Node.js >= 22.
 ## Companion mode
 
 Companion mode is off by default, separate from whitelist/blacklist settings.
-Eligibility requires active exact email/number allow rules covering both
+Eligibility requires active exact email, number, or Slack-account allow rules covering both
 directions, either one Both rule or two applicable one-way allows. It is per
 normalized identifier and channel; phone and iMessage share one policy. Domain
 allowances, default access, contact visibility, and access borrowed from another
@@ -765,6 +765,9 @@ are enforced.
 
 Organization-wide contacts, correspondence, and memory facts.
 
+Correspondence selects all five channels by default. Use `--channels slack` for
+retained messages authored by the contact's saved Slack accounts.
+
 ```bash
 inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
 inkbox contacts get <contact-id>
@@ -1082,6 +1085,8 @@ lookup; the UUID form avoids that lookup.
 | --- | --- |
 | `slack setup` | `start` (preparation status is returned by `connection list`) |
 | `slack search` | Search retained messages across an identity's workspace connections |
+| `slack contact-rule` | `list`, `list-all`, `get`, `create`, `update`, `delete` |
+| `slack contacts-import` | Import one page of directory or selected conversation members into contact cards; organization admin API key required |
 | `slack connection` | `list`, `disconnect` |
 | `slack provisioning-workspace` | `list`, `save --credentials-file <path>` |
 | `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
@@ -1312,3 +1317,28 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Add `--no-plain-reply-fallback` to `imessage send` to require a native reply
 instead.
+
+## Slack contact rules
+
+Use `inkbox identity update HANDLE --slack-filter-mode whitelist` for a shared
+default, or `--slack-inbound-filter-mode` / `--slack-outbound-filter-mode` for
+separate directions. Do not combine the shared and directional flags.
+
+`slack contacts-import` requires an organization admin API key; agent-scoped
+keys cannot run this command.
+
+```bash
+inkbox slack contact-rule create example-agent --action allow \
+  --match-type exact_user --match-target TEXAMPLE:UEXAMPLE
+inkbox slack contacts-import --connection-id 11111111-1111-4111-8111-111111111111
+inkbox identity companion update example-agent --enabled true
+```
+
+Import fetches one page. Follow `nextCursor`, including after an empty
+page, to continue. Import does not create allow rules. Workspace rules match a
+person's verified home workspace; they do not sponsor Companion conversations.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `threadTs` in reply context selects a reply thread; it does not limit sponsorship.

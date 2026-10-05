@@ -216,6 +216,13 @@ approval.
 
 ## Slack
 
+After connecting, contact import is optional: it saves visible people without
+allowing messages or enabling Companion. In 0.7.14+, an organization admin can use
+`slack contacts-import` and `slack contact-rule`,
+or the corresponding SDK methods. Follow import cursors. Changing Slack
+whitelist/blacklist defaults on the identity also requires an organization admin key. Companion requires an exact human
+account allowed in both directions; a workspace allow alone does not sponsor access.
+
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/README.md#slack-workspace-connections) for implemented SDK/CLI methods.
 Use an existing identity and select the intended connected workspace explicitly.
 Organization-member sessions, organization admin API keys, and claimed agent keys can

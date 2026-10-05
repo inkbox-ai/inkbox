@@ -15,6 +15,7 @@ const BASE: &str = "/contacts";
 
 #[derive(Debug, Clone, Default)]
 pub struct CorrespondenceQuery {
+    /// Channels to retrieve; empty selects all supported channels, including Slack.
     pub channels: Vec<CorrespondenceChannel>,
     pub after: Option<String>,
     pub before: Option<String>,
@@ -47,7 +48,18 @@ impl ContactCorrespondenceResource {
         query: &CorrespondenceQuery,
     ) -> Result<ContactCorrespondence> {
         let mut params: Vec<(&str, String)> = Vec::new();
-        for channel in &query.channels {
+        let channels = if query.channels.is_empty() {
+            &[
+                CorrespondenceChannel::Email,
+                CorrespondenceChannel::Sms,
+                CorrespondenceChannel::IMessage,
+                CorrespondenceChannel::Calls,
+                CorrespondenceChannel::Slack,
+            ][..]
+        } else {
+            &query.channels
+        };
+        for channel in channels {
             params.push(("channels", channel.as_str().to_string()));
         }
         push_option(&mut params, "after", query.after.as_ref());
@@ -124,6 +136,11 @@ mod tests {
             when.method(GET)
                 .path("/api/v1/contacts/11111111-1111-1111-1111-111111111111/correspondence")
                 .query_param("channels", "email")
+                .matches(|request| {
+                    request.query_params.as_ref().is_some_and(|params| {
+                        params.iter().filter(|(key, _)| key == "channels").count() == 1
+                    })
+                })
                 .query_param("content", "full")
                 .query_param("order", "asc")
                 .query_param("identity_id", "22222222-2222-2222-2222-222222222222");
@@ -160,5 +177,33 @@ mod tests {
         mock.assert();
         assert!(result.items.is_empty());
         assert_eq!(result.channels[0].channel, CorrespondenceChannel::Email);
+    }
+
+    #[test]
+    fn default_correspondence_query_requests_all_five_channels() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/contacts/contact-1/correspondence")
+                .query_param("channels", "email")
+                .query_param("channels", "sms")
+                .query_param("channels", "imessage")
+                .query_param("channels", "calls")
+                .query_param("channels", "slack");
+            then.status(200).json_body(json!({
+                "contact_id": "11111111-1111-1111-1111-111111111111",
+                "identity_id": "22222222-2222-2222-2222-222222222222",
+                "items": [], "channels": [], "next_cursor": null,
+            }));
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        sdk.contacts()
+            .correspondence()
+            .get("contact-1", &CorrespondenceQuery::default())
+            .unwrap();
+        mock.assert();
     }
 }

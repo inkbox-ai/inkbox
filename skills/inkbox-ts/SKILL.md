@@ -1166,7 +1166,7 @@ await inkbox.contacts.facts.update(contact.id, fact.id, { kind: "profile" });
 if (facts[0]) await inkbox.contacts.facts.delete(contact.id, facts[0].id);  // admin only
 const history = await inkbox.contacts.correspondence.get(contact.id, {
   identityId: "identity-uuid",
-  channels: ["email", "sms"],
+  channels: ["email", "sms", "slack"],
 });
 const survivor = await inkbox.contacts.merge(contact.id, {
   losingContactIds: ["duplicate-contact-uuid"],
@@ -1517,6 +1517,13 @@ Use `inkbox.messageSends.lookup(...)` or `lookupEmail(...)` to recover a lost ID
 An unavailable result does not mean the original message was never sent.
 
 ## Slack
+
+In 0.7.14+, `client.slack.contactRules` manages directional person and workspace rules.
+Use `slackFilterMode` or separate `slackInboundFilterMode` /
+`slackOutboundFilterMode` identity updates for defaults. `importContacts` reads
+one page per call; follow its cursor. Rule writes,
+default changes and import require an organization admin key. Claimed
+agent keys can read their own rules. Import never grants messaging or Companion access.
 
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/typescript/README.md#slack) for implemented SDK/CLI methods.
 Use an existing identity. Select a workspace explicitly for live reads and mutations.

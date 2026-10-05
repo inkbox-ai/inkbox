@@ -194,7 +194,8 @@ export class IdentitiesResource {
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
-    for (const channel of ["mail", "phone"] as const) {
+    if (options.slackFilterMode !== undefined) body["slack_filter_mode"] = options.slackFilterMode;
+    for (const channel of ["mail", "phone", "slack"] as const) {
       const inbound = options[`${channel}InboundFilterMode`];
       const outbound = options[`${channel}OutboundFilterMode`];
       const shared = options[`${channel}FilterMode`] !== undefined
@@ -212,6 +213,14 @@ export class IdentitiesResource {
         : await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body, {
           headers: { "Idempotency-Key": options.idempotencyKey },
         });
+      const expected = Object.fromEntries(Object.entries(body).filter(([key]) => key.startsWith("slack_")));
+      if (expected.slack_filter_mode !== undefined) {
+        expected.slack_inbound_filter_mode = expected.slack_filter_mode;
+        expected.slack_outbound_filter_mode = expected.slack_filter_mode;
+      }
+      if (Object.entries(expected).some(([key, value]) => (data as unknown as Record<string, unknown>)[key] !== value)) {
+        throw new Error("Slack filter mode update was not confirmed by the API; ensure Slack contact rules are available before retrying");
+      }
       return parseAgentIdentityData(data);
     } catch (err) {
       if (err instanceof InkboxAPIError) throw mapIdentityConflictError(err);

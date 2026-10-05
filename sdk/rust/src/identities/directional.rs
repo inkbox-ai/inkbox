@@ -43,6 +43,9 @@ pub struct DirectionalAgentIdentitySummary {
     pub summary: AgentIdentitySummary,
     pub mail_inbound_filter_mode: FilterMode,
     pub mail_outbound_filter_mode: FilterMode,
+    pub slack_filter_mode: FilterMode,
+    pub slack_inbound_filter_mode: FilterMode,
+    pub slack_outbound_filter_mode: FilterMode,
     pub phone_inbound_filter_mode: FilterMode,
     pub phone_outbound_filter_mode: FilterMode,
     pub mailbox: Option<DirectionalChannel<IdentityMailbox>>,
@@ -83,6 +86,15 @@ impl<'de> Deserialize<'de> for DirectionalAgentIdentitySummary {
         Ok(Self {
             mail_inbound_filter_mode: mode("mail_inbound_filter_mode", summary.mail_filter_mode)?,
             mail_outbound_filter_mode: mode("mail_outbound_filter_mode", summary.mail_filter_mode)?,
+            slack_filter_mode: mode("slack_filter_mode", FilterMode::Blacklist)?,
+            slack_inbound_filter_mode: mode(
+                "slack_inbound_filter_mode",
+                mode("slack_filter_mode", FilterMode::Blacklist)?,
+            )?,
+            slack_outbound_filter_mode: mode(
+                "slack_outbound_filter_mode",
+                mode("slack_filter_mode", FilterMode::Blacklist)?,
+            )?,
             phone_inbound_filter_mode: mode(
                 "phone_inbound_filter_mode",
                 summary.phone_filter_mode,
@@ -108,6 +120,12 @@ impl Serialize for DirectionalAgentIdentitySummary {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut value = serde_json::to_value(&self.summary).map_err(serde::ser::Error::custom)?;
         for (key, mode) in [
+            ("slack_filter_mode", self.slack_filter_mode),
+            ("slack_inbound_filter_mode", self.slack_inbound_filter_mode),
+            (
+                "slack_outbound_filter_mode",
+                self.slack_outbound_filter_mode,
+            ),
             ("mail_inbound_filter_mode", self.mail_inbound_filter_mode),
             ("mail_outbound_filter_mode", self.mail_outbound_filter_mode),
             ("phone_inbound_filter_mode", self.phone_inbound_filter_mode),
@@ -140,6 +158,12 @@ impl DirectionalAgentIdentitySummary {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct IdentityFilterModeOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub slack_filter_mode: Option<FilterMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slack_inbound_filter_mode: Option<FilterMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slack_outbound_filter_mode: Option<FilterMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mail_filter_mode: Option<FilterMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phone_filter_mode: Option<FilterMode>,
@@ -157,9 +181,12 @@ pub struct IdentityFilterModeOptions {
 
 impl IdentityFilterModeOptions {
     pub(crate) fn validate(&self) -> crate::Result<()> {
-        if (self.mail_filter_mode.is_some()
-            && (self.mail_inbound_filter_mode.is_some()
-                || self.mail_outbound_filter_mode.is_some()))
+        if (self.slack_filter_mode.is_some()
+            && (self.slack_inbound_filter_mode.is_some()
+                || self.slack_outbound_filter_mode.is_some()))
+            || (self.mail_filter_mode.is_some()
+                && (self.mail_inbound_filter_mode.is_some()
+                    || self.mail_outbound_filter_mode.is_some()))
             || ((self.phone_filter_mode.is_some() || self.imessage_filter_mode.is_some())
                 && (self.phone_inbound_filter_mode.is_some()
                     || self.phone_outbound_filter_mode.is_some()))

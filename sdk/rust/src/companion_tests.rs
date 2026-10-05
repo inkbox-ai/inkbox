@@ -349,3 +349,40 @@ fn companion_sender_access_is_optional_and_rejects_unknown_values() {
         assert!(serde_json::from_value::<CompanionHistoryEntry>(value.clone()).is_err());
     }
 }
+
+#[test]
+fn slack_companion_reply_scope_preserves_routing_and_rejects_invalid_targets() {
+    for mutation in ["valid", "connection", "conversation", "thread", "channel"] {
+        let server = MockServer::start();
+        let mut page = json!({"scope_id":ACTIVATION,"activation_id":ACTIVATION,"conversation_id":ACTIVATION,"channel":"slack","items":[],"history_complete":true,"next_cursor":null,
+            "reply_context":{"channel":"slack","conversation_id":ACTIVATION,"connection_id":ACTIVATION,"slack_conversation_id":"CEXAMPLE","thread_ts":"1234.000100"}});
+        match mutation {
+            "connection" => page["reply_context"]["connection_id"] = Value::Null,
+            "conversation" => {
+                page["reply_context"]["slack_conversation_id"] = json!("person@example.com")
+            }
+            "thread" => page["reply_context"]["thread_ts"] = json!("1234oops"),
+            "channel" => page["reply_context"]["channel"] = json!("mail"),
+            _ => {}
+        }
+        let read = server.mock(|when, then| {
+            when.method(GET).path(PATH);
+            then.status(200).json_body(page);
+        });
+        let sdk = Inkbox::builder("synthetic")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let result =
+            sdk.companion()
+                .activation_messages("example-agent", ACTIVATION, &Default::default());
+        if mutation == "valid" {
+            let context = result.unwrap().reply_context;
+            assert_eq!(context.slack_conversation_id.as_deref(), Some("CEXAMPLE"));
+            assert_eq!(context.thread_ts.as_deref(), Some("1234.000100"));
+        } else {
+            assert!(result.is_err(), "{mutation}");
+        }
+        read.assert();
+    }
+}

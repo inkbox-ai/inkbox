@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.13"
+inkbox = "0.7.14"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.13", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.14", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -796,7 +796,7 @@ fields. Older servers can still return legacy resource owners.
 `client.companion()` provides `get`, `update`, `conversations`,
 `activation_messages`, and `load_initialization`. Configuration is off by
 default and administrator-managed, separate from whitelist/blacklist settings.
-Eligibility requires active exact email/number allow rules covering both
+Eligibility requires active exact email, number, or Slack-account allow rules covering both
 directions, either one Both rule or two applicable one-way allows. It is per
 normalized identifier and channel; phone and iMessage share one policy. Domain
 allowances, default access, contact visibility, and access borrowed from another
@@ -883,6 +883,18 @@ authority and must not trigger history loading.
 
 ## Slack
 
+Slack contact rules support exact people and home workspaces, with whitelist or
+blacklist defaults and optional per-direction settings. Import visible people
+into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.
+See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
+[contact import](https://inkbox.ai/docs/api/slack/contact-import) for version
+`0.7.14` examples.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `thread_ts` selects a reply thread; it does not limit sponsorship.
+
 ```rust,no_run
 use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};
 use uuid::Uuid;
@@ -946,7 +958,10 @@ After browser approval, list connections again to confirm `connected`.
 
 `client.slack()` also provides `list_provisioning_workspaces`, `save_provisioning_workspace`, `disconnect`,
 `list_conversations`, `open_conversation`, `get_conversation`, `list_messages`,
-`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). Pass
+`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). In 0.7.14+,
+`contact_rules` provides directional person/workspace rule CRUD; `import_contacts`
+returns one page per call. Rule writes, default changes, and import require an
+organization admin key. Import grants no messaging or Companion access. Pass
 `SlackPageOptions` / `SlackMessagesOptions` for pagination. Connections, saved workspaces,
 actions, file metadata, pages, and send options are public typed exports.
 
@@ -954,7 +969,7 @@ For webhook subscriptions use `create` / `update` with ordinary event selection.
 For mixed subscriptions use `update_with_scope` with
 `Some(WebhookSubscriptionScope::Identity)`.
 
-Rust Slack enums parse strictly: an unrecognized response or webhook value fails
+Most Rust Slack enums parse strictly: an unrecognized response or webhook value fails
 deserialization and may require an SDK update. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 

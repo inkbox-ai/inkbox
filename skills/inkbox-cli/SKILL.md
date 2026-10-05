@@ -739,6 +739,10 @@ inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <j
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
 
+Correspondence includes all five channels by default. Use `--channels slack` for
+retained messages authored by the contact's saved Slack accounts; it does not
+include every message in their channels.
+
 `inkbox contacts create` saves a matching suggested contact instead of failing:
 when an email or phone in the payload already belongs to an unreviewed contact,
 that contact is confirmed and printed with its memories and existing identifiers.
@@ -958,6 +962,13 @@ not guarantee delivery retries. Errors print the original request key. Do not
 submit a new message solely because confirmation is missing.
 
 ## Slack
+
+In 0.7.14+, use `slack contact-rule` for directional person/workspace rules
+and `slack contacts-import` for one import page. Follow returned cursors. `identity update` accepts
+`--slack-filter-mode` or separate `--slack-inbound-filter-mode` /
+`--slack-outbound-filter-mode`. Writes, default changes and import
+require an organization admin key; claimed agent keys can read their own rules.
+Import never grants messaging or Companion access.
 
 Identity-scoped Slack commands accept `-i/--identity <handle>` or
 `--identity-id <uuid>` (exactly one when supplied). Search can omit both with

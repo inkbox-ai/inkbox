@@ -376,9 +376,12 @@ class AgentIdentitySummary:
     mail_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
     phone_inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
     phone_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    slack_filter_mode: FilterMode = FilterMode.BLACKLIST
+    slack_inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    slack_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
-        for channel in ("mail", "phone"):
+        for channel in ("mail", "phone", "slack"):
             shared = getattr(self, f"{channel}_filter_mode")
             for side in ("inbound", "outbound"):
                 name = f"{channel}_{side}_filter_mode"
@@ -400,6 +403,9 @@ class AgentIdentitySummary:
         return cls(
             mail_inbound_filter_mode=d.get("mail_inbound_filter_mode"),
             mail_outbound_filter_mode=d.get("mail_outbound_filter_mode"),
+            slack_filter_mode=FilterMode(d.get("slack_filter_mode") or "blacklist"),
+            slack_inbound_filter_mode=d.get("slack_inbound_filter_mode"),
+            slack_outbound_filter_mode=d.get("slack_outbound_filter_mode"),
             phone_inbound_filter_mode=d.get("phone_inbound_filter_mode"),
             phone_outbound_filter_mode=d.get("phone_outbound_filter_mode"),
             id=UUID(d["id"]),

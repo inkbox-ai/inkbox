@@ -150,6 +150,9 @@ class IdentitiesResource:
         phone_filter_mode: str | None = None,
         mail_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         mail_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        slack_filter_mode: FilterMode | str | None = None,
+        slack_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        slack_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         phone_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         phone_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> _AgentIdentityData:
@@ -183,6 +186,9 @@ class IdentitiesResource:
                 identity's mail contact rules (admin-only).
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's phone contact rules (admin-only).
+            slack_filter_mode: Set both Slack directions (organization admin only).
+            slack_inbound_filter_mode: Effective receive mode for Slack.
+            slack_outbound_filter_mode: Effective send mode for Slack.
             mail_inbound_filter_mode: Effective receive mode for email.
             mail_outbound_filter_mode: Effective send mode for email.
             phone_inbound_filter_mode: Effective receive mode for phone/iMessage.
@@ -232,7 +238,10 @@ class IdentitiesResource:
             body["mail_filter_mode"] = mail_filter_mode
         if phone_filter_mode is not None:
             body["phone_filter_mode"] = phone_filter_mode
+        if slack_filter_mode is not None:
+            body["slack_filter_mode"] = FilterMode(slack_filter_mode).value
         for channel, inbound, outbound, shared in (
+            ("slack", slack_inbound_filter_mode, slack_outbound_filter_mode, slack_filter_mode),
             ("mail", mail_inbound_filter_mode, mail_outbound_filter_mode, mail_filter_mode),
             ("phone", phone_inbound_filter_mode, phone_outbound_filter_mode,
              phone_filter_mode if phone_filter_mode is not None else imessage_filter_mode),
@@ -259,6 +268,12 @@ class IdentitiesResource:
                 )
         except InkboxAPIError as err:
             raise map_identity_conflict_error(err) from err
+        expected = {key: value for key, value in body.items() if key.startswith("slack_")}
+        if "slack_filter_mode" in expected:
+            expected.update(slack_inbound_filter_mode=expected["slack_filter_mode"],
+                            slack_outbound_filter_mode=expected["slack_filter_mode"])
+        if any(data.get(key) != value for key, value in expected.items()):
+            raise ValueError("Slack filter mode update was not confirmed by the API; ensure Slack contact rules are available before retrying")
         return _AgentIdentityData._from_dict(data)
 
     def delete(self, agent_handle: str) -> None:

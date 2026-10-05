@@ -2,6 +2,7 @@
 inkbox — Python SDK for the Inkbox APIs.
 """
 
+from inkbox.slack_rules import SlackContactRule, SlackContactRulesResource, SlackRuleAction, SlackRuleMatchType
 from inkbox.slack_operations import (
     SlackOperation,
     SlackCapability,
@@ -26,6 +27,7 @@ from inkbox.slack_operations import (
 
 from inkbox.slack import (
     SlackResource,
+    SlackContactImportResponse,
     SlackConnection,
     SlackConnectionsResponse,
     SlackSetupStatus,
@@ -307,6 +309,7 @@ from inkbox.contacts.types import (
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
     SmsCorrespondenceItem,
+    SlackCorrespondenceItem,
 )
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceOptions
 
@@ -493,6 +496,7 @@ from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
 __all__ = [
+    "SlackContactRule", "SlackContactRulesResource", "SlackRuleAction", "SlackRuleMatchType",
     "SenderAccess",
     "DEFAULT_COMPANION_MAX_BYTES",
     "CompanionActivationPage",
@@ -537,6 +541,7 @@ __all__ = [
     "SlackOperationKind",
     # Slack
     "SlackResource",
+    "SlackContactImportResponse",
     "SlackConnection",
     "SlackConnectionsResponse",
     "SlackSetupStatus",
@@ -780,6 +785,7 @@ __all__ = [
     "EmailCorrespondenceItem",
     "IMessageCorrespondenceItem",
     "SmsCorrespondenceItem",
+    "SlackCorrespondenceItem",
     "CallCorrespondenceItem",
     # Notes types
     "Note",

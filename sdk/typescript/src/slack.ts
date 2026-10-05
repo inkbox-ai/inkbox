@@ -1,5 +1,6 @@
 /** Slack workspace setup, live reads, and durable sends. */
 import type { HttpTransport } from "./_http.js";
+import { SlackContactRulesResource } from "./slack-rules.js";
 import { SlackOperationsResource } from "./slack-operations.js";
 
 export type SlackMessageKind =
@@ -158,9 +159,31 @@ const action = (r: RawAction): SlackAction => ({
 const base = (id: string): string =>
   `/slack/connections/${encodeURIComponent(id)}`;
 
+export interface SlackContactImportOptions extends SlackPageOptions { conversationId?: string | null }
+export interface SlackContactImportResponse {
+  importedCount: number;
+  skippedCount: number;
+  contactIds: string[];
+  nextCursor: string | null;
+}
+
 export class SlackResource extends SlackOperationsResource {
+  readonly contactRules: SlackContactRulesResource;
   constructor(http: HttpTransport) {
     super(http);
+    this.contactRules = new SlackContactRulesResource(http);
+  }
+  /** Import one page of visible humans without creating contact rules.
+   * Requires an organization admin API key or Console session. */
+  async importContacts(connectionId: string, options: SlackContactImportOptions = {}): Promise<SlackContactImportResponse> {
+    const r = await this.http.post<{
+      imported_count: number; skipped_count: number; contact_ids: string[]; next_cursor: string | null;
+    }>(`${base(connectionId)}/contacts/import`, {
+      limit: options.limit ?? 100, cursor: options.cursor ?? undefined,
+      conversation_id: options.conversationId ?? undefined,
+    });
+    return { importedCount: r.imported_count, skippedCount: r.skipped_count,
+      contactIds: r.contact_ids, nextCursor: r.next_cursor };
   }
   /**
    * Claimed agent keys can install only their own identity.

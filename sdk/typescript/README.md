@@ -1851,7 +1851,7 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## Companion mode
 
 Companion mode is off by default, separate from whitelist/blacklist settings.
-Eligibility requires active exact email/number allow rules covering both
+Eligibility requires active exact email, number, or Slack-account allow rules covering both
 directions, either one Both rule or two applicable one-way allows. It is per
 normalized identifier and channel; phone and iMessage share one policy. Domain
 allowances, default access, contact visibility, and access borrowed from another
@@ -1935,6 +1935,18 @@ and route to a separate conversation-scoped session. Keep group history out of
 private contact sessions. Unknown notice codes/levels remain available to callers.
 
 ## Slack
+
+Slack contact rules support exact people and home workspaces, with whitelist or
+blacklist defaults and optional per-direction settings. Import visible people
+into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.
+See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
+[contact import](https://inkbox.ai/docs/api/slack/contact-import) for version
+`0.7.14` examples.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `threadTs` selects a reply thread; it does not limit sponsorship.
 
 ```typescript
 import { Inkbox } from "@inkbox/sdk";

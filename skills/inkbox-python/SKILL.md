@@ -1171,7 +1171,7 @@ if facts:
     inkbox.contacts.facts.delete(str(contact.id), str(facts[0].id))  # admin only
 history = inkbox.contacts.correspondence.get(
     str(contact.id),
-    ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms"]),
+    ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms", "slack"]),
 )
 survivor = inkbox.contacts.merge(
     str(contact.id), losing_contact_ids=["duplicate-contact-uuid"]
@@ -1501,6 +1501,13 @@ guarantee delivery retries. Recover a failed send's key with the public
 result as proof that submitting a second message is safe.
 
 ## Slack
+
+In 0.7.14+, `client.slack.contact_rules` manages directional person and workspace rules.
+Use `slack_filter_mode` or separate `slack_inbound_filter_mode` /
+`slack_outbound_filter_mode` identity updates for defaults. `import_contacts` reads
+one page per call; follow its cursor. Rule writes,
+default changes and import require an organization admin key. Claimed
+agent keys can read their own rules. Import never grants messaging or Companion access.
 
 See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/python/README.md#slack) for implemented SDK/CLI methods.
 Use an existing identity. Select a workspace explicitly for live reads and mutations.

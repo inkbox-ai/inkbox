@@ -389,6 +389,7 @@ export type {
   CorrespondenceTranscriptMode,
   EmailCorrespondenceItem,
   SmsCorrespondenceItem,
+  SlackCorrespondenceItem,
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
@@ -468,6 +469,7 @@ export { MessageSendsResource, getMessageRequestKey, type MessageSendLookupOptio
 
 export { SlackResource } from "./slack.js";
 export type {
+  SlackContactImportOptions, SlackContactImportResponse,
   SlackMessageKind,
   SlackConnection,
   SlackConnectionsResponse,
@@ -515,3 +517,5 @@ export type {
   SlackUploadFileOptions,
   SlackMutationOptions,
 } from "./slack-operations.js";
+
+export * from "./slack-rules.js";

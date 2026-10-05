@@ -2,14 +2,14 @@ import type { SenderAccess } from "./sender_access.js";
 import { HttpTransport } from "./_http.js";
 import { collectResponseNotices, parseResponseNotices, type ResponseNotice } from "./response_metadata.js";
 
-export type CompanionChannel = "mail" | "phone" | "imessage";
+export type CompanionChannel = "mail" | "phone" | "imessage" | "slack";
 export const DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024;
 
 export interface CompanionReadiness { ready: boolean; reasons: string[] }
 export interface CompanionConfig {
   enabled: boolean;
   configRevision: number;
-  readiness: Record<CompanionChannel, CompanionReadiness>;
+  readiness: Record<Exclude<CompanionChannel, "slack">, CompanionReadiness> & { slack?: CompanionReadiness };
   notices?: ResponseNotice[];
 }
 export interface CompanionUpdateOptions { enabled?: boolean }
@@ -39,6 +39,9 @@ export interface CompanionReplyContext {
   replyToMessageId?: string | null;
   to?: string[] | null;
   cc?: string[] | null;
+  connectionId?: string | null;
+  slackConversationId?: string | null;
+  threadTs?: string | null;
 }
 export interface CompanionActivationPage {
   scopeId: string;
@@ -77,6 +80,9 @@ export interface CompanionReplyContextWire {
   reply_to_message_id?: string | null;
   to?: string[] | null;
   cc?: string[] | null;
+  connection_id?: string | null;
+  slack_conversation_id?: string | null;
+  thread_ts?: string | null;
 }
 export interface CompanionMetadata {
   scope_id: string;
@@ -111,7 +117,7 @@ function uuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 }
 function channel(value: unknown): value is CompanionChannel {
-  return value === "mail" || value === "phone" || value === "imessage";
+  return value === "mail" || value === "phone" || value === "imessage" || value === "slack";
 }
 function object(value: unknown): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -135,6 +141,9 @@ function parsePage(data: any, activationId: string): CompanionActivationPage {
     || reply.conversation_id.toLowerCase() !== data.conversation_id.toLowerCase()) invalid();
   if (reply.reply_to_message_id != null && !uuid(reply.reply_to_message_id)) invalid();
   if (data.channel === "mail" && (!uuid(reply.reply_to_message_id) || (!reply.to?.length && !reply.cc?.length))) invalid();
+  if (data.channel === "slack" && (!uuid(reply.connection_id)
+    || typeof reply.slack_conversation_id !== "string" || !/^[CGD][A-Z0-9]+$/.test(reply.slack_conversation_id)
+    || (reply.thread_ts != null && (typeof reply.thread_ts !== "string" || !/^[0-9]+\.[0-9]+$/.test(reply.thread_ts))))) invalid();
   for (const key of ["to", "cc"]) {
     if (reply[key] != null && (!Array.isArray(reply[key]) || reply[key].some((v: unknown) => typeof v !== "string" || !v))) invalid();
   }
@@ -152,7 +161,9 @@ function parsePage(data: any, activationId: string): CompanionActivationPage {
   return { scopeId: data.scope_id.toLowerCase(), activationId: data.activation_id.toLowerCase(), conversationId: data.conversation_id.toLowerCase(),
     channel: data.channel, items, historyComplete: data.history_complete, nextCursor: data.next_cursor,
     replyContext: { channel: reply.channel, conversationId: reply.conversation_id.toLowerCase(),
-      replyToMessageId: reply.reply_to_message_id == null ? reply.reply_to_message_id : reply.reply_to_message_id.toLowerCase(), to: reply.to, cc: reply.cc },
+      replyToMessageId: reply.reply_to_message_id == null ? reply.reply_to_message_id : reply.reply_to_message_id.toLowerCase(), to: reply.to, cc: reply.cc,
+      ...(data.channel === "slack" ? { connectionId: reply.connection_id.toLowerCase(),
+        slackConversationId: reply.slack_conversation_id, threadTs: reply.thread_ts } : {}) },
     notices: parseResponseNotices(data.notices) };
 }
 

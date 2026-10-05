@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpTransport } from "../src/_http.js";
 import { ContactsResource } from "../src/contacts/resources/contacts.js";
+import type { SlackCorrespondenceItem } from "../src/index.js";
 
 const BASE = "https://inkbox.ai/api/v1";
 
@@ -233,6 +234,62 @@ describe("contact memory", () => {
     const call = result.items[3];
     expect(call.channel === "calls" && call.transcript?.[0].omittedTurns).toBe(3);
     expect(result.nextCursor).toBe("next-page");
+  });
+
+  it.each([
+    [undefined, ["email", "sms", "imessage", "calls", "slack"]],
+    [["slack"], ["slack"]],
+    [["email", "sms"], ["email", "sms"]],
+  ] as const)("selects correspondence channels without widening explicit subsets: %j", async (channels, expected) => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse({
+      contact_id: "contact-1", identity_id: "identity-1", items: [], channels: [], next_cursor: null,
+    }));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+    await resource.correspondence.get("contact-1", channels === undefined ? undefined : { channels: [...channels] });
+    const params = new URL(vi.mocked(fetch).mock.calls[0][0] as string).searchParams;
+    expect(params.getAll("channels")).toEqual(expected);
+  });
+
+  it.each([{}, { thread_ts: null, text: null, media: null, sender_access: null }, {
+    thread_ts: "1784548700.000001", text: "Hello", media: { count: 2 },
+    sender_access: "sponsored", text_truncated: true,
+  }])("parses Slack correspondence identifiers, content and nullable metadata: %j", async (optional) => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse({
+      contact_id: "contact-1", identity_id: "identity-1", channels: [], next_cursor: null,
+      items: [{
+        channel: "slack", source_id: "source-1", identity_id: "identity-1",
+        direction: "inbound", occurred_at: "2026-07-20T12:00:00Z", status: null, detail_url: null,
+        connection_id: "00000000-0000-4000-8000-000000000001",
+        conversation_id: "C123", workspace_id: "T123", user_id: "U123",
+        message_ts: "1784548800.123456", ...optional,
+      }],
+    }));
+    const result = await new ContactsResource(new HttpTransport("k", BASE)).correspondence.get("contact-1");
+    const item = result.items[0];
+    if (item.channel !== "slack") throw new Error("Expected Slack correspondence");
+    const slack: SlackCorrespondenceItem = item;
+    expect(slack).toMatchObject({
+      connectionId: "00000000-0000-4000-8000-000000000001",
+      conversationId: "C123", workspaceId: "T123", userId: "U123",
+      messageTs: "1784548800.123456", occurredAt: new Date("2026-07-20T12:00:00Z"),
+      threadTs: optional.thread_ts ?? null, text: optional.text ?? null,
+      textTruncated: optional.text_truncated ?? false,
+      media: optional.media ?? null, senderAccess: optional.sender_access ?? null,
+    });
+  });
+
+  it("preserves unavailable channel status and the retry cursor", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse({
+      contact_id: "contact-1", identity_id: "identity-1", items: [],
+      channels: [
+        { channel: "email", status: "available", returned: 0 },
+        { channel: "slack", status: "unavailable", returned: 0 },
+      ],
+      next_cursor: "retry-page",
+    }));
+    const result = await new ContactsResource(new HttpTransport("k", BASE)).correspondence.get("contact-1");
+    expect(result.channels.map((channel) => channel.status)).toEqual(["available", "unavailable"]);
+    expect(result.nextCursor).toBe("retry-page");
   });
 
   it("supports fact deletion, citation URLs, bulk deletion, and batch export", async () => {
