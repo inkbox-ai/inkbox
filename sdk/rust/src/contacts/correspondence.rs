@@ -86,6 +86,7 @@ pub enum CorrespondenceChannelStatus {
     Available,
     NoIdentifier,
     NoResource,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -332,6 +333,30 @@ mod tests {
             serde_json::from_value(cases[3].clone()).unwrap(),
             CorrespondenceItem::Calls(_)
         ));
+    }
+
+    #[test]
+    fn preserves_unavailable_channel_status_and_retry_cursor() {
+        let result: crate::contacts::ContactCorrespondence = serde_json::from_value(json!({
+            "contact_id": "11111111-1111-1111-1111-111111111111",
+            "identity_id": "22222222-2222-2222-2222-222222222222",
+            "items": [],
+            "channels": [
+                {"channel": "email", "status": "available", "returned": 0},
+                {"channel": "slack", "status": "unavailable", "returned": 0}
+            ],
+            "next_cursor": "retry-page"
+        }))
+        .unwrap();
+        assert_eq!(
+            result.channels[0].status,
+            super::CorrespondenceChannelStatus::Available
+        );
+        assert_eq!(
+            result.channels[1].status,
+            super::CorrespondenceChannelStatus::Unavailable
+        );
+        assert_eq!(result.next_cursor.as_deref(), Some("retry-page"));
     }
 
     #[test]

@@ -4,7 +4,7 @@ export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "sl
 export type CorrespondenceContentMode = "metadata" | "preview" | "full";
 export type CorrespondenceTranscriptMode = "none" | "abridged" | "full";
 export type CorrespondenceOrder = "asc" | "desc";
-export type CorrespondenceChannelStatus = "available" | "no_identifier" | "no_resource";
+export type CorrespondenceChannelStatus = "available" | "no_identifier" | "no_resource" | "unavailable";
 export type CorrespondenceDirection = "inbound" | "outbound";
 
 export interface CorrespondenceMediaMetadata {

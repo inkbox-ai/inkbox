@@ -453,6 +453,7 @@ class CorrespondenceChannelStatus(StrEnum):
     AVAILABLE = "available"
     NO_IDENTIFIER = "no_identifier"
     NO_RESOURCE = "no_resource"
+    UNAVAILABLE = "unavailable"
 
 
 class CorrespondenceDirection(StrEnum):

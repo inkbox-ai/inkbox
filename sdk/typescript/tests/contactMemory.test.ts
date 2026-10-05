@@ -278,6 +278,20 @@ describe("contact memory", () => {
     });
   });
 
+  it("preserves unavailable channel status and the retry cursor", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse({
+      contact_id: "contact-1", identity_id: "identity-1", items: [],
+      channels: [
+        { channel: "email", status: "available", returned: 0 },
+        { channel: "slack", status: "unavailable", returned: 0 },
+      ],
+      next_cursor: "retry-page",
+    }));
+    const result = await new ContactsResource(new HttpTransport("k", BASE)).correspondence.get("contact-1");
+    expect(result.channels.map((channel) => channel.status)).toEqual(["available", "unavailable"]);
+    expect(result.nextCursor).toBe("retry-page");
+  });
+
   it("supports fact deletion, citation URLs, bulk deletion, and batch export", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(makeOkResponse({

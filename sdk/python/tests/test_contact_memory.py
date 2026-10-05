@@ -15,6 +15,7 @@ from inkbox.contacts.types import (
     ContactImportResult,
     ContactReviewStatus,
     CorrespondenceChannel,
+    CorrespondenceChannelStatus,
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
     SmsCorrespondenceItem,
@@ -429,6 +430,22 @@ def test_correspondence_default_channels_and_explicit_subsets(channels, expected
     options = None if channels is None else ContactCorrespondenceOptions(channels=channels)
     ContactsResource(transport).correspondence.get(CONTACT_ID, options)
     assert transport.get.call_args.kwargs["params"]["channels"] == expected
+
+
+def test_correspondence_preserves_unavailable_channel_status_and_retry_cursor():
+    transport = MagicMock()
+    transport.get.return_value = {
+        "contact_id": CONTACT_ID, "identity_id": IDENTITY_ID, "items": [],
+        "channels": [
+            {"channel": "email", "status": "available", "returned": 0},
+            {"channel": "slack", "status": "unavailable", "returned": 0},
+        ],
+        "next_cursor": "retry-page",
+    }
+    result = ContactsResource(transport).correspondence.get(CONTACT_ID)
+    assert result.channels[0].status is CorrespondenceChannelStatus.AVAILABLE
+    assert result.channels[1].status is CorrespondenceChannelStatus.UNAVAILABLE
+    assert result.next_cursor == "retry-page"
 
 
 @pytest.mark.parametrize("optional", [{}, {

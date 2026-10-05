@@ -13,13 +13,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Configure Slack whitelist/blacklist defaults and directional contact or workspace rules.
 - Import visible Slack people into contacts with explicit pagination and organization admin authority.
 - Use Slack with Companion configuration, scoped initialization, and webhook metadata.
-- Read contact-authored Slack correspondence alongside other channels. SDK and CLI
-  correspondence requests select all five channels by default; explicit channel
-  subsets remain unchanged.
+- Read contact-authored Slack correspondence alongside other channels.
 - Advance SDK, CLI, and bundled Claude plugin versions to `0.7.14`, with the Codex plugin at `0.1.13`.
 
 ### Changed
 
+- SDK and CLI correspondence requests select all five channels by default;
+  explicit channel subsets remain unchanged.
+- Correspondence channel summaries support `unavailable` when a temporary Slack
+  failure leaves other channels readable without advancing the Slack paging position.
 - **Source compatibility:** Rust `CompanionChannel`, `CorrespondenceChannel`, and
   `CorrespondenceItem` add `Slack`, so exhaustive matches must handle the new
   variant. Slack fields are also added to existing
@@ -31,9 +33,13 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `inkbox = "0.7"` dependency range. Review and adapt before upgrading; pin an
   exact previous version until ready. Existing legacy identity models and
   method signatures remain unchanged.
+- Rust `CorrespondenceChannelStatus` adds `Unavailable`; exhaustive matches must
+  handle the new variant.
 - TypeScript `CompanionChannel` and `CorrespondenceChannel` now include `"slack"`,
   and `CorrespondenceItem` includes `SlackCorrespondenceItem`; exhaustive switches
   and channel-keyed records may need a Slack case.
+- TypeScript `CorrespondenceChannelStatus` adds `"unavailable"`; exhaustive switches
+  and status-keyed records may need the new case.
 - Python, TypeScript, and Rust Slack mode updates raise an error when the API
   response does not confirm the requested modes. Other fields in the same
   update may already have been saved.
