@@ -18,6 +18,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Slack Companion sponsorship covers the whole channel or group DM, including
+  every thread. New participants or sponsor departure require fresh sponsorship;
+  other departures alone do not. Optional reply-thread coordinates still select
+  where to reply, and explicit blocks still apply.
 - SDK and CLI correspondence requests select all five channels by default;
   explicit channel subsets remain unchanged.
 - Correspondence channel summaries support `unavailable` when a temporary Slack

@@ -796,7 +796,7 @@ fields. Older servers can still return legacy resource owners.
 `client.companion()` provides `get`, `update`, `conversations`,
 `activation_messages`, and `load_initialization`. Configuration is off by
 default and administrator-managed, separate from whitelist/blacklist settings.
-Eligibility requires active exact email/number allow rules covering both
+Eligibility requires active exact email, number, or Slack-account allow rules covering both
 directions, either one Both rule or two applicable one-way allows. It is per
 normalized identifier and channel; phone and iMessage share one policy. Domain
 allowances, default access, contact visibility, and access borrowed from another
@@ -889,6 +889,11 @@ into real contact cards and use Slack with Companion mode. Importing a contact d
 See [Slack contact rules](https://inkbox.ai/docs/api/slack/contact-rules) and
 [contact import](https://inkbox.ai/docs/api/slack/contact-import) for version
 `0.7.14` examples.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `thread_ts` selects a reply thread; it does not limit sponsorship.
 
 ```rust,no_run
 use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};

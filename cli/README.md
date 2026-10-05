@@ -19,7 +19,7 @@ Requires Node.js >= 22.
 ## Companion mode
 
 Companion mode is off by default, separate from whitelist/blacklist settings.
-Eligibility requires active exact email/number allow rules covering both
+Eligibility requires active exact email, number, or Slack-account allow rules covering both
 directions, either one Both rule or two applicable one-way allows. It is per
 normalized identifier and channel; phone and iMessage share one policy. Domain
 allowances, default access, contact visibility, and access borrowed from another
@@ -1337,3 +1337,8 @@ inkbox identity companion update example-agent --enabled true
 Import fetches one page. Follow `nextCursor`, including after an empty
 page, to continue. Import does not create allow rules. Workspace rules match a
 person's verified home workspace; they do not sponsor Companion conversations.
+
+Slack sponsorship covers the channel or group DM, including all its threads.
+A new participant joining or the sponsor leaving requires fresh sponsorship;
+another participant leaving alone does not. Explicit blocks still apply.
+Optional `threadTs` in reply context selects a reply thread; it does not limit sponsorship.
