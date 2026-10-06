@@ -31,6 +31,9 @@ def test_expanded_page_keeps_unknown_counts_and_partial_rosters(wire):
         "limit": "25", "cursor": "previous"}
     message = result.messages[0]
     assert message.reply_count == 3 and message.latest_reply == "1789552801.000100"
+    assert message.bot_id == "B123" and message.subtype == "bot_message"
+    assert message.edited_ts == "1789552800.500100" and message.sender_access == "direct"
+    assert message.attachments[0]["image_url"] == "https://example.com/preview.png"
     assert isinstance(message.reactions[0], SlackCachedReaction)
     assert message.reactions[0].count is None and message.reactions[0].reacted is None
     assert message.reactions[1].count == 0 and message.reactions[1].reacted is False
@@ -40,6 +43,12 @@ def test_expanded_page_keeps_unknown_counts_and_partial_rosters(wire):
     assert isinstance(actor, SlackCachedActor) and isinstance(actor.fetched_at, datetime)
     assert result.included.conversations["C123"].name is None
     assert result.included.conversations["C123"].members_complete is False
+    assert result.included.conversations["C123"].topic == "Release notes"
+    assert result.included.conversations["C123"].purpose == "Project updates"
+    assert result.included.conversations["C123"].is_private is True
+    assert result.included.conversations["C123"].is_archived is False
+    assert result.included.conversations["C123"].counterpart_user_id is None
+    assert actor.deleted is False and actor.avatar_cached is True
     assert result.included.emoji["celebrate"].alias_of == "party"
     assert result.included.files["F123"].content_cached and result.included.files["F123"].preview_url
     assert result.next_cursor == "opaque-next" and len(requests) == 1
@@ -70,6 +79,7 @@ def test_cached_emoji_does_not_auto_paginate_or_confuse_aliases(wire):
 
 @pytest.mark.parametrize("method,arguments,path", [
     ("download_cached_media", ("emoji", "party+"), "/cached-media/emoji/party+"),
+    ("download_cached_media", ("emoji", "celebrate"), "/cached-media/emoji/celebrate"),
     ("download_file_preview", ("F123",), "/files/F123/preview"),
 ])
 def test_cached_binary_methods_preserve_bytes_and_authentication(wire, method, arguments, path):

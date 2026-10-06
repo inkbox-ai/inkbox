@@ -18,10 +18,10 @@
         "mentioned": false,
         "source": "event",
         "captured_at": "2026-09-16T10:00:00Z",
-        "bot_id": null,
+        "bot_id": "B123",
         "sender_access": "direct",
-        "subtype": null,
-        "edited_ts": null,
+        "subtype": "bot_message",
+        "edited_ts": "1789552800.500100",
         "reply_count": 3,
         "latest_reply": "1789552801.000100",
         "blocks": [
@@ -69,7 +69,12 @@
           ],
           "members_complete": false,
           "status": "ready",
-          "fetched_at": "2026-09-16T10:00:00Z"
+          "fetched_at": "2026-09-16T10:00:00Z",
+          "topic": "Release notes",
+          "purpose": "Project updates",
+          "counterpart_user_id": null,
+          "is_archived": false,
+          "is_private": true
         }
       },
       "actors": {
@@ -80,7 +85,8 @@
           "avatar_url": "/api/v1/slack/connections/22222222-2222-4222-8222-222222222222/cached-media/user/U123?v=example",
           "avatar_cached": true,
           "status": "ready",
-          "fetched_at": "2026-09-16T10:00:00Z"
+          "fetched_at": "2026-09-16T10:00:00Z",
+          "deleted": false
         }
       },
       "emoji": {

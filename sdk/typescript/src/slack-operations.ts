@@ -135,7 +135,7 @@ export interface SlackArchiveCoverageResponse {
 export interface SlackArchiveMessagesOptions extends SlackPageOptions {
   /** Return the latest matching message per conversation; limit counts conversations. */
   latestPerConversation?: boolean;
-  /** Exclude ordinary thread replies from the main timeline page size. */
+  /** Page roots, broadcasts, and retained replies whose root is unavailable. */
   rootsOnly?: boolean;
   include?: SlackArchiveInclude[];
   conversationId?: string;

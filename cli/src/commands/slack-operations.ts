@@ -283,7 +283,7 @@ export function registerSlackOperationCommands(
     filters(archive.command("messages"))
       .option("--thread-ts <timestamp>", "Thread filter (requires conversation)")
       .option("--latest-per-conversation", "Return one latest message per conversation")
-      .option("--roots-only", "Page roots and thread broadcasts without ordinary replies")
+      .option("--roots-only", "Page roots, broadcasts, and replies whose root is unavailable")
       .option("--include <expansions>", "Comma-separated conversation,sender,reactions,files", includes),
     (s, o) => s.listArchivedMessages(o.connectionId, o),
   );
@@ -301,13 +301,19 @@ export function registerSlackOperationCommands(
       await writeFile(o.output, bytes, { flag: "wx", mode: 0o600 });
       return { path: o.output, bytes: bytes.length };
     });
-  action(connection(groups.files.command("preview"))
-    .requiredOption("--file-id <id>", "Slack file ID")
-    .requiredOption("--output <path>", "New output path; never overwritten"), async (s, o) => {
-      const bytes = await s.downloadFilePreview(o.connectionId, o.fileId);
+  connection(groups.files.command("preview [file-id]"))
+    .description("Download a cached file preview")
+    .option("--file-id <id>", "Alternative to the positional file ID")
+    .requiredOption("--output <path>", "New output path; never overwritten")
+    .action(withErrorHandler(async function (this: Command, fileId: string | undefined, o: Args) {
+      if (fileId && o.fileId) throw new InvalidArgumentError("Pass either a positional file ID or --file-id, not both");
+      const id = fileId ?? o.fileId;
+      if (!id) throw new InvalidArgumentError("A file ID is required");
+      const opts = getGlobalOpts(this);
+      const bytes = await createClient(opts).slack.downloadFilePreview(o.connectionId, id);
       await writeFile(o.output, bytes, { flag: "wx", mode: 0o600 });
-      return { path: o.output, bytes: bytes.length };
-    });
+      output({ path: o.output, bytes: bytes.length }, { json: !!opts.json });
+    }));
   action(
     filters(archive.command("search"))
       .requiredOption("--q <query>", "Retained message text query")

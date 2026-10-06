@@ -226,6 +226,7 @@ fn emoji_search_and_media_use_one_authenticated_request_each() {
     mock.assert_hits(1);
     for (path, preview) in [
         ("cached-media/emoji/party%2B", false),
+        ("cached-media/emoji/celebrate", false),
         ("files/F123/preview", true),
     ] {
         let mock = server.mock(|when, then| {
@@ -237,11 +238,67 @@ fn emoji_search_and_media_use_one_authenticated_request_each() {
         let bytes = if preview {
             client.slack().download_file_preview(id, "F123")
         } else {
-            client
-                .slack()
-                .download_cached_media(id, SlackCachedMediaKind::Emoji, "party+")
+            client.slack().download_cached_media(
+                id,
+                SlackCachedMediaKind::Emoji,
+                if path.ends_with("celebrate") {
+                    "celebrate"
+                } else {
+                    "party+"
+                },
+            )
         };
         assert_eq!(bytes.unwrap(), vec![0u8, 255, 1]);
         mock.assert_hits(1);
     }
+}
+
+#[test]
+fn enriched_response_preserves_every_supplied_display_field() {
+    // Compare the wire fixture recursively, including rich-content field names.
+    fn assert_fields(expected: &Value, actual: &Value) {
+        match expected {
+            Value::Object(fields) => {
+                for (name, value) in fields {
+                    assert_fields(value, &actual[name]);
+                }
+            }
+            Value::Array(items) => {
+                assert_eq!(items.len(), actual.as_array().unwrap().len());
+                for (index, value) in items.iter().enumerate() {
+                    assert_fields(value, &actual[index]);
+                }
+            }
+            _ => assert_eq!(expected, actual),
+        }
+    }
+    let data = fixture();
+    let parsed: SlackEnrichedArchiveMessagesResponse =
+        serde_json::from_value(data["page"].clone()).unwrap();
+    assert_fields(&data["page"], &serde_json::to_value(parsed).unwrap());
+}
+
+#[test]
+fn legacy_values_can_be_wrapped_without_constructing_response_literals() {
+    let data = fixture();
+    let legacy: SlackArchivedMessage =
+        serde_json::from_value(data["page"]["messages"][0].clone()).unwrap();
+    let enriched = SlackEnrichedArchivedMessage::from(legacy.clone());
+    assert_eq!(enriched.message.id, legacy.id);
+    assert_eq!(enriched.text, legacy.text);
+    assert!(enriched.reply_count.is_none());
+    assert!(enriched.reactions.is_none());
+    assert!(enriched.sender_access.is_none());
+    let raw: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/slack.json")).unwrap();
+    let legacy: SlackConnection = serde_json::from_value(raw["connection"].clone()).unwrap();
+    let enriched = SlackEnrichedConnection::from(legacy.clone());
+    assert_eq!(enriched.id, legacy.id);
+    assert!(enriched.generation.is_none());
+    let mut included = SlackArchiveIncluded::default();
+    included.files.insert(
+        "F123".into(),
+        serde_json::from_value(data["page"]["included"]["files"]["F123"].clone()).unwrap(),
+    );
+    assert!(included.files["F123"].content_cached);
 }

@@ -42,8 +42,15 @@ test("cached archive, emoji and byte commands preserve scopes, state and output 
     const invalid = await run([...globals, "archive", "messages", ...conn, "--include", "unsupported"]);
     assert.notEqual(invalid.error, null);
     assert.equal(requests.length, 2);
+    const beforeInvalid = requests.length;
+    for (const ids of [[], ["F123", "--file-id", "FOTHER"]]) {
+      const invalidPreview = await run([...globals, "file", "preview", ...ids, ...conn, "--output", path.join(dir, "invalid")]);
+      assert.notEqual(invalidPreview.error, null);
+      assert.equal(requests.length, beforeInvalid);
+    }
     for (const [name, command] of [["avatar", ["cached-media-download", "--kind", "user", "--resource-id", "U123"]],
-      ["preview", ["file", "preview", "--file-id", "F123"]]]) {
+      ["preview", ["file", "preview", "F123"]],
+      ["preview-flag", ["file", "preview", "--file-id", "F123"]]]) {
       const destination = path.join(dir, name);
       result = await run([...globals, ...command, ...conn, "--output", destination]);
       assert.equal(result.error, null, result.stderr);

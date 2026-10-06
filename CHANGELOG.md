@@ -24,7 +24,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   unchanged. Use `list_enriched_connections` and `list_enriched_archived_messages`
   with additive `SlackEnriched*` types to access installation generations and
   cached archive context. Enriched archive options embed the existing
-  `SlackArchiveMessagesOptions` for filters and pagination.
+  `SlackArchiveMessagesOptions` for filters and pagination. New cached response
+  types are non-exhaustive; legacy values can be wrapped with `From`.
+- `slack file preview <file-id>` accepts a positional file ID, consistent with
+  other file commands. The `--file-id` alternative remains supported.
 
 
 ## 0.7.14 - Slack contact rules (unreleased)

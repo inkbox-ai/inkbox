@@ -23,12 +23,16 @@ it("preserves unknown and zero counts, typed maps, raw rich content and exact ex
   expect(Object.fromEntries(new URL(String(fetch.mock.calls[0][0])).searchParams)).toEqual({
     roots_only: "true", include: "conversation,sender,reactions,files", limit: "25", cursor: "previous",
   });
-  expect(page.messages[0]).toMatchObject({ replyCount: 3, latestReply: "1789552801.000100", reactionsComplete: false,
+  expect(page.messages[0]).toMatchObject({ botId: "B123", subtype: "bot_message",
+    editedTs: "1789552800.500100", senderAccess: "direct",
+    attachments: [{ title: "Release notes", image_url: "https://example.com/preview.png" }], replyCount: 3, latestReply: "1789552801.000100", reactionsComplete: false,
     reactions: [{ count: null, reacted: null, usersComplete: false }, { count: 0, reacted: false, usersComplete: true }] });
   expect(page.messages[0].blocks?.[0].block_id).toBe("keep_snake_case");
   const actor: SlackCachedActor | undefined = page.included?.actors.U123;
   expect(actor?.fetchedAt).toBeInstanceOf(Date);
-  expect(page.included?.conversations.C123).toMatchObject({ name: null, membersComplete: false });
+  expect(actor).toMatchObject({ deleted: false, avatarCached: true });
+  expect(page.included?.conversations.C123).toMatchObject({ name: null, membersComplete: false, topic: "Release notes", purpose: "Project updates",
+    counterpartUserId: null, isArchived: false, isPrivate: true });
   expect(page.included?.emoji.celebrate.aliasOf).toBe("party");
   expect(page.included?.files.F123.previewUrl).toContain("/files/F123/preview");
   expect(page.nextCursor).toBe("opaque-next");
@@ -56,6 +60,8 @@ it("downloads cached media and file previews as authenticated bytes", async () =
   const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
   expect(await client.slack.downloadCachedMedia(C, "emoji", "party+")).toEqual(new Uint8Array([0, 255, 1]));
   expect(await client.slack.downloadFilePreview(C, "F123")).toEqual(new Uint8Array([0, 255, 1]));
+  expect(await client.slack.downloadCachedMedia(C, "emoji", "celebrate")).toEqual(new Uint8Array([0, 255, 1]));
+  expect(new URL(String(fetch.mock.calls[2][0])).pathname).toBe(`/api/v1/slack/connections/${C}/cached-media/emoji/celebrate`);
   expect(new URL(String(fetch.mock.calls[0][0])).pathname).toBe(`/api/v1/slack/connections/${C}/cached-media/emoji/party%2B`);
   expect(new Headers(fetch.mock.calls[0][1]?.headers).get("X-API-Key")).toBe("synthetic-test-key");
   expect(new URL(String(fetch.mock.calls[1][0])).pathname).toBe(`/api/v1/slack/connections/${C}/files/F123/preview`);

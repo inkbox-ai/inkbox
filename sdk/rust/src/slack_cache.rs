@@ -14,11 +14,20 @@ use uuid::Uuid;
 
 /// Connection metadata plus the optional installation version used by display caches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackEnrichedConnection {
     #[serde(flatten)]
     pub connection: SlackConnection,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generation: Option<u64>,
+}
+impl From<SlackConnection> for SlackEnrichedConnection {
+    fn from(connection: SlackConnection) -> Self {
+        Self {
+            connection,
+            generation: None,
+        }
+    }
 }
 impl std::ops::Deref for SlackEnrichedConnection {
     type Target = SlackConnection;
@@ -27,6 +36,7 @@ impl std::ops::Deref for SlackEnrichedConnection {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackEnrichedConnectionsResponse {
     pub connections: Vec<SlackEnrichedConnection>,
     pub installation_available: bool,
@@ -39,6 +49,7 @@ pub struct SlackEnrichedConnectionsResponse {
 }
 /// Retained message with optional display context, leaving legacy message literals unchanged.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackEnrichedArchivedMessage {
     #[serde(flatten)]
     pub message: SlackArchivedMessage,
@@ -67,6 +78,23 @@ pub struct SlackEnrichedArchivedMessage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reactions_complete: Option<bool>,
 }
+impl From<SlackArchivedMessage> for SlackEnrichedArchivedMessage {
+    fn from(message: SlackArchivedMessage) -> Self {
+        Self {
+            message,
+            sender_access: None,
+            bot_id: None,
+            subtype: None,
+            edited_ts: None,
+            reply_count: None,
+            blocks: None,
+            attachments: None,
+            latest_reply: None,
+            reactions: None,
+            reactions_complete: None,
+        }
+    }
+}
 impl std::ops::Deref for SlackEnrichedArchivedMessage {
     type Target = SlackArchivedMessage;
     fn deref(&self) -> &Self::Target {
@@ -74,6 +102,7 @@ impl std::ops::Deref for SlackEnrichedArchivedMessage {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackEnrichedArchiveMessagesResponse {
     pub messages: Vec<SlackEnrichedArchivedMessage>,
     pub next_cursor: Option<String>,
@@ -87,6 +116,7 @@ pub struct SlackEnrichedArchiveMessagesResponse {
 #[derive(Debug, Clone, Default)]
 pub struct SlackEnrichedArchiveMessagesOptions {
     pub archive: SlackArchiveMessagesOptions,
+    /// Page roots, broadcasts, and retained replies whose root is unavailable.
     pub roots_only: Option<bool>,
     pub include: Option<Vec<SlackArchiveInclude>>,
 }
@@ -118,18 +148,21 @@ pub enum SlackCachedMediaKind {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum SlackCachedActorKind {
     User,
     Bot,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum SlackCachedConversationType {
     Im,
     Mpim,
     Channel,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedActor {
     pub id: String,
     pub kind: SlackCachedActorKind,
@@ -142,6 +175,7 @@ pub struct SlackCachedActor {
     pub fetched_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedConversation {
     pub id: String,
     pub name: Option<String>,
@@ -159,6 +193,7 @@ pub struct SlackCachedConversation {
     pub fetched_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedEmoji {
     pub name: String,
     pub alias_of: Option<String>,
@@ -168,6 +203,7 @@ pub struct SlackCachedEmoji {
     pub status: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedFile {
     pub id: String,
     pub name: Option<String>,
@@ -184,6 +220,7 @@ pub struct SlackCachedFile {
 }
 /// Unknown totals stay None; known users need not be the complete actor set.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedReaction {
     pub name: String,
     pub count: Option<u64>,
@@ -194,6 +231,7 @@ pub struct SlackCachedReaction {
     pub reacted: Option<bool>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackArchiveIncluded {
     #[serde(default)]
     pub conversations: HashMap<String, SlackCachedConversation>,
@@ -205,6 +243,7 @@ pub struct SlackArchiveIncluded {
     pub files: HashMap<String, SlackCachedFile>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SlackCachedEmojiPage {
     pub emoji: Vec<SlackCachedEmoji>,
     pub next_cursor: Option<String>,
