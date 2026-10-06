@@ -2002,9 +2002,9 @@ reaction and thread counts are not zero; a known count does not imply a complete
 list of reacting users. Keep display caches separate by connection and invalidate
 them when its optional `generation` changes. Emoji aliases name another definition.
 The byte methods authenticate against Inkbox; do not forward your API key to
-fallback image URLs. Cached image and preview reads return `404` when no copy is
-available, or `503` with `Retry-After` during temporary storage failures or repair.
-Honor that delay before retrying. Emoji image downloads accept alias names and
+fallback image URLs. Cached image and preview reads return `404` when no copy exists
+and no capture is queued. Queued or running capture/repair and temporary storage
+failures return `503` with `Retry-After`. Honor that delay before retrying. Emoji image downloads accept alias names and
 resolve them within the selected connection. Existing live methods and mutation
 idempotency are unchanged.
 
