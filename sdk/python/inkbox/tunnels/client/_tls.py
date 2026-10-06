@@ -25,7 +25,13 @@ def create_default_verify_context() -> ssl.SSLContext:
     ``SSL_CERT_FILE`` still wins.
     """
     ctx = ssl.create_default_context()
-    if ctx.cert_store_stats().get("x509_ca", 0) == 0:
+    try:
+        empty_store = ctx.cert_store_stats().get("x509_ca", 0) == 0
+    except NotImplementedError:
+        # ``truststore.SSLContext`` (injected via ``truststore.inject_into_ssl()``)
+        # verifies against the platform store and does not expose store stats.
+        empty_store = False
+    if empty_store:
         try:
             import certifi
 
