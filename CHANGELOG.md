@@ -6,6 +6,30 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
+## 0.7.15 - Cached Slack history context (unreleased)
+
+### Added
+
+- Read retained Slack messages with optional cached conversation, sender, reaction,
+  and file context; page main timelines separately from ordinary thread replies.
+- Search paginated custom emoji definitions, read cached avatars and emoji images,
+  and download available file previews with authenticated SDK and CLI methods.
+- Preserve reaction completeness, unknown counts, thread summaries, rich message
+  content, file-copy availability, and connection generation in typed responses.
+
+### Compatibility
+
+- Existing calls keep their query defaults and accept responses without new fields.
+- Existing Rust structs, exhaustive literals, methods, and request defaults stay
+  unchanged. Use `list_enriched_connections` and `list_enriched_archived_messages`
+  with additive `SlackEnriched*` types to access installation generations and
+  cached archive context. Enriched archive options embed the existing
+  `SlackArchiveMessagesOptions` for filters and pagination. New cached response
+  types are non-exhaustive; legacy values can be wrapped with `From`.
+- `slack file preview <file-id>` accepts a positional file ID, consistent with
+  other file commands. The `--file-id` alternative remains supported.
+
+
 ## 0.7.14 - Slack contact rules (unreleased)
 
 ### Added

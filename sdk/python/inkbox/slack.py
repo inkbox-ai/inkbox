@@ -26,6 +26,7 @@ class SlackConnection:
     status: Literal["connected", "disconnected", "reauthorization_required"]
     scopes: list[str]
     created_at: datetime
+    generation: int | None = None
 
 
 @dataclass

@@ -8,6 +8,11 @@ from urllib.parse import quote
 from uuid import UUID
 
 from inkbox._http import HttpTransport
+from inkbox.sender_access import SenderAccess
+from inkbox.slack_cache import (
+    SlackArchiveInclude, SlackArchiveIncluded, SlackCachedEmoji, SlackCachedEmojiPage,
+    SlackCachedMediaKind, SlackCachedReaction, _cached, _included,
+)
 
 SlackProcessingStatus = Literal["active", "processing", "suspended", "closed"]
 SlackOperationKind = Literal[
@@ -118,6 +123,16 @@ class SlackArchivedMessage:
     mentioned: bool
     source: Literal["event", "backfill", "action"]
     captured_at: datetime
+    sender_access: SenderAccess | None = None
+    bot_id: str | None = None
+    subtype: str | None = None
+    edited_ts: str | None = None
+    reply_count: int | None = None
+    blocks: list[dict[str, Any]] | None = None
+    attachments: list[dict[str, Any]] | None = None
+    latest_reply: str | None = None
+    reactions: list[SlackCachedReaction] | None = None
+    reactions_complete: bool | None = None
 
 
 @dataclass
@@ -134,6 +149,7 @@ class SlackArchiveMessagesResponse:
     next_cursor: str | None = None
     source: Literal["archive"] = "archive"
     page_boundary: SlackArchivePageBoundary | None = None
+    included: SlackArchiveIncluded | None = None
 
 
 @dataclass
@@ -508,11 +524,16 @@ class SlackOperationsMixin:
         for key in ("thread_ts", "before_ts", "after_ts"):
             _timestamp(params.get(key))
         raw = self._http.get(path, params=params)
+        for item in raw["messages"]:
+            if item.get("reactions") is not None:
+                item["reactions"] = [_cached(SlackCachedReaction, value) for value in item["reactions"]]
         raw["messages"] = [
             _parse(SlackArchivedMessage, item) for item in raw["messages"]
         ]
         if raw.get("page_boundary") is not None:
             raw["page_boundary"] = _parse(SlackArchivePageBoundary, raw["page_boundary"])
+        if raw.get("included") is not None:
+            raw["included"] = _included(raw["included"])
         return _parse(SlackArchiveMessagesResponse, raw)
 
     def list_archived_messages(
@@ -526,6 +547,8 @@ class SlackOperationsMixin:
         cursor: str | None = None,
         limit: int = 50,
         latest_per_conversation: bool | None = None,
+        roots_only: bool | None = None,
+        include: list[SlackArchiveInclude] | None = None,
     ) -> SlackArchiveMessagesResponse:
         """List retained messages, optionally the latest match per conversation."""
         return self._archive_messages(
@@ -538,7 +561,32 @@ class SlackOperationsMixin:
                 "cursor": cursor,
                 "limit": limit,
                 "latest_per_conversation": latest_per_conversation,
+                "roots_only": roots_only,
+                "include": ",".join(include) if include is not None else None,
             },
+        )
+
+    def list_cached_emoji(
+        self, connection_id: UUID | str, *, q: str | None = None,
+        limit: int = 100, cursor: str | None = None,
+    ) -> SlackCachedEmojiPage:
+        """Read one searchable cached emoji page; inspect status and next_cursor."""
+        raw = self._http.get(f"{_base(connection_id)}/emoji", params={"q": q, "limit": limit, "cursor": cursor})
+        raw["emoji"] = [_cached(SlackCachedEmoji, value) for value in raw["emoji"]]
+        return _cached(SlackCachedEmojiPage, raw)
+
+    def download_cached_media(
+        self, connection_id: UUID | str, kind: SlackCachedMediaKind, resource_id: str,
+    ) -> bytes:
+        """Download an authenticated cached avatar or emoji image, not a remote URL."""
+        return self._http.get_bytes(
+            f"{_base(connection_id)}/cached-media/{quote(kind, safe='')}/{quote(resource_id, safe='')}", accept="image/*",
+        )
+
+    def download_file_preview(self, connection_id: UUID | str, file_id: str) -> bytes:
+        """Read cached preview bytes; unavailable previews return an API error."""
+        return self._http.get_bytes(
+            f"{_base(connection_id)}/files/{quote(file_id, safe='')}/preview", accept="image/*",
         )
 
     def search_archived_messages(

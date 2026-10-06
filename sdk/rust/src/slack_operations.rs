@@ -194,6 +194,26 @@ pub struct SlackArchiveMessagesOptions {
     pub cursor: Option<String>,
     pub limit: Option<u32>,
 }
+impl SlackArchiveMessagesOptions {
+    pub(crate) fn query_params(&self) -> Vec<(&'static str, String)> {
+        let mut params = vec![("limit", self.limit.unwrap_or(50).to_string())];
+        if let Some(latest) = self.latest_per_conversation {
+            params.push(("latest_per_conversation", latest.to_string()));
+        }
+        for (key, value) in [
+            ("conversation_id", &self.conversation_id),
+            ("thread_ts", &self.thread_ts),
+            ("before_ts", &self.before_ts),
+            ("after_ts", &self.after_ts),
+            ("cursor", &self.cursor),
+        ] {
+            if let Some(v) = value {
+                params.push((key, v.clone()));
+            }
+        }
+        params
+    }
+}
 #[derive(Debug, Clone, Default)]
 pub struct SlackArchiveSearchOptions {
     pub conversation_id: Option<String>,
@@ -523,21 +543,7 @@ impl SlackResource {
         id: Uuid,
         options: &SlackArchiveMessagesOptions,
     ) -> Result<SlackArchiveMessagesResponse> {
-        let mut params = vec![("limit", options.limit.unwrap_or(50).to_string())];
-        if let Some(latest) = options.latest_per_conversation {
-            params.push(("latest_per_conversation", latest.to_string()));
-        }
-        for (key, value) in [
-            ("conversation_id", &options.conversation_id),
-            ("thread_ts", &options.thread_ts),
-            ("before_ts", &options.before_ts),
-            ("after_ts", &options.after_ts),
-            ("cursor", &options.cursor),
-        ] {
-            if let Some(v) = value {
-                params.push((key, v.clone()));
-            }
-        }
+        let params = options.query_params();
         Ok(serde_json::from_value(self.http.get(
             &format!("{}/archive/messages", base(id)),
             &params,

@@ -519,3 +519,16 @@ export type {
 } from "./slack-operations.js";
 
 export * from "./slack-rules.js";
+
+export type {
+  SlackArchiveInclude,
+  SlackArchiveIncluded,
+  SlackCachedActor,
+  SlackCachedConversation,
+  SlackCachedEmoji,
+  SlackCachedEmojiPage,
+  SlackCachedFile,
+  SlackCachedMediaKind,
+  SlackCachedReaction,
+  SlackCachedEmojiOptions,
+} from "./slack-cache.js";

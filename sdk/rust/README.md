@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.14"
+inkbox = "0.7.15"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.14", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.15", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -973,6 +973,54 @@ Most Rust Slack enums parse strictly: an unrecognized response or webhook value 
 deserialization and may require an SDK update. `Unknown` on action/operation status
 means terminal uncertainty, never an arbitrary unrecognized value.
 
+### Cached Slack display context
+
+```rust,no_run
+use inkbox::{SlackArchiveInclude, SlackArchiveMessagesOptions, SlackEnrichedArchiveMessagesOptions,
+    SlackCachedEmojiOptions, SlackCachedMediaKind};
+# fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
+let page = client.slack().list_enriched_archived_messages(connection_id, &SlackEnrichedArchiveMessagesOptions {
+    archive: SlackArchiveMessagesOptions {
+        conversation_id: Some("C0123456789".into()), ..Default::default()
+    },
+    roots_only: Some(true),
+    include: Some(vec![SlackArchiveInclude::Conversation, SlackArchiveInclude::Sender,
+        SlackArchiveInclude::Reactions, SlackArchiveInclude::Files]),
+})?;
+let emoji_page = client.slack().list_cached_emoji(connection_id, &SlackCachedEmojiOptions {
+    q: Some("party".into()), ..Default::default()
+})?;
+let image = client.slack().download_cached_media(connection_id, SlackCachedMediaKind::User, "U0123456789")?;
+let preview = client.slack().download_file_preview(connection_id, "F0123456789")?;
+# Ok(()) }
+```
+
+Use `list_enriched_connections(identity_id)` to read each connection’s optional
+`generation`. The enriched response wrappers retain the original connection under
+`connection` and message under `message`; these fields also remain readable through
+`Deref`. Existing `list_connections`, `list_archived_messages`, and search methods
+keep their original response types, struct literals, and request defaults.
+New cached response types are non-exhaustive: read their public fields or
+deserialize test fixtures with `serde_json::from_value`. Convert an existing
+connection or message with `SlackEnrichedConnection::from(connection)` or
+`SlackEnrichedArchivedMessage::from(message)`; optional context starts unknown.
+Request options remain constructible with struct literals.
+
+Cached context is optional and may be incomplete or temporarily stale. Unknown
+reaction and thread counts are not zero; a known count does not imply a complete
+list of reacting users. Keep display caches separate by connection and invalidate
+them when its optional `generation` changes. Emoji aliases name another definition.
+The byte methods authenticate against Inkbox; do not forward your API key to
+fallback image URLs. Cached image and preview reads return `404` when no copy exists
+and no capture is queued. Queued or running capture/repair and temporary storage
+failures return `503` with `Retry-After`. Honor that delay before retrying. Emoji image downloads accept alias names and
+resolve them within the selected connection. Existing live methods and mutation
+idempotency are unchanged.
+
+Use root-only archive pages for the main timeline. They also retain replies whose
+root is unavailable, so captured threads remain discoverable. Open a thread using
+the reply’s `thread_ts` (`threadTs` in TypeScript/CLI); its missing root is not restored.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
@@ -993,8 +1041,11 @@ an optional approved Console completion URL with the exact path `/console/slack/
 no query or fragment, and at most 2048 characters. `None`, or the existing `start_installation` method,
 uses the default completion page.
 
-Conversation/history/file reads are live and scoped to the selected connection, not
-an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+Conversation and live-history reads use the selected connection. The Console and
+organization admin keys can read available retained file copies without a live Slack
+lookup. Agent-scoped downloads still check current file access. A content download
+without a retained copy can fall back to Slack and requires current access. These
+methods do not read an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
 page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
 messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
@@ -1078,8 +1129,10 @@ Search uses plain English keywords, ranked by relevance and then recency, not
 Slack query operators or semantic search. Attachment bodies are not indexed.
 The query accepts 1..512 characters and page sizes are 1..100 (default 50).
 Follow the returned cursor with the same filters even for short or empty pages;
-stop only when the cursor is absent. Results require current access and may not
-cover all workspace history. Search errors are raised, not returned as empty results.
+stop only when the cursor is absent. Agent-scoped results require current Slack
+access; the Console and organization admin keys read authorized retained history
+without a live Slack lookup. Results may not cover all workspace history. Search
+errors are raised, not returned as empty results.
 The connection-specific archive search remains available.
 
 ```rust,no_run

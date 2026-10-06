@@ -14,6 +14,7 @@ export interface SlackConnection {
   status: "connected" | "disconnected" | "reauthorization_required";
   scopes: string[];
   createdAt: Date;
+  generation?: number;
 }
 export interface SlackConnectionsResponse {
   connections: SlackConnection[];
@@ -93,6 +94,7 @@ interface RawConnection {
   status: SlackConnection["status"];
   scopes: string[];
   created_at: string;
+  generation?: number;
 }
 interface RawSetupStatus {
   status: SlackSetupStatus["status"];
@@ -135,6 +137,7 @@ const connection = (r: RawConnection): SlackConnection => ({
   status: r.status,
   scopes: r.scopes,
   createdAt: new Date(r.created_at),
+  generation: r.generation,
 });
 const provisioningWorkspace = (r: RawProvisioningWorkspace): SlackProvisioningWorkspace => ({
   id: r.id,

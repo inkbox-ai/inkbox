@@ -1982,6 +1982,36 @@ client.webhooks.subscriptions.update(
 )
 ```
 
+### Cached Slack display context
+
+```python
+page = inkbox.slack.list_archived_messages(
+    connection_id, conversation_id="C0123456789", roots_only=True,
+    include=["conversation", "sender", "reactions", "files"],
+)
+if page.included:
+    print(page.included.conversations)
+emoji_page = inkbox.slack.list_cached_emoji(connection_id, q="party", limit=100)
+# Continue with cursor=emoji_page.next_cursor; one page is not the entire directory.
+image = inkbox.slack.download_cached_media(connection_id, "user", "U0123456789")
+preview = inkbox.slack.download_file_preview(connection_id, "F0123456789")
+```
+
+Cached context is optional and may be incomplete or temporarily stale. Unknown
+reaction and thread counts are not zero; a known count does not imply a complete
+list of reacting users. Keep display caches separate by connection and invalidate
+them when its optional `generation` changes. Emoji aliases name another definition.
+The byte methods authenticate against Inkbox; do not forward your API key to
+fallback image URLs. Cached image and preview reads return `404` when no copy exists
+and no capture is queued. Queued or running capture/repair and temporary storage
+failures return `503` with `Retry-After`. Honor that delay before retrying. Emoji image downloads accept alias names and
+resolve them within the selected connection. Existing live methods and mutation
+idempotency are unchanged.
+
+Use root-only archive pages for the main timeline. They also retain replies whose
+root is unavailable, so captured threads remain discoverable. Open a thread using
+the reply’s `thread_ts` (`threadTs` in TypeScript/CLI); its missing root is not restored.
+
 ### Slack behavior
 
 Organization-member sessions and organization admin API keys can prepare and install
@@ -2002,8 +2032,11 @@ completion URL with the exact path `/console/slack/complete`, no query or fragme
 and at most 2048 characters.
 Omit it to use the default completion page.
 
-Conversation/history/file reads are live and scoped to the selected connection, not
-an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+Conversation and live-history reads use the selected connection. The Console and
+organization admin keys can read available retained file copies without a live Slack
+lookup. Agent-scoped downloads still check current file access. A content download
+without a retained copy can fall back to Slack and requires current access. These
+methods do not read an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
 page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
 messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
@@ -2087,8 +2120,10 @@ Search uses plain English keywords, ranked by relevance and then recency, not
 Slack query operators or semantic search. Attachment bodies are not indexed.
 The query accepts 1..512 characters and page sizes are 1..100 (default 50).
 Follow the returned cursor with the same filters even for short or empty pages;
-stop only when the cursor is absent. Results require current access and may not
-cover all workspace history. Search errors are raised, not returned as empty results.
+stop only when the cursor is absent. Agent-scoped results require current Slack
+access; the Console and organization admin keys read authorized retained history
+without a live Slack lookup. Results may not cover all workspace history. Search
+errors are raised, not returned as empty results.
 The connection-specific archive search remains available.
 
 ```python

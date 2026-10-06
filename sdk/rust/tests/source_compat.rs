@@ -1,4 +1,4 @@
-//! Literal construction and positional calls supported before directional APIs.
+//! Literal construction and positional calls supported by earlier API surfaces.
 
 use inkbox::{
     contacts::*,
@@ -11,6 +11,51 @@ use inkbox::{
     Inkbox,
 };
 use uuid::Uuid;
+
+#[test]
+fn legacy_slack_literals_remain_constructible() {
+    let id = Uuid::nil();
+    let connection = inkbox::SlackConnection {
+        id,
+        identity_id: id,
+        workspace_id: "TEXAMPLE".into(),
+        workspace_name: "Example".into(),
+        bot_user_id: "UBOT".into(),
+        status: inkbox::SlackConnectionStatus::Connected,
+        scopes: vec![],
+        created_at: String::new(),
+    };
+    let message = inkbox::SlackArchivedMessage {
+        id,
+        connection_id: connection.id,
+        conversation_id: "CEXAMPLE".into(),
+        message_ts: "1700000000.000001".into(),
+        thread_ts: None,
+        user_id: None,
+        text: "Example".into(),
+        files: vec![],
+        mentioned: false,
+        source: inkbox::SlackArchiveSource::Event,
+        captured_at: String::new(),
+    };
+    let page = inkbox::SlackArchiveMessagesResponse {
+        messages: vec![message],
+        next_cursor: None,
+        source: "archive".into(),
+        page_boundary: None,
+    };
+    let options = inkbox::SlackArchiveMessagesOptions {
+        latest_per_conversation: None,
+        conversation_id: None,
+        thread_ts: None,
+        before_ts: None,
+        after_ts: None,
+        cursor: None,
+        limit: None,
+    };
+    assert_eq!(page.messages[0].connection_id, connection.id);
+    assert!(options.limit.is_none());
+}
 
 #[test]
 fn legacy_response_literals_remain_constructible() {
@@ -246,5 +291,22 @@ fn legacy_positional_calls(client: &Inkbox, agent: &inkbox::AgentIdentity) -> in
         .contacts()
         .access()
         .update("agent", "contact", &UpdateContactAccess::default())?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn legacy_slack_method_signatures(client: &Inkbox, id: Uuid) -> inkbox::Result<()> {
+    let slack = client.slack();
+    let _: inkbox::SlackConnectionsResponse = slack.list_connections(id)?;
+    let _: inkbox::SlackConnection = slack.disconnect(id)?;
+    let _: inkbox::SlackArchiveMessagesResponse =
+        slack.list_archived_messages(id, &inkbox::SlackArchiveMessagesOptions::default())?;
+    let _: inkbox::SlackArchiveMessagesResponse = slack.search_archived_messages(
+        id,
+        "example",
+        &inkbox::SlackArchiveSearchOptions::default(),
+    )?;
+    let _: inkbox::SlackArchiveMessagesResponse =
+        slack.search_messages("example", &inkbox::SlackSearchMessagesOptions::default())?;
     Ok(())
 }

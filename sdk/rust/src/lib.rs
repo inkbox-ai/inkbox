@@ -92,7 +92,9 @@ mod response_metadata_tests;
 
 pub mod slack;
 pub use slack::*;
+pub mod slack_cache;
 pub mod slack_operations;
+pub use slack_cache::*;
 pub use slack_operations::*;
 pub use webhooks::types::{
     SlackActorProfile, SlackUserProfile, SlackWebhookData, SlackWebhookEventType,

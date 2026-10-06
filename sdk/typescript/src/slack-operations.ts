@@ -1,6 +1,10 @@
 /** Scoped Slack utilities, durable actions, and retained history. */
 import type { HttpTransport } from "./_http.js";
 import type { SlackPageOptions } from "./slack.js";
+import type { SenderAccess } from "./sender_access.js";
+import { archiveIncluded, cachedEmoji, cachedReaction } from "./slack-cache.js";
+import type { CachedWire, RawArchiveIncluded, SlackArchiveInclude, SlackArchiveIncluded,
+  SlackCachedEmoji, SlackCachedEmojiOptions, SlackCachedEmojiPage, SlackCachedMediaKind, SlackCachedReaction } from "./slack-cache.js";
 
 export type SlackProcessingStatus =
   "active" | "processing" | "suspended" | "closed";
@@ -89,6 +93,16 @@ export interface SlackArchivedMessage {
   mentioned: boolean;
   source: "event" | "backfill" | "action";
   capturedAt: Date;
+  senderAccess?: SenderAccess | null;
+  botId?: string | null;
+  subtype?: string | null;
+  editedTs?: string | null;
+  replyCount?: number | null;
+  blocks?: Record<string, unknown>[] | null;
+  attachments?: Record<string, unknown>[] | null;
+  latestReply?: string | null;
+  reactions?: SlackCachedReaction[] | null;
+  reactionsComplete?: boolean | null;
 }
 /** Inclusive oldest scanned list position; not necessarily a returned message. */
 export interface SlackArchivePageBoundary {
@@ -100,6 +114,7 @@ export interface SlackArchiveMessagesResponse {
   nextCursor: string | null;
   source: "archive";
   pageBoundary?: SlackArchivePageBoundary | null;
+  included?: SlackArchiveIncluded | null;
 }
 export interface SlackArchiveCoverage {
   conversationId: string;
@@ -120,6 +135,9 @@ export interface SlackArchiveCoverageResponse {
 export interface SlackArchiveMessagesOptions extends SlackPageOptions {
   /** Return the latest matching message per conversation; limit counts conversations. */
   latestPerConversation?: boolean;
+  /** Page roots, broadcasts, and retained replies whose root is unavailable. */
+  rootsOnly?: boolean;
+  include?: SlackArchiveInclude[];
   conversationId?: string;
   threadTs?: string | null;
   beforeTs?: string | null;
@@ -127,7 +145,7 @@ export interface SlackArchiveMessagesOptions extends SlackPageOptions {
 }
 export interface SlackArchiveSearchOptions extends Omit<
   SlackArchiveMessagesOptions,
-  "threadTs" | "latestPerConversation"
+  "threadTs" | "latestPerConversation" | "rootsOnly" | "include"
 > {
   userId?: string;
 }
@@ -189,7 +207,7 @@ const settings = (r: Wire<SlackArchiveSettings>): SlackArchiveSettings => ({
   revision: r.revision,
 });
 const archivedMessage = (
-  r: Wire<SlackArchivedMessage>,
+  r: Omit<Wire<SlackArchivedMessage>, "reactions"> & { reactions?: CachedWire<SlackCachedReaction>[] | null },
 ): SlackArchivedMessage => ({
   id: r.id,
   connectionId: r.connection_id,
@@ -202,6 +220,12 @@ const archivedMessage = (
   mentioned: r.mentioned,
   source: r.source,
   capturedAt: new Date(r.captured_at),
+  senderAccess: r.sender_access ?? null,
+  botId: r.bot_id ?? null, subtype: r.subtype ?? null, editedTs: r.edited_ts ?? null,
+  replyCount: r.reply_count ?? null, blocks: r.blocks ?? null, attachments: r.attachments ?? null,
+  latestReply: r.latest_reply ?? null,
+  reactions: r.reactions?.map(cachedReaction) ?? null,
+  reactionsComplete: r.reactions_complete ?? null,
 });
 const coverage = (r: Wire<SlackArchiveCoverage>): SlackArchiveCoverage => ({
   conversationId: r.conversation_id,
@@ -526,10 +550,11 @@ export class SlackOperationsResource {
     extra: Record<string, string | boolean | null | undefined> = {},
   ): Promise<SlackArchiveMessagesResponse> {
     const r = await this.http.get<{
-      messages: Wire<SlackArchivedMessage>[];
+      messages: Parameters<typeof archivedMessage>[0][];
       next_cursor?: string | null;
       page_boundary?: Wire<SlackArchivePageBoundary> | null;
       source: "archive";
+      included?: RawArchiveIncluded | null;
     }>(path, {
       conversation_id: options.conversationId,
       thread_ts: timestamp(options.threadTs),
@@ -543,6 +568,7 @@ export class SlackOperationsResource {
       messages: r.messages.map(archivedMessage),
       nextCursor: r.next_cursor ?? null,
       source: r.source,
+      included: r.included ? archiveIncluded(r.included) : null,
       pageBoundary: r.page_boundary
         ? { messageTs: r.page_boundary.message_ts, id: r.page_boundary.id }
         : null,
@@ -554,7 +580,24 @@ export class SlackOperationsResource {
   ): Promise<SlackArchiveMessagesResponse> {
     return this.archiveMessages(`${base(connectionId)}/archive/messages`, options, {
       latest_per_conversation: options.latestPerConversation,
+      roots_only: options.rootsOnly,
+      include: options.include?.join(","),
     });
+  }
+  async listCachedEmoji(connectionId: string, options: SlackCachedEmojiOptions = {}): Promise<SlackCachedEmojiPage> {
+    const r = await this.http.get<{ emoji: CachedWire<SlackCachedEmoji>[]; next_cursor?: string | null;
+      status: string; error_code?: string | null }>(`${base(connectionId)}/emoji`, {
+      q: options.q, limit: options.limit ?? 100, cursor: options.cursor,
+    });
+    return { emoji: r.emoji.map(cachedEmoji), nextCursor: r.next_cursor ?? null,
+      status: r.status, errorCode: r.error_code ?? null };
+  }
+  /** Download an authenticated cached image by ID; never forwards credentials to a remote URL. */
+  async downloadCachedMedia(connectionId: string, kind: SlackCachedMediaKind, resourceId: string): Promise<Uint8Array> {
+    return (await this.http.getBytes(`${base(connectionId)}/cached-media/${encodeURIComponent(kind)}/${encodeURIComponent(resourceId)}`)).data;
+  }
+  async downloadFilePreview(connectionId: string, fileId: string): Promise<Uint8Array> {
+    return (await this.http.getBytes(`${base(connectionId)}/files/${encodeURIComponent(fileId)}/preview`)).data;
   }
   async searchArchivedMessages(
     connectionId: string,
