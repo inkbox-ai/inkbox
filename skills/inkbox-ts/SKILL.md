@@ -478,6 +478,14 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 ## iMessage
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 iMessage can use shared service or an organization-owned dedicated line. Shared service requires the recipient to message first; a dedicated line can initiate one-to-one and group conversations, subject to server-side policy checks.
 
 Discover the router (triage) line at runtime — it can change, so never hardcode it:
@@ -1599,7 +1607,9 @@ watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 ```typescript
 const message = await identity.getIMessage(messageId);

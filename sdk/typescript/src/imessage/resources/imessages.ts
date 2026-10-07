@@ -454,6 +454,7 @@ export class IMessagesResource {
   /**
    * Send a one-to-one read receipt and mark inbound messages read locally.
    * Group conversations return 409.
+   * Non-phone conversations are receive-only and return 422 recipient_not_e164.
    *
    * @param conversationId - UUID of the conversation.
    * @returns Object with `conversationId` and `updatedCount`.
@@ -474,6 +475,7 @@ export class IMessagesResource {
   /**
    * Show a typing indicator to a one-to-one recipient.
    * Group conversations return 409.
+   * Non-phone conversations are receive-only and return 422 recipient_not_e164.
    *
    * @param conversationId - UUID of the conversation.
    */

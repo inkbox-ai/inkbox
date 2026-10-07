@@ -226,9 +226,21 @@ There are no Slack-specific filters. Context applies only to received mail, text
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
+## iMessage sender addresses
+
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 ## Threaded iMessages
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 Native replies target a specific message within an existing conversation.
 Python/TypeScript send helpers accept `reply_to_message_id` / `replyToMessageId`

@@ -664,9 +664,21 @@ Pausing the identity stops live operations and webhook delivery while preserving
 its connections and history. Workspace approval, connection ownership, and current
 conversation access remain required.
 
+## iMessage sender addresses
+
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 Reply to a specific message in an existing one-to-one or group conversation with
 Python `reply_to_message_id`, TypeScript `replyToMessageId`, Rust `send_reply`, or

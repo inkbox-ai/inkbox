@@ -558,7 +558,9 @@ class IMessageWebhookMessage(TypedDict):
     """
     Stored iMessage. ``is_blocked`` is not part of the wire body -- blocked
     messages require Companion sponsorship unless directly admitted. Group messages have no assignment and
-    include sender/participant fields.
+    include sender/participant fields. On dedicated lines, ``remote_number``
+    may be a non-phone sender address; receiving a message does not imply that
+    a reply, reaction, typing indicator, or read receipt can be sent.
     """
 
     id: str

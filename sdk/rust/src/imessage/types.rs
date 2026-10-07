@@ -286,6 +286,7 @@ pub struct IMessage {
     pub assignment_id: Option<Uuid>,
     /// "inbound" | "outbound"
     pub direction: String,
+    /// Sender address; non-phone one-to-one conversations are receive-only.
     pub remote_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sender_number: Option<String>,
@@ -390,6 +391,7 @@ impl Default for IMessageThreadListOptions {
 pub struct IMessageConversation {
     pub id: Uuid,
     pub assignment_id: Option<Uuid>,
+    /// Sender address; non-phone one-to-one conversations are receive-only.
     pub remote_number: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -410,6 +412,7 @@ pub struct IMessageConversation {
 pub struct IMessageConversationSummary {
     pub id: Uuid,
     pub assignment_id: Option<Uuid>,
+    /// Sender address; non-phone one-to-one conversations are receive-only.
     pub remote_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_text: Option<String>,

@@ -451,6 +451,7 @@ class IMessagesResource:
         """Send a one-to-one read receipt and mark inbound messages read locally.
 
         Group conversations are unsupported and return 409.
+        Non-phone conversations are receive-only and return 422 recipient_not_e164.
 
         Args:
             conversation_id: UUID of the conversation.
@@ -468,6 +469,7 @@ class IMessagesResource:
         """Show a typing indicator to a one-to-one recipient.
 
         Group conversations are unsupported and return 409.
+        Non-phone conversations are receive-only and return 422 recipient_not_e164.
 
         Args:
             conversation_id: UUID of the conversation.

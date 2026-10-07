@@ -242,6 +242,9 @@ class IMessageMessageReaction:
 class IMessage:
     """An iMessage in a one-to-one or group conversation.
 
+    On dedicated lines, ``remote_number`` can be a non-phone sender address;
+    those one-to-one conversations are receive-only.
+
     Group rows have ``is_group=True``, no assignment, a best-known participant
     snapshot, and per-recipient outbound delivery state.
     """
@@ -350,6 +353,9 @@ class IMessageThread:
 @dataclass
 class IMessageConversation:
     """One iMessage conversation.
+
+    ``remote_number`` and ``participants`` preserve sender addresses, not only
+    phone numbers. Non-phone one-to-one conversations are receive-only.
 
     One-to-one rows expose assignment state. Group rows have no assignment and
     expose a best-known participant snapshot and creation lifecycle instead.

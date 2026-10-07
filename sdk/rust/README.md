@@ -448,6 +448,14 @@ match inkbox.get_identity("unknown") {
 
 ### Dedicated iMessage lines
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 List or claim organization-owned dedicated lines through the iMessage resource:
 
 ```rust
@@ -1158,7 +1166,9 @@ backfill, coverage, and purge use exported `SlackArchive*` response and option t
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 Thread-aware methods are additive: existing `IMessage` construction and positional
 send/list signatures are unchanged. Use `ThreadedIMessage` (`message` plus nullable

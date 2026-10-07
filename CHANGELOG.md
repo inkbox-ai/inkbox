@@ -6,6 +6,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
+### Documentation and compatibility
+
+- Clarify that dedicated iMessage lines can receive sender addresses that are not
+  phone numbers. These conversations are receive-only; outbound recipients remain
+  E.164 phone numbers.
+- Cover address preservation in Python, TypeScript, Rust, webhook payloads, and CLI
+  output, including propagation of `422 recipient_not_e164` errors. Existing
+  string types and method signatures are unchanged.
+
 ## 0.7.15 - Cached Slack history context (unreleased)
 
 ### Added
