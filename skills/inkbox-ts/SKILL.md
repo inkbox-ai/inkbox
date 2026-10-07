@@ -566,16 +566,23 @@ for (const a of connections) {
 // accept seven named reactions (love, like, dislike, laugh, emphasize,
 // question, eyes); inbound can also be "custom" with the literal emoji in
 // customEmoji. Arbitrary custom emoji are not sendable.
-const sentReaction = await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+// This example selects a phone-number 1:1 message, not a receive-only sender.
+const target = msgs.find(m => m.direction === "inbound" && !m.isGroup && !m.isBlocked
+  && /^\+[1-9][0-9]{1,14}$/.test(m.remoteNumber ?? ""));
+if (target) {
+  const targetConvo = await identity.getIMessageConversation(target.conversationId);
+  if (targetConvo.assignmentStatus === "active") {
+    const sentReaction = await identity.sendIMessageReaction({ messageId: target.id, reaction: "like" });
 
-// Live tapbacks come back on message reads, oldest first.
-for (const r of msgs[0].reactions ?? []) {
-  console.log(r.direction, r.reaction, r.customEmoji);
+    // Live tapbacks come back on message reads, oldest first.
+    for (const r of target.reactions ?? []) {
+      console.log(r.direction, r.reaction, r.customEmoji);
+    }
+
+    // Take your own tapback back. A failed removal leaves it in place.
+    await identity.removeIMessageReaction(sentReaction.id);
+  }
 }
-
-// Take your own tapback back. Only the sender can. A failed removal leaves the
-// tapback in place rather than clearing it locally, so the call can be retried.
-await identity.removeIMessageReaction(sentReaction.id);
 
 // Read receipts + typing indicator are one-to-one only; groups return 409.
 await identity.markIMessageConversationRead(sent.conversationId);

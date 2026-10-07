@@ -544,6 +544,8 @@ idempotency key when retrying an ambiguous claim.
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agent_identity_id` / `is_blocked` filters):
 
 ```python
+import re
+
 from inkbox import IMessageSendStyle
 
 # Send to a connected recipient, or reply into a conversation by UUID.
@@ -587,15 +589,21 @@ for a in connections:
 # accept seven named reactions (love, like, dislike, laugh, emphasize,
 # question, eyes); inbound can also be "custom" with the literal emoji in
 # custom_emoji. Arbitrary custom emoji are not sendable.
-sent_reaction = identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+# This example selects a phone-number 1:1 message, not a receive-only sender.
+target = next((m for m in msgs if m.direction == "inbound" and not m.is_group
+               and not m.is_blocked
+               and re.fullmatch(r"\+[1-9][0-9]{1,14}", m.remote_number or "")), None)
+if target is not None:
+    target_convo = identity.get_imessage_conversation(target.conversation_id)
+    if target_convo.assignment_status == "active":
+        sent_reaction = identity.send_imessage_reaction(message_id=target.id, reaction="like")
 
-# Live tapbacks come back on message reads, oldest first.
-for r in msgs[0].reactions or []:
-    print(r.direction, r.reaction, r.custom_emoji)
+        # Live tapbacks come back on message reads, oldest first.
+        for r in target.reactions or []:
+            print(r.direction, r.reaction, r.custom_emoji)
 
-# Take your own tapback back. Only the sender can. A failed removal leaves the
-# tapback in place rather than clearing it locally, so the call can be retried.
-identity.remove_imessage_reaction(sent_reaction.id)
+        # Take your own tapback back. A failed removal leaves it in place.
+        identity.remove_imessage_reaction(sent_reaction.id)
 
 # Read receipts + typing indicator are one-to-one only; groups return 409.
 identity.mark_imessage_conversation_read(sent.conversation_id)
