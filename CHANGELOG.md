@@ -4,17 +4,6 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## Unreleased
-
-### Documentation and compatibility
-
-- Clarify that dedicated iMessage lines can receive sender addresses that are not
-  phone numbers. These conversations are receive-only; outbound recipients remain
-  E.164 phone numbers.
-- Cover address preservation in Python, TypeScript, Rust, webhook payloads, and CLI
-  output, including propagation of `422 recipient_not_e164` errors. Existing
-  string types and method signatures are unchanged.
-
 ## 0.7.15 - Cached Slack history context (unreleased)
 
 ### Added
@@ -25,6 +14,17 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   and download available file previews with authenticated SDK and CLI methods.
 - Preserve reaction completeness, unknown counts, thread summaries, rich message
   content, file-copy availability, and connection generation in typed responses.
+- Document receive-only sender-address conversations on dedicated iMessage lines,
+  with cross-language and CLI coverage for address preservation and propagation of
+  `422 recipient_not_e164` errors. Existing string types and methods are unchanged.
+
+### Changed
+
+- Before the recipient's first reply, one-to-one iMessage text containing phone
+  numbers now returns HTTP `422` with
+  `imessage_reply_required_for_phone_numbers` on every line type, including
+  dedicated lines. This content restriction ends after the recipient replies;
+  outbound `to` recipients still require E.164 phone numbers.
 
 ### Compatibility
 
