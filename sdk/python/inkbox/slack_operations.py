@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 import re
-from typing import Any, Literal
+from typing import Any, Literal, NotRequired, TypedDict
 from urllib.parse import quote
 from uuid import UUID
 
@@ -26,7 +26,33 @@ SlackOperationKind = Literal[
     "conversation_join",
     "conversation_leave",
     "processing_status",
+    "stream_start",
+    "stream_append",
+    "stream_stop",
 ]
+SlackTaskStatus = Literal["in_progress", "complete", "error"]
+SlackTaskDisplayMode = Literal["timeline", "plan"]
+
+
+class SlackTaskUpdate(TypedDict):
+    """Update a stable task ID; text fields are limited to 256 characters."""
+
+    type: Literal["task_update"]
+    id: str
+    title: str
+    status: SlackTaskStatus
+    details: NotRequired[str | None]
+    output: NotRequired[str | None]
+
+
+class SlackPlanUpdate(TypedDict):
+    """Set the title of a task plan."""
+
+    type: Literal["plan_update"]
+    title: str
+
+
+SlackTaskChunk = SlackTaskUpdate | SlackPlanUpdate
 
 
 @dataclass
@@ -42,6 +68,7 @@ class SlackOperation:
     retry_after: int | None = None
     processing_status: SlackProcessingStatus | None = None
     agent_status: SlackProcessingStatus | None = None
+    thread_ts: str | None = None
 
 
 @dataclass
@@ -59,6 +86,7 @@ class SlackCapabilitiesResponse:
     capabilities: dict[str, SlackCapability]
     native_processing_status: Literal["unknown", "missing_scope"]
     max_upload_bytes: int
+    native_task_streaming: Literal["unknown", "missing_scope"] = "unknown"
 
 
 @dataclass
@@ -220,7 +248,7 @@ class SlackOperationsMixin:
                 "idempotency_key must be 1..128 letters, digits, '.', '_', ':', or '-'"
             )
         kwargs = {"headers": {"Idempotency-Key": key}}
-        if method != "delete_with_response":
+        if method not in {"delete_with_response", "get"}:
             kwargs["json"] = body
         return _parse(SlackOperation, getattr(self._http, method)(path, **kwargs))
 
@@ -231,6 +259,41 @@ class SlackOperationsMixin:
             for name, value in raw["capabilities"].items()
         }
         return _parse(SlackCapabilitiesResponse, raw)
+
+    def get_operation_by_key(
+        self, connection_id: UUID | str, *, idempotency_key: str,
+    ) -> SlackOperation:
+        """Look up an existing operation without repeating its write."""
+        return self._operation("get", f"{_base(connection_id)}/operations/by-key", idempotency_key)
+
+    def start_stream(
+        self, connection_id: UUID | str, conversation_id: str, *,
+        thread_ts: str, recipient_user_id: str, recipient_team_id: str,
+        chunks: list[SlackTaskChunk], idempotency_key: str,
+        task_display_mode: SlackTaskDisplayMode = "timeline",
+    ) -> SlackOperation:
+        """Start task progress in the original thread; retain the operation ID."""
+        return self._operation("post", f"{_conversation(connection_id, conversation_id)}/streams",
+            idempotency_key, {"thread_ts": _timestamp(thread_ts), "recipient_user_id": recipient_user_id,
+                "recipient_team_id": recipient_team_id, "chunks": chunks, "task_display_mode": task_display_mode})
+
+    def append_stream(
+        self, connection_id: UUID | str, conversation_id: str, stream_id: UUID | str, *,
+        chunks: list[SlackTaskChunk], idempotency_key: str,
+    ) -> SlackOperation:
+        """Append tasks to a successful start operation's UUID, not its timestamp."""
+        return self._operation("post",
+            f"{_conversation(connection_id, conversation_id)}/streams/{quote(str(stream_id), safe='')}/append",
+            idempotency_key, {"chunks": chunks})
+
+    def stop_stream(
+        self, connection_id: UUID | str, conversation_id: str, stream_id: UUID | str, *,
+        idempotency_key: str, chunks: list[SlackTaskChunk] | None = None,
+    ) -> SlackOperation:
+        """Close task progress, optionally including final task updates."""
+        return self._operation("post",
+            f"{_conversation(connection_id, conversation_id)}/streams/{quote(str(stream_id), safe='')}/stop",
+            idempotency_key, {"chunks": chunks if chunks is not None else []})
 
     def list_users(
         self, connection_id: UUID | str, *, limit: int = 100, cursor: str | None = None

@@ -26,3 +26,7 @@ timestamps, Unicode queries, and an empty page with a continuation cursor.
 `imessage_sender_addresses.json` exercises receive-only sender addresses through
 Python, TypeScript, Rust, webhook reads, and CLI output. The same checks retain
 ordinary phone-number compatibility and the structured outbound rejection.
+
+`slack_task_streams.json` pins task-stream creation, updates, closure, and read-only
+operation recovery by key across all four clients, including empty final chunks,
+plan presentation, and failed or uncertain operation responses.
