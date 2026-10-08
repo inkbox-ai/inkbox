@@ -4,7 +4,7 @@
 use crate::error::{InkboxError, Result};
 use crate::http::NO_QUERY;
 use crate::slack::{base, segment, SlackPageOptions, SlackResource};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -30,6 +30,45 @@ pub enum SlackOperationKind {
     ConversationJoin,
     ConversationLeave,
     ProcessingStatus,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackTaskStatus {
+    InProgress,
+    Complete,
+    Error,
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackTaskDisplayMode {
+    #[default]
+    Timeline,
+    Plan,
+}
+/// Task and plan text fields are limited to 256 characters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SlackTaskChunk {
+    TaskUpdate {
+        id: String,
+        title: String,
+        status: SlackTaskStatus,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        details: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    },
+    PlanUpdate {
+        title: String,
+    },
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SlackStreamStartOptions {
+    pub thread_ts: String,
+    pub recipient_user_id: String,
+    pub recipient_team_id: String,
+    pub chunks: Vec<SlackTaskChunk>,
+    pub task_display_mode: SlackTaskDisplayMode,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,9 +98,10 @@ pub struct SlackCapability {
     pub missing_scopes: Vec<String>,
     pub scopes_satisfied: bool,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SlackNativeProcessingStatus {
+    #[default]
     Unknown,
     MissingScope,
 }
@@ -73,6 +113,57 @@ pub struct SlackCapabilitiesResponse {
     pub capabilities: HashMap<String, SlackCapability>,
     pub native_processing_status: SlackNativeProcessingStatus,
     pub max_upload_bytes: u64,
+}
+/// Stream-capable operation kinds; the legacy enum remains unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SlackStreamOperationKind {
+    ReactionAdd,
+    ReactionRemove,
+    PinAdd,
+    PinRemove,
+    MessageUpdate,
+    MessageDelete,
+    FileUpload,
+    ConversationJoin,
+    ConversationLeave,
+    ProcessingStatus,
+    StreamStart,
+    StreamAppend,
+    StreamStop,
+}
+/// Stream-capable operation envelope, preserving existing operation struct literals.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SlackStreamOperation {
+    pub id: Uuid,
+    pub connection_id: Uuid,
+    pub operation: SlackStreamOperationKind,
+    pub status: SlackOperationStatus,
+    pub conversation_id: String,
+    pub message_ts: Option<String>,
+    pub thread_ts: Option<String>,
+    pub file_id: Option<String>,
+    pub error_code: Option<String>,
+    pub retry_after: Option<u32>,
+    pub processing_status: Option<SlackProcessingStatus>,
+    pub agent_status: Option<SlackProcessingStatus>,
+}
+/// Capabilities including task streaming, without changing legacy struct literals.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SlackTaskCapabilitiesResponse {
+    #[serde(flatten)]
+    pub connection: SlackCapabilitiesResponse,
+    #[serde(default)]
+    pub native_task_streaming: SlackNativeProcessingStatus,
+}
+impl std::ops::Deref for SlackTaskCapabilitiesResponse {
+    type Target = SlackCapabilitiesResponse;
+    fn deref(&self) -> &Self::Target {
+        &self.connection
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackUsersResponse {
@@ -278,13 +369,13 @@ fn page(options: &SlackPageOptions, default: u32) -> Vec<(&'static str, String)>
     params
 }
 impl SlackResource {
-    fn operation_mutation(
+    fn operation_mutation<T: DeserializeOwned>(
         &self,
         method: &str,
         path: &str,
         key: &str,
         body: Option<&Value>,
-    ) -> Result<SlackOperation> {
+    ) -> Result<T> {
         if key.is_empty()
             || key.len() > 128
             || !key
@@ -297,11 +388,81 @@ impl SlackResource {
         }
         let headers = &[("Idempotency-Key", key)];
         let raw = match method {
+            "GET" => self.http.get_with_headers(path, NO_QUERY, headers)?,
             "DELETE" => self.http.delete_with_response_and_headers(path, headers)?,
             "PATCH" => self.http.patch_with_headers(path, &body, headers)?,
             _ => self.http.post_with_headers(path, body, NO_QUERY, headers)?,
         };
         Ok(serde_json::from_value(raw)?)
+    }
+    /// Look up an existing operation without repeating its write.
+    pub fn get_operation_by_key(&self, id: Uuid, key: &str) -> Result<SlackStreamOperation> {
+        self.operation_mutation("GET", &format!("{}/operations/by-key", base(id)), key, None)
+    }
+    /// Start task progress in the original thread; retain the operation ID.
+    pub fn start_stream(
+        &self,
+        id: Uuid,
+        channel: &str,
+        options: &SlackStreamStartOptions,
+        key: &str,
+    ) -> Result<SlackStreamOperation> {
+        self.operation_mutation(
+            "POST",
+            &format!("{}/streams", conversation(id, channel)),
+            key,
+            Some(&serde_json::to_value(options)?),
+        )
+    }
+    /// stream_id is the successful start operation UUID, not its timestamp.
+    pub fn append_stream(
+        &self,
+        id: Uuid,
+        channel: &str,
+        stream_id: Uuid,
+        chunks: &[SlackTaskChunk],
+        key: &str,
+    ) -> Result<SlackStreamOperation> {
+        self.operation_mutation(
+            "POST",
+            &format!("{}/streams/{stream_id}/append", conversation(id, channel)),
+            key,
+            Some(&json!({"chunks": chunks})),
+        )
+    }
+    /// Close task progress; pass an empty slice when no final task updates are needed.
+    pub fn stop_stream(
+        &self,
+        id: Uuid,
+        channel: &str,
+        stream_id: Uuid,
+        chunks: &[SlackTaskChunk],
+        key: &str,
+    ) -> Result<SlackStreamOperation> {
+        self.operation_mutation(
+            "POST",
+            &format!("{}/streams/{stream_id}/stop", conversation(id, channel)),
+            key,
+            Some(&json!({"chunks": chunks})),
+        )
+    }
+    /// Read a stream-capable operation envelope by its operation UUID.
+    pub fn get_stream_operation(
+        &self,
+        id: Uuid,
+        operation_id: Uuid,
+    ) -> Result<SlackStreamOperation> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("{}/operations/{operation_id}", base(id)),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Read task streaming eligibility; missing fields from older servers default to Unknown.
+    pub fn task_capabilities(&self, id: Uuid) -> Result<SlackTaskCapabilitiesResponse> {
+        Ok(serde_json::from_value(
+            self.http
+                .get(&format!("{}/capabilities", base(id)), NO_QUERY)?,
+        )?)
     }
     pub fn capabilities(&self, id: Uuid) -> Result<SlackCapabilitiesResponse> {
         Ok(serde_json::from_value(

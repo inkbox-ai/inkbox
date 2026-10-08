@@ -18,7 +18,21 @@ export type SlackOperationKind =
   | "file_upload"
   | "conversation_join"
   | "conversation_leave"
-  | "processing_status";
+  | "processing_status"
+  | "stream_start" | "stream_append" | "stream_stop";
+export type SlackTaskStatus = "in_progress" | "complete" | "error";
+export type SlackTaskDisplayMode = "timeline" | "plan";
+/** Update a stable task ID; text fields are limited to 256 characters. */
+export interface SlackTaskUpdate {
+  type: "task_update";
+  id: string;
+  title: string;
+  status: SlackTaskStatus;
+  details?: string | null;
+  output?: string | null;
+}
+export interface SlackPlanUpdate { type: "plan_update"; title: string }
+export type SlackTaskChunk = SlackTaskUpdate | SlackPlanUpdate;
 export interface SlackOperation {
   id: string;
   connectionId: string;
@@ -31,6 +45,7 @@ export interface SlackOperation {
   retryAfter: number | null;
   processingStatus: SlackProcessingStatus | null;
   agentStatus: SlackProcessingStatus | null;
+  threadTs?: string | null;
 }
 export interface SlackCapability {
   requiredScopes: string[];
@@ -44,6 +59,7 @@ export interface SlackCapabilitiesResponse {
   capabilities: Record<string, SlackCapability>;
   nativeProcessingStatus: "unknown" | "missing_scope";
   maxUploadBytes: number;
+  nativeTaskStreaming?: "unknown" | "missing_scope";
 }
 export interface SlackUsersResponse {
   users: Record<string, unknown>[];
@@ -166,6 +182,19 @@ export interface SlackUploadFileOptions {
 export interface SlackMutationOptions {
   idempotencyKey: string;
 }
+export interface SlackStreamStartOptions extends SlackMutationOptions {
+  threadTs: string;
+  recipientUserId: string;
+  recipientTeamId: string;
+  chunks: SlackTaskChunk[];
+  taskDisplayMode?: SlackTaskDisplayMode;
+}
+export interface SlackStreamAppendOptions extends SlackMutationOptions {
+  chunks: SlackTaskChunk[];
+}
+export interface SlackStreamStopOptions extends SlackMutationOptions {
+  chunks?: SlackTaskChunk[];
+}
 
 type Snake<S extends string> = S extends `${infer A}${infer B}`
   ? `${A extends Lowercase<A> ? A : `_${Lowercase<A>}`}${Snake<B>}`
@@ -201,6 +230,7 @@ const operation = (r: RawOperation): SlackOperation => ({
   retryAfter: r.retry_after ?? null,
   processingStatus: r.processing_status ?? null,
   agentStatus: r.agent_status ?? null,
+  threadTs: r.thread_ts ?? null,
 });
 const settings = (r: Wire<SlackArchiveSettings>): SlackArchiveSettings => ({
   retentionDays: r.retention_days,
@@ -243,7 +273,7 @@ const coverage = (r: Wire<SlackArchiveCoverage>): SlackArchiveCoverage => ({
 export class SlackOperationsResource {
   constructor(protected readonly http: HttpTransport) {}
   private async mutate(
-    method: "POST" | "PATCH" | "DELETE",
+    method: "POST" | "PATCH" | "DELETE" | "GET",
     path: string,
     key: string,
     body?: unknown,
@@ -254,12 +284,35 @@ export class SlackOperationsResource {
       );
     const opts = { headers: { "Idempotency-Key": key } };
     const result =
-      method === "DELETE"
+      method === "GET"
+        ? await this.http.get<RawOperation>(path, undefined, opts)
+        : method === "DELETE"
         ? await this.http.deleteWithResponse<RawOperation>(path, opts)
         : method === "PATCH"
           ? await this.http.patch<RawOperation>(path, body, opts)
           : await this.http.post<RawOperation>(path, body, opts);
     return operation(result);
+  }
+  /** Look up an existing operation without repeating its write. */
+  async getOperationByKey(connectionId: string, opts: SlackMutationOptions): Promise<SlackOperation> {
+    return this.mutate("GET", `${base(connectionId)}/operations/by-key`, opts.idempotencyKey);
+  }
+  /** Start task progress in the original thread; retain the operation ID. */
+  async startStream(connectionId: string, conversationId: string, opts: SlackStreamStartOptions): Promise<SlackOperation> {
+    return this.mutate("POST", `${conversation(connectionId, conversationId)}/streams`, opts.idempotencyKey, {
+      thread_ts: timestamp(opts.threadTs), recipient_user_id: opts.recipientUserId,
+      recipient_team_id: opts.recipientTeamId, chunks: opts.chunks, task_display_mode: opts.taskDisplayMode ?? "timeline",
+    });
+  }
+  /** streamId is the successful start operation UUID, not its timestamp. */
+  async appendStream(connectionId: string, conversationId: string, streamId: string, opts: SlackStreamAppendOptions): Promise<SlackOperation> {
+    return this.mutate("POST", `${conversation(connectionId, conversationId)}/streams/${encodeURIComponent(streamId)}/append`,
+      opts.idempotencyKey, { chunks: opts.chunks });
+  }
+  /** Close task progress, optionally including final task updates. */
+  async stopStream(connectionId: string, conversationId: string, streamId: string, opts: SlackStreamStopOptions): Promise<SlackOperation> {
+    return this.mutate("POST", `${conversation(connectionId, conversationId)}/streams/${encodeURIComponent(streamId)}/stop`,
+      opts.idempotencyKey, { chunks: opts.chunks ?? [] });
   }
   async capabilities(connectionId: string): Promise<SlackCapabilitiesResponse> {
     const r = await this.http.get<
@@ -272,6 +325,7 @@ export class SlackOperationsResource {
       scopes: r.scopes,
       missingScopes: r.missing_scopes,
       nativeProcessingStatus: r.native_processing_status,
+      nativeTaskStreaming: r.native_task_streaming ?? "unknown",
       maxUploadBytes: r.max_upload_bytes,
       capabilities: Object.fromEntries(
         Object.entries(r.capabilities).map(([name, value]) => [

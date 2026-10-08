@@ -1,8 +1,9 @@
 import { createReadStream } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { Command, InvalidArgumentError } from "commander";
-import type { SlackArchiveInclude, SlackCachedMediaKind, SlackProcessingStatus, SlackResource } from "@inkbox/sdk";
+import { Command, InvalidArgumentError, Option } from "commander";
+import type { SlackArchiveInclude, SlackCachedMediaKind, SlackProcessingStatus, SlackResource,
+  SlackTaskChunk, SlackTaskDisplayMode } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -36,6 +37,20 @@ interface Args {
   resourceId: string;
   fileId: string;
   output: string;
+  streamId: string;
+  recipientUserId: string;
+  recipientTeamId: string;
+  taskDisplayMode: SlackTaskDisplayMode;
+  chunks: SlackTaskChunk[];
+}
+function taskChunks(value: string): SlackTaskChunk[] {
+  let parsed: unknown;
+  try { parsed = JSON.parse(value); }
+  catch { throw new InvalidArgumentError("--chunks must be a JSON array of task_update or plan_update objects"); }
+  if (!Array.isArray(parsed) || !parsed.every(chunk => chunk && typeof chunk === "object"
+      && (chunk.type === "task_update" || chunk.type === "plan_update")))
+    throw new InvalidArgumentError("--chunks must be a JSON array of task_update or plan_update objects");
+  return parsed as SlackTaskChunk[];
 }
 function includes(value: string): SlackArchiveInclude[] {
   const names = value.split(",").map(name => name.trim());
@@ -215,6 +230,25 @@ export function registerSlackOperationCommands(
     ),
     (s, o) => s.getOperation(o.connectionId, o.operationId),
   );
+  action(key(connection(operations.command("get-by-key")))
+    .description("Recover an operation by its original key without repeating the write"),
+    (s, o) => s.getOperationByKey(o.connectionId, o));
+  const streams = slack.command("stream").description("Native threaded task progress; never automatically retried");
+  action(key(conversation(streams.command("start")))
+    .requiredOption("--thread-ts <timestamp>", "Original thread timestamp")
+    .requiredOption("--recipient-user-id <id>", "Original Slack recipient user ID")
+    .requiredOption("--recipient-team-id <id>", "Original Slack recipient workspace ID")
+    .requiredOption("--chunks <json>", "JSON array of 1..20 task_update or plan_update chunks", taskChunks)
+    .addOption(new Option("--task-display-mode <mode>", "Task presentation").choices(["timeline", "plan"]).default("timeline")),
+    (s, o) => s.startStream(o.connectionId, o.conversationId, o));
+  action(key(conversation(streams.command("append")))
+    .requiredOption("--stream-id <id>", "Successful start operation UUID, not a message timestamp")
+    .requiredOption("--chunks <json>", "JSON array of 1..20 task chunks", taskChunks),
+    (s, o) => s.appendStream(o.connectionId, o.conversationId, o.streamId, o));
+  action(key(conversation(streams.command("stop")))
+    .requiredOption("--stream-id <id>", "Successful start operation UUID, not a message timestamp")
+    .option("--chunks <json>", "Optional final task chunks, at most 20", taskChunks),
+    (s, o) => s.stopStream(o.connectionId, o.conversationId, o.streamId, o));
   const processing = slack.command("processing-status");
   action(
     key(conversation(processing.command("set")))

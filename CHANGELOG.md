@@ -4,10 +4,16 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## Unreleased
+## 0.7.16 - Slack task progress streams (2026-10-08)
 
 ### Added
 
+- Typed native Slack task progress across Python, TypeScript, Rust, and the CLI:
+  start, append, and close a stream in its original thread, with task and plan
+  updates and stable idempotency keys.
+- Recover Slack operations by their original key without repeating the write.
+  Operation responses include an optional thread timestamp; older capability
+  responses default native task streaming eligibility to `unknown`.
 - Document receive-only sender-address conversations on dedicated iMessage lines,
   with cross-language and CLI coverage for address preservation and propagation of
   `422 recipient_not_e164` errors. Existing string types and methods are unchanged.
@@ -19,6 +25,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `imessage_reply_required_for_phone_numbers` on every line type, including
   dedicated lines. This content restriction ends after the recipient replies;
   outbound `to` recipients still require E.164 phone numbers.
+
+### Notes
+
+- Rust adds `SlackStreamOperation`, `get_stream_operation`, and `task_capabilities`
+  alongside the existing types and methods, preserving old struct literals and
+  exhaustive matches.
+- Stream mutations are never automatically retried. Inspect the returned operation
+  status; `unknown` does not authorize a replacement progress message. Native
+  streaming remains workspace-dependent, even when `chat:write` is granted.
 
 ## 0.7.15 - Cached Slack history context (2026-10-06)
 

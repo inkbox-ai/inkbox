@@ -33,6 +33,11 @@ from inkbox.slack_operations import (
     SlackArchivePurgeResponse,
     SlackProcessingStatus,
     SlackOperationKind,
+    SlackTaskStatus,
+    SlackTaskDisplayMode,
+    SlackTaskUpdate,
+    SlackPlanUpdate,
+    SlackTaskChunk,
 )
 
 
@@ -559,6 +564,11 @@ __all__ = [
     "SlackArchivePurgeResponse",
     "SlackProcessingStatus",
     "SlackOperationKind",
+    "SlackTaskStatus",
+    "SlackTaskDisplayMode",
+    "SlackTaskUpdate",
+    "SlackPlanUpdate",
+    "SlackTaskChunk",
     # Slack
     "SlackResource",
     "SlackContactImportResponse",
