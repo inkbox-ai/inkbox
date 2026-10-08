@@ -758,6 +758,9 @@ pub struct TextMessageRecipient {
     pub delivered_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failed_at: Option<String>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// A text message (SMS or MMS).
@@ -805,6 +808,9 @@ pub struct TextMessage {
     pub sender_phone_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipients: Option<Vec<TextMessageRecipient>>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// One row per text conversation.
@@ -828,6 +834,12 @@ pub struct TextConversationSummary {
     /// Defaults to `false` when absent.
     #[serde(default)]
     pub latest_has_media: bool,
+    #[serde(default)]
+    pub latest_outbound_service: Option<String>,
+    #[serde(default)]
+    pub latest_outbound_status: Option<SmsDeliveryStatus>,
+    #[serde(default)]
+    pub latest_outbound_delivery_final: Option<bool>,
 }
 
 /// Result from updating a text conversation.

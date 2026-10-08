@@ -4,6 +4,35 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.20 - Message delivery finality (unreleased)
+
+### Added
+
+- Server-reported `delivery_final` (`deliveryFinal` in TypeScript) on iMessage and
+  SMS/MMS messages, recipient rows, and webhook payloads across all three SDKs.
+  `true` means stop waiting, not necessarily successful delivery; absent and null
+  values remain unknown, and explicit `false` is preserved.
+- Conversation summaries expose the latest outbound transport, status, and
+  finality independently of the latest inbound message.
+- CLI iMessage and text send results, message tables, and conversation summaries
+  show current delivery status and finality. Sends still return immediately.
+- SMS webhook status types accept the existing `blocked_spam_filter` outcome.
+
+### Deprecated
+
+- `was_downgraded` (`wasDowngraded` in TypeScript) remains an optional compatibility
+  field for older responses. Read `service` for the actual iMessage, RCS, or SMS
+  transport; the legacy flag is not computed from it.
+
+### Notes
+
+- Older API responses and inbound messages have unknown/null finality. SDKs do
+  not infer a delivery outcome or wait automatically; fetch the message again or
+  consume lifecycle webhooks for updates.
+- Rust users constructing response structs directly must initialize the new
+  optional fields, for example with `delivery_final: None`.
+- Release the matching packages before publishing the new feature instructions.
+
 ## 0.7.19 - Call connections and transcript attribution (unreleased)
 
 ### Added

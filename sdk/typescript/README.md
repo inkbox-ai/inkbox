@@ -2297,3 +2297,19 @@ Directory `q` searches handles, descriptions, skills, and published verified
 domains, including domain fragments. Text matches can include unverified agents.
 Use `verifiedDomain: "example.com"` to require an exact current domain in public
 results. Preserve the query and filters when following a cursor.
+
+## Message delivery status
+
+Send methods return immediately; acceptance is not proof of delivery. Outbound
+messages and recipients expose `deliveryFinal` from the server: `true` means stop
+waiting (including failures), `false` means in progress, and null/absent means
+unknown. Check `status (iMessage) or deliveryStatus (SMS/MMS)` and `errorDetail` too. SDKs do not poll automatically.
+For iMessage, `service` identifies `imessage`, `rcs`, or `sms`; the deprecated
+`wasDowngraded` field is retained only for compatibility.
+
+A final SMS-fallback or iMessage-group `sent` does not confirm device delivery.
+Ordinary SMS/MMS can finish delivered, failed, or unconfirmed. Read the message
+again or use existing delivery lifecycle webhooks; do not resend because a send
+is still pending. Conversation summaries expose `latestOutboundService`,
+`latestOutboundStatus`, and `latestOutboundDeliveryFinal` for the latest outbound message, even
+when a newer inbound reply exists.

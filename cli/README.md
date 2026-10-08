@@ -1397,3 +1397,18 @@ Slack sponsorship covers the channel or group DM, including all its threads.
 A new participant joining or the sponsor leaving requires fresh sponsorship;
 another participant leaving alone does not. Explicit blocks still apply.
 Optional `threadTs` in reply context selects a reply thread; it does not limit sponsorship.
+
+## Message delivery status
+
+`imessage send` and `text send` return immediately; acceptance is not proof of delivery. Outbound
+messages and recipients expose `deliveryFinal` from the server: `true` means stop
+waiting (including failures), `false` means in progress, and null/absent means
+unknown. Check `status (iMessage) or deliveryStatus (SMS/MMS)` and `errorDetail` too. The CLI does not poll automatically.
+For iMessage, `service` identifies `imessage`, `rcs`, or `sms`; the deprecated
+`wasDowngraded` field is retained only for compatibility.
+
+A final SMS-fallback or iMessage-group `sent` does not confirm device delivery.
+Ordinary SMS/MMS can finish delivered, failed, or unconfirmed. Use `inkbox imessage get <id> -i <handle>` or `inkbox text get <id> -i <handle>` or use existing delivery lifecycle webhooks; do not resend because a send
+is still pending. Conversation summaries expose `latestOutboundService`,
+`latestOutboundStatus`, and `latestOutboundDeliveryFinal` for the latest outbound message, even
+when a newer inbound reply exists.

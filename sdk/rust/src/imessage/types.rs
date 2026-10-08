@@ -258,6 +258,9 @@ pub struct IMessageRecipient {
     pub delivered_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failed_at: Option<String>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// A live tapback attached to a message in read responses.
@@ -307,6 +310,7 @@ pub struct IMessage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub media: Option<Vec<IMessageMediaItem>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Deprecated compatibility field; use service to identify transport.
     pub was_downgraded: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<IMessageDeliveryStatus>,
@@ -325,6 +329,9 @@ pub struct IMessage {
     /// Live (non-removed) tapbacks targeting this message, oldest first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reactions: Option<Vec<IMessageMessageReaction>>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// Thread metadata added without changing the wrapped public message type.
@@ -435,6 +442,12 @@ pub struct IMessageConversationSummary {
     /// Group lifecycle; `None` for one-to-one conversations and older responses.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_creation_status: Option<IMessageGroupCreationStatus>,
+    #[serde(default)]
+    pub latest_outbound_service: Option<IMessageService>,
+    #[serde(default)]
+    pub latest_outbound_status: Option<IMessageDeliveryStatus>,
+    #[serde(default)]
+    pub latest_outbound_delivery_final: Option<bool>,
 }
 
 /// A tapback reaction on an iMessage.

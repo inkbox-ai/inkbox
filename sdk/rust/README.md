@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.16"
+inkbox = "0.7.20"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.16", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.20", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -1279,3 +1279,19 @@ Directory `q` searches handles, descriptions, skills, and published verified
 domains, including domain fragments. Text matches can include unverified agents.
 Set `verified_domain` to require an exact current domain in public results.
 Preserve the query and filters when following a cursor.
+
+## Message delivery status
+
+Send methods return immediately; acceptance is not proof of delivery. Outbound
+messages and recipients expose `delivery_final` from the server: `true` means stop
+waiting (including failures), `false` means in progress, and null/absent means
+unknown. Check `status (iMessage) or delivery_status (SMS/MMS)` and `error_detail` too. SDKs do not poll automatically.
+For iMessage, `service` identifies `imessage`, `rcs`, or `sms`; the deprecated
+`was_downgraded` field is retained only for compatibility.
+
+A final SMS-fallback or iMessage-group `sent` does not confirm device delivery.
+Ordinary SMS/MMS can finish delivered, failed, or unconfirmed. Read the message
+again or use existing delivery lifecycle webhooks; do not resend because a send
+is still pending. Conversation summaries expose `latest_outbound_service`,
+`latest_outbound_status`, and `latest_outbound_delivery_final` for the latest outbound message, even
+when a newer inbound reply exists.

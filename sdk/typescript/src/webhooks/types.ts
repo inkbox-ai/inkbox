@@ -39,7 +39,8 @@ export type SmsDeliveryStatusWire =
   | "delivered"
   | "delivery_failed"
   | "delivery_unconfirmed"
-  | "sending_failed";
+  | "sending_failed"
+  | "blocked_spam_filter";
 
 export type TextMessageOriginWire = "user_initiated" | "auto_reply";
 
@@ -403,6 +404,7 @@ export interface TextWebhookMessage {
   recipients: RawTextMessageRecipient[] | null;
   created_at: string;
   updated_at: string;
+  delivery_final?: boolean | null;
 }
 
 export interface TextWebhookPayload {
@@ -505,6 +507,7 @@ export interface IMessageRecipientWire {
   sent_at: string | null;
   delivered_at: string | null;
   failed_at: string | null;
+  delivery_final?: boolean | null;
 }
 
 /** A live tapback attached to a message (snake_case wire shape). */
@@ -543,7 +546,8 @@ export interface IMessageWebhookMessage {
   service: IMessageServiceWire;
   send_style: IMessageSendStyleWire | null;
   media: IMessageMediaItemWire[] | null;
-  was_downgraded: boolean | null;
+  /** @deprecated Use service to identify transport. */
+  was_downgraded?: boolean | null;
   status: IMessageDeliveryStatusWire | null;
   error_code: string | null;
   error_message: string | null;
@@ -554,6 +558,7 @@ export interface IMessageWebhookMessage {
   reactions: IMessageMessageReactionWire[] | null;
   created_at: string;
   updated_at: string;
+  delivery_final?: boolean | null;
 }
 
 /**

@@ -472,10 +472,14 @@ class TextMessageRecipient:
     delivered_at: datetime | None = None
     failed_at: datetime | None = None
 
+    # Server-reported finality; None on inbound or older responses.
+    delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMessageRecipient:
         raw_delivery = d.get("delivery_status")
         return cls(
+            delivery_final=d.get("delivery_final"),
             recipient_phone_number=d["recipient_phone_number"],
             delivery_status=SmsDeliveryStatus(raw_delivery) if raw_delivery else None,
             carrier=d.get("carrier"),
@@ -527,6 +531,9 @@ class TextMessage:
     sender_phone_number: str | None = None
     recipients: list[TextMessageRecipient] | None = None
 
+    # Server-reported finality; None on inbound or older responses.
+    delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMessage:
         raw_media = d.get("media")
@@ -542,6 +549,7 @@ class TextMessage:
         raw_origin = d.get("origin")
         raw_conversation_id = d.get("conversation_id")
         return cls(
+            delivery_final=d.get("delivery_final"),
             id=UUID(d["id"]),
             direction=d["direction"],
             local_phone_number=d["local_phone_number"],
@@ -586,10 +594,20 @@ class TextConversationSummary:
     is_group: bool = False
     latest_has_media: bool = False
 
+    latest_outbound_service: str | None = None
+    latest_outbound_status: SmsDeliveryStatus | None = None
+    latest_outbound_delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextConversationSummary:
         raw_id = d.get("id")
         return cls(
+            latest_outbound_service=d.get("latest_outbound_service"),
+            latest_outbound_status=(
+                SmsDeliveryStatus(d["latest_outbound_status"])
+                if d.get("latest_outbound_status") else None
+            ),
+            latest_outbound_delivery_final=d.get("latest_outbound_delivery_final"),
             remote_phone_number=d.get("remote_phone_number"),
             latest_text=d.get("latest_text"),
             latest_direction=d["latest_direction"],
