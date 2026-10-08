@@ -1,0 +1,119 @@
+{
+  "sender": "Sender+tag@example.com",
+  "identity_id": "10000000-0000-4000-8000-000000000001",
+  "message": {
+    "id": "30000000-0000-4000-8000-000000000003",
+    "conversation_id": "20000000-0000-4000-8000-000000000002",
+    "assignment_id": "40000000-0000-4000-8000-000000000004",
+    "direction": "inbound",
+    "remote_number": "Sender+tag@example.com",
+    "sender_number": null,
+    "participants": null,
+    "is_group": false,
+    "content": "Your verification code is 123456.",
+    "message_type": "message",
+    "service": "imessage",
+    "send_style": null,
+    "media": null,
+    "was_downgraded": false,
+    "status": "received",
+    "error_code": null,
+    "error_message": null,
+    "error_reason": null,
+    "error_detail": null,
+    "is_read": false,
+    "recipients": null,
+    "reactions": [
+      {
+        "id": "50000000-0000-4000-8000-000000000005",
+        "direction": "inbound",
+        "reaction": "like",
+        "custom_emoji": null,
+        "remote_number": "Sender+tag@example.com",
+        "part_index": 0,
+        "created_at": "2026-10-07T00:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-07T00:00:00Z",
+    "updated_at": "2026-10-07T00:00:00Z"
+  },
+  "conversation": {
+    "id": "20000000-0000-4000-8000-000000000002",
+    "assignment_id": "40000000-0000-4000-8000-000000000004",
+    "assignment_status": "active",
+    "remote_number": "Sender+tag@example.com",
+    "participants": [
+      "Sender+tag@example.com"
+    ],
+    "is_group": false,
+    "group_creation_status": null,
+    "created_at": "2026-10-07T00:00:00Z",
+    "updated_at": "2026-10-07T00:00:00Z",
+    "latest_text": "Your verification code is 123456.",
+    "latest_direction": "inbound",
+    "latest_message_at": "2026-10-07T00:00:00Z",
+    "latest_has_media": false,
+    "unread_count": 1,
+    "total_count": 1
+  },
+  "assignment": {
+    "id": "40000000-0000-4000-8000-000000000004",
+    "remote_number": "Sender+tag@example.com",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "organization_id": "org_example",
+    "status": "active",
+    "released_at": null,
+    "created_at": "2026-10-07T00:00:00Z",
+    "updated_at": "2026-10-07T00:00:00Z"
+  },
+  "webhook": {
+    "id": "evt_sender_address",
+    "event_type": "imessage.received",
+    "timestamp": "2026-10-07T00:00:00Z",
+    "data": {
+      "message": {
+        "id": "30000000-0000-4000-8000-000000000003",
+        "conversation_id": "20000000-0000-4000-8000-000000000002",
+        "assignment_id": "40000000-0000-4000-8000-000000000004",
+        "direction": "inbound",
+        "remote_number": "Sender+tag@example.com",
+        "sender_number": null,
+        "participants": null,
+        "is_group": false,
+        "content": "Your verification code is 123456.",
+        "message_type": "message",
+        "service": "imessage",
+        "send_style": null,
+        "media": null,
+        "was_downgraded": false,
+        "status": "received",
+        "error_code": null,
+        "error_message": null,
+        "error_reason": null,
+        "error_detail": null,
+        "is_read": false,
+        "recipients": null,
+        "reactions": [
+          {
+            "id": "50000000-0000-4000-8000-000000000005",
+            "direction": "inbound",
+            "reaction": "like",
+            "custom_emoji": null,
+            "remote_number": "Sender+tag@example.com",
+            "part_index": 0,
+            "created_at": "2026-10-07T00:00:00Z"
+          }
+        ],
+        "created_at": "2026-10-07T00:00:00Z",
+        "updated_at": "2026-10-07T00:00:00Z"
+      },
+      "reaction": null,
+      "contacts": [],
+      "agent_identities": []
+    }
+  },
+  "error": {
+    "error": "recipient_not_e164",
+    "message": "Conversations with non-phone senders are receive-only. Outbound iMessage requires an E.164 phone number."
+  }
+}

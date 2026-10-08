@@ -379,6 +379,14 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>
 
 All iMessage commands are identity-scoped and require `-i <handle>`. Shared service requires the recipient to message first; dedicated identities may initiate one-to-one and group conversations. The identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 ```bash
 inkbox imessage triage-number   # the router number + the connect command humans text to it
 inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
@@ -1049,7 +1057,9 @@ watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**. `--no-plain-reply-fallback` requires
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies. `--no-plain-reply-fallback` requires
 `--reply-to-message-id`; `--thread-id` on `imessage list` requires `--conversation-id`.
 
 ```bash

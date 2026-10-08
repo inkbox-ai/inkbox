@@ -713,7 +713,8 @@ pub struct IMessageMessageReactionWire {
 
 /// Stored iMessage. `is_blocked` is not part of the wire body -- blocked
 /// messages never reach the webhook. Group messages have no assignment and
-/// include sender/participant fields.
+/// include sender/participant fields. Dedicated inbound remote_number values may
+/// be non-phone, receive-only sender addresses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookMessage {
     /// Receipt-time admission; omitted when unknown or inapplicable.

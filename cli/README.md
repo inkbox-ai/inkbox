@@ -495,6 +495,14 @@ iMessage over shared service or a dedicated line. Shared-service recipients
 connect first; dedicated identities may initiate one-to-one or group
 conversations.
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 ```bash
 inkbox imessage triage-number                # Router number + the command humans text to connect
 
@@ -1310,7 +1318,9 @@ affiliation in public results.
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**. `--no-plain-reply-fallback` requires
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies. `--no-plain-reply-fallback` requires
 `--reply-to-message-id`; `--thread-id` on `imessage list` requires `--conversation-id`.
 
 ```bash

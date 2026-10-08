@@ -465,6 +465,14 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 iMessage can use the shared service or an organization-owned dedicated line. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service requires the recipient to message first. A dedicated line may start a conversation, subject to consent, contact-rule, and rate-limit checks.
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 Discover the router (triage) number at runtime — it can change, so never hardcode it:
 
 ```python
@@ -536,6 +544,8 @@ idempotency key when retrying an ambiguous claim.
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agent_identity_id` / `is_blocked` filters):
 
 ```python
+import re
+
 from inkbox import IMessageSendStyle
 
 # Send to a connected recipient, or reply into a conversation by UUID.
@@ -579,15 +589,21 @@ for a in connections:
 # accept seven named reactions (love, like, dislike, laugh, emphasize,
 # question, eyes); inbound can also be "custom" with the literal emoji in
 # custom_emoji. Arbitrary custom emoji are not sendable.
-sent_reaction = identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+# This example selects a phone-number 1:1 message, not a receive-only sender.
+target = next((m for m in msgs if m.direction == "inbound" and not m.is_group
+               and not m.is_blocked
+               and re.fullmatch(r"\+[1-9][0-9]{1,14}", m.remote_number or "")), None)
+if target is not None:
+    target_convo = identity.get_imessage_conversation(target.conversation_id)
+    if target_convo.assignment_status == "active":
+        sent_reaction = identity.send_imessage_reaction(message_id=target.id, reaction="like")
 
-# Live tapbacks come back on message reads, oldest first.
-for r in msgs[0].reactions or []:
-    print(r.direction, r.reaction, r.custom_emoji)
+        # Live tapbacks come back on message reads, oldest first.
+        for r in target.reactions or []:
+            print(r.direction, r.reaction, r.custom_emoji)
 
-# Take your own tapback back. Only the sender can. A failed removal leaves the
-# tapback in place rather than clearing it locally, so the call can be retried.
-identity.remove_imessage_reaction(sent_reaction.id)
+        # Take your own tapback back. A failed removal leaves it in place.
+        identity.remove_imessage_reaction(sent_reaction.id)
 
 # Read receipts + typing indicator are one-to-one only; groups return 409.
 identity.mark_imessage_conversation_read(sent.conversation_id)
@@ -1583,7 +1599,9 @@ watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 ```python
 message = identity.get_imessage(message_id)

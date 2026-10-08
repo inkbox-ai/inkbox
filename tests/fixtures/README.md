@@ -22,3 +22,7 @@ contains all 23 event envelopes. Both files contain synthetic identifiers and da
 search, and browser-handoff operations with shared synthetic requests and responses.
 Search cases include optional filters, multiple workspace connections, precise
 timestamps, Unicode queries, and an empty page with a continuation cursor.
+
+`imessage_sender_addresses.json` exercises receive-only sender addresses through
+Python, TypeScript, Rust, webhook reads, and CLI output. The same checks retain
+ordinary phone-number compatibility and the structured outbound rejection.

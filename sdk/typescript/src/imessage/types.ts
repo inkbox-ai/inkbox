@@ -159,6 +159,9 @@ export interface IMessageMessageReaction {
 /**
  * An iMessage in a one-to-one or group conversation.
  *
+ * On dedicated lines, remoteNumber can be a non-phone sender address;
+ * those one-to-one conversations are receive-only.
+ *
  * Group rows have no assignment, carry a best-known participant snapshot,
  * and expose per-recipient outbound delivery state.
  */
@@ -227,6 +230,9 @@ export function parseIMessageThread(r: RawIMessageThread): IMessageThread {
 
 /**
  * One iMessage conversation.
+ *
+ * remoteNumber and participants preserve sender addresses, not only phone
+ * numbers. Non-phone one-to-one conversations are receive-only.
  *
  * One-to-one rows expose assignment state. Group rows have no assignment and
  * expose a best-known participant snapshot and creation lifecycle instead.

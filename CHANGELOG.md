@@ -6,7 +6,21 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
-## 0.7.15 - Cached Slack history context (unreleased)
+### Added
+
+- Document receive-only sender-address conversations on dedicated iMessage lines,
+  with cross-language and CLI coverage for address preservation and propagation of
+  `422 recipient_not_e164` errors. Existing string types and methods are unchanged.
+
+### Changed
+
+- Before the recipient's first reply, one-to-one iMessage text containing phone
+  numbers now returns HTTP `422` with
+  `imessage_reply_required_for_phone_numbers` on every line type, including
+  dedicated lines. This content restriction ends after the recipient replies;
+  outbound `to` recipients still require E.164 phone numbers.
+
+## 0.7.15 - Cached Slack history context (2026-10-06)
 
 ### Added
 

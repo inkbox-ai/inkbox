@@ -480,6 +480,14 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 iMessage can use shared service or an organization-owned dedicated line. Shared service requires the recipient to message first; a dedicated line can initiate one-to-one and group conversations, subject to server-side policy checks.
 
+Dedicated lines can also receive one-to-one messages from non-phone sender
+addresses, such as `sender@example.com`. Read responses and `imessage.received`
+webhooks preserve the address as a string; do not normalize it into a phone number
+or assume every received message can be answered. These conversations are
+**receive-only**: sending messages, reactions, typing indicators, or read receipts
+returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
+be E.164 phone numbers. Reading message history does not send a read receipt.
+
 Discover the router (triage) line at runtime — it can change, so never hardcode it:
 
 ```typescript
@@ -558,16 +566,23 @@ for (const a of connections) {
 // accept seven named reactions (love, like, dislike, laugh, emphasize,
 // question, eyes); inbound can also be "custom" with the literal emoji in
 // customEmoji. Arbitrary custom emoji are not sendable.
-const sentReaction = await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+// This example selects a phone-number 1:1 message, not a receive-only sender.
+const target = msgs.find(m => m.direction === "inbound" && !m.isGroup && !m.isBlocked
+  && /^\+[1-9][0-9]{1,14}$/.test(m.remoteNumber ?? ""));
+if (target) {
+  const targetConvo = await identity.getIMessageConversation(target.conversationId);
+  if (targetConvo.assignmentStatus === "active") {
+    const sentReaction = await identity.sendIMessageReaction({ messageId: target.id, reaction: "like" });
 
-// Live tapbacks come back on message reads, oldest first.
-for (const r of msgs[0].reactions ?? []) {
-  console.log(r.direction, r.reaction, r.customEmoji);
+    // Live tapbacks come back on message reads, oldest first.
+    for (const r of target.reactions ?? []) {
+      console.log(r.direction, r.reaction, r.customEmoji);
+    }
+
+    // Take your own tapback back. A failed removal leaves it in place.
+    await identity.removeIMessageReaction(sentReaction.id);
+  }
 }
-
-// Take your own tapback back. Only the sender can. A failed removal leaves the
-// tapback in place rather than clearing it locally, so the call can be retried.
-await identity.removeIMessageReaction(sentReaction.id);
 
 // Read receipts + typing indicator are one-to-one only; groups return 409.
 await identity.markIMessageConversationRead(sent.conversationId);
@@ -1599,7 +1614,9 @@ watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
 ## Threaded iMessage replies
 
-Requires SDK/CLI **0.7.13 or later**.
+Requires SDK/CLI **0.7.13 or later**. These reply examples require a
+phone-number conversation or a supported group; non-phone one-to-one
+conversations remain receive-only, including threaded replies.
 
 ```typescript
 const message = await identity.getIMessage(messageId);
