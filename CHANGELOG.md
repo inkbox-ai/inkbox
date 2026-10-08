@@ -4,16 +4,10 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.15 - Cached Slack history context (unreleased)
+## Unreleased
 
 ### Added
 
-- Read retained Slack messages with optional cached conversation, sender, reaction,
-  and file context; page main timelines separately from ordinary thread replies.
-- Search paginated custom emoji definitions, read cached avatars and emoji images,
-  and download available file previews with authenticated SDK and CLI methods.
-- Preserve reaction completeness, unknown counts, thread summaries, rich message
-  content, file-copy availability, and connection generation in typed responses.
 - Document receive-only sender-address conversations on dedicated iMessage lines,
   with cross-language and CLI coverage for address preservation and propagation of
   `422 recipient_not_e164` errors. Existing string types and methods are unchanged.
@@ -25,6 +19,17 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `imessage_reply_required_for_phone_numbers` on every line type, including
   dedicated lines. This content restriction ends after the recipient replies;
   outbound `to` recipients still require E.164 phone numbers.
+
+## 0.7.15 - Cached Slack history context (2026-10-06)
+
+### Added
+
+- Read retained Slack messages with optional cached conversation, sender, reaction,
+  and file context; page main timelines separately from ordinary thread replies.
+- Search paginated custom emoji definitions, read cached avatars and emoji images,
+  and download available file previews with authenticated SDK and CLI methods.
+- Preserve reaction completeness, unknown counts, thread summaries, rich message
+  content, file-copy availability, and connection generation in typed responses.
 
 ### Compatibility
 
