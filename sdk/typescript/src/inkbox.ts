@@ -295,6 +295,10 @@ export class Inkbox {
 
     if (vaultKey !== undefined) {
       this._vaultUnlockPromise = this._vaultResource.unlock(vaultKey);
+      // Mark the rejection as handled so a failed unlock does not crash the
+      // process when callers never await `ready()` / `getCredentials()`.
+      // Those still await the original promise and surface the error.
+      this._vaultUnlockPromise.catch(() => {});
     }
   }
 
