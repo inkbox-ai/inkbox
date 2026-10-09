@@ -4,6 +4,14 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.17 - Python tunnel TLS compatibility (unreleased)
+
+### Changed
+
+- Python tunnels connect with platform certificate verifiers that do not support
+  certificate-store statistics, preserving certificate and hostname verification
+  and the certificate-bundle fallback for known-empty stores.
+
 ## 0.7.16 - Slack task progress streams (2026-10-08)
 
 ### Added
