@@ -1,3 +1,8 @@
+import {
+  parsePhoneTranscriptSpeaker,
+  type PhoneTranscriptSpeaker,
+  type RawPhoneTranscriptSpeaker,
+} from "../phone/types.js";
 import type { SenderAccess } from "../sender_access.js";
 
 export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack";
@@ -18,6 +23,7 @@ export interface CorrespondenceAttachmentMetadata {
 }
 
 export interface CorrespondenceTranscriptEntry {
+  speaker?: PhoneTranscriptSpeaker | null;
   id: string | null;
   seq: number | null;
   party: string | null;
@@ -193,6 +199,7 @@ export interface RawCallCorrespondenceItem extends RawCorrespondenceItemBase {
   ended_at: string | null;
   duration_seconds: number | null;
   transcript: Array<{
+    speaker?: RawPhoneTranscriptSpeaker | null;
     id: string | null;
     seq: number | null;
     party: string | null;
@@ -316,6 +323,7 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
           marker: t.marker,
           omittedTurns: t.omitted_turns,
           omittedMs: t.omitted_ms,
+          speaker: t.speaker == null ? null : parsePhoneTranscriptSpeaker(t.speaker),
         })) ?? null,
         transcriptAbridged: r.transcript_abridged,
         transcriptUnavailable: r.transcript_unavailable,

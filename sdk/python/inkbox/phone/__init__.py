@@ -4,6 +4,11 @@ inkbox.phone — phone types and exceptions.
 
 from inkbox.phone.exceptions import InkboxAPIError, InkboxError
 from inkbox.contact_rules import ContactRuleDirection
+from inkbox.transcripts import (
+    PhoneTranscriptSpeaker,
+    PhoneTranscriptSpeakerKind,
+    PhoneTranscriptSpeakerWire,
+)
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
@@ -62,6 +67,9 @@ __all__ = [
     "PhoneCallWithRateLimit",
     "PhoneNumber",
     "PhoneTranscript",
+    "PhoneTranscriptSpeaker",
+    "PhoneTranscriptSpeakerKind",
+    "PhoneTranscriptSpeakerWire",
     "PostCallActionItem",
     "RateLimitInfo",
     "SigningKey",

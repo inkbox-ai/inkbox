@@ -13,6 +13,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 from inkbox.contacts.types import Contact
+from inkbox.transcripts import PhoneTranscriptSpeaker
 
 from inkbox.mail.types import ContactRuleStatus, FilterMode, FilterModeChangeNotice
 
@@ -619,7 +620,7 @@ class TextConversationUpdateResult:
 
 @dataclass
 class PhoneTranscript:
-    """A transcript segment from a phone call."""
+    """A transcript segment. ``speaker`` is unknown for older/unattributed turns."""
 
     id: UUID
     call_id: UUID
@@ -628,9 +629,11 @@ class PhoneTranscript:
     party: str
     text: str
     created_at: datetime
+    speaker: PhoneTranscriptSpeaker | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneTranscript:
+        raw_speaker = d.get("speaker")
         return cls(
             id=UUID(d["id"]),
             call_id=UUID(d["call_id"]),
@@ -639,6 +642,10 @@ class PhoneTranscript:
             party=d["party"],
             text=d["text"],
             created_at=datetime.fromisoformat(d["created_at"]),
+            speaker=(
+                PhoneTranscriptSpeaker._from_dict(raw_speaker)
+                if raw_speaker is not None else None
+            ),
         )
 
 

@@ -260,6 +260,8 @@ pub struct WebhookContextTextItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookTranscriptEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<crate::phone::types::PhoneTranscriptSpeaker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub party: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,

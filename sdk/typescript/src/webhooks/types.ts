@@ -9,6 +9,7 @@
  */
 
 import type {
+  RawPhoneTranscriptSpeaker,
   RawRateLimitInfo,
   RawTextMediaItem,
   RawTextMessageRecipient,
@@ -162,6 +163,7 @@ export interface WebhookContextTextItem {
  * `marker`/`omitted_turns`/`omitted_ms`.
  */
 export interface WebhookTranscriptEntry {
+  speaker?: RawPhoneTranscriptSpeaker | null;
   party?: string;
   text?: string;
   ts_ms?: number;

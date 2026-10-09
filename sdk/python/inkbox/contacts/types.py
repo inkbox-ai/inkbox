@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID
 from inkbox.contact_rules import _UNSET
 from inkbox.sender_access import SenderAccess
+from inkbox.transcripts import PhoneTranscriptSpeaker
 
 
 def _opt_uuid(value: Any) -> UUID | None:
@@ -617,6 +618,7 @@ class CorrespondenceTranscriptEntry:
     marker: CorrespondenceTranscriptMarker | None = None
     omitted_turns: int | None = None
     omitted_ms: int | None = None
+    speaker: PhoneTranscriptSpeaker | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CorrespondenceTranscriptEntry:
@@ -633,6 +635,10 @@ class CorrespondenceTranscriptEntry:
             ),
             omitted_turns=d.get("omitted_turns"),
             omitted_ms=d.get("omitted_ms"),
+            speaker=(
+                PhoneTranscriptSpeaker._from_dict(d["speaker"])
+                if d.get("speaker") is not None else None
+            ),
         )
 
 
