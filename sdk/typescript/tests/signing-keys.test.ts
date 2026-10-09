@@ -17,9 +17,9 @@ function makeSignature(key: string, requestId: string, timestamp: string, body: 
 }
 
 function makeResource() {
-  const http = { post: vi.fn() } as unknown as HttpTransport;
+  const http = { post: vi.fn(), get: vi.fn() } as unknown as HttpTransport;
   const resource = new SigningKeysResource(http);
-  return { resource, http: http as { post: ReturnType<typeof vi.fn> } };
+  return { resource, http: http as { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> } };
 }
 
 function makeHeaders(sig: string): Record<string, string> {
@@ -107,6 +107,25 @@ describe("SigningKeysResource", () => {
       expect(key.signingKey).toBe("sk-test-hmac-secret-abc123");
       expect(key.createdAt).toBeInstanceOf(Date);
       expect(key.createdAt.toISOString()).toBe("2026-03-09T00:00:00.000Z");
+    });
+
+    it("URL-encodes agentHandle with @ or special characters", async () => {
+      const { resource, http } = makeResource();
+      http.post.mockResolvedValue(RAW_SIGNING_KEY);
+
+      await resource.createOrRotate("@support-agent");
+      expect(http.post).toHaveBeenCalledWith("/identities/%40support-agent/signing-key", {});
+    });
+  });
+
+  describe("getStatus", () => {
+    it("URL-encodes agentHandle with @ or special characters", async () => {
+      const { resource, http } = makeResource();
+      http.get.mockResolvedValue({ configured: true, created_at: "2026-03-09T00:00:00.000Z" });
+
+      const status = await resource.getStatus("@support-agent");
+      expect(http.get).toHaveBeenCalledWith("/identities/%40support-agent/signing-key");
+      expect(status.configured).toBe(true);
     });
   });
 });
