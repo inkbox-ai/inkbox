@@ -16,6 +16,9 @@ describe("transcript speaker snapshots", () => {
     expect(turns[0].speaker?.phoneNumber).toBe(rows[0].speaker?.phone_number);
     expect(turns[2].speaker?.agentIdentityId).toBe(rows[2].speaker?.agent_identity_id);
     expect(turns.map((t) => t.text)).toEqual(rows.map((t) => t.text));
+    expect(turns.map((t) => t.phoneNumber)).toEqual(rows.map((r) => r.phone_number));
+    expect(turns[0].phoneNumber).not.toBe(turns[1].phoneNumber);
+    expect(turns[2].phoneNumber).toBeNull();
     expect(turns[3].speaker).toBeNull();
     const { speaker: _, ...legacy } = rows[3];
     expect(parsePhoneTranscript(legacy).speaker).toBeNull();
@@ -32,8 +35,19 @@ describe("transcript speaker snapshots", () => {
     const call = parseCorrespondenceItem(raw);
     if (call.channel !== "calls") throw new Error("Expected call correspondence");
     expect(call.transcript?.map((t) => t.speaker)).toEqual(rows.map((r) => parsePhoneTranscript(r).speaker));
-    const entry: WebhookTranscriptEntry = { speaker: rows[0].speaker };
+    expect(call.transcript?.map((t) => t.phoneNumber)).toEqual(rows.map((r) => r.phone_number));
+    const entry: WebhookTranscriptEntry = { speaker: rows[0].speaker, phone_number: rows[0].phone_number };
     expect(entry.speaker?.phone_number).toBe("+14155550100");
+    expect(entry.phone_number).toBe("+14155550100");
+  });
+
+  it("keeps a dedicated local number and never infers a missing or null turn number", () => {
+    expect(parsePhoneTranscript({ ...rows[2], phone_number: "+14155550102" }).phoneNumber).toBe("+14155550102");
+    expect(parsePhoneTranscript({ ...rows[0], phone_number: null }).phoneNumber).toBeNull();
+    const { phone_number: _, ...legacy } = rows[0];
+    expect(parsePhoneTranscript(legacy).phoneNumber).toBeNull();
+    const shared: WebhookTranscriptEntry = { party: "local", phone_number: null };
+    expect(shared.phone_number).toBeNull();
   });
 
   it("defaults optional facts without inventing identity", () => {

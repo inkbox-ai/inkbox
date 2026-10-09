@@ -14,7 +14,8 @@
       "phone_number": "+14155550100",
       "contact_id": "44444444-4444-4444-8444-444444444444",
       "agent_identity_id": null
-    }
+    },
+    "phone_number": "+14155550100"
   },
   {
     "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000002",
@@ -31,7 +32,8 @@
       "phone_number": "+14155550101",
       "contact_id": null,
       "agent_identity_id": null
-    }
+    },
+    "phone_number": "+14155550101"
   },
   {
     "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
@@ -48,7 +50,8 @@
       "phone_number": null,
       "contact_id": null,
       "agent_identity_id": "55555555-5555-4555-8555-555555555555"
-    }
+    },
+    "phone_number": null
   },
   {
     "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000004",
@@ -58,6 +61,7 @@
     "party": "remote",
     "text": "Taylor: this is literal historical text.",
     "created_at": "2026-03-10T12:00:00Z",
-    "speaker": null
+    "speaker": null,
+    "phone_number": null
   }
 ]

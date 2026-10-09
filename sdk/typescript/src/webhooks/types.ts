@@ -164,6 +164,7 @@ export interface WebhookContextTextItem {
  */
 export interface WebhookTranscriptEntry {
   speaker?: RawPhoneTranscriptSpeaker | null;
+  phone_number?: string | null;
   party?: string;
   text?: string;
   ts_ms?: number;

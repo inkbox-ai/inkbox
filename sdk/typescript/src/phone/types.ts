@@ -388,6 +388,8 @@ export interface PhoneTranscript {
   createdAt: Date;
   /** Unknown for older or unattributed turns; distinct from local/remote party. */
   speaker?: PhoneTranscriptSpeaker | null;
+  /** This turn's line number; null for shared local lines or unknown attribution. */
+  phoneNumber?: string | null;
 }
 
 export enum HostedAgentToolInvocationStatus {
@@ -749,6 +751,7 @@ export interface RawPhoneTranscript {
   text: string;
   created_at: string;
   speaker?: RawPhoneTranscriptSpeaker | null;
+  phone_number?: string | null;
 }
 
 export interface RawHostedAgentToolInvocation {
@@ -973,6 +976,7 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
     party: r.party,
     text: r.text,
     createdAt: new Date(r.created_at),
+    phoneNumber: r.phone_number ?? null,
     speaker: r.speaker == null ? null : parsePhoneTranscriptSpeaker(r.speaker),
   };
 }

@@ -630,6 +630,7 @@ class PhoneTranscript:
     text: str
     created_at: datetime
     speaker: PhoneTranscriptSpeaker | None = None
+    phone_number: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneTranscript:
@@ -641,6 +642,7 @@ class PhoneTranscript:
             ts_ms=d["ts_ms"],
             party=d["party"],
             text=d["text"],
+            phone_number=d.get("phone_number"),
             created_at=datetime.fromisoformat(d["created_at"]),
             speaker=(
                 PhoneTranscriptSpeaker._from_dict(raw_speaker)

@@ -619,6 +619,7 @@ class CorrespondenceTranscriptEntry:
     omitted_turns: int | None = None
     omitted_ms: int | None = None
     speaker: PhoneTranscriptSpeaker | None = None
+    phone_number: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CorrespondenceTranscriptEntry:
@@ -635,6 +636,7 @@ class CorrespondenceTranscriptEntry:
             ),
             omitted_turns=d.get("omitted_turns"),
             omitted_ms=d.get("omitted_ms"),
+            phone_number=d.get("phone_number"),
             speaker=(
                 PhoneTranscriptSpeaker._from_dict(d["speaker"])
                 if d.get("speaker") is not None else None

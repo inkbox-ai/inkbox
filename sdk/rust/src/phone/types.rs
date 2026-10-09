@@ -827,6 +827,9 @@ pub struct PhoneTranscript {
     /// None for older or unattributed turns. Do not infer identity from text.
     #[serde(default)]
     pub speaker: Option<PhoneTranscriptSpeaker>,
+    /// This turn's line number; None for shared local lines or unknown attribution.
+    #[serde(default)]
+    pub phone_number: Option<String>,
 }
 
 /// Execution state for a Voice AI tool invocation.

@@ -245,13 +245,10 @@ export function registerPhoneCommands(program: Command): void {
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const transcripts = await identity.listTranscripts(callId);
         output(
-          opts.json ? transcripts : transcripts.map((turn) => ({
-            ...turn,
-            speaker: turn.speaker?.name ?? turn.speaker?.phoneNumber ?? turn.speaker?.id ?? null,
-          })),
+          transcripts,
           {
             json: !!opts.json,
-            columns: ["seq", "party", "speaker", "text", "createdAt"],
+            columns: ["seq", "party", "phoneNumber", "text", "createdAt"],
           },
         );
       }),
@@ -357,13 +354,10 @@ export function registerPhoneCommands(program: Command): void {
           },
         );
         output(
-          opts.json ? transcripts : transcripts.map((turn) => ({
-            ...turn,
-            speaker: turn.speaker?.name ?? turn.speaker?.phoneNumber ?? turn.speaker?.id ?? null,
-          })),
+          transcripts,
           {
             json: !!opts.json,
-            columns: ["id", "callId", "seq", "party", "speaker", "text", "createdAt"],
+            columns: ["id", "callId", "seq", "party", "phoneNumber", "text", "createdAt"],
           },
         );
       }),

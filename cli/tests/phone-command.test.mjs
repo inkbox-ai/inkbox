@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFile, execFileSync } from "node:child_process";
 import http from "node:http";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { buildPlaceCallOptions } from "../dist/commands/phone.js";
 
@@ -68,6 +69,38 @@ const IDENTITY = {
   },
   tunnel: null,
 };
+
+for (const args of [
+  ["transcripts", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
+  ["search-transcripts", "--query", "Hello"],
+]) {
+  test(`${args[0]} shows only a number attribution column and preserves JSON metadata`, async () => {
+    const turns = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_transcript_speakers.json", import.meta.url), "utf8"));
+    const mock = await listen((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(req.url === "/api/v1/identities/support-bot" ? IDENTITY : turns));
+    });
+    try {
+      const options = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`];
+      const result = await runCli([...options, "phone", ...args, "-i", "support-bot"]);
+      assert.ifError(result.error);
+      assert.match(result.stdout.split("\n")[0], /phoneNumber/);
+      assert.doesNotMatch(result.stdout.split("\n")[0], /speaker/);
+      assert.match(result.stdout, /\+14155550100/);
+      assert.match(result.stdout, /\+14155550101/);
+      assert.doesNotMatch(result.stdout, /Assistant|11111111-1111-5111-8111-111111111111/);
+      const json = await runCli([...options, "--json", "phone", ...args, "-i", "support-bot"]);
+      assert.ifError(json.error);
+      const parsed = JSON.parse(json.stdout);
+      assert.equal(parsed[0].phoneNumber, turns[0].phone_number);
+      assert.equal(parsed[0].speaker.name, turns[0].speaker.name);
+      assert.equal(parsed[2].phoneNumber, null);
+      assert.equal(parsed[3].text, turns[3].text);
+    } finally {
+      mock.server.close();
+    }
+  });
+}
 
 test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /--authority-mode <mode>/);

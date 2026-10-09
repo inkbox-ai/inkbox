@@ -213,6 +213,7 @@ class WebhookTranscriptEntryWire(TypedDict, total=False):
     text: str
     ts_ms: int
     speaker: PhoneTranscriptSpeakerWire | None
+    phone_number: str | None
     truncated: bool
     marker: Literal["abridged"]
     omitted_turns: int
