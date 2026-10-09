@@ -26,11 +26,12 @@ def create_default_verify_context() -> ssl.SSLContext:
     """
     ctx = ssl.create_default_context()
     try:
-        stats = ctx.cert_store_stats()
+        empty_store = ctx.cert_store_stats().get("x509_ca", 0) == 0
     except NotImplementedError:
-        # Platform verifiers can validate certificates without exposing their store.
-        return ctx
-    if stats.get("x509_ca", 0) == 0:
+        # ``truststore.SSLContext`` (injected via ``truststore.inject_into_ssl()``)
+        # verifies against the platform store and does not expose store stats.
+        empty_store = False
+    if empty_store:
         try:
             import certifi
 
