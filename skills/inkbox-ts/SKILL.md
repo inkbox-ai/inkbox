@@ -471,9 +471,9 @@ await identity.markTextRead("text-uuid");
 const readResult = await identity.markTextConversationRead("+15551234567");
 console.log(readResult.updatedCount);
 
-// Admin-only: search, update, delete
+// Admin-only: search and update read state
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
+await inkbox.texts.update(phone.id, "text-uuid", { isRead: false });
 ```
 
 ## iMessage

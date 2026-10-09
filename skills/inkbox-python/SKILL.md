@@ -456,9 +456,9 @@ identity.mark_text_read("text-uuid")
 result = identity.mark_text_conversation_read("+15551234567")
 print(result["updated_count"])
 
-# Admin-only: search, update, delete
+# Admin-only: search and update read state
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
-inkbox.texts.update(phone.id, "text-uuid", status="deleted")
+inkbox.texts.update(phone.id, "text-uuid", is_read=False)
 ```
 
 ## iMessage

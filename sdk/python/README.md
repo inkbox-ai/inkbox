@@ -629,9 +629,9 @@ msgs = identity.get_text_conversation("+15551234567", limit=50)
 identity.mark_text_read("text-uuid")
 identity.mark_text_conversation_read("+15551234567")
 
-# Org-level: search and delete
+# Org-level: search and update read state
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
-inkbox.texts.update(phone.id, "text-uuid", status="deleted")
+inkbox.texts.update(phone.id, "text-uuid", is_read=False)
 ```
 
 ---
