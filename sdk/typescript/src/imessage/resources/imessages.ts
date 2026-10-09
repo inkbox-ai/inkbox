@@ -68,14 +68,17 @@ export class IMessagesResource {
   async getThread(messageId: string, options?: {
     agentIdentityId?: string; limit?: number; cursor?: string;
   }): Promise<IMessageThread> {
-    return this.getThreadPage(`/messages/${messageId}/thread`, options);
+    return this.getThreadPage(`/messages/${encodeURIComponent(messageId)}/thread`, options);
   }
 
   /** Read a thread by its opaque ID within a conversation. */
   async getConversationThread(conversationId: string, threadId: string, options?: {
     agentIdentityId?: string; limit?: number; cursor?: string;
   }): Promise<IMessageThread> {
-    return this.getThreadPage(`/conversations/${conversationId}/threads/${threadId}`, options);
+    return this.getThreadPage(
+      `/conversations/${encodeURIComponent(conversationId)}/threads/${encodeURIComponent(threadId)}`,
+      options,
+    );
   }
 
   private async getThreadPage(path: string, options?: {
@@ -89,7 +92,7 @@ export class IMessagesResource {
 
   /** Read a visible message and its current delivery status. */
   async get(messageId: string, options?: { agentIdentityId?: string }): Promise<IMessage> {
-    const data = await this.http.get<RawIMessage>(`/messages/${messageId}`,
+    const data = await this.http.get<RawIMessage>(`/messages/${encodeURIComponent(messageId)}`,
       options?.agentIdentityId ? { agent_identity_id: options.agentIdentityId } : undefined);
     return parseIMessage(data);
   }
@@ -339,7 +342,7 @@ export class IMessagesResource {
    * @param assignmentId - UUID of the connection, from `listAssignments`.
    */
   async releaseAssignment(assignmentId: string): Promise<void> {
-    await this.http.delete(`/assignments/${assignmentId}`);
+    await this.http.delete(`/assignments/${encodeURIComponent(assignmentId)}`);
   }
 
   /**
@@ -404,7 +407,7 @@ export class IMessagesResource {
       params["agent_identity_id"] = options.agentIdentityId;
     }
     const data = await this.http.get<RawIMessageConversation>(
-      `/conversations/${conversationId}`,
+      `/conversations/${encodeURIComponent(conversationId)}`,
       params,
     );
     return parseIMessageConversation(data);
@@ -448,7 +451,7 @@ export class IMessagesResource {
    * @param reactionId - UUID of the reaction to take back.
    */
   async removeReaction(reactionId: string): Promise<void> {
-    await this.http.delete(`/reactions/${reactionId}`);
+    await this.http.delete(`/reactions/${encodeURIComponent(reactionId)}`);
   }
 
   /**
