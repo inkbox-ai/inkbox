@@ -46,16 +46,28 @@ function readConfigFile(): Record<string, string> {
   }
 }
 
+// Flag, then env var, then ~/.inkbox/config. An empty env var counts as
+// unset (matching the SDKs' resolveClientSettings), so `INKBOX_API_KEY=`
+// exported in CI or a container doesn't hide the config file.
+function pick(
+  flag: string | undefined,
+  env: string,
+  fileValue: () => string | undefined,
+): string | undefined {
+  if (flag !== undefined) return flag;
+  const envValue = process.env[env];
+  if (envValue) return envValue;
+  return fileValue();
+}
+
 /** Same precedence as createClient: flag, then env, then ~/.inkbox/config. */
 export function resolveBaseUrl(opts: GlobalOpts): string | undefined {
-  return (
-    opts.baseUrl ?? process.env.INKBOX_BASE_URL ?? readConfigFile().base_url
-  );
+  return pick(opts.baseUrl, "INKBOX_BASE_URL", () => readConfigFile().base_url);
 }
 
 export function createClient(opts: GlobalOpts, timeoutMs?: number): Inkbox {
   const fileCfg = readConfigFile();
-  const apiKey = opts.apiKey ?? process.env.INKBOX_API_KEY ?? fileCfg.api_key;
+  const apiKey = pick(opts.apiKey, "INKBOX_API_KEY", () => fileCfg.api_key);
   if (!apiKey) {
     console.error(
       "Error: API key required. Set INKBOX_API_KEY, pass --api-key, or add " +
@@ -63,9 +75,8 @@ export function createClient(opts: GlobalOpts, timeoutMs?: number): Inkbox {
     );
     process.exit(1);
   }
-  const vaultKey =
-    opts.vaultKey ?? process.env.INKBOX_VAULT_KEY ?? fileCfg.vault_key;
-  const baseUrl = opts.baseUrl ?? process.env.INKBOX_BASE_URL ?? fileCfg.base_url;
+  const vaultKey = pick(opts.vaultKey, "INKBOX_VAULT_KEY", () => fileCfg.vault_key);
+  const baseUrl = pick(opts.baseUrl, "INKBOX_BASE_URL", () => fileCfg.base_url);
   return new Inkbox({
     apiKey,
     vaultKey: vaultKey || undefined,
