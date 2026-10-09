@@ -25,7 +25,12 @@ def create_default_verify_context() -> ssl.SSLContext:
     ``SSL_CERT_FILE`` still wins.
     """
     ctx = ssl.create_default_context()
-    if ctx.cert_store_stats().get("x509_ca", 0) == 0:
+    try:
+        stats = ctx.cert_store_stats()
+    except NotImplementedError:
+        # Platform verifiers can validate certificates without exposing their store.
+        return ctx
+    if stats.get("x509_ca", 0) == 0:
         try:
             import certifi
 
