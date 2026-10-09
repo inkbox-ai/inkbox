@@ -11,6 +11,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python tunnels connect with platform certificate verifiers that do not support
   certificate-store statistics, preserving certificate and hostname verification
   and the certificate-bundle fallback for known-empty stores.
+- Call and webhook histories distinguish automatic forwarding, live transfers,
+  and three-way calls across Python, TypeScript, and Rust. Existing read methods
+  expose the outcome without adding manual transfer or conference commands.
+  Rust exhaustive matches on `CallForwardingTrigger` must handle the new
+  `LiveTransfer` and `LiveConference` variants.
 
 ## 0.7.16 - Slack task progress streams (2026-10-08)
 

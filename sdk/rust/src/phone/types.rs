@@ -326,6 +326,8 @@ impl ForwardingTargetType {
 #[serde(rename_all = "snake_case")]
 pub enum CallForwardingTrigger {
     IncomingAction,
+    LiveTransfer,
+    LiveConference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1063,6 +1065,29 @@ mod tests {
         assert!(back.get("call").is_none());
         assert_eq!(back["id"], v["id"]);
         assert_eq!(back["rate_limit"]["calls_limit"], 10);
+    }
+
+    #[test]
+    fn phone_call_preserves_mixed_operation_history() {
+        let history: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/call_forwardings.json"
+        ))
+        .unwrap();
+        let mut value = call_json();
+        value["forwardings"] = history.clone();
+        let call: PhoneCall = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            call.forwardings
+                .iter()
+                .map(|attempt| attempt.trigger)
+                .collect::<Vec<_>>(),
+            vec![
+                CallForwardingTrigger::IncomingAction,
+                CallForwardingTrigger::LiveTransfer,
+                CallForwardingTrigger::LiveConference
+            ]
+        );
+        assert_eq!(serde_json::to_value(&call.forwardings).unwrap(), history);
     }
 
     #[test]

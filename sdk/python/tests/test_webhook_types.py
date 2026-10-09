@@ -29,11 +29,20 @@ from inkbox import (
     VoicemailDetectionWire,
     WebhookMailAgentIdentity,
     WebhookMailContact,
+    WebhookPhoneCallForwarding,
 )
 
 
 def test_imessage_group_reaction_assignment_is_nullable():
     assert get_type_hints(IMessageWebhookReaction)["assignment_id"] == str | None
+
+
+def test_call_operation_history_matches_exported_webhook_wire_type():
+    path = Path(__file__).resolve().parents[3] / "tests/fixtures/call_forwardings.json"
+    history = json.loads(path.read_text())
+    values = set(get_args(get_type_hints(WebhookPhoneCallForwarding)["trigger"]))
+    assert values == {"incoming_action", "live_transfer", "live_conference"}
+    assert {item["trigger"] for item in history} == values
 
 
 def test_imessage_reaction_wire_keeps_eyes_and_inbound_custom_distinct():

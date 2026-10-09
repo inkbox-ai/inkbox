@@ -1380,6 +1380,33 @@ mod tests {
     }
 
     #[test]
+    fn call_ended_preserves_mixed_operation_history() {
+        let mut payload: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/webhook_payloads/call_ended_hosted.json"
+        ))
+        .unwrap();
+        payload["data"]["call"]["forwardings"] = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/call_forwardings.json"
+        ))
+        .unwrap();
+        let parsed: CallEndedWebhookPayload = serde_json::from_value(payload).unwrap();
+        assert_eq!(
+            parsed
+                .data
+                .call
+                .forwardings
+                .iter()
+                .map(|attempt| attempt.trigger)
+                .collect::<Vec<_>>(),
+            vec![
+                crate::phone::CallForwardingTrigger::IncomingAction,
+                crate::phone::CallForwardingTrigger::LiveTransfer,
+                crate::phone::CallForwardingTrigger::LiveConference
+            ]
+        );
+    }
+
+    #[test]
     fn call_ended_hosted_carries_mode_reason_outcome_and_actions() {
         let raw = r#"{
             "id": "evt_hosted",

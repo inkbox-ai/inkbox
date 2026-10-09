@@ -725,7 +725,7 @@ class WebhookPhoneCallForwarding(TypedDict):
     """One forwarding attempt embedded in a call lifecycle webhook."""
 
     id: str
-    trigger: Literal["incoming_action"]
+    trigger: Literal["incoming_action", "live_transfer", "live_conference"]
     status: Literal["requested", "dialing", "forwarded", "failed"]
     target_type: Literal["phone", "sip"]
     target: str
