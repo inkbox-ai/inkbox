@@ -114,8 +114,6 @@ pub struct CorrespondenceAttachmentMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorrespondenceTranscriptEntry {
     #[serde(default)]
-    pub speaker: Option<crate::phone::types::PhoneTranscriptSpeaker>,
-    #[serde(default)]
     pub phone_number: Option<String>,
     #[serde(default)]
     pub id: Option<Uuid>,

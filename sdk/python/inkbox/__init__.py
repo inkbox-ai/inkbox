@@ -176,11 +176,6 @@ from inkbox.mail.types import (
 )
 
 # Phone types
-from inkbox.transcripts import (
-    PhoneTranscriptSpeaker,
-    PhoneTranscriptSpeakerKind,
-    PhoneTranscriptSpeakerWire,
-)
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
@@ -706,9 +701,6 @@ __all__ = [
     "PhoneRuleAction",
     "PhoneRuleMatchType",
     "PhoneTranscript",
-    "PhoneTranscriptSpeaker",
-    "PhoneTranscriptSpeakerKind",
-    "PhoneTranscriptSpeakerWire",
     "PostCallActionItem",
     "RateLimitInfo",
     "SmsDeliveryStatus",

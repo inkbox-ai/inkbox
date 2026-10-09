@@ -1,12 +1,12 @@
 use inkbox::contacts::CorrespondenceTranscriptEntry;
-use inkbox::phone::{PhoneTranscript, PhoneTranscriptSpeaker, PhoneTranscriptSpeakerKind};
+use inkbox::phone::PhoneTranscript;
 use inkbox::webhooks::types::WebhookTranscriptEntry;
 use serde_json::{json, Value};
 
 #[test]
-fn speaker_snapshots_survive_all_transcript_shapes() {
+fn turn_phone_numbers_survive_all_transcript_shapes() {
     let rows: Vec<Value> = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/phone_transcript_speakers.json"
+        "../../../tests/fixtures/phone_transcript_numbers.json"
     ))
     .unwrap();
     let turns: Vec<PhoneTranscript> = rows
@@ -14,48 +14,26 @@ fn speaker_snapshots_survive_all_transcript_shapes() {
         .map(|row| serde_json::from_value(row.clone()).unwrap())
         .collect();
     assert_eq!(turns[0].party, turns[1].party);
-    assert_ne!(
-        turns[0].speaker.as_ref().unwrap().id,
-        turns[1].speaker.as_ref().unwrap().id
-    );
-    assert_eq!(
-        turns[2].speaker.as_ref().unwrap().kind,
-        PhoneTranscriptSpeakerKind::Agent
-    );
+    assert_ne!(turns[0].phone_number, turns[1].phone_number);
     for (row, turn) in rows.iter().zip(turns.iter()) {
         assert_eq!(turn.text, row["text"].as_str().unwrap());
         assert_eq!(turn.phone_number.as_deref(), row["phone_number"].as_str());
+        assert_eq!(serde_json::to_value(turn).unwrap(), *row);
         let correspondence: CorrespondenceTranscriptEntry =
             serde_json::from_value(row.clone()).unwrap();
         let webhook: WebhookTranscriptEntry = serde_json::from_value(row.clone()).unwrap();
         assert_eq!(turn.phone_number, correspondence.phone_number);
         assert_eq!(turn.phone_number, webhook.phone_number);
-        assert_eq!(
-            serde_json::to_value(&turn.speaker).unwrap(),
-            serde_json::to_value(&correspondence.speaker).unwrap()
-        );
-        assert_eq!(
-            serde_json::to_value(&turn.speaker).unwrap(),
-            serde_json::to_value(&webhook.speaker).unwrap()
-        );
     }
-    assert!(turns[3].speaker.is_none());
-    let mut old = rows[3].clone();
-    old.as_object_mut().unwrap().remove("speaker");
-    assert!(serde_json::from_value::<PhoneTranscript>(old)
-        .unwrap()
-        .speaker
-        .is_none());
     let marker: WebhookTranscriptEntry =
         serde_json::from_value(json!({"marker": "abridged"})).unwrap();
-    assert!(marker.speaker.is_none());
     assert!(marker.phone_number.is_none());
 }
 
 #[test]
-fn turn_phone_number_is_nullable_and_not_inferred_from_snapshot() {
+fn dedicated_local_number_and_unavailable_attribution() {
     let rows: Vec<Value> = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/phone_transcript_speakers.json"
+        "../../../tests/fixtures/phone_transcript_numbers.json"
     ))
     .unwrap();
     let mut dedicated = rows[2].clone();
@@ -75,16 +53,4 @@ fn turn_phone_number_is_nullable_and_not_inferred_from_snapshot() {
         assert!(correspondence.phone_number.is_none());
         assert!(webhook.phone_number.is_none());
     }
-}
-
-#[test]
-fn sparse_speaker_keeps_unknown_facts_absent() {
-    let speaker: PhoneTranscriptSpeaker = serde_json::from_value(json!({
-        "id": "11111111-1111-5111-8111-111111111111", "kind": "human"
-    }))
-    .unwrap();
-    assert!(speaker.name.is_none());
-    assert!(speaker.phone_number.is_none());
-    assert!(speaker.contact_id.is_none());
-    assert!(speaker.agent_identity_id.is_none());
 }

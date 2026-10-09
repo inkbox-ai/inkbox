@@ -7,14 +7,6 @@
     "party": "remote",
     "text": "Hello.",
     "created_at": "2026-03-10T12:00:00Z",
-    "speaker": {
-      "id": "11111111-1111-5111-8111-111111111111",
-      "kind": "human",
-      "name": "Taylor",
-      "phone_number": "+14155550100",
-      "contact_id": "44444444-4444-4444-8444-444444444444",
-      "agent_identity_id": null
-    },
     "phone_number": "+14155550100"
   },
   {
@@ -25,14 +17,6 @@
     "party": "remote",
     "text": "Hello.",
     "created_at": "2026-03-10T12:00:00Z",
-    "speaker": {
-      "id": "22222222-2222-5222-8222-222222222222",
-      "kind": "human",
-      "name": "Jordan",
-      "phone_number": "+14155550101",
-      "contact_id": null,
-      "agent_identity_id": null
-    },
     "phone_number": "+14155550101"
   },
   {
@@ -43,14 +27,6 @@
     "party": "local",
     "text": "Hello.",
     "created_at": "2026-03-10T12:00:00Z",
-    "speaker": {
-      "id": "33333333-3333-5333-8333-333333333333",
-      "kind": "agent",
-      "name": "Assistant",
-      "phone_number": null,
-      "contact_id": null,
-      "agent_identity_id": "55555555-5555-4555-8555-555555555555"
-    },
     "phone_number": null
   },
   {
@@ -61,7 +37,6 @@
     "party": "remote",
     "text": "Taylor: this is literal historical text.",
     "created_at": "2026-03-10T12:00:00Z",
-    "speaker": null,
     "phone_number": null
   }
 ]

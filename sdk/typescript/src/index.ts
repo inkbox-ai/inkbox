@@ -272,8 +272,6 @@ export type {
   PostCallActionItem,
   RateLimitInfo,
   PhoneTranscript,
-  PhoneTranscriptSpeaker,
-  RawPhoneTranscriptSpeaker,
   SmsOptIn,
   TextMediaItem,
   TextMessage,

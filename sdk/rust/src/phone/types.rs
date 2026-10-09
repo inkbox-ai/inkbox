@@ -790,30 +790,6 @@ pub struct TextConversationUpdateResult {
     pub updated_count: i64,
 }
 
-/// Speaker role, independent of the local or remote call side.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PhoneTranscriptSpeakerKind {
-    Human,
-    Agent,
-}
-
-/// Recorded identity of a speaker. The ID is stable within a call, not across calls.
-/// Snapshot facts do not track later contact edits.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhoneTranscriptSpeaker {
-    pub id: Uuid,
-    pub kind: PhoneTranscriptSpeakerKind,
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub phone_number: Option<String>,
-    #[serde(default)]
-    pub contact_id: Option<Uuid>,
-    #[serde(default)]
-    pub agent_identity_id: Option<Uuid>,
-}
-
 /// A transcript segment from a phone call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoneTranscript {
@@ -824,9 +800,6 @@ pub struct PhoneTranscript {
     pub party: String,
     pub text: String,
     pub created_at: String,
-    /// None for older or unattributed turns. Do not infer identity from text.
-    #[serde(default)]
-    pub speaker: Option<PhoneTranscriptSpeaker>,
     /// This turn's line number; None for shared local lines or unknown attribution.
     #[serde(default)]
     pub phone_number: Option<String>,

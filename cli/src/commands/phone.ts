@@ -244,13 +244,10 @@ export function registerPhoneCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const transcripts = await identity.listTranscripts(callId);
-        output(
-          transcripts,
-          {
-            json: !!opts.json,
-            columns: ["seq", "party", "phoneNumber", "text", "createdAt"],
-          },
-        );
+        output(transcripts, {
+          json: !!opts.json,
+          columns: ["seq", "party", "phoneNumber", "text", "createdAt"],
+        });
       }),
     );
 
@@ -353,13 +350,10 @@ export function registerPhoneCommands(program: Command): void {
             limit: parseInt(cmdOpts.limit, 10),
           },
         );
-        output(
-          transcripts,
-          {
-            json: !!opts.json,
-            columns: ["id", "callId", "seq", "party", "phoneNumber", "text", "createdAt"],
-          },
-        );
+        output(transcripts, {
+          json: !!opts.json,
+          columns: ["id", "callId", "seq", "party", "phoneNumber", "text", "createdAt"],
+        });
       }),
     );
 

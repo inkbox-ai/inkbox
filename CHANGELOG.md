@@ -33,11 +33,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Call transcript segments expose their line number separately from spoken text,
-  with optional speaker snapshots for participant identity. Python, TypeScript,
-  and Rust preserve these fields in call, correspondence, and webhook turns.
+  across Python, TypeScript, and Rust in call, correspondence, and webhook turns.
   Shared local lines and unknown attribution have no phone number.
-- CLI transcript tables show the turn's phone number without an additional
-  speaker-name column; JSON output retains the optional speaker snapshot.
+- CLI transcript tables and JSON output include the turn's nullable phone number.
 
 ### Changed
 

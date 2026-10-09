@@ -74,8 +74,8 @@ for (const args of [
   ["transcripts", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
   ["search-transcripts", "--query", "Hello"],
 ]) {
-  test(`${args[0]} shows only a number attribution column and preserves JSON metadata`, async () => {
-    const turns = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_transcript_speakers.json", import.meta.url), "utf8"));
+  test(`${args[0]} shows per-turn numbers and preserves transcript JSON`, async () => {
+    const turns = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_transcript_numbers.json", import.meta.url), "utf8"));
     const mock = await listen((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(req.url === "/api/v1/identities/support-bot" ? IDENTITY : turns));
@@ -85,15 +85,13 @@ for (const args of [
       const result = await runCli([...options, "phone", ...args, "-i", "support-bot"]);
       assert.ifError(result.error);
       assert.match(result.stdout.split("\n")[0], /phoneNumber/);
-      assert.doesNotMatch(result.stdout.split("\n")[0], /speaker/);
       assert.match(result.stdout, /\+14155550100/);
       assert.match(result.stdout, /\+14155550101/);
-      assert.doesNotMatch(result.stdout, /Assistant|11111111-1111-5111-8111-111111111111/);
       const json = await runCli([...options, "--json", "phone", ...args, "-i", "support-bot"]);
       assert.ifError(json.error);
       const parsed = JSON.parse(json.stdout);
       assert.equal(parsed[0].phoneNumber, turns[0].phone_number);
-      assert.equal(parsed[0].speaker.name, turns[0].speaker.name);
+      assert.deepEqual(Object.keys(parsed[0]).sort(), ["id", "callId", "seq", "tsMs", "party", "text", "createdAt", "phoneNumber"].sort());
       assert.equal(parsed[2].phoneNumber, null);
       assert.equal(parsed[3].text, turns[3].text);
     } finally {

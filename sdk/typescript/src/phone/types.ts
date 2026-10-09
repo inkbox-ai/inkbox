@@ -357,26 +357,6 @@ export interface PhoneCallWithRateLimit extends PhoneCall {
   rateLimit: RateLimitInfo;
 }
 
-/** Stable within one call; snapshot facts do not track later contact edits. */
-export interface PhoneTranscriptSpeaker {
-  id: string;
-  kind: "human" | "agent";
-  name: string | null;
-  phoneNumber: string | null;
-  contactId: string | null;
-  agentIdentityId: string | null;
-}
-
-/** Wire representation used by transcript and webhook payloads. */
-export interface RawPhoneTranscriptSpeaker {
-  id: string;
-  kind: "human" | "agent";
-  name?: string | null;
-  phone_number?: string | null;
-  contact_id?: string | null;
-  agent_identity_id?: string | null;
-}
-
 export interface PhoneTranscript {
   id: string;
   callId: string;
@@ -386,8 +366,6 @@ export interface PhoneTranscript {
   party: string;
   text: string;
   createdAt: Date;
-  /** Unknown for older or unattributed turns; distinct from local/remote party. */
-  speaker?: PhoneTranscriptSpeaker | null;
   /** This turn's line number; null for shared local lines or unknown attribution. */
   phoneNumber?: string | null;
 }
@@ -750,7 +728,6 @@ export interface RawPhoneTranscript {
   party: string;
   text: string;
   created_at: string;
-  speaker?: RawPhoneTranscriptSpeaker | null;
   phone_number?: string | null;
 }
 
@@ -954,19 +931,6 @@ export function parsePhoneCallWithRateLimit(
   };
 }
 
-export function parsePhoneTranscriptSpeaker(
-  r: RawPhoneTranscriptSpeaker,
-): PhoneTranscriptSpeaker {
-  return {
-    id: r.id,
-    kind: r.kind,
-    name: r.name ?? null,
-    phoneNumber: r.phone_number ?? null,
-    contactId: r.contact_id ?? null,
-    agentIdentityId: r.agent_identity_id ?? null,
-  };
-}
-
 export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
   return {
     id: r.id,
@@ -977,7 +941,6 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
     text: r.text,
     createdAt: new Date(r.created_at),
     phoneNumber: r.phone_number ?? null,
-    speaker: r.speaker == null ? null : parsePhoneTranscriptSpeaker(r.speaker),
   };
 }
 

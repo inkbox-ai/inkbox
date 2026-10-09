@@ -1,30 +1,29 @@
+// sdk/typescript/tests/phone/transcript-phone-numbers.test.ts
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parsePhoneTranscript, parsePhoneTranscriptSpeaker, type RawPhoneTranscript } from "../../src/phone/types.js";
+import { parsePhoneTranscript, type RawPhoneTranscript } from "../../src/phone/types.js";
 import { parseCorrespondenceItem, type RawCallCorrespondenceItem } from "../../src/contacts/correspondence.js";
-import type { RawPhoneTranscriptSpeaker, WebhookTranscriptEntry } from "../../src/index.js";
+import type { WebhookTranscriptEntry } from "../../src/index.js";
 
 const rows: RawPhoneTranscript[] = JSON.parse(readFileSync(
-  new URL("../../../../tests/fixtures/phone_transcript_speakers.json", import.meta.url), "utf8",
+  new URL("../../../../tests/fixtures/phone_transcript_numbers.json", import.meta.url), "utf8",
 ));
 
-describe("transcript speaker snapshots", () => {
-  it("keeps participants distinct from call side and preserves literal text", () => {
+describe("transcript phone numbers", () => {
+  it("distinguishes remote lines and preserves literal text", () => {
     const turns = rows.map(parsePhoneTranscript);
     expect(turns[0].party).toBe(turns[1].party);
-    expect(turns[0].speaker?.id).not.toBe(turns[1].speaker?.id);
-    expect(turns[0].speaker?.phoneNumber).toBe(rows[0].speaker?.phone_number);
-    expect(turns[2].speaker?.agentIdentityId).toBe(rows[2].speaker?.agent_identity_id);
+    expect(turns[0].phoneNumber).not.toBe(turns[1].phoneNumber);
     expect(turns.map((t) => t.text)).toEqual(rows.map((t) => t.text));
     expect(turns.map((t) => t.phoneNumber)).toEqual(rows.map((r) => r.phone_number));
-    expect(turns[0].phoneNumber).not.toBe(turns[1].phoneNumber);
+    expect(Object.keys(turns[0]).sort()).toEqual([
+      "id", "callId", "seq", "tsMs", "party", "text", "createdAt", "phoneNumber",
+    ].sort());
     expect(turns[2].phoneNumber).toBeNull();
-    expect(turns[3].speaker).toBeNull();
-    const { speaker: _, ...legacy } = rows[3];
-    expect(parsePhoneTranscript(legacy).speaker).toBeNull();
+    expect(turns[3].phoneNumber).toBeNull();
   });
 
-  it("retains attribution in correspondence while webhook types retain wire casing", () => {
+  it("retains per-turn numbers in correspondence and webhook wire types", () => {
     const raw: RawCallCorrespondenceItem = {
       channel: "calls", source_id: rows[0].call_id, direction: "inbound",
       occurred_at: rows[0].created_at, identity_id: "55555555-5555-4555-8555-555555555555",
@@ -34,26 +33,18 @@ describe("transcript speaker snapshots", () => {
     };
     const call = parseCorrespondenceItem(raw);
     if (call.channel !== "calls") throw new Error("Expected call correspondence");
-    expect(call.transcript?.map((t) => t.speaker)).toEqual(rows.map((r) => parsePhoneTranscript(r).speaker));
     expect(call.transcript?.map((t) => t.phoneNumber)).toEqual(rows.map((r) => r.phone_number));
-    const entry: WebhookTranscriptEntry = { speaker: rows[0].speaker, phone_number: rows[0].phone_number };
-    expect(entry.speaker?.phone_number).toBe("+14155550100");
+    expect(call.transcript?.map((t) => t.text)).toEqual(rows.map((r) => r.text));
+    const entry: WebhookTranscriptEntry = { phone_number: rows[0].phone_number };
     expect(entry.phone_number).toBe("+14155550100");
   });
 
-  it("keeps a dedicated local number and never infers a missing or null turn number", () => {
+  it("preserves dedicated local numbers and unavailable attribution", () => {
     expect(parsePhoneTranscript({ ...rows[2], phone_number: "+14155550102" }).phoneNumber).toBe("+14155550102");
     expect(parsePhoneTranscript({ ...rows[0], phone_number: null }).phoneNumber).toBeNull();
     const { phone_number: _, ...legacy } = rows[0];
     expect(parsePhoneTranscript(legacy).phoneNumber).toBeNull();
     const shared: WebhookTranscriptEntry = { party: "local", phone_number: null };
     expect(shared.phone_number).toBeNull();
-  });
-
-  it("defaults optional facts without inventing identity", () => {
-    const raw: RawPhoneTranscriptSpeaker = { id: "11111111-1111-5111-8111-111111111111", kind: "human" };
-    expect(parsePhoneTranscriptSpeaker(raw)).toEqual({
-      id: raw.id, kind: raw.kind, name: null, phoneNumber: null, contactId: null, agentIdentityId: null,
-    });
   });
 });

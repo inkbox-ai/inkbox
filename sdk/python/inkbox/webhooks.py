@@ -15,7 +15,6 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 from inkbox.companion import CompanionMetadata
 from inkbox.sender_access import SenderAccess
-from inkbox.transcripts import PhoneTranscriptSpeakerWire
 
 from inkbox.slack import SlackMessageKind
 
@@ -212,7 +211,6 @@ class WebhookTranscriptEntryWire(TypedDict, total=False):
     party: str
     text: str
     ts_ms: int
-    speaker: PhoneTranscriptSpeakerWire | None
     phone_number: str | None
     truncated: bool
     marker: Literal["abridged"]
