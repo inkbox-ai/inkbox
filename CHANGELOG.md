@@ -4,6 +4,30 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.19 - Call connections and transcript attribution (unreleased)
+
+### Added
+
+- Call records, contact correspondence, and lifecycle webhooks expose optional
+  `connections` history across Python, TypeScript, and Rust. Distinguish handoffs
+  from conference guests and preserve their outcomes and lifecycle timestamps.
+- Transcript segments expose nullable `phone_number` separately from spoken text.
+  Shared local lines and unknown attribution have no phone number.
+- CLI call JSON includes connection history; transcript tables and JSON include
+  the turn's nullable phone number.
+
+### Changed
+
+- Prefer `connections` when supplied, even when empty; use legacy `forwardings`
+  only when the field is absent. Both lists describe the same attempts.
+- Legacy call and webhook histories accept live-transfer and conference triggers.
+  Rust exhaustive matches on `CallForwardingTrigger` must handle the new
+  `LiveTransfer` and `LiveConference` variants.
+- These additions are read-only. Transfers and conferences remain Voice AI
+  actions, with no new manual SDK methods or CLI commands.
+- Upgrade Python and Rust clients to this release before reading histories with
+  live-transfer or conference attempts; older versions reject those trigger values.
+
 ## 0.7.18 - Immutable agent handles (unreleased)
 
 ### Removed
@@ -29,19 +53,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   Profile and channel-configuration updates retain their existing behavior.
 
 ## 0.7.17 - Python tunnel TLS compatibility (unreleased)
-
-### Added
-
-- Call records, contact correspondence, and lifecycle webhooks expose typed
-  `connections` history, with
-  handoff versus conference kinds and neutral connection progress. The optional
-  field distinguishes older responses from an empty history; existing
-  `forwardings` remains available for compatibility. CLI call JSON preserves it.
-
-- Call transcript segments expose their line number separately from spoken text,
-  across Python, TypeScript, and Rust in call, correspondence, and webhook turns.
-  Shared local lines and unknown attribution have no phone number.
-- CLI transcript tables and JSON output include the turn's nullable phone number.
 
 ### Changed
 

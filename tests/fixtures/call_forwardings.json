@@ -1,0 +1,38 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "trigger": "incoming_action",
+    "status": "failed",
+    "target_type": "phone",
+    "target": "+14155550100",
+    "requested_at": "2026-10-08T12:00:00Z",
+    "dialing_at": "2026-10-08T12:00:01Z",
+    "forwarded_at": null,
+    "ended_at": "2026-10-08T12:01:00Z",
+    "failure_code": "no_answer"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "trigger": "live_transfer",
+    "status": "failed",
+    "target_type": "phone",
+    "target": "+14155550100",
+    "requested_at": "2026-10-08T12:00:00Z",
+    "dialing_at": "2026-10-08T12:00:01Z",
+    "forwarded_at": null,
+    "ended_at": "2026-10-08T12:01:00Z",
+    "failure_code": "no_answer"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000003",
+    "trigger": "live_conference",
+    "status": "forwarded",
+    "target_type": "phone",
+    "target": "+14155550100",
+    "requested_at": "2026-10-08T12:00:00Z",
+    "dialing_at": "2026-10-08T12:00:01Z",
+    "forwarded_at": "2026-10-08T12:00:03Z",
+    "ended_at": "2026-10-08T12:01:00Z",
+    "failure_code": null
+  }
+]

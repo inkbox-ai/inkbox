@@ -1120,6 +1120,29 @@ mod tests {
     }
 
     #[test]
+    fn phone_call_preserves_mixed_operation_history() {
+        let history: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/call_forwardings.json"
+        ))
+        .unwrap();
+        let mut value = call_json();
+        value["forwardings"] = history.clone();
+        let call: PhoneCall = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            call.forwardings
+                .iter()
+                .map(|attempt| attempt.trigger)
+                .collect::<Vec<_>>(),
+            vec![
+                CallForwardingTrigger::IncomingAction,
+                CallForwardingTrigger::LiveTransfer,
+                CallForwardingTrigger::LiveConference
+            ]
+        );
+        assert_eq!(serde_json::to_value(&call.forwardings).unwrap(), history);
+    }
+
+    #[test]
     fn phone_call_with_rate_limit_tolerates_missing_rate_limit() {
         let parsed: PhoneCallWithRateLimit = serde_json::from_value(call_json()).unwrap();
         assert!(parsed.rate_limit.is_none());
