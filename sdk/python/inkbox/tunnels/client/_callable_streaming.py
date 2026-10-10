@@ -145,3 +145,8 @@ async def invoke_asgi_streaming(
                 await response.end_body()
             except Exception:
                 pass
+        else:
+            try:
+                await response.reset("upstream-error")
+            except Exception:
+                pass
