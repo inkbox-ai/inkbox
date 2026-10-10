@@ -6,6 +6,13 @@ Dataclasses mirroring the Inkbox Phone API response models.
 
 from __future__ import annotations
 from inkbox.contact_rules import ContactRuleDirection
+from inkbox._call_connections import (
+    CallConnectionKind as CallConnectionKind,
+    CallConnectionStatus as CallConnectionStatus,
+    CallConnectionTrigger as CallConnectionTrigger,
+    ForwardingTargetType as ForwardingTargetType,
+    PhoneCallConnection as PhoneCallConnection,
+)
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -163,13 +170,6 @@ class IncomingCallAction(StrEnum):
     FORWARD = "forward"
 
 
-class ForwardingTargetType(StrEnum):
-    """Kind of destination used to forward a call."""
-
-    PHONE = "phone"
-    SIP = "sip"
-
-
 class CallForwardingTrigger(StrEnum):
     """What initiated a call-forwarding attempt."""
 
@@ -184,29 +184,6 @@ class CallForwardingStatus(StrEnum):
     REQUESTED = "requested"
     DIALING = "dialing"
     FORWARDED = "forwarded"
-    FAILED = "failed"
-
-
-class CallConnectionKind(StrEnum):
-    """Whether the caller is handed off or a guest joins the conversation."""
-
-    HANDOFF = "handoff"
-    CONFERENCE = "conference"
-
-
-class CallConnectionTrigger(StrEnum):
-    """What initiated a destination connection."""
-
-    INCOMING_ACTION = "incoming_action"
-    AGENT_TOOL = "agent_tool"
-
-
-class CallConnectionStatus(StrEnum):
-    """Connection progress, separate from the original call's status."""
-
-    REQUESTED = "requested"
-    DIALING = "dialing"
-    CONNECTED = "connected"
     FAILED = "failed"
 
 
@@ -886,39 +863,6 @@ class PhoneCallForwarding:
             requested_at=datetime.fromisoformat(d["requested_at"]),
             dialing_at=_dt(d.get("dialing_at")),
             forwarded_at=_dt(d.get("forwarded_at")),
-            ended_at=_dt(d.get("ended_at")),
-            failure_code=d.get("failure_code"),
-        )
-
-
-@dataclass
-class PhoneCallConnection:
-    """One handoff or conference attempt, ordered oldest-first on a call."""
-
-    id: UUID
-    kind: CallConnectionKind
-    trigger: CallConnectionTrigger
-    status: CallConnectionStatus
-    target_type: ForwardingTargetType
-    target: str
-    requested_at: datetime
-    dialing_at: datetime | None
-    connected_at: datetime | None
-    ended_at: datetime | None
-    failure_code: str | None
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> PhoneCallConnection:
-        return cls(
-            id=UUID(d["id"]),
-            kind=CallConnectionKind(d["kind"]),
-            trigger=CallConnectionTrigger(d["trigger"]),
-            status=CallConnectionStatus(d["status"]),
-            target_type=ForwardingTargetType(d["target_type"]),
-            target=d["target"],
-            requested_at=datetime.fromisoformat(d["requested_at"]),
-            dialing_at=_dt(d.get("dialing_at")),
-            connected_at=_dt(d.get("connected_at")),
             ended_at=_dt(d.get("ended_at")),
             failure_code=d.get("failure_code"),
         )

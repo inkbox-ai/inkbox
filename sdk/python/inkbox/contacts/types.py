@@ -10,13 +10,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, TYPE_CHECKING
+from typing import Any
 from uuid import UUID
 from inkbox.contact_rules import _UNSET
 from inkbox.sender_access import SenderAccess
 
-if TYPE_CHECKING:
-    from inkbox.phone.types import PhoneCallConnection
+from inkbox._call_connections import PhoneCallConnection
 
 
 def _opt_uuid(value: Any) -> UUID | None:
@@ -820,8 +819,6 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
             media=parsed_media,
             sender_access=d.get("sender_access"),
         )
-    from inkbox.phone.types import PhoneCallConnection
-
     transcript = d.get("transcript")
     return CallCorrespondenceItem(
         **common,

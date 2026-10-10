@@ -23,6 +23,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Legacy call and webhook histories accept live-transfer and conference triggers.
   Rust exhaustive matches on `CallForwardingTrigger` must handle the new
   `LiveTransfer` and `LiveConference` variants.
+- **Source-breaking for Rust struct literals:** add `connections: None` to
+  `PhoneCall`, `WebhookPhoneCall`, and `CallCorrespondenceItem`, and
+  `phone_number: None` to `PhoneTranscript`, `WebhookTranscriptEntry`, and
+  `CorrespondenceTranscriptEntry`. Exhaustive patterns need these fields or `..`.
+  Deserializing older responses still works without these fields.
 - These additions are read-only. Transfers and conferences remain Voice AI
   actions, with no new manual SDK methods or CLI commands.
 - Upgrade Python and Rust clients to this release before reading histories with

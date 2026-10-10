@@ -80,3 +80,11 @@ def test_correspondence_uses_same_connections_and_tolerates_older_responses():
     assert _parse_correspondence_item(item).connections == []
     item.pop("connections")
     assert _parse_correspondence_item(item).connections is None
+
+
+def test_correspondence_connection_annotation_resolves_at_runtime():
+    from inkbox.contacts import CallCorrespondenceItem
+    from inkbox.phone.types import PhoneCallConnection as PhoneConnection
+
+    assert PhoneConnection is PhoneCallConnection
+    assert get_type_hints(CallCorrespondenceItem)["connections"] == list[PhoneCallConnection] | None

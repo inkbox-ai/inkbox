@@ -891,7 +891,7 @@ recipient sends. `reply_ready` distinguishes send readiness from history access;
 SMS consent still applies. Group iMessage requires a dedicated line, and MMS
 chats with identical participants represent one logical conversation.
 
-Existing webhook struct literals remain unchanged. To retain the optional
+Companion metadata does not add fields to the underlying webhook structs. To retain the optional
 top-level block, deserialize `CompanionMailWebhookPayload`,
 `CompanionTextWebhookPayload`, or `CompanionIMessageWebhookPayload` from
 `inkbox::webhooks::types`. These alias `WithCompanion<T>`, exposing the original
