@@ -297,6 +297,24 @@ describe("Inkbox.ready()", () => {
     spy.mockRestore();
   });
 
+  it("does not leave an unhandled rejection when ready() is never awaited", async () => {
+    // Fail at the transport layer: a spy on `unlock` itself would attach its
+    // own handler to the returned promise and hide the unhandled rejection.
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const ink = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "wrong-key" });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(unhandled).not.toHaveBeenCalled();
+      await expect(ink.ready()).rejects.toThrow("network down");
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      spy.mockRestore();
+    }
+  });
+
   it("resolves immediately when no vaultKey provided", async () => {
     const ink = makeInkbox();
 
