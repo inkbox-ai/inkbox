@@ -159,6 +159,8 @@ def _aes_gcm_decrypt(key: bytes, blob: bytes, aad: str = "") -> bytes:
         blob: Ciphertext blob.
         aad: Additional authenticated data (must match what was used during encryption).
     """
+    if len(blob) < AES_IV_BYTES + 16:
+        raise InkboxVaultKeyError("Invalid ciphertext: payload is too short")
     ct = blob[:-28]
     nonce = blob[-28:-16]
     tag = blob[-16:]
