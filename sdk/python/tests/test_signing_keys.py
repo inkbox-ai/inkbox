@@ -104,3 +104,10 @@ class TestVerifyWebhook:
 
     def test_missing_headers_returns_false(self):
         assert not verify_webhook(payload=self.BODY, headers={}, secret=self.KEY)
+
+    def test_non_ascii_signature_returns_false(self):
+        assert not verify_webhook(payload=self.BODY, headers=self._headers("sha256=é"), secret=self.KEY)
+
+    def test_truncated_signature_returns_false(self):
+        sig = _make_signature(self.KEY, self.REQUEST_ID, self.TIMESTAMP, self.BODY)
+        assert not verify_webhook(payload=self.BODY, headers=self._headers(sig[:-1]), secret=self.KEY)
