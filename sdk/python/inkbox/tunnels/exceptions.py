@@ -19,7 +19,7 @@ class TunnelNameInvalid(TunnelError):
     Fast-fail before the request is sent — distinct from
     :class:`inkbox.identities.exceptions.HandleUnavailableError`, which
     surfaces the server-side 409 when the unified handle namespace
-    rejects the name at create / rename time.
+    rejects the name during identity creation.
     """
 
 

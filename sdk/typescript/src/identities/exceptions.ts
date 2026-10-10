@@ -10,8 +10,7 @@ import { InkboxAPIError, type InkboxAPIErrorDetail } from "../_http.js";
 export type BlockingNamespace = "identities" | "tunnels" | "mail" | null;
 
 /**
- * Raised by `identities.create()` / `identities.update()` (and the
- * `inkbox.createIdentity` / `identity.update` wrappers) when the
+ * Raised by `identities.create()` or `inkbox.createIdentity()` when the
  * requested agent_handle collides with the global handle namespace.
  *
  * The unified namespace check runs across identities, tunnels, and the
@@ -33,10 +32,8 @@ export class HandleUnavailableError extends InkboxAPIError {
 }
 
 /**
- * Inspect a 409 error detail for a `blocking_namespace` field. Returns
- * the parsed value when present, else `null`. (Servers running 1.0+ set
- * this on every `agent_handle_unavailable` 409 from identity-create or
- * identity-rename.)
+ * Read `blocking_namespace` from an identity-creation error detail.
+ * Returns `null` when the field is absent or unrecognized.
  */
 export function readBlockingNamespace(detail: InkboxAPIErrorDetail): BlockingNamespace {
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
@@ -47,7 +44,7 @@ export function readBlockingNamespace(detail: InkboxAPIErrorDetail): BlockingNam
 }
 
 /**
- * If `err` is a 409 collision error from the identities endpoints,
+ * If `err` is a 409 handle collision from identity creation,
  * return a `HandleUnavailableError`; otherwise return the original
  * error untouched so it propagates as-is.
  */

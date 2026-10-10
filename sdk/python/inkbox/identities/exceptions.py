@@ -15,12 +15,12 @@ BlockingNamespace = Literal["identities", "tunnels", "mail", None]
 
 
 class HandleUnavailableError(InkboxAPIError):
-    """Raised on 409 from identity-create / identity-rename when the
+    """Raised on 409 from identity creation when the
     requested agent_handle collides with the unified global namespace.
 
     ``blocking_namespace`` reports which side rejected: ``"identities"``,
     ``"tunnels"``, or ``"mail"``. May be ``None`` if the server did not
-    set the field (older deploys; treat as opaque).
+    set the field.
     """
 
     def __init__(
@@ -42,7 +42,7 @@ def _read_blocking_namespace(detail: Any) -> BlockingNamespace:
 
 
 def map_identity_conflict_error(err: InkboxAPIError) -> Exception:
-    """If ``err`` is a 409 collision from the identities surface,
+    """If ``err`` is a 409 handle collision from identity creation,
     return a :class:`HandleUnavailableError`; else return ``err``."""
     detail = err.detail
     is_handle_conflict = False

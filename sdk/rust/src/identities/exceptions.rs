@@ -38,7 +38,7 @@ impl BlockingNamespace {
     }
 }
 
-/// Typed view of a 409 from identity-create / identity-rename when the
+/// Typed view of a 409 from identity creation when the
 /// requested `agent_handle` collides with the unified global namespace.
 ///
 /// `blocking_namespace` reports which side rejected; it is `None` when the
