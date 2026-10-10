@@ -1315,14 +1315,13 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
-   * Update this identity's handle, display name, description, iMessage
+   * Update this identity's display name, description, iMessage
    * reachability, and/or contact-rule filter modes.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    * For `displayName` and `description`, explicit `null` clears the column;
    * omitting the key leaves it untouched.
    *
-   * @param options.newHandle - New agent handle.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle identity-level iMessage reachability.

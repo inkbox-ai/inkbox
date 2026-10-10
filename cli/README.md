@@ -220,6 +220,8 @@ inkbox signup status                             # Check claim status and restri
 
 Manage agent identities.
 
+Handles are fixed at creation. Use `identity update <handle> --display-name <name>` to change an agent's presentation.
+
 ```bash
 inkbox identity list                         # Agent-scoped credentials return only themselves
 inkbox identity get <handle>                 # Get identity details
@@ -234,7 +236,6 @@ inkbox identity create <handle>              # Provisions identity + mailbox + t
   --imessage-enabled                         #   Opt the identity into iMessage (default off)
 inkbox identity delete <handle>              # Cascades to mailbox + tunnel; revokes scoped API keys
 inkbox identity update <handle>              # Update an identity
-  --new-handle <handle>                      #   New handle
   --display-name <name>                      #   New display name ("" to clear)
   --description <text>                       #   New description ("" to clear)
   --clear-description                        #   Explicit null (mutually exclusive with --description)

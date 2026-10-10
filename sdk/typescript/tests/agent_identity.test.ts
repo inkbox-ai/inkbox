@@ -850,16 +850,17 @@ describe("AgentIdentity phone helpers", () => {
 describe("AgentIdentity management", () => {
   it("update refreshes internal data", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ agentHandle: "new-handle" }));
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ displayName: "New display" }));
     const identity = new AgentIdentity(makeData(), ink);
 
-    await identity.update({ newHandle: "new-handle" });
+    await identity.update({ displayName: "New display" });
 
-    expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", { newHandle: "new-handle" });
-    expect(identity.agentHandle).toBe("new-handle");
+    expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", { displayName: "New display" });
+    expect(identity.displayName).toBe("New display");
+    expect(identity.agentHandle).toBe("sales-agent");
   });
 
-  it("update with newHandle refreshes the cached tunnel", async () => {
+  it("profile update preserves channel names in the detailed response", async () => {
     const ink = mockInkbox();
     const oldTunnel = {
       id: "tun-1", organizationId: "org-1", tunnelName: "sales-agent",
@@ -869,21 +870,21 @@ describe("AgentIdentity management", () => {
       publicHost: "sales-agent.inkboxwire.com", zone: "inkboxwire.com",
       metadata: {}, createdAt: new Date(), updatedAt: new Date(),
     };
-    const renamedTunnel = { ...oldTunnel, tunnelName: "new-handle", publicHost: "new-handle.inkboxwire.com" };
     vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({
-      agentHandle: "new-handle",
-      tunnel: renamedTunnel,
+      displayName: "New display",
+      tunnel: oldTunnel,
     }));
     const identity = new AgentIdentity(makeData({ tunnel: oldTunnel }), ink);
 
-    await identity.update({ newHandle: "new-handle" });
+    await identity.update({ displayName: "New display" });
 
     expect(ink._idsResource.get).not.toHaveBeenCalled();
-    expect(identity.tunnel?.tunnelName).toBe("new-handle");
-    expect(identity.tunnel?.publicHost).toBe("new-handle.inkboxwire.com");
+    expect(identity.tunnel?.tunnelName).toBe("sales-agent");
+    expect(identity.tunnel?.publicHost).toBe("sales-agent.inkboxwire.com");
+    expect(identity.mailbox?.emailAddress).toBe(PARSED_MAILBOX.emailAddress);
   });
 
-  it("update without newHandle does not refresh", async () => {
+  it("profile update does not fetch the identity again", async () => {
     const ink = mockInkbox();
     vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ displayName: "New Display" }));
     const identity = new AgentIdentity(makeData(), ink);

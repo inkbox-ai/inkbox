@@ -75,12 +75,14 @@ Python SDK methods: `Inkbox.signup(...)`, `Inkbox.verify_signup(api_key, ...)`, 
 
 ## Identities
 
+Handles are fixed at creation. Change the display name to update an agent's presentation.
+
 ```python
 identity = inkbox.create_identity("sales-agent")
 identity = inkbox.get_identity("sales-agent")
 identities = inkbox.list_identities()  # → list[AgentIdentitySummary]
 
-identity.update(new_handle="new-name")   # rename
+identity.update(display_name="Sales assistant")
 identity.refresh()                       # re-fetch from API, updates cached channels
 identity.delete()                        # cascades: mailbox + tunnel + phone-number release
 ```

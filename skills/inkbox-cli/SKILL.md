@@ -107,6 +107,8 @@ inkbox signup status
 
 ## Identities
 
+Handles are fixed at creation. Use `identity update <handle> --display-name <name>` to change an agent's presentation.
+
 ```bash
 inkbox identity list
 inkbox identity get <handle>
@@ -117,7 +119,7 @@ inkbox identity create <handle> [--display-name <name>] [--description <text>]
                                  [--sending-domain <name> | --platform-domain]
                                  [--tls-mode edge|passthrough]
 inkbox identity delete <handle>
-inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
+inkbox identity update <handle> [--display-name <name>]
                                  [--description <text> | --clear-description]
                                  [--imessage-enabled true|false]
                                  [--contact-sharing-enabled true|false]

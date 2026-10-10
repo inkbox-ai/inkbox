@@ -74,12 +74,14 @@ TypeScript SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {..
 
 ## Identities
 
+Handles are fixed at creation. Change the display name to update an agent's presentation.
+
 ```typescript
 const identity = await inkbox.createIdentity("sales-agent");
 const identity = await inkbox.getIdentity("sales-agent");
 const identities = await inkbox.listIdentities();   // AgentIdentitySummary[]
 
-await identity.update({ newHandle: "new-name" });   // rename
+await identity.update({ displayName: "Sales assistant" });
 await identity.refresh();                            // re-fetch from API, updates cached channels
 await identity.delete();                             // cascades: mailbox + tunnel + phone-number release
 ```

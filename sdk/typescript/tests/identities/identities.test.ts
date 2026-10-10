@@ -1,6 +1,9 @@
 // sdk/typescript/tests/identities/identities.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
+import { AgentIdentity } from "../../src/agent_identity.js";
+import type { Inkbox } from "../../src/inkbox.js";
+import { parseAgentIdentityData } from "../../src/identities/types.js";
 import type { HttpTransport } from "../../src/_http.js";
 import {
   RAW_IDENTITY,
@@ -227,15 +230,15 @@ describe("IdentitiesResource.get", () => {
 });
 
 describe("IdentitiesResource.update", () => {
-  it("sends newHandle", async () => {
+  it.each(["new-handle", HANDLE, null, undefined])("rejects a supplied newHandle (%s) before HTTP through either API", async (newHandle) => {
     const http = mockHttp();
-    vi.mocked(http.patch).mockResolvedValue({ ...RAW_IDENTITY, agent_handle: "new-handle" });
     const res = new IdentitiesResource(http);
-
-    const result = await res.update(HANDLE, { newHandle: "new-handle" });
-
-    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, { agent_handle: "new-handle" });
-    expect(result.agentHandle).toBe("new-handle");
+    const identity = new AgentIdentity(parseAgentIdentityData(RAW_IDENTITY_DETAIL), { _idsResource: res } as Inkbox);
+    const options = { newHandle, displayName: "Must not change" } as unknown as Parameters<IdentitiesResource["update"]>[1];
+    await expect(res.update(HANDLE, options)).rejects.toThrow("Agent handles are read-only");
+    await expect(identity.update(options)).rejects.toThrow("Agent handles are read-only");
+    expect(http.patch).not.toHaveBeenCalled();
+    expect(identity.agentHandle).toBe(HANDLE);
   });
 
   it("omits undefined fields", async () => {
@@ -243,10 +246,10 @@ describe("IdentitiesResource.update", () => {
     vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
     const res = new IdentitiesResource(http);
 
-    await res.update(HANDLE, { newHandle: "new-handle" });
+    await res.update(HANDLE, { displayName: "New display" });
 
     const [, body] = vi.mocked(http.patch).mock.calls[0] as [string, Record<string, unknown>];
-    expect(body["agent_handle"]).toBe("new-handle");
+    expect(body).toEqual({ display_name: "New display" });
   });
 
   it("claims a dedicated number during update with a stable idempotency key", async () => {
@@ -372,12 +375,12 @@ describe("IdentitiesResource.update", () => {
     expect(err).toMatchObject({ name: "InkboxAPIError" });
   });
 
-  it("still maps an actual handle collision", async () => {
+  it("maps a handle collision during creation", async () => {
     const http = mockHttp();
     const { InkboxAPIError } = await import("../../src/_http.js");
     const { HandleUnavailableError } = await import("../../src/identities/exceptions.js");
     const support = "Contact the Support Agent using its Agent Card.";
-    vi.mocked(http.patch).mockRejectedValue(
+    vi.mocked(http.post).mockRejectedValue(
       new InkboxAPIError(
         409,
         {
@@ -391,8 +394,8 @@ describe("IdentitiesResource.update", () => {
     );
     const res = new IdentitiesResource(http);
 
-    const err = await res.update(HANDLE, {
-      newHandle: "already-used",
+    const err = await res.create({
+      agentHandle: "already-used",
     }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(HandleUnavailableError);
