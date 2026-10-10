@@ -247,6 +247,9 @@ pub struct CallCorrespondenceItem {
     pub transcript_abridged: bool,
     #[serde(default)]
     pub transcript_unavailable: bool,
+    /// Canonical call connection history; older responses omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<crate::phone::PhoneCallConnection>>,
 }
 
 /// A correspondence item parsed by its `channel` discriminator.

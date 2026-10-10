@@ -32,7 +32,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Call records and lifecycle webhooks expose typed `connections` history, with
+- Call records, contact correspondence, and lifecycle webhooks expose typed
+  `connections` history, with
   handoff versus conference kinds and neutral connection progress. The optional
   field distinguishes older responses from an empty history; existing
   `forwardings` remains available for compatibility. CLI call JSON preserves it.

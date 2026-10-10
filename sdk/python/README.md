@@ -1193,7 +1193,8 @@ Call records also expose `connections` when available: `kind` distinguishes
 when they later end. Prefer `connections` when present, including an empty list.
 Only use `forwardings` as a fallback for older responses that omit `connections`;
 the two lists describe the same attempts. Transfers and conferences are Voice AI
-actions, not SDK call-control methods.
+actions, not SDK call-control methods. Call items in contact correspondence also
+expose the same optional `connections` list, without a legacy forwarding list.
 
 ---
 

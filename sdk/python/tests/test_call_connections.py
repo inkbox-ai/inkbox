@@ -62,3 +62,21 @@ def test_webhook_connection_types_are_exported_and_resolve():
     assert "kind" in get_type_hints(WebhookPhoneCallConnection)
     assert "connected_at" in get_type_hints(WebhookPhoneCallConnection)
     assert "forwarded_at" not in get_type_hints(WebhookPhoneCallConnection)
+
+
+def test_correspondence_uses_same_connections_and_tolerates_older_responses():
+    from inkbox.contacts.types import CallCorrespondenceItem, _parse_correspondence_item
+
+    wire = fixture()
+    item = {
+        "channel": "calls", "source_id": wire["id"], "identity_id": "55555555-5555-4555-8555-555555555555",
+        "direction": "inbound", "occurred_at": wire["created_at"],
+        "remote_phone_number": wire["remote_phone_number"], "connections": wire["connections"],
+    }
+    parsed = _parse_correspondence_item(item)
+    assert isinstance(parsed, CallCorrespondenceItem)
+    assert parsed.connections == PhoneCall._from_dict(wire).connections
+    item["connections"] = []
+    assert _parse_correspondence_item(item).connections == []
+    item.pop("connections")
+    assert _parse_correspondence_item(item).connections is None

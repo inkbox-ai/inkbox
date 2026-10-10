@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CallConnectionKind, CallConnectionStatus, CallConnectionTrigger, CallForwardingTrigger } from "../../src/index.js";
 import type { PhoneCallConnection, WebhookPhoneCallConnection } from "../../src/index.js";
+import { parseCorrespondenceItem, type RawCallCorrespondenceItem } from "../../src/contacts/correspondence.js";
 import { parsePhoneCall, type RawPhoneCall } from "../../src/phone/types.js";
 
 function fixture(): RawPhoneCall {
@@ -46,5 +47,29 @@ describe("call connections", () => {
       dialing_at: null, connected_at: "2026-10-09T12:00:03Z", ended_at: null, failure_code: null,
     };
     expect(connection.connected_at).toBe("2026-10-09T12:00:03Z");
+  });
+});
+
+
+describe("call correspondence connections", () => {
+  it("shares the canonical parser and preserves absent versus empty history", () => {
+    const wire = fixture();
+    const item: RawCallCorrespondenceItem = {
+      channel: "calls", source_id: wire.id, identity_id: "55555555-5555-4555-8555-555555555555",
+      direction: "inbound", occurred_at: wire.created_at, status: "completed", detail_url: null,
+      remote_phone_number: wire.remote_phone_number!, local_phone_number: wire.local_phone_number,
+      started_at: null, ended_at: null, duration_seconds: null, transcript: null,
+      transcript_abridged: false, transcript_unavailable: false, connections: wire.connections,
+    };
+    function parse() {
+      const parsed = parseCorrespondenceItem(item);
+      if (parsed.channel !== "calls") throw new Error("Expected call correspondence");
+      return parsed;
+    }
+    expect(parse().connections).toEqual(parsePhoneCall(wire).connections);
+    item.connections = [];
+    expect(parse().connections).toEqual([]);
+    delete item.connections;
+    expect(parse().connections).toBeUndefined();
   });
 });

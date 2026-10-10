@@ -75,3 +75,28 @@ fn lifecycle_webhook_preserves_the_same_connection_contract() {
     let call: WebhookPhoneCall = serde_json::from_value(old).unwrap();
     assert!(call.connections.is_none());
 }
+
+#[test]
+fn correspondence_keeps_canonical_connections_and_older_response_compatibility() {
+    use inkbox::contacts::{CallCorrespondenceItem, CorrespondenceItem};
+    let wire = fixture();
+    let mut item = json!({
+        "channel": "calls", "source_id": wire["id"], "identity_id": "55555555-5555-4555-8555-555555555555",
+        "direction": "inbound", "occurred_at": wire["created_at"],
+        "remote_phone_number": wire["remote_phone_number"], "connections": wire["connections"],
+    });
+    let parsed: CorrespondenceItem = serde_json::from_value(item.clone()).unwrap();
+    let CorrespondenceItem::Calls(call) = parsed else {
+        panic!("Expected call correspondence")
+    };
+    let connections = call.connections.unwrap();
+    assert_eq!(connections.len(), 5);
+    assert_eq!(connections[2].kind, CallConnectionKind::Conference);
+    assert_eq!(connections[2].status, CallConnectionStatus::Connected);
+    item["connections"] = json!([]);
+    let empty: CallCorrespondenceItem = serde_json::from_value(item.clone()).unwrap();
+    assert!(empty.connections.unwrap().is_empty());
+    item.as_object_mut().unwrap().remove("connections");
+    let old: CallCorrespondenceItem = serde_json::from_value(item).unwrap();
+    assert!(old.connections.is_none());
+}
