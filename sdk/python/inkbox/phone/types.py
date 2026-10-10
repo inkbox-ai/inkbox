@@ -174,6 +174,8 @@ class CallForwardingTrigger(StrEnum):
     """What initiated a call-forwarding attempt."""
 
     INCOMING_ACTION = "incoming_action"
+    LIVE_TRANSFER = "live_transfer"
+    LIVE_CONFERENCE = "live_conference"
 
 
 class CallForwardingStatus(StrEnum):
@@ -182,6 +184,29 @@ class CallForwardingStatus(StrEnum):
     REQUESTED = "requested"
     DIALING = "dialing"
     FORWARDED = "forwarded"
+    FAILED = "failed"
+
+
+class CallConnectionKind(StrEnum):
+    """Whether the caller is handed off or a guest joins the conversation."""
+
+    HANDOFF = "handoff"
+    CONFERENCE = "conference"
+
+
+class CallConnectionTrigger(StrEnum):
+    """What initiated a destination connection."""
+
+    INCOMING_ACTION = "incoming_action"
+    AGENT_TOOL = "agent_tool"
+
+
+class CallConnectionStatus(StrEnum):
+    """Connection progress, separate from the original call's status."""
+
+    REQUESTED = "requested"
+    DIALING = "dialing"
+    CONNECTED = "connected"
     FAILED = "failed"
 
 
@@ -348,6 +373,8 @@ class PhoneCall:
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
     # Forwarding attempts in chronological order. Older responses omit this.
     forwardings: list[PhoneCallForwarding] = field(default_factory=list)
+    # Prefer this history when present; None means an older response.
+    connections: list[PhoneCallConnection] | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -388,6 +415,9 @@ class PhoneCall:
             forwardings=[
                 PhoneCallForwarding._from_dict(f) for f in d.get("forwardings", [])
             ],
+            connections=[PhoneCallConnection._from_dict(c) for c in d["connections"]]
+            if d.get("connections") is not None
+            else None,
         )
 
 
@@ -856,6 +886,39 @@ class PhoneCallForwarding:
             requested_at=datetime.fromisoformat(d["requested_at"]),
             dialing_at=_dt(d.get("dialing_at")),
             forwarded_at=_dt(d.get("forwarded_at")),
+            ended_at=_dt(d.get("ended_at")),
+            failure_code=d.get("failure_code"),
+        )
+
+
+@dataclass
+class PhoneCallConnection:
+    """One handoff or conference attempt, ordered oldest-first on a call."""
+
+    id: UUID
+    kind: CallConnectionKind
+    trigger: CallConnectionTrigger
+    status: CallConnectionStatus
+    target_type: ForwardingTargetType
+    target: str
+    requested_at: datetime
+    dialing_at: datetime | None
+    connected_at: datetime | None
+    ended_at: datetime | None
+    failure_code: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PhoneCallConnection:
+        return cls(
+            id=UUID(d["id"]),
+            kind=CallConnectionKind(d["kind"]),
+            trigger=CallConnectionTrigger(d["trigger"]),
+            status=CallConnectionStatus(d["status"]),
+            target_type=ForwardingTargetType(d["target_type"]),
+            target=d["target"],
+            requested_at=datetime.fromisoformat(d["requested_at"]),
+            dialing_at=_dt(d.get("dialing_at")),
+            connected_at=_dt(d.get("connected_at")),
             ended_at=_dt(d.get("ended_at")),
             failure_code=d.get("failure_code"),
         )

@@ -326,6 +326,8 @@ impl ForwardingTargetType {
 #[serde(rename_all = "snake_case")]
 pub enum CallForwardingTrigger {
     IncomingAction,
+    LiveTransfer,
+    LiveConference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -334,6 +336,32 @@ pub enum CallForwardingStatus {
     Requested,
     Dialing,
     Forwarded,
+    Failed,
+}
+
+/// Whether the caller is handed off or a guest joins the conversation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionKind {
+    Handoff,
+    Conference,
+}
+
+/// What initiated the destination connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionTrigger {
+    IncomingAction,
+    AgentTool,
+}
+
+/// Connection progress, separate from the original call's status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionStatus {
+    Requested,
+    Dialing,
+    Connected,
     Failed,
 }
 
@@ -562,6 +590,9 @@ pub struct PhoneCall {
     /// Forwarding attempts in chronological order.
     #[serde(default)]
     pub forwardings: Vec<PhoneCallForwarding>,
+    /// Prefer when present. None means an older response; Some([]) is authoritative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<PhoneCallConnection>>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -607,6 +638,26 @@ pub struct IncomingCallActionConfig {
     pub forwarding_phone_number: Option<String>,
     #[serde(default)]
     pub forwarding_sip_uri: Option<String>,
+}
+
+/// One handoff or conference attempt, returned oldest-first on the call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneCallConnection {
+    pub id: Uuid,
+    pub kind: CallConnectionKind,
+    pub trigger: CallConnectionTrigger,
+    pub status: CallConnectionStatus,
+    pub target_type: ForwardingTargetType,
+    pub target: String,
+    pub requested_at: String,
+    #[serde(default)]
+    pub dialing_at: Option<String>,
+    #[serde(default)]
+    pub connected_at: Option<String>,
+    #[serde(default)]
+    pub ended_at: Option<String>,
+    #[serde(default)]
+    pub failure_code: Option<String>,
 }
 
 /// One attempt to forward a call, returned oldest-first on the call.

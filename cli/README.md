@@ -445,6 +445,15 @@ does not require a dedicated phone number. The recipient must already have a
 shared iMessage connection to the identity; otherwise the call fails with
 `409 no_shared_connection`.
 
+#### Call connection history
+
+`inkbox phone calls -i my-agent --json` includes optional `connections` history.
+A connection distinguishes `handoff` from `conference`, with `incoming_action`
+or `agent_tool` as its trigger. Prefer this list when present, even when empty;
+`forwardings` is a compatibility view and must not be counted again. These are
+read-only outcomes of incoming-call routing and Voice AI actions, not commands
+to transfer or conference a live call.
+
 ### text
 
 Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`.

@@ -289,6 +289,14 @@ Incoming calls can be forwarded to a complete E.164 number or a SIP URI with a p
 `IncomingCallActionSetOptions`. Call responses expose chronological
 `forwardings`; older responses deserialize to an empty vector.
 
+Call records also expose `connections` when available: `kind` distinguishes
+`handoff` from `conference`, and `trigger` distinguishes `incoming_action` from
+`agent_tool`. Successful attempts use `status: "connected"`; `ended_at` records
+when they later end. Prefer `connections` when present, including an empty list.
+Only use `forwardings` as a fallback for older responses that omit `connections`;
+the two lists describe the same attempts. Transfers and conferences are Voice AI
+actions, not SDK call-control methods.
+
 Contact rules and webhook signing keys are keyed by **agent identity**, addressed
 by `agent_handle`. Use `mail_identity_contact_rules()` /
 `phone_identity_contact_rules()` (per-identity `list`/`get`/`create`/`update`/

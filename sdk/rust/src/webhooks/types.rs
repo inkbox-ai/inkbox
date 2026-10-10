@@ -922,6 +922,9 @@ pub struct WebhookPhoneCall {
     /// Chronological forwarding attempts; absent on older webhook replays.
     #[serde(default)]
     pub forwardings: Vec<crate::phone::PhoneCallForwarding>,
+    /// Canonical history; omitted by older webhook replays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<crate::phone::PhoneCallConnection>>,
 }
 
 fn default_webhook_call_mode() -> String {

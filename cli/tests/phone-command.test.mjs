@@ -991,3 +991,30 @@ test("text send and list work with a UK identity phone without a state", async (
     mock.server.close();
   }
 });
+
+test("calls JSON preserves canonical connections without dropping legacy history", async () => {
+  const call = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_call_connections.json", import.meta.url), "utf8"));
+  const requests = [];
+  const mock = await listen((req, res) => {
+    requests.push({ method: req.method, url: req.url });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(req.url === "/api/v1/identities/support-bot" ? IDENTITY : [call]));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "phone", "calls", "-i", "support-bot",
+    ]);
+    assert.ifError(result.error);
+    assert.equal(result.stderr, "");
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every(request => request.method === "GET"));
+    const calls = JSON.parse(result.stdout);
+    assert.equal(calls[0].connections[2].kind, "conference");
+    assert.equal(calls[0].connections[2].status, "connected");
+    assert.equal(calls[0].connections[2].connectedAt, "2026-10-09T12:02:03.000Z");
+    assert.equal(calls[0].forwardings[2].trigger, "live_conference");
+  } finally {
+    mock.server.close();
+  }
+});

@@ -32,6 +32,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
+- Call records and lifecycle webhooks expose typed `connections` history, with
+  handoff versus conference kinds and neutral connection progress. The optional
+  field distinguishes older responses from an empty history; existing
+  `forwardings` remains available for compatibility. CLI call JSON preserves it.
+
 - Call transcript segments expose their line number separately from spoken text,
   across Python, TypeScript, and Rust in call, correspondence, and webhook turns.
   Shared local lines and unknown attribution have no phone number.

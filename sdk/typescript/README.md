@@ -1301,6 +1301,14 @@ for (const forwarding of (await inkbox.calls.get("call-uuid")).forwardings) {
 }
 ```
 
+Call records also expose `connections` when available: `kind` distinguishes
+`handoff` from `conference`, and `trigger` distinguishes `incoming_action` from
+`agent_tool`. Successful attempts use `status: "connected"`; `endedAt` records
+when they later end. Prefer `connections` when present, including an empty list.
+Only use `forwardings` as a fallback for older responses that omit `connections`;
+the two lists describe the same attempts. Transfers and conferences are Voice AI
+actions, not SDK call-control methods.
+
 ---
 
 ## Org-level Mailboxes

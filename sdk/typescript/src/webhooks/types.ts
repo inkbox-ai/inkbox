@@ -677,11 +677,27 @@ export interface WebhookPhoneCall {
   on_voicemail?: OnVoicemailWire | null;
   /** Chronological forwarding attempts; absent on older webhook replays. */
   forwardings?: WebhookPhoneCallForwarding[];
+  /** Canonical history; omitted by older webhook replays. */
+  connections?: WebhookPhoneCallConnection[];
+}
+
+export interface WebhookPhoneCallConnection {
+  id: string;
+  kind: "handoff" | "conference";
+  trigger: "incoming_action" | "agent_tool";
+  status: "requested" | "dialing" | "connected" | "failed";
+  target_type: "phone" | "sip";
+  target: string;
+  requested_at: string;
+  dialing_at?: string | null;
+  connected_at?: string | null;
+  ended_at?: string | null;
+  failure_code?: string | null;
 }
 
 export interface WebhookPhoneCallForwarding {
   id: string;
-  trigger: "incoming_action";
+  trigger: "incoming_action" | "live_transfer" | "live_conference";
   status: "requested" | "dialing" | "forwarded" | "failed";
   target_type: "phone" | "sip";
   target: string;

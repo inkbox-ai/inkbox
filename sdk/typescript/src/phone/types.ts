@@ -152,12 +152,31 @@ export enum ForwardingTargetType {
 
 export enum CallForwardingTrigger {
   INCOMING_ACTION = "incoming_action",
+  LIVE_TRANSFER = "live_transfer",
+  LIVE_CONFERENCE = "live_conference",
 }
 
 export enum CallForwardingStatus {
   REQUESTED = "requested",
   DIALING = "dialing",
   FORWARDED = "forwarded",
+  FAILED = "failed",
+}
+
+export enum CallConnectionKind {
+  HANDOFF = "handoff",
+  CONFERENCE = "conference",
+}
+
+export enum CallConnectionTrigger {
+  INCOMING_ACTION = "incoming_action",
+  AGENT_TOOL = "agent_tool",
+}
+
+export enum CallConnectionStatus {
+  REQUESTED = "requested",
+  DIALING = "dialing",
+  CONNECTED = "connected",
   FAILED = "failed",
 }
 
@@ -340,6 +359,8 @@ export interface PhoneCall {
   postCallActionItems: PostCallActionItem[];
   /** Forwarding attempts in chronological order. */
   forwardings: PhoneCallForwarding[];
+  /** Prefer when present. Omitted only by older responses; an empty list is authoritative. */
+  connections?: PhoneCallConnection[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -412,6 +433,21 @@ export interface IncomingCallActionConfig {
   forwardingTargetType: ForwardingTargetType | null;
   forwardingPhoneNumber: string | null;
   forwardingSipUri: string | null;
+}
+
+/** One handoff or conference attempt, returned oldest-first on the call. */
+export interface PhoneCallConnection {
+  id: string;
+  kind: CallConnectionKind;
+  trigger: CallConnectionTrigger;
+  status: CallConnectionStatus;
+  targetType: ForwardingTargetType;
+  target: string;
+  requestedAt: Date;
+  dialingAt: Date | null;
+  connectedAt: Date | null;
+  endedAt: Date | null;
+  failureCode: string | null;
 }
 
 /** One attempt to forward a call, returned oldest-first on the call. */
@@ -645,6 +681,7 @@ export interface RawPhoneCall {
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   forwardings?: RawPhoneCallForwarding[];
+  connections?: RawPhoneCallConnection[];
   created_at: string;
   updated_at: string;
 }
@@ -756,6 +793,20 @@ export interface RawIncomingCallActionConfig {
   forwarding_target_type?: string | null;
   forwarding_phone_number?: string | null;
   forwarding_sip_uri?: string | null;
+}
+
+export interface RawPhoneCallConnection {
+  id: string;
+  kind: string;
+  trigger: string;
+  status: string;
+  target_type: string;
+  target: string;
+  requested_at: string;
+  dialing_at?: string | null;
+  connected_at?: string | null;
+  ended_at?: string | null;
+  failure_code?: string | null;
 }
 
 export interface RawPhoneCallForwarding {
@@ -906,6 +957,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     onVoicemail: parseOnVoicemail(r.on_voicemail),
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
     forwardings: (r.forwardings ?? []).map(parsePhoneCallForwarding),
+    connections: r.connections?.map(parsePhoneCallConnection),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -980,6 +1032,22 @@ export function parseIncomingCallActionConfig(
     forwardingTargetType: (r.forwarding_target_type as ForwardingTargetType) ?? null,
     forwardingPhoneNumber: r.forwarding_phone_number ?? null,
     forwardingSipUri: r.forwarding_sip_uri ?? null,
+  };
+}
+
+export function parsePhoneCallConnection(r: RawPhoneCallConnection): PhoneCallConnection {
+  return {
+    id: r.id,
+    kind: r.kind as CallConnectionKind,
+    trigger: r.trigger as CallConnectionTrigger,
+    status: r.status as CallConnectionStatus,
+    targetType: r.target_type as ForwardingTargetType,
+    target: r.target,
+    requestedAt: new Date(r.requested_at),
+    dialingAt: r.dialing_at ? new Date(r.dialing_at) : null,
+    connectedAt: r.connected_at ? new Date(r.connected_at) : null,
+    endedAt: r.ended_at ? new Date(r.ended_at) : null,
+    failureCode: r.failure_code ?? null,
   };
 }
 
