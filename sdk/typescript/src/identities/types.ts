@@ -89,7 +89,6 @@ export interface UpdateIdentityOptions {
   slackOutboundFilterMode?: "whitelist" | "blacklist";
   phoneInboundFilterMode?: "whitelist" | "blacklist";
   phoneOutboundFilterMode?: "whitelist" | "blacklist";
-  newHandle?: string;
   displayName?: string | null;
   description?: string | null;
   imessageEnabled?: boolean;

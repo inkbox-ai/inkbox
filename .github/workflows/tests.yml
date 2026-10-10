@@ -84,6 +84,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Build and check public type contracts
+        run: npm run build && npx tsc --noEmit -p tsconfig.contract-tests.json
+
       - name: Run TypeScript tests
         run: npx vitest run --coverage --coverage.thresholds.lines=80
 

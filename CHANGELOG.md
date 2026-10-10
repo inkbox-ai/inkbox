@@ -4,6 +4,30 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.18 - Immutable agent handles (unreleased)
+
+### Removed
+
+- Identity renaming through Python (`new_handle`), TypeScript (`newHandle`),
+  Rust, and the CLI (`identity update --new-handle`). Choose the handle when
+  creating the identity; update its display name to change how it is presented.
+- **Source-breaking:** Rust removes the `new_handle` parameter from `update`,
+  `update_with_imessage_number`, and `update_with_contact_sharing_and_imessage_number`
+  on both identity layers. Remove the argument even if it was `None`:
+
+  ```rust
+  // Before
+  client.identities().update("sales-agent", None, Unset::Omit, Unset::Omit, None, None, None, None)?;
+  // After
+  client.identities().update("sales-agent", Unset::Omit, Unset::Omit, None, None, None, None)?;
+  ```
+
+### Changed
+
+- Python rejects the removed keyword; TypeScript rejects a supplied `newHandle`
+  at runtime as well as in its public types; the CLI rejects the removed flag.
+  Profile and channel-configuration updates retain their existing behavior.
+
 ## 0.7.17 - Python tunnel TLS compatibility (unreleased)
 
 ### Changed

@@ -6,7 +6,7 @@
 
 import { InkboxAPIError, type InkboxAPIErrorDetail } from "../_http.js";
 
-/** Which namespace blocked the handle on a 409 from create / rename. */
+/** Which namespace blocked the handle on a 409 from creation. */
 export type BlockingNamespace = "identities" | "tunnels" | "mail" | null;
 
 /**

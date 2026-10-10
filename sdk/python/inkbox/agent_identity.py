@@ -2088,7 +2088,6 @@ class AgentIdentity:
     def update(
         self,
         *,
-        new_handle: str | None = None,
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
@@ -2107,7 +2106,7 @@ class AgentIdentity:
         phone_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
         phone_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> None:
-        """Update this identity's handle, display name, description,
+        """Update this identity's display name, description,
         iMessage reachability, and contact-rule filter modes.
 
         Only provided fields are applied; omitted fields are left
@@ -2116,7 +2115,6 @@ class AgentIdentity:
         it untouched.
 
         Args:
-            new_handle: New agent handle.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
             imessage_enabled: Toggle iMessage reachability.
@@ -2147,8 +2145,6 @@ class AgentIdentity:
             phone_outbound_filter_mode: Effective send mode for phone/iMessage.
         """
         update_kwargs: dict[str, Any] = {}
-        if new_handle is not None:
-            update_kwargs["new_handle"] = new_handle
         if display_name is not _UNSET:
             update_kwargs["display_name"] = display_name
         if description is not _UNSET:

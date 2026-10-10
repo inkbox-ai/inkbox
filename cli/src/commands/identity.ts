@@ -568,7 +568,6 @@ export function registerIdentityCommands(program: Command): void {
         "the column (sends explicit null); omit the flag to leave " +
         "untouched.",
     )
-    .option("--new-handle <name>", "New handle")
     .option("--display-name <name>", "New display name (pass '' to clear)")
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
@@ -589,7 +588,6 @@ export function registerIdentityCommands(program: Command): void {
         this: Command,
         handle: string,
         cmdOpts: {
-          newHandle?: string;
           displayName?: string;
           description?: string;
           clearDescription?: boolean;
@@ -646,7 +644,6 @@ export function registerIdentityCommands(program: Command): void {
           mailOutboundFilterMode?: "whitelist" | "blacklist";
           phoneInboundFilterMode?: "whitelist" | "blacklist";
           phoneOutboundFilterMode?: "whitelist" | "blacklist";
-          newHandle?: string;
           displayName?: string | null;
           description?: string | null;
           imessageEnabled?: boolean;
@@ -661,7 +658,6 @@ export function registerIdentityCommands(program: Command): void {
         for (const key of ["slackFilterMode", "slackInboundFilterMode", "slackOutboundFilterMode", "mailInboundFilterMode", "mailOutboundFilterMode", "phoneInboundFilterMode", "phoneOutboundFilterMode"] as const) {
           if (cmdOpts[key] !== undefined) updateOpts[key] = cmdOpts[key] as "whitelist" | "blacklist";
         }
-        if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
         if (cmdOpts.displayName !== undefined) {
           updateOpts.displayName = cmdOpts.displayName === "" ? null : cmdOpts.displayName;
         }

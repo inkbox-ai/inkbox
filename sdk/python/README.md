@@ -243,9 +243,8 @@ all_identities = inkbox.list_identities()
 # Agent-scoped credentials discover peers through the A2A directory.
 peers = inkbox.a2a.organization_directory()
 
-# Update handle, display name, and description. For description,
+# Update display name and description. The handle is fixed at creation. For description,
 # pass None to clear and omit the kwarg to leave untouched.
-identity.update(new_handle="sales-bot-v2")
 identity.update(display_name="New Name", description="New blurb")
 identity.update(description=None)  # clear
 

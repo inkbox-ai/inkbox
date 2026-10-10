@@ -1,4 +1,4 @@
-//! Literal construction and positional calls supported by earlier API surfaces.
+//! Retained literal and positional contracts, plus current identity update calls.
 
 use inkbox::{
     contacts::*,
@@ -276,16 +276,9 @@ fn legacy_positional_calls(client: &Inkbox, agent: &inkbox::AgentIdentity) -> in
     )?;
     agent.list_mail_contact_rules(None, None, None, None)?;
     agent.list_phone_contact_rules(None, None, None, None)?;
-    client.identities().update(
-        "agent",
-        None,
-        Unset::Omit,
-        Unset::Omit,
-        None,
-        None,
-        None,
-        None,
-    )?;
+    client
+        .identities()
+        .update("agent", Unset::Omit, Unset::Omit, None, None, None, None)?;
     client.contacts().access().get("agent", "contact")?;
     client
         .contacts()

@@ -245,28 +245,22 @@ class TestIdentitiesGet:
 
 
 class TestIdentitiesUpdate:
-    def test_update_handle(self):
+    @pytest.mark.parametrize("handle", ["new-handle", HANDLE, None])
+    def test_update_rejects_handle_before_http(self, handle):
         res, http = _resource()
-        http.patch.return_value = {
-            **IDENTITY_DETAIL_DICT,
-            "agent_handle": "new-handle",
-        }
-
-        result = res.update(HANDLE, new_handle="new-handle")
-
-        http.patch.assert_called_once_with(
-            f"/{HANDLE}", json={"agent_handle": "new-handle"}
-        )
-        assert result.agent_handle == "new-handle"
+        with pytest.raises(TypeError, match="new_handle"):
+            res.update(HANDLE, new_handle=handle)
+        http.patch.assert_not_called()
 
     def test_omitted_fields_not_sent(self):
         res, http = _resource()
         http.patch.return_value = IDENTITY_DETAIL_DICT
 
-        res.update(HANDLE, new_handle="new-handle")
+        result = res.update(HANDLE, display_name="New display")
 
         _, kwargs = http.patch.call_args
-        assert "status" not in kwargs["json"]
+        assert kwargs["json"] == {"display_name": "New display"}
+        assert result.agent_handle == HANDLE
 
     def test_claims_new_imessage_number(self):
         res, http = _resource()

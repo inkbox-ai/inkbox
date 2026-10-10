@@ -522,29 +522,14 @@ class TestAgentIdentityIncomingCallAction:
 
 
 class TestAgentIdentityUpdate:
-    def test_update_with_new_handle_uses_detailed_response(self):
+    @pytest.mark.parametrize("handle", ["new-handle", "sales-agent", None])
+    def test_update_rejects_handle_before_http(self, handle):
         identity, inkbox = _identity_with_mailbox()
-        refreshed_detail = {
-            **IDENTITY_DETAIL_DICT,
-            "agent_handle": "new-handle",
-            "tunnel": {
-                **IDENTITY_DETAIL_DICT["tunnel"],
-                "tunnel_name": "new-handle",
-                "public_host": "new-handle.inkboxwire.com",
-            },
-        }
-        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(
-            refreshed_detail
-        )
+        with pytest.raises(TypeError, match="new_handle"):
+            identity.update(new_handle=handle)
+        inkbox._ids_resource.update.assert_not_called()
 
-        identity.update(new_handle="new-handle")
-
-        inkbox._ids_resource.get.assert_not_called()
-        assert identity.tunnel is not None
-        assert identity.tunnel.tunnel_name == "new-handle"
-        assert identity.tunnel.public_host == "new-handle.inkboxwire.com"
-
-    def test_update_without_new_handle_uses_detailed_response(self):
+    def test_profile_update_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
         updated = {**IDENTITY_DETAIL_DICT, "display_name": "New Display"}
         inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(updated)
@@ -553,6 +538,9 @@ class TestAgentIdentityUpdate:
 
         inkbox._ids_resource.get.assert_not_called()
         assert identity.display_name == "New Display"
+        assert identity.agent_handle == IDENTITY_DETAIL_DICT["agent_handle"]
+        assert identity.tunnel.tunnel_name == IDENTITY_DETAIL_DICT["tunnel"]["tunnel_name"]
+        assert identity.mailbox.email_address == IDENTITY_DETAIL_DICT["mailbox"]["email_address"]
 
     def test_number_claim_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()

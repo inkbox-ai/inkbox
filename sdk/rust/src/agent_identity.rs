@@ -1932,7 +1932,7 @@ impl AgentIdentity {
     // Identity management
     // -----------------------------------------------------------------------
 
-    /// Update this identity's handle, display name, description, iMessage
+    /// Update this identity's display name, description, iMessage
     /// reachability and contact-rule filter modes.
     ///
     /// Only provided fields are applied; omitted fields are left unchanged. For
@@ -1940,7 +1940,6 @@ impl AgentIdentity {
     /// `Unset::Omit` leaves it untouched.
     ///
     /// # Arguments
-    /// * `new_handle` - New agent handle.
     /// * `display_name` - New display name, or `Unset::Value(None)` to clear.
     /// * `description` - New description, or `Unset::Value(None)` to clear.
     /// * `imessage_enabled` - Toggle identity-level iMessage reachability.
@@ -1953,7 +1952,6 @@ impl AgentIdentity {
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
-        new_handle: Option<&str>,
         display_name: crate::identities::types::Unset<String>,
         description: crate::identities::types::Unset<String>,
         imessage_enabled: Option<bool>,
@@ -1962,7 +1960,6 @@ impl AgentIdentity {
         phone_filter_mode: Option<&str>,
     ) -> Result<()> {
         self.update_with_imessage_number(
-            new_handle,
             display_name,
             description,
             imessage_enabled,
@@ -1983,7 +1980,6 @@ impl AgentIdentity {
     #[allow(clippy::too_many_arguments)]
     pub fn update_with_imessage_number(
         &self,
-        new_handle: Option<&str>,
         display_name: Unset<String>,
         description: Unset<String>,
         imessage_enabled: Option<bool>,
@@ -1995,7 +1991,6 @@ impl AgentIdentity {
         idempotency_key: Option<&str>,
     ) -> Result<()> {
         self.update_with_contact_sharing_and_imessage_number(
-            new_handle,
             display_name,
             description,
             imessage_enabled,
@@ -2014,7 +2009,6 @@ impl AgentIdentity {
     #[allow(clippy::too_many_arguments)]
     pub fn update_with_contact_sharing_and_imessage_number(
         &self,
-        new_handle: Option<&str>,
         display_name: Unset<String>,
         description: Unset<String>,
         imessage_enabled: Option<bool>,
@@ -2031,7 +2025,6 @@ impl AgentIdentity {
             .identities()
             .update_with_contact_sharing_and_imessage_number(
                 &self.agent_handle(),
-                new_handle,
                 display_name,
                 description,
                 imessage_enabled,
@@ -3082,7 +3075,6 @@ mod tests {
         let identity = identity_at(&server.base_url(), false);
         identity
             .update_with_imessage_number(
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
@@ -3125,15 +3117,7 @@ mod tests {
             r#type: "dedicated_outbound".into(),
         });
         identity
-            .update(
-                None,
-                Unset::Omit,
-                Unset::Omit,
-                Some(false),
-                None,
-                None,
-                None,
-            )
+            .update(Unset::Omit, Unset::Omit, Some(false), None, None, None)
             .unwrap();
 
         patch.assert();

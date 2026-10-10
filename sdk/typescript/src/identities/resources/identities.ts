@@ -126,7 +126,7 @@ export class IdentitiesResource {
   }
 
   /**
-   * Update an identity's handle, display name, description, iMessage
+   * Update an identity's display name, description, iMessage
    * reachability, and/or contact-rule filter modes.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
@@ -134,7 +134,6 @@ export class IdentitiesResource {
    * (sets the row column to NULL); omitting the key leaves it untouched.
    *
    * @param agentHandle - Current handle of the identity to update.
-   * @param options.newHandle - New handle value.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle identity-level iMessage reachability.
@@ -157,6 +156,9 @@ export class IdentitiesResource {
     agentHandle: string,
     options: UpdateIdentityOptions,
   ): Promise<_AgentIdentityData> {
+    if ("newHandle" in options) {
+      throw new TypeError("Agent handles are read-only and cannot be updated");
+    }
     if (options.claimIMessageNumber !== undefined && options.claimIMessageNumber !== true) {
       throw new Error("claimIMessageNumber must be true when supplied");
     }
@@ -182,7 +184,6 @@ export class IdentitiesResource {
       validateIdempotencyKey(options.idempotencyKey);
     }
     const body: Record<string, unknown> = {};
-    if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;

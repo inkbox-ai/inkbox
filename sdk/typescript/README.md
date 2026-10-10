@@ -299,8 +299,8 @@ const allIdentities = await inkbox.listIdentities();
 // Agent-scoped credentials discover peers through the A2A directory.
 const peers = await inkbox.a2a.organizationDirectory();
 
-// Update identity metadata or handle
-await identity.update({ newHandle: "sales-bot-v2" });
+// Update the display name; the handle is fixed at creation.
+await identity.update({ displayName: "Sales assistant" });
 
 // Release the phone number (carrier release + local delete). Mailbox and
 // tunnel are 1:1 with the identity and can only be removed by deleting it.

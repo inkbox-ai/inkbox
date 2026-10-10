@@ -292,7 +292,7 @@ impl IdentitiesResource {
         AgentIdentityData::from_value(data)
     }
 
-    /// Update an identity's handle, display name, description, iMessage
+    /// Update an identity's display name, description, iMessage
     /// reachability and contact-rule filter modes.
     ///
     /// Only provided fields are applied; omitted fields are left unchanged. For
@@ -301,7 +301,6 @@ impl IdentitiesResource {
     ///
     /// # Arguments
     /// * `agent_handle` - Current handle of the identity to update.
-    /// * `new_handle` - New handle value (`None` omits the key).
     /// * `display_name` - New display name, or `Unset::Value(None)` to clear.
     /// * `description` - New description, or `Unset::Value(None)` to clear.
     /// * `imessage_enabled` - Toggle identity-level iMessage reachability.
@@ -315,7 +314,6 @@ impl IdentitiesResource {
     pub fn update(
         &self,
         agent_handle: &str,
-        new_handle: Option<&str>,
         display_name: Unset<String>,
         description: Unset<String>,
         imessage_enabled: Option<bool>,
@@ -325,7 +323,6 @@ impl IdentitiesResource {
     ) -> Result<AgentIdentitySummary> {
         self.update_with_imessage_number(
             agent_handle,
-            new_handle,
             display_name,
             description,
             imessage_enabled,
@@ -350,7 +347,6 @@ impl IdentitiesResource {
     pub fn update_with_imessage_number(
         &self,
         agent_handle: &str,
-        new_handle: Option<&str>,
         display_name: Unset<String>,
         description: Unset<String>,
         imessage_enabled: Option<bool>,
@@ -363,7 +359,6 @@ impl IdentitiesResource {
     ) -> Result<AgentIdentityData> {
         self.update_with_contact_sharing_and_imessage_number(
             agent_handle,
-            new_handle,
             display_name,
             description,
             imessage_enabled,
@@ -383,7 +378,6 @@ impl IdentitiesResource {
     pub fn update_with_contact_sharing_and_imessage_number(
         &self,
         agent_handle: &str,
-        new_handle: Option<&str>,
         display_name: Unset<String>,
         description: Unset<String>,
         imessage_enabled: Option<bool>,
@@ -423,10 +417,6 @@ impl IdentitiesResource {
             validate_idempotency_key(key)?;
         }
         let mut body = Map::new();
-        if let Some(h) = new_handle {
-            // Note: the body key is `agent_handle`, not `new_handle`.
-            body.insert("agent_handle".into(), Value::String(h.to_string()));
-        }
         if let Unset::Value(d) = &display_name {
             body.insert(
                 "display_name".into(),
@@ -694,7 +684,6 @@ mod tests {
             .identities()
             .update_with_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
@@ -728,7 +717,6 @@ mod tests {
             .identities()
             .update_with_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
@@ -759,7 +747,6 @@ mod tests {
             .identities()
             .update_with_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
@@ -786,7 +773,6 @@ mod tests {
             .identities()
             .update_with_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 Some(false),
@@ -819,7 +805,6 @@ mod tests {
             .identities()
             .update_with_contact_sharing_and_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
@@ -842,7 +827,6 @@ mod tests {
             .identities()
             .update_with_imessage_number(
                 "support-bot",
-                None,
                 Unset::Omit,
                 Unset::Omit,
                 None,
