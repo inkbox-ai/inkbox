@@ -141,6 +141,8 @@ export interface IMessageRecipient {
   sentAt: Date | null;
   deliveredAt: Date | null;
   failedAt: Date | null;
+  /** Server-reported finality; null on inbound or older responses. */
+  deliveryFinal?: boolean | null;
 }
 
 /** A live tapback attached to a message in read responses. */
@@ -186,6 +188,7 @@ export interface IMessage {
   service: IMessageService;
   sendStyle: IMessageSendStyle | null;
   media: IMessageMediaItem[] | null;
+  /** @deprecated Use service to identify transport. */
   wasDowngraded: boolean | null;
   status: IMessageDeliveryStatus | null;
   errorCode: string | null;
@@ -199,6 +202,8 @@ export interface IMessage {
   reactions: IMessageMessageReaction[] | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Server-reported finality; null on inbound or older responses. */
+  deliveryFinal?: boolean | null;
 }
 
 /** A chronological thread page. Pass nextCursor to retrieve more messages. */
@@ -266,6 +271,9 @@ export interface IMessageConversationSummary {
   latestHasMedia: boolean;
   unreadCount: number;
   totalCount: number;
+  latestOutboundService?: IMessageService | null;
+  latestOutboundStatus?: IMessageDeliveryStatus | null;
+  latestOutboundDeliveryFinal?: boolean | null;
 }
 
 /** A tapback reaction on an iMessage. */
@@ -349,6 +357,7 @@ export interface RawIMessageRecipient {
   sent_at?: string | null;
   delivered_at?: string | null;
   failed_at?: string | null;
+  delivery_final?: boolean | null;
 }
 
 export interface RawIMessageMessageReaction {
@@ -378,6 +387,7 @@ export interface RawIMessage {
   service: string;
   send_style?: string | null;
   media?: RawIMessageMediaItem[] | null;
+  /** @deprecated Use service to identify transport. */
   was_downgraded?: boolean | null;
   status?: string | null;
   error_code?: string | null;
@@ -390,6 +400,7 @@ export interface RawIMessage {
   reactions?: RawIMessageMessageReaction[] | null;
   created_at: string;
   updated_at: string;
+  delivery_final?: boolean | null;
 }
 
 export interface RawIMessageConversation {
@@ -422,6 +433,9 @@ export interface RawIMessageConversationSummary extends RawIMessageConversation 
   latest_has_media?: boolean;
   unread_count?: number;
   total_count?: number;
+  latest_outbound_service?: string | null;
+  latest_outbound_status?: string | null;
+  latest_outbound_delivery_final?: boolean | null;
 }
 
 export interface RawIMessageReaction {
@@ -490,6 +504,7 @@ export function parseIMessageMediaItem(r: RawIMessageMediaItem): IMessageMediaIt
 
 export function parseIMessageRecipient(r: RawIMessageRecipient): IMessageRecipient {
   return {
+    deliveryFinal: r.delivery_final ?? null,
     remoteNumber: r.remote_number,
     deliveryStatus: (r.delivery_status as IMessageDeliveryStatus) ?? null,
     service: (r.service as IMessageService) ?? null,
@@ -519,6 +534,7 @@ export function parseIMessageMessageReaction(
 
 export function parseIMessage(r: RawIMessage): IMessage {
   return {
+    deliveryFinal: r.delivery_final ?? null,
     replyToMessageId: r.reply_to_message_id ?? null,
     threadId: r.thread_id ?? null,
     threadRootMessageId: r.thread_root_message_id ?? null,
@@ -586,6 +602,9 @@ export function parseIMessageConversationSummary(
   r: RawIMessageConversationSummary,
 ): IMessageConversationSummary {
   return {
+    latestOutboundService: (r.latest_outbound_service as IMessageService) ?? null,
+    latestOutboundStatus: (r.latest_outbound_status as IMessageDeliveryStatus) ?? null,
+    latestOutboundDeliveryFinal: r.latest_outbound_delivery_final ?? null,
     id: r.id,
     assignmentId: r.assignment_id,
     assignmentStatus: r.assignment_status

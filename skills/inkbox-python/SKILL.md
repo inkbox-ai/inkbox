@@ -1649,3 +1649,24 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Set `plain_reply_fallback=False` on `send_imessage` or `imessages.send` to
 require a native reply instead.
+
+## Delivery status and fallback
+
+Sending returns immediately with the current state; an accepted send is not a
+confirmed delivery. For iMessage, `service` identifies the actual transport
+(`imessage`, `rcs`, or `sms`). Use it instead of the deprecated `was_downgraded`
+field. `delivery_final` is reported by the server: `true` means stop waiting,
+including failures; `false` means still in flight; `None` means unknown or inbound.
+Read `status` (SMS/MMS: `delivery_status`) and error fields as well.
+
+iMessage/RCS one-to-one messages normally finish at `delivered`, `declined`, or
+`error`; SMS fallback and iMessage groups finish at `sent` or failure. A final
+`sent` is not proof of delivery to a device. Ordinary SMS/MMS messages finish at
+`delivered` or a terminal failed/unconfirmed outcome; group texts use the aggregate
+message status. Do not resend merely because the current state is not final.
+
+Refresh an iMessage with `inkbox.imessages.get(message.id)` or a text with
+`agent.get_text(message.id)`, or subscribe to the existing sent, delivered, and
+failure lifecycle events. Conversation summaries also carry
+`latest_outbound_service`, `latest_outbound_status`, and
+`latest_outbound_delivery_final`, even when the latest message is inbound.

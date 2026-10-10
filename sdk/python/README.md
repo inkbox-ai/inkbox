@@ -2260,3 +2260,19 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Set `plain_reply_fallback=False` on `send_imessage` or `imessages.send` to
 require a native reply instead.
+
+## Message delivery status
+
+Send methods return immediately; acceptance is not proof of delivery. Outbound
+messages and recipients expose `delivery_final` from the server: `true` means stop
+waiting (including failures), `false` means in progress, and null/absent means
+unknown. Check `status (iMessage) or delivery_status (SMS/MMS)` and `error_detail` too. SDKs do not poll automatically.
+For iMessage, `service` identifies `imessage`, `rcs`, or `sms`; the deprecated
+`was_downgraded` field is retained only for compatibility.
+
+A final SMS-fallback or iMessage-group `sent` does not confirm device delivery.
+Ordinary SMS/MMS can finish delivered, failed, or unconfirmed. Read the message
+again or use existing delivery lifecycle webhooks; do not resend because a send
+is still pending. Conversation summaries expose `latest_outbound_service`,
+`latest_outbound_status`, and `latest_outbound_delivery_final` for the latest outbound message, even
+when a newer inbound reply exists.

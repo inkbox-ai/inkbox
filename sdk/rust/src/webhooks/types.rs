@@ -61,6 +61,7 @@ pub enum SmsDeliveryStatusWire {
     DeliveryFailed,
     DeliveryUnconfirmed,
     SendingFailed,
+    BlockedSpamFilter,
 }
 
 /// Whether a text was user-initiated or an automatic reply.
@@ -133,6 +134,9 @@ pub struct TextMessageRecipientWire {
     pub sent_at: Option<String>,
     pub delivered_at: Option<String>,
     pub failed_at: Option<String>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// Org rate-limit snapshot on inbound-call payloads.
@@ -558,6 +562,9 @@ pub struct TextWebhookMessage {
     pub recipients: Option<Vec<TextMessageRecipientWire>>,
     pub created_at: String,
     pub updated_at: String,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// Wrapper under `TextWebhookPayload.data`.
@@ -699,6 +706,9 @@ pub struct IMessageRecipientWire {
     pub sent_at: Option<String>,
     pub delivered_at: Option<String>,
     pub failed_at: Option<String>,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// A live tapback attached to a message (snake_case wire shape).
@@ -742,6 +752,7 @@ pub struct IMessageWebhookMessage {
     pub service: IMessageServiceWire,
     pub send_style: Option<IMessageSendStyleWire>,
     pub media: Option<Vec<IMessageMediaItemWire>>,
+    /// Deprecated compatibility field; use service to identify transport.
     pub was_downgraded: Option<bool>,
     pub status: Option<IMessageDeliveryStatusWire>,
     pub error_code: Option<String>,
@@ -753,6 +764,9 @@ pub struct IMessageWebhookMessage {
     pub reactions: Option<Vec<IMessageMessageReactionWire>>,
     pub created_at: String,
     pub updated_at: String,
+    /// Server-reported finality; None on inbound or older responses.
+    #[serde(default)]
+    pub delivery_final: Option<bool>,
 }
 
 /// A tapback reaction on an iMessage (snake_case wire shape).
