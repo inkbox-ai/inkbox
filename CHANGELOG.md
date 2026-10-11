@@ -4,6 +4,37 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.19 - Call connections and transcript attribution (unreleased)
+
+### Added
+
+- Call records, contact correspondence, and lifecycle webhooks expose optional
+  `connections` history across Python, TypeScript, and Rust. Distinguish handoffs
+  from conference guests and preserve their outcomes and lifecycle timestamps.
+- Transcript segments expose nullable `phone_number` separately from spoken text.
+  Shared local lines and unknown attribution have no phone number.
+- CLI call JSON includes connection history; transcript tables and JSON include
+  the turn's nullable phone number.
+
+### Changed
+
+- Prefer `connections` when supplied, even when empty; use legacy `forwardings`
+  only when the field is absent. Legacy history includes only automatic incoming
+  forwarding; live transfers and conference guests appear only in `connections`.
+- Legacy call and webhook histories accept live-transfer and conference triggers.
+  Rust and TypeScript exhaustive matches on `CallForwardingTrigger` must handle
+  the additional live-transfer and conference variants accepted for older payloads.
+- **Source-breaking for Rust struct literals:** add `connections: None` to
+  `PhoneCall`, `WebhookPhoneCall`, and `CallCorrespondenceItem`, and
+  `phone_number: None` to `PhoneTranscript`, `WebhookTranscriptEntry`, and
+  `CorrespondenceTranscriptEntry`. Exhaustive patterns need these fields or `..`.
+  Deserializing older responses still works without these fields.
+- These additions are read-only. Transfers and conferences remain Voice AI
+  actions, with no new manual SDK methods or CLI commands.
+- Existing clients continue reading call and webhook histories without an upgrade.
+  Upgrade to use the new `connections` and transcript-number fields. New connection
+  kinds, triggers, and statuses preserve unknown values without misclassifying them.
+
 ## 0.7.18 - Immutable agent handles (unreleased)
 
 ### Removed

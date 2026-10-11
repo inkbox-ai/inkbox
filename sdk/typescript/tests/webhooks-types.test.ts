@@ -8,6 +8,8 @@
 // suppresses excess-key checks anyway).
 
 import { readFileSync, readdirSync } from "fs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import type {
@@ -51,6 +53,14 @@ function loadFixture<T>(name: string): T {
 }
 
 describe("webhook fixture inventory", () => {
+  it("compiles call-operation triggers from the public exports", () => {
+    execFileSync(process.execPath, [
+      fileURLToPath(new URL("../node_modules/typescript/bin/tsc", import.meta.url)),
+      "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "NodeNext",
+      fileURLToPath(new URL("./fixtures/call-forwarding-triggers.ts", import.meta.url)),
+    ], { timeout: 30_000, stdio: "pipe" });
+  }, 30_000);
+
   it("matches the canonical event set exactly (drift-loud)", () => {
     const present = readdirSync(FIXTURES_DIR).filter((f) => f.endsWith(".json")).sort();
     const expected = [...EXPECTED_FIXTURES].sort();

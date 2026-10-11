@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFile, execFileSync } from "node:child_process";
 import http from "node:http";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { buildPlaceCallOptions } from "../dist/commands/phone.js";
 
@@ -68,6 +69,36 @@ const IDENTITY = {
   },
   tunnel: null,
 };
+
+for (const args of [
+  ["transcripts", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
+  ["search-transcripts", "--query", "Hello"],
+]) {
+  test(`${args[0]} shows per-turn numbers and preserves transcript JSON`, async () => {
+    const turns = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_transcript_numbers.json", import.meta.url), "utf8"));
+    const mock = await listen((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(req.url === "/api/v1/identities/support-bot" ? IDENTITY : turns));
+    });
+    try {
+      const options = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`];
+      const result = await runCli([...options, "phone", ...args, "-i", "support-bot"]);
+      assert.ifError(result.error);
+      assert.match(result.stdout.split("\n")[0], /phoneNumber/);
+      assert.match(result.stdout, /\+14155550100/);
+      assert.match(result.stdout, /\+14155550101/);
+      const json = await runCli([...options, "--json", "phone", ...args, "-i", "support-bot"]);
+      assert.ifError(json.error);
+      const parsed = JSON.parse(json.stdout);
+      assert.equal(parsed[0].phoneNumber, turns[0].phone_number);
+      assert.deepEqual(Object.keys(parsed[0]).sort(), ["id", "callId", "seq", "tsMs", "party", "text", "createdAt", "phoneNumber"].sort());
+      assert.equal(parsed[2].phoneNumber, null);
+      assert.equal(parsed[3].text, turns[3].text);
+    } finally {
+      mock.server.close();
+    }
+  });
+}
 
 test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /--authority-mode <mode>/);
@@ -956,6 +987,34 @@ test("text send and list work with a UK identity phone without a state", async (
     assert.equal(inbound.localPhoneNumber, "+447700900123");
     assert.equal(inbound.remotePhoneNumber, "+447700900456");
     assert.equal(inbound.direction, "inbound");
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("calls JSON preserves canonical connections without dropping legacy history", async () => {
+  const call = JSON.parse(readFileSync(new URL("../../tests/fixtures/phone_call_connections.json", import.meta.url), "utf8"));
+  const requests = [];
+  const mock = await listen((req, res) => {
+    requests.push({ method: req.method, url: req.url });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(req.url === "/api/v1/identities/support-bot" ? IDENTITY : [call]));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "phone", "calls", "-i", "support-bot",
+    ]);
+    assert.ifError(result.error);
+    assert.equal(result.stderr, "");
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every(request => request.method === "GET"));
+    const calls = JSON.parse(result.stdout);
+    assert.equal(calls[0].connections[2].kind, "conference");
+    assert.equal(calls[0].connections[2].status, "connected");
+    assert.equal(calls[0].connections[2].connectedAt, "2026-10-09T12:02:03.000Z");
+    assert.equal(calls[0].forwardings.length, 1);
+    assert.equal(calls[0].forwardings[0].trigger, "incoming_action");
   } finally {
     mock.server.close();
   }

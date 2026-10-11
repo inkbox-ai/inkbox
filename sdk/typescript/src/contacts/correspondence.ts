@@ -1,4 +1,5 @@
 import type { SenderAccess } from "../sender_access.js";
+import { parsePhoneCallConnection, type PhoneCallConnection, type RawPhoneCallConnection } from "../phone/types.js";
 
 export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack";
 export type CorrespondenceContentMode = "metadata" | "preview" | "full";
@@ -18,6 +19,7 @@ export interface CorrespondenceAttachmentMetadata {
 }
 
 export interface CorrespondenceTranscriptEntry {
+  phoneNumber?: string | null;
   id: string | null;
   seq: number | null;
   party: string | null;
@@ -98,6 +100,7 @@ export interface CallCorrespondenceItem extends CorrespondenceItemBase {
   transcript: CorrespondenceTranscriptEntry[] | null;
   transcriptAbridged: boolean;
   transcriptUnavailable: boolean;
+  connections?: PhoneCallConnection[];
 }
 
 export type CorrespondenceItem =
@@ -193,6 +196,7 @@ export interface RawCallCorrespondenceItem extends RawCorrespondenceItemBase {
   ended_at: string | null;
   duration_seconds: number | null;
   transcript: Array<{
+    phone_number?: string | null;
     id: string | null;
     seq: number | null;
     party: string | null;
@@ -204,6 +208,7 @@ export interface RawCallCorrespondenceItem extends RawCorrespondenceItemBase {
   }> | null;
   transcript_abridged: boolean;
   transcript_unavailable: boolean;
+  connections?: RawPhoneCallConnection[];
 }
 
 export type RawCorrespondenceItem =
@@ -316,9 +321,11 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
           marker: t.marker,
           omittedTurns: t.omitted_turns,
           omittedMs: t.omitted_ms,
+          phoneNumber: t.phone_number ?? null,
         })) ?? null,
         transcriptAbridged: r.transcript_abridged,
         transcriptUnavailable: r.transcript_unavailable,
+        connections: r.connections?.map(parsePhoneCallConnection),
       };
   }
 }

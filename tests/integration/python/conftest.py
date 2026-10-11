@@ -7,7 +7,6 @@ Shared fixtures for Python SDK integration tests.
 from __future__ import annotations
 
 import os
-import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generator
@@ -23,7 +22,7 @@ import pytest
 @dataclass(frozen=True)
 class SdkIntegrationConfig:
     base_url: str
-    interservice_secret: str
+    interservice_secret: str = field(repr=False)
     environment: str
     verbose: bool
     http_timeout: float = 60.0
@@ -34,10 +33,10 @@ class SdkIntegrationConfig:
 @dataclass
 class BootstrapResult:
     email_address: str
-    password: str
+    password: str = field(repr=False)
     user_id: str
     org_id: str
-    api_key: str
+    api_key: str = field(repr=False)
 
 
 @dataclass

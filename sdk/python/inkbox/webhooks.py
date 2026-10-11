@@ -211,6 +211,7 @@ class WebhookTranscriptEntryWire(TypedDict, total=False):
     party: str
     text: str
     ts_ms: int
+    phone_number: str | None
     truncated: bool
     marker: Literal["abridged"]
     omitted_turns: int
@@ -719,13 +720,15 @@ class WebhookPhoneCall(TypedDict):
     on_voicemail: NotRequired[OnVoicemailWire | None]
     # Chronological forwarding attempts; omitted by older webhook replays.
     forwardings: NotRequired[list[WebhookPhoneCallForwarding]]
+    # Canonical history; omitted by older webhook replays.
+    connections: NotRequired[list[WebhookPhoneCallConnection]]
 
 
 class WebhookPhoneCallForwarding(TypedDict):
     """One forwarding attempt embedded in a call lifecycle webhook."""
 
     id: str
-    trigger: Literal["incoming_action"]
+    trigger: Literal["incoming_action", "live_transfer", "live_conference"]
     status: Literal["requested", "dialing", "forwarded", "failed"]
     target_type: Literal["phone", "sip"]
     target: str
@@ -734,6 +737,22 @@ class WebhookPhoneCallForwarding(TypedDict):
     forwarded_at: str | None
     ended_at: str | None
     failure_code: str | None
+
+
+class WebhookPhoneCallConnection(TypedDict):
+    """One handoff or conference attempt in a call lifecycle webhook."""
+
+    id: str
+    kind: Literal["handoff", "conference"] | str
+    trigger: Literal["incoming_action", "agent_tool"] | str
+    status: Literal["requested", "dialing", "connected", "failed"] | str
+    target_type: Literal["phone", "sip"]
+    target: str
+    requested_at: str
+    dialing_at: NotRequired[str | None]
+    connected_at: NotRequired[str | None]
+    ended_at: NotRequired[str | None]
+    failure_code: NotRequired[str | None]
 
 
 class WebhookCallTranscript(TypedDict):

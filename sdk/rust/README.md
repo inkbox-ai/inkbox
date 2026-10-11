@@ -286,8 +286,34 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 
 Incoming calls can be forwarded to a complete E.164 number or a SIP URI with a public DNS hostname using
 `incoming_call_action().set_with_options(...)` and
-`IncomingCallActionSetOptions`. Call responses expose chronological
-`forwardings`; older responses deserialize to an empty vector.
+`IncomingCallActionSetOptions`. Read chronological connection history on an
+existing call, falling back to legacy incoming forwarding for older responses:
+
+```rust
+let call = inkbox.calls().get("call-uuid")?;
+if let Some(connections) = &call.connections {
+    for connection in connections { // Some(empty) is authoritative.
+        println!("{:?} {:?} {}", connection.kind, connection.status, connection.target);
+    }
+} else {
+    for forwarding in &call.forwardings {
+        println!("{:?} {}", forwarding.status, forwarding.target);
+    }
+}
+```
+
+Call records also expose `connections` when available: `kind` distinguishes
+`handoff` from `conference`, and `trigger` distinguishes `incoming_action` from
+`agent_tool`. Successful attempts use `status: "connected"`; `ended_at` records
+when they later end. Prefer `connections` when present, including an empty list.
+Only use `forwardings` as a fallback for older responses that omit `connections`;
+`forwardings` contains only automatic incoming-call forwarding, while `connections`
+also includes live transfers and conference guests. Do not count overlapping
+attempts twice. Transfers and conferences are Voice AI
+actions, not SDK call-control methods. Call items in contact correspondence also
+expose the same optional `connections` list, without a legacy forwarding list.
+Unknown connection kinds, triggers, and statuses retain their original string
+values; do not interpret an unfamiliar value as a handoff or a successful connection.
 
 Contact rules and webhook signing keys are keyed by **agent identity**, addressed
 by `agent_handle`. Use `mail_identity_contact_rules()` /
@@ -882,7 +908,7 @@ recipient sends. `reply_ready` distinguishes send readiness from history access;
 SMS consent still applies. Group iMessage requires a dedicated line, and MMS
 chats with identical participants represent one logical conversation.
 
-Existing webhook struct literals remain unchanged. To retain the optional
+Companion metadata does not add fields to the underlying webhook structs. To retain the optional
 top-level block, deserialize `CompanionMailWebhookPayload`,
 `CompanionTextWebhookPayload`, or `CompanionIMessageWebhookPayload` from
 `inkbox::webhooks::types`. These alias `WithCompanion<T>`, exposing the original

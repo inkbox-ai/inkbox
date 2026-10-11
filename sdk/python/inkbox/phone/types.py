@@ -6,6 +6,13 @@ Dataclasses mirroring the Inkbox Phone API response models.
 
 from __future__ import annotations
 from inkbox.contact_rules import ContactRuleDirection
+from inkbox._call_connections import (
+    CallConnectionKind as CallConnectionKind,
+    CallConnectionStatus as CallConnectionStatus,
+    CallConnectionTrigger as CallConnectionTrigger,
+    ForwardingTargetType as ForwardingTargetType,
+    PhoneCallConnection as PhoneCallConnection,
+)
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -163,17 +170,12 @@ class IncomingCallAction(StrEnum):
     FORWARD = "forward"
 
 
-class ForwardingTargetType(StrEnum):
-    """Kind of destination used to forward a call."""
-
-    PHONE = "phone"
-    SIP = "sip"
-
-
 class CallForwardingTrigger(StrEnum):
     """What initiated a call-forwarding attempt."""
 
     INCOMING_ACTION = "incoming_action"
+    LIVE_TRANSFER = "live_transfer"
+    LIVE_CONFERENCE = "live_conference"
 
 
 class CallForwardingStatus(StrEnum):
@@ -348,6 +350,8 @@ class PhoneCall:
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
     # Forwarding attempts in chronological order. Older responses omit this.
     forwardings: list[PhoneCallForwarding] = field(default_factory=list)
+    # Prefer this history when present; None means an older response.
+    connections: list[PhoneCallConnection] | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -388,6 +392,9 @@ class PhoneCall:
             forwardings=[
                 PhoneCallForwarding._from_dict(f) for f in d.get("forwardings", [])
             ],
+            connections=[PhoneCallConnection._from_dict(c) for c in d["connections"]]
+            if d.get("connections") is not None
+            else None,
         )
 
 
@@ -619,7 +626,7 @@ class TextConversationUpdateResult:
 
 @dataclass
 class PhoneTranscript:
-    """A transcript segment from a phone call."""
+    """A transcript segment with its line number when available."""
 
     id: UUID
     call_id: UUID
@@ -628,6 +635,7 @@ class PhoneTranscript:
     party: str
     text: str
     created_at: datetime
+    phone_number: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneTranscript:
@@ -638,6 +646,7 @@ class PhoneTranscript:
             ts_ms=d["ts_ms"],
             party=d["party"],
             text=d["text"],
+            phone_number=d.get("phone_number"),
             created_at=datetime.fromisoformat(d["created_at"]),
         )
 

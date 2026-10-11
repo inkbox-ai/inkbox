@@ -347,6 +347,17 @@ console.log(hosted.mode, hosted.reason, hosted.onVoicemail);
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {
   console.log(c.id, c.direction, c.remotePhoneNumber, c.status, c.mode);
+  // connections includes incoming forwarding, live handoffs, and conference guests.
+  // Missing means an older response; an empty list is authoritative.
+  if (c.connections !== undefined) {
+    for (const connection of c.connections) {
+      console.log(connection.kind, connection.trigger, connection.status, connection.target);
+    }
+  } else {
+    for (const forwarding of c.forwardings) { // Automatic incoming forwarding only.
+      console.log(forwarding.status, forwarding.target);
+    }
+  }
   for (const item of c.postCallActionItems) {
     console.log(`  [${item.seq}] ${item.action}: ${item.details}`);
   }
@@ -355,7 +366,9 @@ for (const c of calls) {
 // Transcript segments (ordered by seq)
 const segments = await identity.listTranscripts(calls[0].id);
 for (const t of segments) {
-  console.log(`[${t.party}] ${t.text}`);   // party: "local" or "remote"
+  // remote can be the original caller or a conference guest; party is not a person ID.
+  // phoneNumber is nullable; shared local lines and unknown attribution have no number.
+  console.log(`[${t.phoneNumber ?? t.party}] ${t.text}`);
 }
 
 // To press keypad keys during a client-driven call, send this JSON

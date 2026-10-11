@@ -230,6 +230,17 @@ describe("parseRateLimitInfo", () => {
 });
 
 describe("parsePhoneCallWithRateLimit", () => {
+  it("preserves every trigger in a mixed call-operation history", () => {
+    const history = JSON.parse(readFileSync(new URL("../../../../tests/fixtures/call_forwardings.json", import.meta.url), "utf8"));
+    const call = parsePhoneCall({ ...RAW_PHONE_CALL, forwardings: history });
+    expect(call.forwardings.map((attempt) => attempt.trigger)).toEqual([
+      CallForwardingTrigger.INCOMING_ACTION,
+      CallForwardingTrigger.LIVE_TRANSFER,
+      CallForwardingTrigger.LIVE_CONFERENCE,
+    ]);
+    expect(call.forwardings.map((attempt) => attempt.id)).toEqual(history.map((attempt: { id: string }) => attempt.id));
+  });
+
   it("includes rateLimit", () => {
     const c = parsePhoneCallWithRateLimit(RAW_PHONE_CALL_WITH_RATE_LIMIT);
     expect(c.rateLimit.callsUsed).toBe(5);

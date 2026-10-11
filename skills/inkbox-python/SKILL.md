@@ -346,12 +346,22 @@ print(call.mode, call.reason, call.on_voicemail)
 calls = identity.list_calls(limit=10, offset=0)
 for c in calls:
     print(c.id, c.direction, c.remote_phone_number, c.status, c.mode)
+    # connections includes incoming forwarding, live handoffs, and conference guests.
+    # Missing means an older response; an empty list is authoritative.
+    if c.connections is not None:
+        for connection in c.connections:
+            print(connection.kind, connection.trigger, connection.status, connection.target)
+    else:
+        for forwarding in c.forwardings:  # Automatic incoming forwarding only.
+            print(forwarding.status, forwarding.target)
     for item in c.post_call_action_items:
         print(f"  [{item.seq}] {item.action}: {item.details}")
 
 # Transcript segments (ordered by seq)
 for t in identity.list_transcripts(calls[0].id):
-    print(f"[{t.party}] {t.text}")   # party: "local" or "remote"
+    # remote can be the original caller or a conference guest; party is not a person ID.
+    # phone_number is nullable; shared local lines and unknown attribution have no number.
+    print(f"[{t.phone_number or t.party}] {t.text}")
 
 # To press keypad keys during a client-driven call, send this JSON
 # through the call's media WebSocket: {"event": "dtmf", "digits": "1"}

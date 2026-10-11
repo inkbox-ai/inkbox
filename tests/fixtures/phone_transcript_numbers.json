@@ -1,0 +1,42 @@
+[
+  {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+    "call_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "seq": 0,
+    "ts_ms": 1773144000000,
+    "party": "remote",
+    "text": "Hello.",
+    "created_at": "2026-03-10T12:00:00Z",
+    "phone_number": "+14155550100"
+  },
+  {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000002",
+    "call_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "seq": 1,
+    "ts_ms": 1773144001000,
+    "party": "remote",
+    "text": "Hello.",
+    "created_at": "2026-03-10T12:00:00Z",
+    "phone_number": "+14155550101"
+  },
+  {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
+    "call_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "seq": 2,
+    "ts_ms": 1773144002000,
+    "party": "local",
+    "text": "Hello.",
+    "created_at": "2026-03-10T12:00:00Z",
+    "phone_number": null
+  },
+  {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000004",
+    "call_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "seq": 3,
+    "ts_ms": 1773144003000,
+    "party": "remote",
+    "text": "Taylor: this is literal historical text.",
+    "created_at": "2026-03-10T12:00:00Z",
+    "phone_number": null
+  }
+]

@@ -246,7 +246,7 @@ export function registerPhoneCommands(program: Command): void {
         const transcripts = await identity.listTranscripts(callId);
         output(transcripts, {
           json: !!opts.json,
-          columns: ["seq", "party", "text", "createdAt"],
+          columns: ["seq", "party", "phoneNumber", "text", "createdAt"],
         });
       }),
     );
@@ -352,7 +352,7 @@ export function registerPhoneCommands(program: Command): void {
         );
         output(transcripts, {
           json: !!opts.json,
-          columns: ["id", "callId", "seq", "party", "text", "createdAt"],
+          columns: ["id", "callId", "seq", "party", "phoneNumber", "text", "createdAt"],
         });
       }),
     );

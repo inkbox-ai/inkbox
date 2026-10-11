@@ -15,6 +15,8 @@ from uuid import UUID
 from inkbox.contact_rules import _UNSET
 from inkbox.sender_access import SenderAccess
 
+from inkbox._call_connections import PhoneCallConnection
+
 
 def _opt_uuid(value: Any) -> UUID | None:
     return UUID(str(value)) if value is not None else None
@@ -617,6 +619,7 @@ class CorrespondenceTranscriptEntry:
     marker: CorrespondenceTranscriptMarker | None = None
     omitted_turns: int | None = None
     omitted_ms: int | None = None
+    phone_number: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CorrespondenceTranscriptEntry:
@@ -633,6 +636,7 @@ class CorrespondenceTranscriptEntry:
             ),
             omitted_turns=d.get("omitted_turns"),
             omitted_ms=d.get("omitted_ms"),
+            phone_number=d.get("phone_number"),
         )
 
 
@@ -708,6 +712,7 @@ class CallCorrespondenceItem(CorrespondenceItem):
     transcript: list[CorrespondenceTranscriptEntry] | None = None
     transcript_abridged: bool = False
     transcript_unavailable: bool = False
+    connections: list[PhoneCallConnection] | None = None
 
 
 @dataclass
@@ -827,6 +832,9 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
         else None,
         transcript_abridged=bool(d.get("transcript_abridged", False)),
         transcript_unavailable=bool(d.get("transcript_unavailable", False)),
+        connections=[PhoneCallConnection._from_dict(c) for c in d["connections"]]
+        if d.get("connections") is not None
+        else None,
     )
 
 

@@ -1,0 +1,100 @@
+{
+  "id": "11111111-1111-4111-8111-111111111111",
+  "origin": "dedicated_number",
+  "local_phone_number": "+14155550100",
+  "remote_phone_number": "+14155550101",
+  "direction": "inbound",
+  "status": "completed",
+  "client_websocket_url": null,
+  "use_inkbox_tts": null,
+  "use_inkbox_stt": null,
+  "hangup_reason": null,
+  "started_at": "2026-10-09T12:00:00Z",
+  "ended_at": "2026-10-09T12:04:00Z",
+  "created_at": "2026-10-09T12:00:00Z",
+  "updated_at": "2026-10-09T12:04:00Z",
+  "duration_seconds": 240,
+  "mode": "hosted_agent",
+  "reason": null,
+  "connections": [
+    {
+      "id": "22222222-2222-4222-8222-000000000001",
+      "kind": "handoff",
+      "trigger": "incoming_action",
+      "status": "connected",
+      "target_type": "sip",
+      "target": "sip:+14155550102@voice.example.com",
+      "requested_at": "2026-10-09T12:00:00Z",
+      "dialing_at": "2026-10-09T12:00:01Z",
+      "connected_at": "2026-10-09T12:00:03Z",
+      "ended_at": "2026-10-09T12:00:30Z",
+      "failure_code": null
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000002",
+      "kind": "handoff",
+      "trigger": "agent_tool",
+      "status": "failed",
+      "target_type": "phone",
+      "target": "+14155550102",
+      "requested_at": "2026-10-09T12:01:00Z",
+      "dialing_at": "2026-10-09T12:01:01Z",
+      "connected_at": null,
+      "ended_at": "2026-10-09T12:01:30Z",
+      "failure_code": "destination_rejected"
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000003",
+      "kind": "conference",
+      "trigger": "agent_tool",
+      "status": "connected",
+      "target_type": "phone",
+      "target": "+14155550102",
+      "requested_at": "2026-10-09T12:02:00Z",
+      "dialing_at": "2026-10-09T12:02:01Z",
+      "connected_at": "2026-10-09T12:02:03Z",
+      "ended_at": "2026-10-09T12:02:30Z",
+      "failure_code": null
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000004",
+      "kind": "conference",
+      "trigger": "agent_tool",
+      "status": "requested",
+      "target_type": "phone",
+      "target": "+14155550102",
+      "requested_at": "2026-10-09T12:03:00Z",
+      "dialing_at": null,
+      "connected_at": null,
+      "ended_at": null,
+      "failure_code": null
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000005",
+      "kind": "conference",
+      "trigger": "agent_tool",
+      "status": "dialing",
+      "target_type": "phone",
+      "target": "+14155550102",
+      "requested_at": "2026-10-09T12:04:00Z",
+      "dialing_at": "2026-10-09T12:04:01Z",
+      "connected_at": null,
+      "ended_at": null,
+      "failure_code": null
+    }
+  ],
+  "forwardings": [
+    {
+      "id": "22222222-2222-4222-8222-000000000001",
+      "trigger": "incoming_action",
+      "status": "forwarded",
+      "target_type": "sip",
+      "target": "sip:+14155550102@voice.example.com",
+      "requested_at": "2026-10-09T12:00:00Z",
+      "dialing_at": "2026-10-09T12:00:01Z",
+      "ended_at": "2026-10-09T12:00:30Z",
+      "failure_code": null,
+      "forwarded_at": "2026-10-09T12:00:03Z"
+    }
+  ]
+}

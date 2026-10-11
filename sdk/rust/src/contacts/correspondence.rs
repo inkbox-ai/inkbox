@@ -114,6 +114,8 @@ pub struct CorrespondenceAttachmentMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorrespondenceTranscriptEntry {
     #[serde(default)]
+    pub phone_number: Option<String>,
+    #[serde(default)]
     pub id: Option<Uuid>,
     #[serde(default)]
     pub seq: Option<u64>,
@@ -245,6 +247,9 @@ pub struct CallCorrespondenceItem {
     pub transcript_abridged: bool,
     #[serde(default)]
     pub transcript_unavailable: bool,
+    /// Canonical call connection history; older responses omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<crate::phone::PhoneCallConnection>>,
 }
 
 /// A correspondence item parsed by its `channel` discriminator.

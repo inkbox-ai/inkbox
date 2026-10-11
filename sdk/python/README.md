@@ -1182,10 +1182,28 @@ inkbox.incoming_call_action.set(
     forwarding_sip_uri="sip:+14155550100@voice.example.com",
 )
 
-# Forwarding attempts are chronological and separate from call.status
-for forwarding in inkbox.calls.get("call-uuid").forwardings:
-    print(forwarding.status, forwarding.target)
+# Connection attempts are chronological and separate from call.status.
+call = inkbox.calls.get("call-uuid")
+if call.connections is not None:  # An empty list is authoritative.
+    for connection in call.connections:
+        print(connection.kind, connection.status, connection.target)
+else:  # Older responses expose automatic incoming forwarding only.
+    for forwarding in call.forwardings:
+        print(forwarding.status, forwarding.target)
 ```
+
+Call records also expose `connections` when available: `kind` distinguishes
+`handoff` from `conference`, and `trigger` distinguishes `incoming_action` from
+`agent_tool`. Successful attempts use `status: "connected"`; `ended_at` records
+when they later end. Prefer `connections` when present, including an empty list.
+Only use `forwardings` as a fallback for older responses that omit `connections`;
+`forwardings` contains only automatic incoming-call forwarding, while `connections`
+also includes live transfers and conference guests. Do not count overlapping
+attempts twice. Transfers and conferences are Voice AI
+actions, not SDK call-control methods. Call items in contact correspondence also
+expose the same optional `connections` list, without a legacy forwarding list.
+Unknown connection kinds, triggers, and statuses retain their original string
+values; do not interpret an unfamiliar value as a handoff or a successful connection.
 
 ---
 

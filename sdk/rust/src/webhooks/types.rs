@@ -260,6 +260,8 @@ pub struct WebhookContextTextItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookTranscriptEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phone_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub party: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
@@ -920,6 +922,9 @@ pub struct WebhookPhoneCall {
     /// Chronological forwarding attempts; absent on older webhook replays.
     #[serde(default)]
     pub forwardings: Vec<crate::phone::PhoneCallForwarding>,
+    /// Canonical history; omitted by older webhook replays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<crate::phone::PhoneCallConnection>>,
 }
 
 fn default_webhook_call_mode() -> String {
@@ -1377,6 +1382,33 @@ mod tests {
         );
         assert_eq!(payload.data.outcome, None);
         assert!(payload.data.post_call_action_items.is_empty());
+    }
+
+    #[test]
+    fn call_ended_preserves_mixed_operation_history() {
+        let mut payload: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/webhook_payloads/call_ended_hosted.json"
+        ))
+        .unwrap();
+        payload["data"]["call"]["forwardings"] = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/call_forwardings.json"
+        ))
+        .unwrap();
+        let parsed: CallEndedWebhookPayload = serde_json::from_value(payload).unwrap();
+        assert_eq!(
+            parsed
+                .data
+                .call
+                .forwardings
+                .iter()
+                .map(|attempt| attempt.trigger)
+                .collect::<Vec<_>>(),
+            vec![
+                crate::phone::CallForwardingTrigger::IncomingAction,
+                crate::phone::CallForwardingTrigger::LiveTransfer,
+                crate::phone::CallForwardingTrigger::LiveConference
+            ]
+        );
     }
 
     #[test]
