@@ -683,9 +683,9 @@ export interface WebhookPhoneCall {
 
 export interface WebhookPhoneCallConnection {
   id: string;
-  kind: "handoff" | "conference";
-  trigger: "incoming_action" | "agent_tool";
-  status: "requested" | "dialing" | "connected" | "failed";
+  kind: "handoff" | "conference" | (string & {});
+  trigger: "incoming_action" | "agent_tool" | (string & {});
+  status: "requested" | "dialing" | "connected" | "failed" | (string & {});
   target_type: "phone" | "sip";
   target: string;
   requested_at: string;

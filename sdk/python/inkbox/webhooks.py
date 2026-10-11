@@ -743,9 +743,9 @@ class WebhookPhoneCallConnection(TypedDict):
     """One handoff or conference attempt in a call lifecycle webhook."""
 
     id: str
-    kind: Literal["handoff", "conference"]
-    trigger: Literal["incoming_action", "agent_tool"]
-    status: Literal["requested", "dialing", "connected", "failed"]
+    kind: Literal["handoff", "conference"] | str
+    trigger: Literal["incoming_action", "agent_tool"] | str
+    status: Literal["requested", "dialing", "connected", "failed"] | str
     target_type: Literal["phone", "sip"]
     target: str
     requested_at: str

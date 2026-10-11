@@ -1,7 +1,4 @@
-use inkbox::phone::{
-    CallConnectionKind, CallConnectionStatus, CallConnectionTrigger, CallForwardingTrigger,
-    PhoneCall,
-};
+use inkbox::phone::{CallConnectionKind, CallConnectionStatus, CallConnectionTrigger, PhoneCall};
 use inkbox::webhooks::WebhookPhoneCall;
 use serde_json::{json, Value};
 
@@ -41,13 +38,10 @@ fn parses_connection_progress_and_legacy_projection() {
     assert!(connections[3].dialing_at.is_none());
     assert_eq!(connections[4].status, CallConnectionStatus::Dialing);
     assert!(connections[4].connected_at.is_none());
+    assert_eq!(call.forwardings.len(), 1);
     assert_eq!(
-        call.forwardings[1].trigger,
-        CallForwardingTrigger::LiveTransfer
-    );
-    assert_eq!(
-        call.forwardings[2].trigger,
-        CallForwardingTrigger::LiveConference
+        call.forwardings[0].trigger,
+        inkbox::phone::CallForwardingTrigger::IncomingAction
     );
 }
 
@@ -60,7 +54,7 @@ fn omitted_and_empty_connection_history_remain_distinct() {
     wire["connections"] = json!([]);
     let new: PhoneCall = serde_json::from_value(wire).unwrap();
     assert!(new.connections.unwrap().is_empty());
-    assert_eq!(new.forwardings.len(), 5);
+    assert_eq!(new.forwardings.len(), 1);
 }
 
 #[test]
@@ -99,4 +93,35 @@ fn correspondence_keeps_canonical_connections_and_older_response_compatibility()
     item.as_object_mut().unwrap().remove("connections");
     let old: CallCorrespondenceItem = serde_json::from_value(item).unwrap();
     assert!(old.connections.is_none());
+}
+
+#[test]
+fn future_connection_values_are_preserved_without_known_classification() {
+    let mut wire = fixture();
+    wire["connections"][0]["kind"] = json!("future_kind");
+    wire["connections"][0]["trigger"] = json!("future_trigger");
+    wire["connections"][0]["status"] = json!("future_status");
+    let call: PhoneCall = serde_json::from_value(wire.clone()).unwrap();
+    let connection = &call.connections.as_ref().unwrap()[0];
+    assert_eq!(
+        connection.kind,
+        CallConnectionKind::Unknown("future_kind".into())
+    );
+    assert_eq!(
+        connection.trigger,
+        CallConnectionTrigger::Unknown("future_trigger".into())
+    );
+    assert_eq!(
+        connection.status,
+        CallConnectionStatus::Unknown("future_status".into())
+    );
+    assert_ne!(connection.kind, CallConnectionKind::Handoff);
+    assert_ne!(connection.status, CallConnectionStatus::Connected);
+    let roundtrip = serde_json::to_value(connection).unwrap();
+    for key in ["kind", "trigger", "status"] {
+        assert_eq!(roundtrip[key], wire["connections"][0][key]);
+    }
+    let webhook: WebhookPhoneCall = serde_json::from_value(wire).unwrap();
+    assert_eq!(webhook.connections.unwrap()[0].kind, connection.kind);
+    assert!(serde_json::from_value::<CallConnectionKind>(json!(123)).is_err());
 }

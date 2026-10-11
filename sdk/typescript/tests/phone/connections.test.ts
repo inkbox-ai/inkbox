@@ -1,7 +1,7 @@
 // sdk/typescript/tests/phone/connections.test.ts
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CallConnectionKind, CallConnectionStatus, CallConnectionTrigger, CallForwardingTrigger } from "../../src/index.js";
+import { CallConnectionKind, CallConnectionStatus, CallConnectionTrigger } from "../../src/index.js";
 import type { PhoneCallConnection, WebhookPhoneCallConnection } from "../../src/index.js";
 import { parseCorrespondenceItem, type RawCallCorrespondenceItem } from "../../src/contacts/correspondence.js";
 import { parsePhoneCall, type RawPhoneCall } from "../../src/phone/types.js";
@@ -26,8 +26,8 @@ describe("call connections", () => {
     expect(connections[3].dialingAt).toBeNull();
     expect(connections[4].status).toBe(CallConnectionStatus.DIALING);
     expect(connections[4].connectedAt).toBeNull();
-    expect(call.forwardings[1].trigger).toBe(CallForwardingTrigger.LIVE_TRANSFER);
-    expect(call.forwardings[2].trigger).toBe(CallForwardingTrigger.LIVE_CONFERENCE);
+    expect(call.forwardings).toHaveLength(1);
+    expect(call.forwardings[0].trigger).toBe("incoming_action");
   });
 
   it("preserves absent versus authoritative empty connections", () => {
@@ -37,7 +37,7 @@ describe("call connections", () => {
     wire.connections = [];
     const call = parsePhoneCall(wire);
     expect(call.connections).toEqual([]);
-    expect(call.forwardings).toHaveLength(5);
+    expect(call.forwardings).toHaveLength(1);
   });
 
   it("exports the snake-case webhook contract", () => {
@@ -72,4 +72,18 @@ describe("call correspondence connections", () => {
     delete item.connections;
     expect(parse().connections).toBeUndefined();
   });
+});
+
+
+it("preserves future connection values without classifying them as known outcomes", () => {
+  const wire = fixture();
+  Object.assign(wire.connections![0], {kind: "future_kind", trigger: "future_trigger", status: "future_status"});
+  const connection = parsePhoneCall(wire).connections![0];
+  expect(connection.kind).toBe("future_kind");
+  expect(connection.trigger).toBe("future_trigger");
+  expect(connection.status).toBe("future_status");
+  expect(connection.kind).not.toBe(CallConnectionKind.HANDOFF);
+  expect(connection.status).not.toBe(CallConnectionStatus.CONNECTED);
+  const webhook: WebhookPhoneCallConnection = {...wire.connections![0], target_type: "phone"};
+  expect(webhook.kind).toBe("future_kind");
 });

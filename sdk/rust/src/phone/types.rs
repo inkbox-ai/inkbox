@@ -340,29 +340,38 @@ pub enum CallForwardingStatus {
 }
 
 /// Whether the caller is handed off or a guest joins the conversation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallConnectionKind {
     Handoff,
     Conference,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
 }
 
 /// What initiated the destination connection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallConnectionTrigger {
     IncomingAction,
     AgentTool,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
 }
 
 /// Connection progress, separate from the original call's status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallConnectionStatus {
     Requested,
     Dialing,
     Connected,
     Failed,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
 }
 
 /// Consent state of a receiver number for the calling org.

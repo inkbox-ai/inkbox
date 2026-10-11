@@ -95,54 +95,6 @@
       "ended_at": "2026-10-09T12:00:30Z",
       "failure_code": null,
       "forwarded_at": "2026-10-09T12:00:03Z"
-    },
-    {
-      "id": "22222222-2222-4222-8222-000000000002",
-      "trigger": "live_transfer",
-      "status": "failed",
-      "target_type": "phone",
-      "target": "+14155550102",
-      "requested_at": "2026-10-09T12:01:00Z",
-      "dialing_at": "2026-10-09T12:01:01Z",
-      "ended_at": "2026-10-09T12:01:30Z",
-      "failure_code": "destination_rejected",
-      "forwarded_at": null
-    },
-    {
-      "id": "22222222-2222-4222-8222-000000000003",
-      "trigger": "live_conference",
-      "status": "forwarded",
-      "target_type": "phone",
-      "target": "+14155550102",
-      "requested_at": "2026-10-09T12:02:00Z",
-      "dialing_at": "2026-10-09T12:02:01Z",
-      "ended_at": "2026-10-09T12:02:30Z",
-      "failure_code": null,
-      "forwarded_at": "2026-10-09T12:02:03Z"
-    },
-    {
-      "id": "22222222-2222-4222-8222-000000000004",
-      "trigger": "live_conference",
-      "status": "requested",
-      "target_type": "phone",
-      "target": "+14155550102",
-      "requested_at": "2026-10-09T12:03:00Z",
-      "dialing_at": null,
-      "ended_at": null,
-      "failure_code": null,
-      "forwarded_at": null
-    },
-    {
-      "id": "22222222-2222-4222-8222-000000000005",
-      "trigger": "live_conference",
-      "status": "dialing",
-      "target_type": "phone",
-      "target": "+14155550102",
-      "requested_at": "2026-10-09T12:04:00Z",
-      "dialing_at": "2026-10-09T12:04:01Z",
-      "ended_at": null,
-      "failure_code": null,
-      "forwarded_at": null
     }
   ]
 }

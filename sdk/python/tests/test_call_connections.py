@@ -9,7 +9,6 @@ from inkbox import (
     CallConnectionKind,
     CallConnectionStatus,
     CallConnectionTrigger,
-    CallForwardingTrigger,
     PhoneCall,
     PhoneCallConnection,
     WebhookPhoneCallConnection,
@@ -43,8 +42,8 @@ def test_connection_kinds_triggers_statuses_and_timestamps():
     assert call.connections[3].dialing_at is None
     assert call.connections[4].status is CallConnectionStatus.DIALING
     assert call.connections[4].connected_at is None
-    assert call.forwardings[1].trigger is CallForwardingTrigger.LIVE_TRANSFER
-    assert call.forwardings[2].trigger is CallForwardingTrigger.LIVE_CONFERENCE
+    assert len(call.forwardings) == 1
+    assert call.forwardings[0].trigger == "incoming_action"
 
 
 def test_missing_connections_is_distinct_from_authoritative_empty_list():
@@ -54,7 +53,7 @@ def test_missing_connections_is_distinct_from_authoritative_empty_list():
     wire["connections"] = []
     parsed = PhoneCall._from_dict(wire)
     assert parsed.connections == []
-    assert len(parsed.forwardings) == 5
+    assert len(parsed.forwardings) == 1
 
 
 def test_webhook_connection_types_are_exported_and_resolve():
@@ -88,3 +87,30 @@ def test_correspondence_connection_annotation_resolves_at_runtime():
 
     assert PhoneConnection is PhoneCallConnection
     assert get_type_hints(CallCorrespondenceItem)["connections"] == list[PhoneCallConnection] | None
+
+
+def test_future_connection_values_preserve_the_raw_strings():
+    wire = fixture()
+    wire["connections"][0].update(kind="future_kind", trigger="future_trigger", status="future_status")
+    connection = PhoneCall._from_dict(wire).connections[0]
+    assert connection.kind.value == "future_kind"
+    assert connection.trigger.value == "future_trigger"
+    assert connection.status.value == "future_status"
+    assert connection.kind != CallConnectionKind.HANDOFF
+    assert connection.status != CallConnectionStatus.CONNECTED
+    assert json.loads(json.dumps([connection.kind, connection.trigger, connection.status])) == [
+        "future_kind", "future_trigger", "future_status"
+    ]
+    from inkbox.contacts.types import _parse_correspondence_item
+    item = {"channel": "calls", "source_id": wire["id"],
+            "identity_id": "55555555-5555-4555-8555-555555555555", "direction": "inbound",
+            "occurred_at": wire["created_at"], "remote_phone_number": wire["remote_phone_number"],
+            "connections": wire["connections"]}
+    assert _parse_correspondence_item(item).connections[0] == connection
+
+
+def test_connection_enums_still_reject_non_string_values():
+    import pytest
+    for enum in (CallConnectionKind, CallConnectionTrigger, CallConnectionStatus):
+        with pytest.raises(ValueError):
+            enum(123)

@@ -1306,9 +1306,13 @@ Call records also expose `connections` when available: `kind` distinguishes
 `agent_tool`. Successful attempts use `status: "connected"`; `endedAt` records
 when they later end. Prefer `connections` when present, including an empty list.
 Only use `forwardings` as a fallback for older responses that omit `connections`;
-the two lists describe the same attempts. Transfers and conferences are Voice AI
+`forwardings` contains only automatic incoming-call forwarding, while `connections`
+also includes live transfers and conference guests. Do not count overlapping
+attempts twice. Transfers and conferences are Voice AI
 actions, not SDK call-control methods. Call items in contact correspondence also
 expose the same optional `connections` list, without a legacy forwarding list.
+Unknown connection kinds, triggers, and statuses retain their original string
+values; do not interpret an unfamiliar value as a handoff or a successful connection.
 
 ---
 

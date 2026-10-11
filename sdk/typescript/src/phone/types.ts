@@ -438,9 +438,9 @@ export interface IncomingCallActionConfig {
 /** One handoff or conference attempt, returned oldest-first on the call. */
 export interface PhoneCallConnection {
   id: string;
-  kind: CallConnectionKind;
-  trigger: CallConnectionTrigger;
-  status: CallConnectionStatus;
+  kind: CallConnectionKind | (string & {});
+  trigger: CallConnectionTrigger | (string & {});
+  status: CallConnectionStatus | (string & {});
   targetType: ForwardingTargetType;
   target: string;
   requestedAt: Date;
@@ -1038,9 +1038,9 @@ export function parseIncomingCallActionConfig(
 export function parsePhoneCallConnection(r: RawPhoneCallConnection): PhoneCallConnection {
   return {
     id: r.id,
-    kind: r.kind as CallConnectionKind,
-    trigger: r.trigger as CallConnectionTrigger,
-    status: r.status as CallConnectionStatus,
+    kind: r.kind,
+    trigger: r.trigger,
+    status: r.status,
     targetType: r.target_type as ForwardingTargetType,
     target: r.target,
     requestedAt: new Date(r.requested_at),

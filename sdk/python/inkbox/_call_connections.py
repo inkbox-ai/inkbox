@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
 
@@ -16,21 +16,34 @@ class ForwardingTargetType(StrEnum):
     SIP = "sip"
 
 
-class CallConnectionKind(StrEnum):
+class _ConnectionValue(StrEnum):
+    """Preserve future response values without interpreting them as known states."""
+
+    @classmethod
+    def _missing_(cls, value: object) -> Self | None:
+        if not isinstance(value, str):
+            return None
+        member = str.__new__(cls, value)
+        member._name_ = f"UNKNOWN_{value.upper()}"
+        member._value_ = value
+        return member
+
+
+class CallConnectionKind(_ConnectionValue):
     """Whether the caller is handed off or a guest joins the conversation."""
 
     HANDOFF = "handoff"
     CONFERENCE = "conference"
 
 
-class CallConnectionTrigger(StrEnum):
+class CallConnectionTrigger(_ConnectionValue):
     """What initiated a destination connection."""
 
     INCOMING_ACTION = "incoming_action"
     AGENT_TOOL = "agent_tool"
 
 
-class CallConnectionStatus(StrEnum):
+class CallConnectionStatus(_ConnectionValue):
     """Connection progress, separate from the original call's status."""
 
     REQUESTED = "requested"

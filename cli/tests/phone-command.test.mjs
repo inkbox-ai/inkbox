@@ -1013,7 +1013,8 @@ test("calls JSON preserves canonical connections without dropping legacy history
     assert.equal(calls[0].connections[2].kind, "conference");
     assert.equal(calls[0].connections[2].status, "connected");
     assert.equal(calls[0].connections[2].connectedAt, "2026-10-09T12:02:03.000Z");
-    assert.equal(calls[0].forwardings[2].trigger, "live_conference");
+    assert.equal(calls[0].forwardings.length, 1);
+    assert.equal(calls[0].forwardings[0].trigger, "incoming_action");
   } finally {
     mock.server.close();
   }
