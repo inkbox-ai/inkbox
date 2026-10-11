@@ -1295,9 +1295,16 @@ await inkbox.incomingCallAction.set({
   forwardingPhoneNumber: "+14155550100",
 });
 
-// Forwarding attempts are chronological and separate from call.status
-for (const forwarding of (await inkbox.calls.get("call-uuid")).forwardings) {
-  console.log(forwarding.status, forwarding.target);
+// Connection attempts are chronological and separate from call.status.
+const call = await inkbox.calls.get("call-uuid");
+if (call.connections !== undefined) { // An empty list is authoritative.
+  for (const connection of call.connections) {
+    console.log(connection.kind, connection.status, connection.target);
+  }
+} else { // Older responses expose automatic incoming forwarding only.
+  for (const forwarding of call.forwardings) {
+    console.log(forwarding.status, forwarding.target);
+  }
 }
 ```
 

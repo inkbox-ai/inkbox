@@ -1182,9 +1182,14 @@ inkbox.incoming_call_action.set(
     forwarding_sip_uri="sip:+14155550100@voice.example.com",
 )
 
-# Forwarding attempts are chronological and separate from call.status
-for forwarding in inkbox.calls.get("call-uuid").forwardings:
-    print(forwarding.status, forwarding.target)
+# Connection attempts are chronological and separate from call.status.
+call = inkbox.calls.get("call-uuid")
+if call.connections is not None:  # An empty list is authoritative.
+    for connection in call.connections:
+        print(connection.kind, connection.status, connection.target)
+else:  # Older responses expose automatic incoming forwarding only.
+    for forwarding in call.forwardings:
+        print(forwarding.status, forwarding.target)
 ```
 
 Call records also expose `connections` when available: `kind` distinguishes

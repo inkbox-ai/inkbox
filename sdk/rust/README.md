@@ -286,8 +286,21 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 
 Incoming calls can be forwarded to a complete E.164 number or a SIP URI with a public DNS hostname using
 `incoming_call_action().set_with_options(...)` and
-`IncomingCallActionSetOptions`. Call responses expose chronological
-`forwardings`; older responses deserialize to an empty vector.
+`IncomingCallActionSetOptions`. Read chronological connection history on an
+existing call, falling back to legacy incoming forwarding for older responses:
+
+```rust
+let call = inkbox.calls().get("call-uuid")?;
+if let Some(connections) = &call.connections {
+    for connection in connections { // Some(empty) is authoritative.
+        println!("{:?} {:?} {}", connection.kind, connection.status, connection.target);
+    }
+} else {
+    for forwarding in &call.forwardings {
+        println!("{:?} {}", forwarding.status, forwarding.target);
+    }
+}
+```
 
 Call records also expose `connections` when available: `kind` distinguishes
 `handoff` from `conference`, and `trigger` distinguishes `incoming_action` from
