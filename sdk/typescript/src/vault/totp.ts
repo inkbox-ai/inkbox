@@ -191,12 +191,13 @@ export function parseTotpUri(uri: string): TOTPConfig {
     );
   }
 
-  const otpType = parsed.hostname;
+  const rawOtpType = parsed.hostname;
+  const otpType = rawOtpType.toLowerCase();
   if (otpType === "hotp") {
     throw new Error("HOTP is not supported — only TOTP URIs are accepted");
   }
   if (otpType !== "totp") {
-    throw new Error(`Invalid OTP type: expected 'totp', got '${otpType}'`);
+    throw new Error(`Invalid OTP type: expected 'totp', got '${rawOtpType}'`);
   }
 
   // Parse label — path is /<label>, label is [Issuer:]AccountName
