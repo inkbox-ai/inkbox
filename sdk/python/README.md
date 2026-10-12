@@ -1383,6 +1383,10 @@ runtime reconnects. These properties describe this local listener. The
 `listener.tunnel` object is the bootstrap resource snapshot; fetch the tunnel
 again when you need current control-plane fields. Authentication rejection and
 takeover remain terminal and surface from `wait()` / `serve_forever()`.
+Planned handoffs also report `reconnecting` until the replacement connection is
+established, then emit `connected` again. Retryable HELLO responses honor a valid
+`Retry-After` delay or HTTP date, bounded to 60 seconds; missing or invalid values
+use the existing jittered exponential backoff. Shutdown interrupts retry waits.
 Synchronous `close()` raises `TimeoutError` if the runtime thread does not stop
 within 30 seconds; avoid calling it from a `finally` block if that exception
 would mask another error.

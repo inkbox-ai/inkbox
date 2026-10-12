@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.20 - Python tunnel retry pacing and readiness (unreleased)
+
+### Fixed
+
+- Python tunnel reconnects honor valid `Retry-After` delay-seconds and HTTP dates
+  on transient HELLO failures, bounded to 60 seconds. The delay survives a
+  planned handoff falling back to cold reconnect, and shutdown interrupts waits.
+- Python listeners report `reconnecting` during a planned handoff and emit
+  `connected` once the replacement is ready. Authentication rejection and
+  supersession remain terminal without retries.
+- A successful Python tunnel HELLO immediately followed by GOAWAY or EOF no
+  longer starts serving or briefly restores readiness on a closed connection.
+
 ## 0.7.19 - Call connections and transcript attribution (unreleased)
 
 ### Added

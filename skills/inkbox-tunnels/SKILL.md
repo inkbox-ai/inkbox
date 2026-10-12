@@ -329,7 +329,13 @@ the runtime starts, so retain and inspect the thread result.
 
 ## Server Redeploys
 
-Redeploys of the tunnel service are graceful (SDK ≥ 0.4.8). When the server signals a drain, a long-running listener reconnects **make-before-break**: it stands up a fresh connection and parks a new intake pool before closing the draining one, so short HTTP requests see no gap and in-flight HTTP replies round-trip across the handoff. The handoff is in-band — `on_status` does **not** fire `"reconnecting"` (that status still means an unplanned drop / cold reconnect).
+When the server signals a drain, Python and TypeScript listeners establish a
+replacement connection and park a new intake pool before completing the old
+connection's cleanup. In-flight HTTP replies can use the replacement connection.
+Python reports `reconnecting` during this handoff and emits `connected` after the
+replacement is established; requests may need retrying while it reconnects.
+TypeScript keeps its existing streams alive during the handoff and does not emit
+`reconnecting` unless it falls back to cold reconnect.
 
 In-progress WebSocket and passthrough-TCP sessions **cannot** migrate — the third-party socket lives on the dying task. They end with a typed `server_draining` close (WS close code `4500`) and the peer reconnects onto the new task. Write handlers to reconnect idempotently.
 

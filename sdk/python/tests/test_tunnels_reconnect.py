@@ -166,10 +166,11 @@ async def test_read_eof_is_durable_for_late_waiter() -> None:
     await runtime._read_loop(conn)
     conn.streams[1] = asyncio.Queue()
 
-    status, body = await asyncio.wait_for(
+    status, body, headers = await asyncio.wait_for(
         runtime._await_response(1, conn), timeout=0.1,
     )
     assert (status, body) == (0, b"")
+    assert headers == []
 
 
 @pytest.mark.asyncio
@@ -182,7 +183,7 @@ async def test_queued_response_wins_over_connection_close() -> None:
     queue.put_nowait(_StreamEvent("end"))
     runtime._publish_connection_closed(conn)
 
-    assert await runtime._await_response(1, conn) == (204, b"")
+    assert await runtime._await_response(1, conn) == (204, b"", [(":status", "204")])
 
 
 @pytest.mark.asyncio
@@ -828,7 +829,7 @@ async def test_failed_attempts_back_off_and_dedupe_reconnecting(monkeypatch) -> 
 
     monkeypatch.setattr(runtime, "_run_once", fail)
     monkeypatch.setattr(runtime_module.random, "random", lambda: 0.5)
-    monkeypatch.setattr(runtime_module.asyncio, "sleep", record_sleep)
+    monkeypatch.setattr(runtime, "_sleep_before_retry", record_sleep)
 
     await runtime.serve_forever()
 

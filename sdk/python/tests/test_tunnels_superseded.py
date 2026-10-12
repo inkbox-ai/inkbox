@@ -228,7 +228,7 @@ async def test_hello_superseded_is_terminal(monkeypatch):
         return None
 
     async def _await(sid, conn=None):
-        return 409, b'{"reason":"hello-superseded"}'
+        return 409, b'{"reason":"hello-superseded"}', []
 
     monkeypatch.setattr(runtime, "_flush_conn", _flush)
     monkeypatch.setattr(runtime, "_await_response", _await)
@@ -250,7 +250,7 @@ async def test_hello_generic_409_is_transient(monkeypatch):
         return None
 
     async def _await(sid, conn=None):
-        return 409, b'{"reason":"something-else"}'
+        return 409, b'{"reason":"something-else"}', []
 
     monkeypatch.setattr(runtime, "_flush_conn", _flush)
     monkeypatch.setattr(runtime, "_await_response", _await)
@@ -320,7 +320,7 @@ async def test_hello_superseded_terminal_even_during_handoff(monkeypatch):
         return None
 
     async def _await(sid, conn=None):
-        return 409, b'{"reason":"hello-superseded"}'
+        return 409, b'{"reason":"hello-superseded"}', []
 
     monkeypatch.setattr(runtime, "_flush_conn", _flush)
     monkeypatch.setattr(runtime, "_await_response", _await)
