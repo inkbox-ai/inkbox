@@ -19,7 +19,7 @@ def test_thread_metadata_legacy_null_and_constructor_compatibility():
     assert legacy.thread_id is None and legacy.reply_to_message_id is None
     assert legacy.thread_root_message_id is None
     assert ExportedThread is IMessageThread
-    assert [f.name for f in fields(IMessage)][-3:] == ["reply_to_message_id", "thread_id", "thread_root_message_id"]
+    assert [f.name for f in fields(IMessage)][-4:-1] == ["reply_to_message_id", "thread_id", "thread_root_message_id"]
     assert IMessage._from_dict({**IMESSAGE_DICT, "thread_id": None}).thread_id is None
     assert IMessage._from_dict(ROW).thread_id == UUID(THREAD_ID)
 

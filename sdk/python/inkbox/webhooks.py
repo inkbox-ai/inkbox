@@ -44,6 +44,7 @@ SmsDeliveryStatusWire = Literal[
     "delivery_failed",
     "delivery_unconfirmed",
     "sending_failed",
+    "blocked_spam_filter",
 ]
 
 TextMessageOriginWire = Literal["user_initiated", "auto_reply"]
@@ -104,6 +105,8 @@ class TextMessageRecipientWire(TypedDict):
     sent_at: str | None
     delivered_at: str | None
     failed_at: str | None
+
+    delivery_final: NotRequired[bool | None]
 
 
 class RateLimitInfoWire(TypedDict):
@@ -443,6 +446,8 @@ class TextWebhookMessage(TypedDict):
     created_at: str
     updated_at: str
 
+    delivery_final: NotRequired[bool | None]
+
 
 class TextWebhookData(TypedDict):
     text_message: TextWebhookMessage
@@ -542,6 +547,8 @@ class IMessageRecipientWire(TypedDict):
     delivered_at: str | None
     failed_at: str | None
 
+    delivery_final: NotRequired[bool | None]
+
 
 class IMessageMessageReactionWire(TypedDict):
     """A live tapback attached to a message (snake_case wire shape)."""
@@ -581,7 +588,8 @@ class IMessageWebhookMessage(TypedDict):
     service: IMessageServiceWire
     send_style: IMessageSendStyleWire | None
     media: list[IMessageMediaItemWire] | None
-    was_downgraded: bool | None
+    # Deprecated compatibility field; use service to identify transport.
+    was_downgraded: NotRequired[bool | None]
     status: IMessageDeliveryStatusWire | None
     error_code: str | None
     error_message: str | None
@@ -592,6 +600,8 @@ class IMessageWebhookMessage(TypedDict):
     reactions: list[IMessageMessageReactionWire] | None
     created_at: str
     updated_at: str
+
+    delivery_final: NotRequired[bool | None]
 
 
 class IMessageWebhookReaction(TypedDict):

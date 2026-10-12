@@ -195,11 +195,15 @@ class IMessageRecipient:
     delivered_at: datetime | None = None
     failed_at: datetime | None = None
 
+    # Server-reported finality; None on inbound or older responses.
+    delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageRecipient:
         raw_status = d.get("delivery_status")
         raw_service = d.get("service")
         return cls(
+            delivery_final=d.get("delivery_final"),
             remote_number=d["remote_number"],
             delivery_status=IMessageDeliveryStatus(raw_status) if raw_status else None,
             service=IMessageService(raw_service) if raw_service else None,
@@ -262,6 +266,7 @@ class IMessage:
     updated_at: datetime
     send_style: IMessageSendStyle | None = None
     media: list[IMessageMediaItem] | None = None
+    # Deprecated compatibility field; use service to identify transport.
     was_downgraded: bool | None = None
     status: IMessageDeliveryStatus | None = None
     error_code: str | None = None
@@ -281,6 +286,9 @@ class IMessage:
     thread_id: UUID | None = None
     thread_root_message_id: UUID | None = None
 
+    # Server-reported finality; None on inbound or older responses.
+    delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessage:
         raw_media = d.get("media")
@@ -289,6 +297,7 @@ class IMessage:
         raw_send_style = d.get("send_style")
         raw_status = d.get("status")
         return cls(
+            delivery_final=d.get("delivery_final"),
             id=UUID(d["id"]),
             conversation_id=UUID(d["conversation_id"]),
             assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
@@ -414,9 +423,22 @@ class IMessageConversationSummary:
     # None for one-to-one conversations and responses from older deployments.
     group_creation_status: IMessageGroupCreationStatus | None = None
 
+    latest_outbound_service: IMessageService | None = None
+    latest_outbound_status: IMessageDeliveryStatus | None = None
+    latest_outbound_delivery_final: bool | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversationSummary:
         return cls(
+            latest_outbound_service=(
+                IMessageService(d["latest_outbound_service"])
+                if d.get("latest_outbound_service") else None
+            ),
+            latest_outbound_status=(
+                IMessageDeliveryStatus(d["latest_outbound_status"])
+                if d.get("latest_outbound_status") else None
+            ),
+            latest_outbound_delivery_final=d.get("latest_outbound_delivery_final"),
             id=UUID(d["id"]),
             assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
             remote_number=d.get("remote_number"),

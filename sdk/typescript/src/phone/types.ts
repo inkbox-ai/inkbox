@@ -525,6 +525,8 @@ export interface TextMessageRecipient {
   sentAt: Date | null;
   deliveredAt: Date | null;
   failedAt: Date | null;
+  /** Server-reported finality; null on inbound or older responses. */
+  deliveryFinal?: boolean | null;
 }
 
 export interface TextMessage {
@@ -559,6 +561,8 @@ export interface TextMessage {
   isBlocked: boolean;
   createdAt: Date;
   updatedAt: Date;
+  /** Server-reported finality; null on inbound or older responses. */
+  deliveryFinal?: boolean | null;
 }
 
 export interface TextConversationSummary {
@@ -573,6 +577,9 @@ export interface TextConversationSummary {
   latestMessageAt: Date;
   unreadCount: number;
   totalCount: number;
+  latestOutboundService?: string | null;
+  latestOutboundStatus?: SmsDeliveryStatus | null;
+  latestOutboundDeliveryFinal?: boolean | null;
 }
 
 export interface TextConversationUpdateResult {
@@ -713,6 +720,7 @@ export interface RawTextMessageRecipient {
   sent_at?: string | null;
   delivered_at?: string | null;
   failed_at?: string | null;
+  delivery_final?: boolean | null;
 }
 
 export interface RawTextMessage {
@@ -739,6 +747,7 @@ export interface RawTextMessage {
   is_blocked?: boolean;
   created_at: string;
   updated_at: string;
+  delivery_final?: boolean | null;
 }
 
 export interface RawTextConversationSummary {
@@ -753,6 +762,9 @@ export interface RawTextConversationSummary {
   latest_message_at: string;
   unread_count: number;
   total_count: number;
+  latest_outbound_service?: string | null;
+  latest_outbound_status?: string | null;
+  latest_outbound_delivery_final?: boolean | null;
 }
 
 export interface RawPhoneTranscript {
@@ -1117,6 +1129,7 @@ export function parseTextMessageRecipient(
   r: RawTextMessageRecipient,
 ): TextMessageRecipient {
   return {
+    deliveryFinal: r.delivery_final ?? null,
     recipientPhoneNumber: r.recipient_phone_number,
     deliveryStatus: r.delivery_status
       ? (r.delivery_status as SmsDeliveryStatus)
@@ -1133,6 +1146,7 @@ export function parseTextMessageRecipient(
 
 export function parseTextMessage(r: RawTextMessage): TextMessage {
   return {
+    deliveryFinal: r.delivery_final ?? null,
     id: r.id,
     direction: r.direction,
     localPhoneNumber: r.local_phone_number,
@@ -1163,6 +1177,9 @@ export function parseTextConversationSummary(
   r: RawTextConversationSummary,
 ): TextConversationSummary {
   return {
+    latestOutboundService: (r.latest_outbound_service as string) ?? null,
+    latestOutboundStatus: (r.latest_outbound_status as SmsDeliveryStatus) ?? null,
+    latestOutboundDeliveryFinal: r.latest_outbound_delivery_final ?? null,
     remotePhoneNumber: r.remote_phone_number ?? null,
     id: r.id ?? null,
     participants: r.participants ?? null,
