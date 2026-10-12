@@ -92,7 +92,9 @@ def verify_webhook(
         digestmod=hashlib.sha256,
     ).hexdigest()
     received = signature.removeprefix("sha256=")
-    return hmac.compare_digest(expected, received)
+    # Compare bytes: compare_digest raises TypeError for str containing
+    # non-ASCII characters, and the header value is attacker-controlled.
+    return hmac.compare_digest(expected.encode(), received.encode())
 
 
 def _identity_path(agent_handle: str) -> str:
