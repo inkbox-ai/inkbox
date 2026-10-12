@@ -242,6 +242,10 @@ fn generate_hotp(
 /// # Returns
 /// A [`TOTPCode`] with the code and timing metadata.
 pub fn generate_totp(config: &TOTPConfig) -> Result<TOTPCode> {
+    // Configs deserialized from vault payloads (or built as struct literals)
+    // skip `TOTPConfig::new`, so validate here: `period == 0` would divide by
+    // zero and an out-of-range `digits` would overflow `10u32.pow(digits)`.
+    config.validate()?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| InkboxError::InvalidArgument("system clock before unix epoch".into()))?
@@ -599,6 +603,23 @@ mod tests {
             TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 60, None, None).unwrap();
         let result = generate_totp(&config).unwrap();
         assert_eq!(result.period_end - result.period_start, 60);
+    }
+
+    #[test]
+    fn totp_rejects_unvalidated_zero_period() {
+        // Deserialization does not go through `TOTPConfig::new`.
+        let config: TOTPConfig =
+            serde_json::from_value(json!({"secret": RFC_SECRET_SHA1, "period": 0})).unwrap();
+        let e = generate_totp(&config).unwrap_err();
+        assert!(e.to_string().contains("period must be 30 or 60"));
+    }
+
+    #[test]
+    fn totp_rejects_unvalidated_digits() {
+        let config: TOTPConfig =
+            serde_json::from_value(json!({"secret": RFC_SECRET_SHA1, "digits": 10})).unwrap();
+        let e = generate_totp(&config).unwrap_err();
+        assert!(e.to_string().contains("digits must be 6 or 8"));
     }
 
     #[test]
