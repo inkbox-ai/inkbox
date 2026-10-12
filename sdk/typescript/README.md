@@ -710,9 +710,9 @@ const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 await identity.markTextRead("text-uuid");
 await identity.markTextConversationRead("+15551234567");
 
-// Org-level: search and delete
+// Org-level: search and update read state
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
+await inkbox.texts.update(phone.id, "text-uuid", { isRead: false });
 ```
 
 ---
