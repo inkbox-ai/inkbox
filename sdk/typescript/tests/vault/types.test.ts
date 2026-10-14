@@ -143,9 +143,15 @@ describe("parsePayload", () => {
     expect(p.accessKey).toBe("a");
     expect(p.secretKey).toBe("s");
   });
-  it("other with notes", () => {
-    const p = parsePayload("other", { data: "stuff", notes: "ctx" });
-    expect((p as OtherPayload).notes).toBe("ctx");
+  it("other with object or non-string data", () => {
+    const p1 = parsePayload("other", { data: { nested: "val", count: 42 } }) as OtherPayload;
+    expect(p1.data).toBe('{"nested":"val","count":42}');
+
+    const p2 = parsePayload("other", { data: 12345 }) as OtherPayload;
+    expect(p2.data).toBe("12345");
+
+    const p3 = parsePayload("other", {}) as OtherPayload;
+    expect(p3.data).toBe("");
   });
 });
 
