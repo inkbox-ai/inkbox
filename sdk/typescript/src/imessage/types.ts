@@ -99,6 +99,8 @@ export interface IMessageNumber {
   id: string;
   number: string;
   type: "dedicated_outbound";
+  /** The personal line role; `type` remains a compatibility field. */
+  lineRole?: "personal";
   status: IMessageNumberStatus;
   agentIdentityId: string | null;
   agentHandle: string | null;
@@ -109,6 +111,7 @@ export interface IdentityIMessageNumber {
   id: string;
   number: string;
   type: "dedicated_outbound";
+  lineRole?: "personal";
 }
 
 /** Whether a matching remote number is allowed through or blocked. */
@@ -637,6 +640,7 @@ export function parseIMessageNumber(
     id: r.id,
     number: r.number,
     type: parseCompatibilityNumberType(r.type),
+    lineRole: "personal",
     status: r.status as IMessageNumberStatus,
     agentIdentityId: r.agent_identity_id,
     agentHandle: r.agent_handle,
@@ -650,6 +654,7 @@ export function parseIdentityIMessageNumber(
     id: r.id,
     number: r.number,
     type: parseCompatibilityNumberType(r.type),
+    lineRole: "personal",
   };
 }
 

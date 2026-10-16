@@ -454,7 +454,7 @@ export function registerIdentityCommands(program: Command): void {
     )
     .option(
       "--contact-sharing-enabled <bool>",
-      "Share the identity's name and optional avatar from its dedicated iMessage line: true or false.",
+      "Share the identity's name and optional avatar from its personal iMessage line: true or false.",
     )
     .option(
       "--email-local-part <part>",

@@ -74,6 +74,20 @@ pub struct IdentityIMessageNumber {
     pub r#type: String,
 }
 
+impl IMessageNumber {
+    /// The personal line role, independently of the compatibility field.
+    pub fn line_role(&self) -> &'static str {
+        "personal"
+    }
+}
+
+impl IdentityIMessageNumber {
+    /// The role of the line attached to this identity.
+    pub fn line_role(&self) -> &'static str {
+        "personal"
+    }
+}
+
 /// Transport a message actually went over (iMessage may downgrade).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]

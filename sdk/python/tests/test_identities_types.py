@@ -49,6 +49,7 @@ class TestAgentIdentityDataParsing:
         assert d.phone_number.number == "+18335794607"
         assert isinstance(d.imessage_number, IdentityIMessageNumber)
         assert d.imessage_number.type == "dedicated_outbound"
+        assert d.imessage_number.line_role == "personal"
 
     def test_no_channels(self):
         d = _AgentIdentityData._from_dict(IDENTITY_DICT)
@@ -65,6 +66,7 @@ class TestIdentityIMessageNumberParsing:
         assert isinstance(number.id, UUID)
         assert number.number == "+15551230001"
         assert number.type == "dedicated_outbound"
+        assert number.line_role == "personal"
 
     def test_rejects_non_compatibility_response_type(self):
         with pytest.raises(ValueError, match="dedicated_outbound"):

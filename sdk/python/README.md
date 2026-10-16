@@ -695,10 +695,10 @@ identity = inkbox.create_identity("my-agent", imessage_enabled=True)
 router = inkbox.imessages.get_triage_number()
 print(router.number, router.connect_command)  # e.g. 'connect @my-agent'
 
-# List every dedicated line owned by the organization, attached or not.
+# List personal iMessage lines, attached or not.
 numbers = inkbox.imessages.list_numbers()
 for number in numbers:
-    print(number.number, number.type, number.agent_handle)
+    print(number.number, number.line_role, number.agent_handle)
 
 # Claim an unattached organization-owned number. Keep the caller-generated
 # key stable if the request's outcome is ambiguous and you retry it.

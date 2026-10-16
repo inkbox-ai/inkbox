@@ -329,6 +329,11 @@ class IdentityIMessageNumber:
     number: str
     type: Literal["dedicated_outbound"]
 
+    @property
+    def line_role(self) -> Literal["personal"]:
+        """The role of the line attached to this identity."""
+        return "personal"
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityIMessageNumber:
         return cls(

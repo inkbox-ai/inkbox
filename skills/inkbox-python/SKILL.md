@@ -509,7 +509,7 @@ the org-level iMessage resource, then inspect the typed number model. Claims
 require admin credentials.
 
 ```python
-numbers = inkbox.imessages.list_numbers()  # attached and unattached
+numbers = inkbox.imessages.list_numbers()  # personal lines, attached and unattached
 number = inkbox.imessages.claim_number(
     idempotency_key="claim-agent-2026-07-18",
 )

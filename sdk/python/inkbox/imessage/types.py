@@ -148,6 +148,11 @@ class IMessageNumber:
     agent_identity_id: UUID | None
     agent_handle: str | None
 
+    @property
+    def line_role(self) -> Literal["personal"]:
+        """The line's role, independent of the legacy compatibility field."""
+        return "personal"
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageNumber:
         raw_identity_id = d["agent_identity_id"]

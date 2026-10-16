@@ -472,15 +472,16 @@ match inkbox.get_identity("unknown") {
 }
 ```
 
-### Dedicated iMessage lines
+### Personal iMessage lines
 
-List or claim organization-owned dedicated lines through the iMessage resource:
+List or claim personal iMessage lines through the iMessage resource:
 
 ```rust
 let available = inkbox.imessages().list_numbers()?;
 let number = inkbox
     .imessages()
     .claim_number("setup-support-number-v1")?;
+assert_eq!(number.line_role(), "personal");
 ```
 
 Dedicated lines can also receive one-to-one messages from non-phone sender

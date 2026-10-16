@@ -826,11 +826,11 @@ await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15555550999",
 });
 
-// List every dedicated line owned by the organization. Unattached lines
+// List personal iMessage lines. Unattached lines
 // have null agentIdentityId and agentHandle fields.
 const numbers = await inkbox.imessages.listNumbers();
 for (const number of numbers) {
-  console.log(number.number, number.agentHandle);
+  console.log(number.number, number.lineRole, number.agentHandle);
 }
 
 // Claim an unattached number for the organization. Generate the key once and

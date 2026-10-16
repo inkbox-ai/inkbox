@@ -274,9 +274,11 @@ class TestIMessageNumbers:
 
         transport.get.assert_called_once_with("/numbers")
         assert numbers[0].type == "dedicated_outbound"
+        assert numbers[0].line_role == "personal"
         assert numbers[0].status is IMessageNumberStatus.ACTIVE
         assert numbers[0].agent_identity_id == UUID(IDENTITY_ID)
         assert numbers[1].type == "dedicated_outbound"
+        assert numbers[1].line_role == "personal"
         assert numbers[1].status is IMessageNumberStatus.PAUSED
         assert numbers[1].agent_identity_id is None
         assert numbers[1].agent_handle is None

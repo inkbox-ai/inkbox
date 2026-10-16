@@ -56,6 +56,7 @@ describe("parseAgentIdentityData", () => {
       id: RAW_IDENTITY_IMESSAGE_NUMBER.id,
       number: "+15555550123",
       type: "dedicated_outbound",
+      lineRole: "personal",
     });
   });
 

@@ -13,6 +13,31 @@ use inkbox::{
 use uuid::Uuid;
 
 #[test]
+fn personal_line_roles_preserve_existing_struct_literals() {
+    use inkbox::imessage::types::{IMessageNumber, IMessageNumberStatus, IdentityIMessageNumber};
+
+    let line = IMessageNumber {
+        id: Uuid::nil(),
+        number: "+15555550123".into(),
+        r#type: "dedicated_outbound".into(),
+        status: IMessageNumberStatus::Active,
+        agent_identity_id: None,
+        agent_handle: None,
+    };
+    let attached = IdentityIMessageNumber {
+        id: line.id,
+        number: line.number.clone(),
+        r#type: line.r#type.clone(),
+    };
+    assert_eq!(line.line_role(), "personal");
+    assert_eq!(attached.line_role(), "personal");
+    let mut response = serde_json::to_value(&line).unwrap();
+    response["line_role"] = serde_json::json!("personal");
+    let parsed: IMessageNumber = serde_json::from_value(response).unwrap();
+    assert_eq!(parsed.r#type, "dedicated_outbound");
+}
+
+#[test]
 fn legacy_slack_literals_remain_constructible() {
     let id = Uuid::nil();
     let connection = inkbox::SlackConnection {
