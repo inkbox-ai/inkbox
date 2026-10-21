@@ -132,7 +132,10 @@ def _b32decode(secret: str) -> bytes:
     Raises:
         ValueError: If the secret is not valid base32.
     """
-    padded = secret.upper() + "=" * (-len(secret) % 8)
+    clean = secret.rstrip("=").upper()
+    if not clean:
+        raise ValueError(f"Invalid base32 secret (length={len(secret)})")
+    padded = clean + "=" * (-len(clean) % 8)
     try:
         return base64.b32decode(padded)
     except Exception:
