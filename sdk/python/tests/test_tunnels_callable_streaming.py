@@ -127,3 +127,42 @@ async def test_callable_dispatch_outbound_body_cap_resets():
     )
     await dispatch.dispatch(request, sink)
     assert sink.reset_reason == "response-too-large"
+
+
+async def test_callable_dispatch_app_exception_before_head_sends_502():
+    async def app(scope, receive, send):
+        raise RuntimeError("boom before head")
+
+    dispatch = CallableDispatch(
+        app=app, public_host="agent.test", max_outbound_body_bytes=1_000_000,
+    )
+    sink = _CapturingSink()
+    request = DispatchRequest(
+        method="GET", path="/x", headers=[], body=_empty_body(),
+    )
+    await dispatch.dispatch(request, sink)
+    assert sink.head is not None
+    assert sink.head.status == 502
+    assert sink.body == b"upstream error"
+    assert sink.ended
+
+
+async def test_callable_dispatch_app_exception_after_head_resets_stream():
+    async def app(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"partial", "more_body": True})
+        raise RuntimeError("boom mid-stream")
+
+    dispatch = CallableDispatch(
+        app=app, public_host="agent.test", max_outbound_body_bytes=1_000_000,
+    )
+    sink = _CapturingSink()
+    request = DispatchRequest(
+        method="GET", path="/x", headers=[], body=_empty_body(),
+    )
+    await dispatch.dispatch(request, sink)
+    assert sink.head is not None
+    assert sink.head.status == 200
+    assert sink.body == b"partial"
+    assert sink.reset_reason == "upstream-error"
+    assert not sink.ended
