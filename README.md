@@ -44,14 +44,16 @@ optional notices. See the [Companion mode guide](https://inkbox.ai/docs/capabili
 
 ## Cursor plugin
 
-**Status:** Pre-release and under repository review; not yet submitted to or
-available in the Cursor Marketplace.
+Inkbox is available in the
+[Cursor Marketplace](https://cursor.com/marketplace/inkbox). The plugin is an
+MCP-only package that connects to `https://inkbox.ai/mcp/cursor` and gives
+Cursor an Inkbox identity for email, SMS, iMessage, Slack, voice calls,
+contacts, notes, and agent-to-agent tasks.
 
-This repository includes an MCP-only Cursor plugin package that connects to
-`https://inkbox.ai/mcp/cursor`. After Marketplace publication, install
-**Inkbox** from Cursor's **Customize** view, enable the Inkbox MCP server, and
-select **Connect** to authorize an organization and identity in the browser. No
-API key, client secret, local process, or bundled Cursor skills are required.
+Install **Inkbox** from Cursor's **Customize** view, enable the Inkbox MCP
+server, and select **Connect** to authorize an organization and identity in the
+browser. No API key, client secret, local process, or bundled Cursor skills are
+required.
 
 ---
 
