@@ -816,3 +816,11 @@ Conversation participants contain remote numbers only, and `sender_number` /
 typing indicators, remote read receipts, and WhatsApp calls are not supported.
 
 Effective WhatsApp policy limits and usage are independent from iMessage. Read them with Python `identity.get_whatsapp_limits()`, TypeScript `identity.getWhatsAppLimits()`, Rust `identity.get_whatsapp_limits()`, or `inkbox whatsapp limits -i agent-handle`. The returned public `whatsapp.*` maps retain future policy keys. The 4,000-character / 20 MiB transport ceilings do not promise that a particular identity's effective limits are that high; the server enforces its current configured policy.
+
+The limits response contains the agent identity, effective `limits`, and daily-only
+`usage`; it has no billing-cycle timestamp, monthly allowance, or enabled-agent
+cap. Current defaults allow 1,000 outbound messages per identity in a rolling
+24-hour window and three messages of at most 159 characters before the recipient
+replies, with 60 seconds between new contacts. Before a reply, links, phone numbers, email addresses,
+and media are not allowed. Read the effective limits rather than assuming these
+defaults apply to every identity.

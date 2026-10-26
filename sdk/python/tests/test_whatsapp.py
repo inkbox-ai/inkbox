@@ -262,8 +262,12 @@ def test_effective_limits_are_owned_typed_and_preserve_future_policy_keys():
     http.get.return_value = F["limits"]
     result = WhatsAppResource(http).get_limits(agent_identity_id=OWNER)
     assert str(result.agent_identity_id) == OWNER
-    assert result.cycle_start.tzinfo is not None
+    assert set(vars(result)) == {"agent_identity_id", "limits", "usage"}
+    assert result.limits["whatsapp.texts_per_agent_identity_per_24h"] == 1000
+    assert result.limits["whatsapp.pre_reply_messages"] == 3
+    assert result.limits["whatsapp.pre_reply_max_text_length"] == 159
+    assert result.limits["whatsapp.outbound_new_contact_min_interval_seconds"] == 60
     assert result.limits["whatsapp.max_media_bytes"] == 5242880
     assert result.limits["whatsapp.future_limit"] == 7
-    assert result.usage["whatsapp.texts_per_agent_identity_per_24h"] == 2
+    assert result.usage == {"whatsapp.texts_per_agent_identity_per_24h": 2}
     http.get.assert_called_once_with("/limits", params={"agent_identity_id": OWNER})

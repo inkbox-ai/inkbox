@@ -284,20 +284,17 @@ const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
 export interface WhatsAppLimits {
   agentIdentityId: string;
-  cycleStart: Date;
   limits: Record<string, number>;
   usage: Record<string, number>;
 }
 export interface RawWhatsAppLimits {
   agent_identity_id: string;
-  cycle_start: string;
   limits: Record<string, number>;
   usage: Record<string, number>;
 }
 export function parseWhatsAppLimits(row: RawWhatsAppLimits): WhatsAppLimits {
   return {
     agentIdentityId: row.agent_identity_id,
-    cycleStart: new Date(row.cycle_start),
     limits: { ...row.limits },
     usage: { ...row.usage },
   };

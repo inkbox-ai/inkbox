@@ -5,9 +5,10 @@
  * in-process fake h2 server (`fake_h2_server.ts`).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as http2 from "node:http2";
 import * as tls from "node:tls";
+import { once } from "node:events";
 import {
   TunnelAuthError,
   TunnelRuntime,
@@ -71,6 +72,39 @@ describe("TunnelRuntime — happy path", () => {
     await runtime.aclose();
     await servePromise;
   });
+});
+
+it("owns a rejected stream when a closing session defers its request error", async () => {
+  const runtime = makeRuntime({});
+  const session = http2.connect(`https://${fakeServer.authority}`, {
+    rejectUnauthorized: false,
+  });
+  await once(session, "connect");
+  const request = vi.spyOn(session, "request");
+  try {
+    session.close();
+    expect(() => (runtime as any).openStream(
+      { session, streams: new Map() },
+      { ":method": "GET", ":path": "/" },
+      { endStream: true },
+    )).toThrow(/h2 stream id not assigned synchronously|GOAWAY/);
+    const outcome = request.mock.results[0];
+    if (outcome.type === "return") {
+      const stream = outcome.value;
+      expect(stream.listenerCount("error")).toBeGreaterThan(0);
+      expect(stream.destroyed).toBe(true);
+      // Let the real stream emit its deferred error without a test error handler.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(stream.closed).toBe(true);
+    } else {
+      // Older Node versions reject synchronously without allocating a stream.
+      expect(outcome.value.code).toBe("ERR_HTTP2_GOAWAY_SESSION");
+    }
+  } finally {
+    request.mockRestore();
+    session.destroy();
+    await runtime.aclose();
+  }
 });
 
 describe("TunnelRuntime — auth failure", () => {

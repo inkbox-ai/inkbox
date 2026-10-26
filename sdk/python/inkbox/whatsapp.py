@@ -228,13 +228,12 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
 @dataclass
 class WhatsAppLimits:
     agent_identity_id: UUID
-    cycle_start: datetime
     limits: dict[str, int]
     usage: dict[str, int]
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppLimits:
-        return cls(UUID(d["agent_identity_id"]), datetime.fromisoformat(d["cycle_start"]), dict(d["limits"]), dict(d["usage"]))
+        return cls(UUID(d["agent_identity_id"]), dict(d["limits"]), dict(d["usage"]))
 
 
 class WhatsAppResource:
