@@ -255,3 +255,15 @@ def test_real_multipart_transport_preserves_owner_query():
         assert b'filename="image.png"' in requests[0].content
     finally:
         http.close()
+
+
+def test_effective_limits_are_owned_typed_and_preserve_future_policy_keys():
+    http = MagicMock()
+    http.get.return_value = F["limits"]
+    result = WhatsAppResource(http).get_limits(agent_identity_id=OWNER)
+    assert str(result.agent_identity_id) == OWNER
+    assert result.cycle_start.tzinfo is not None
+    assert result.limits["whatsapp.max_media_bytes"] == 5242880
+    assert result.limits["whatsapp.future_limit"] == 7
+    assert result.usage["whatsapp.texts_per_agent_identity_per_24h"] == 2
+    http.get.assert_called_once_with("/limits", params={"agent_identity_id": OWNER})

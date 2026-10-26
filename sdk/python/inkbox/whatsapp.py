@@ -225,6 +225,18 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
     return {"agent_identity_id": str(value)} if value is not None else {}
 
 
+@dataclass
+class WhatsAppLimits:
+    agent_identity_id: UUID
+    cycle_start: datetime
+    limits: dict[str, int]
+    usage: dict[str, int]
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppLimits:
+        return cls(UUID(d["agent_identity_id"]), datetime.fromisoformat(d["cycle_start"]), dict(d["limits"]), dict(d["usage"]))
+
+
 class WhatsAppResource:
     """One-to-one WhatsApp on an approved dedicated number.
 
@@ -392,3 +404,7 @@ class WhatsAppResource:
         return WhatsAppMarkReadResult(
             UUID(data["conversation_id"]), data["updated_count"]
         )
+
+    def get_limits(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppLimits:
+        """Read effective server limits and independent usage; transport maxima are not entitlements."""
+        return WhatsAppLimits._from_dict(self._http.get("/limits", params=_owner(agent_identity_id)))

@@ -4,6 +4,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
+/// Effective server limits and independent usage. Unknown public policy keys remain available.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppLimits {
+    pub agent_identity_id: Uuid,
+    pub cycle_start: String,
+    pub limits: std::collections::HashMap<String, i64>,
+    pub usage: std::collections::HashMap<String, i64>,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WhatsAppDirection {
@@ -284,5 +292,10 @@ impl WhatsAppResource {
             ),
             &owner(identity),
         )?)?)
+    }
+    pub fn get_limits(&self, identity: Option<&Uuid>) -> Result<WhatsAppLimits> {
+        Ok(serde_json::from_value(
+            self.http.get("/limits", &owner(identity))?,
+        )?)
     }
 }
