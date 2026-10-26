@@ -430,6 +430,7 @@ class CorrespondenceChannel(StrEnum):
     EMAIL = "email"
     SMS = "sms"
     IMESSAGE = "imessage"
+    WHATSAPP = "whatsapp"
     CALLS = "calls"
     SLACK = "slack"
 
@@ -689,6 +690,17 @@ class IMessageCorrespondenceItem(CorrespondenceItem):
 
 
 @dataclass
+class WhatsAppCorrespondenceItem(CorrespondenceItem):
+    conversation_id: UUID
+    local_number: str
+    remote_number: str | None
+    participants: list[str]
+    is_group: bool
+    text: str | None = None
+    media: CorrespondenceMediaMetadata | None = None
+
+
+@dataclass
 class SlackCorrespondenceItem(CorrespondenceItem):
     connection_id: UUID
     conversation_id: str
@@ -805,6 +817,10 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
             text=d.get("text"),
             media=parsed_media,
         )
+    if channel is CorrespondenceChannel.WHATSAPP:
+        return WhatsAppCorrespondenceItem(**common, conversation_id=UUID(d["conversation_id"]),
+            local_number=d["local_number"], remote_number=d.get("remote_number"),
+            participants=d["participants"], is_group=d["is_group"], text=d.get("text"), media=parsed_media)
     if channel is CorrespondenceChannel.SLACK:
         return SlackCorrespondenceItem(
             **common,

@@ -7,13 +7,13 @@ export function registerSendLookupCommand(program: Command): void {
   program.command("send-lookup")
     .description("Recover the original message ID using its send request key")
     .addOption(new Option("--sender-kind <kind>", "Sender resource type")
-      .choices(["mailbox", "phone_number", "imessage_identity"]).makeOptionMandatory())
+      .choices(["mailbox", "phone_number", "imessage_identity", "whatsapp_identity"]).makeOptionMandatory())
     .option("--sender-id <uuid>", "Original sender resource UUID")
     .option("--email-address <address>", "Resolve a sending mailbox by address")
-    .requiredOption("--operation <operation>", "mail.send, mail.reply_all, mail.forward, text.send, or imessage.send")
+    .requiredOption("--operation <operation>", "mail.send, mail.reply_all, mail.forward, text.send, imessage.send, or whatsapp.send")
     .requiredOption("--idempotency-key <key>", "Original send request key")
     .action(withErrorHandler(async function (this: Command, options: {
-      senderKind: "mailbox" | "phone_number" | "imessage_identity"; senderId?: string;
+      senderKind: "mailbox" | "phone_number" | "imessage_identity" | "whatsapp_identity"; senderId?: string;
       emailAddress?: string; operation: string; idempotencyKey: string;
     }) {
       if (!!options.senderId === !!options.emailAddress) throw new Error("Pass exactly one of --sender-id or --email-address.");

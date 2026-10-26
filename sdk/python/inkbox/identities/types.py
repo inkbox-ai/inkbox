@@ -385,6 +385,9 @@ class AgentIdentitySummary:
     slack_inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
     slack_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
 
+    whatsapp_enabled: bool = False
+    whatsapp_number: str | None = None
+
     def __post_init__(self) -> None:
         for channel in ("mail", "phone", "slack"):
             shared = getattr(self, f"{channel}_filter_mode")
@@ -421,6 +424,8 @@ class AgentIdentitySummary:
             email_address=d.get("email_address"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            whatsapp_enabled=d.get("whatsapp_enabled", False),
+            whatsapp_number=d.get("whatsapp_number"),
             imessage_enabled=d.get("imessage_enabled", False),
             contact_sharing_enabled=d.get("contact_sharing_enabled", True),
             imessage_filter_mode=FilterMode(imessage_mode),

@@ -1,7 +1,7 @@
 import type { SenderAccess } from "../sender_access.js";
 import { parsePhoneCallConnection, type PhoneCallConnection, type RawPhoneCallConnection } from "../phone/types.js";
 
-export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack";
+export type CorrespondenceChannel = "email" | "sms" | "imessage" | "calls" | "slack" | "whatsapp";
 export type CorrespondenceContentMode = "metadata" | "preview" | "full";
 export type CorrespondenceTranscriptMode = "none" | "abridged" | "full";
 export type CorrespondenceOrder = "asc" | "desc";
@@ -76,6 +76,17 @@ export interface IMessageCorrespondenceItem extends CorrespondenceItemBase {
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface WhatsAppCorrespondenceItem extends CorrespondenceItemBase {
+  channel: "whatsapp";
+  conversationId: string;
+  localNumber: string;
+  remoteNumber: string | null;
+  participants: string[];
+  isGroup: boolean;
+  text: string | null;
+  media: CorrespondenceMediaMetadata | null;
+}
+
 export interface SlackCorrespondenceItem extends CorrespondenceItemBase {
   channel: "slack";
   connectionId: string;
@@ -107,6 +118,7 @@ export type CorrespondenceItem =
   | EmailCorrespondenceItem
   | SmsCorrespondenceItem
   | IMessageCorrespondenceItem
+  | WhatsAppCorrespondenceItem
   | SlackCorrespondenceItem
   | CallCorrespondenceItem;
 
@@ -174,6 +186,17 @@ export interface RawIMessageCorrespondenceItem extends RawCorrespondenceItemBase
   media: CorrespondenceMediaMetadata | null;
 }
 
+export interface RawWhatsAppCorrespondenceItem extends RawCorrespondenceItemBase {
+  channel: "whatsapp";
+  conversation_id: string;
+  local_number: string;
+  remote_number: string | null;
+  participants: string[];
+  is_group: boolean;
+  text: string | null;
+  media: CorrespondenceMediaMetadata | null;
+}
+
 export interface RawSlackCorrespondenceItem extends RawCorrespondenceItemBase {
   channel: "slack";
   connection_id: string;
@@ -215,6 +238,7 @@ export type RawCorrespondenceItem =
   | RawEmailCorrespondenceItem
   | RawSmsCorrespondenceItem
   | RawIMessageCorrespondenceItem
+  | RawWhatsAppCorrespondenceItem
   | RawSlackCorrespondenceItem
   | RawCallCorrespondenceItem;
 
@@ -278,6 +302,8 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
         text: r.text,
         media: r.media,
       };
+    case "whatsapp":
+      return { ...base, channel:r.channel, conversationId:r.conversation_id,localNumber:r.local_number,remoteNumber:r.remote_number,participants:r.participants,isGroup:r.is_group,text:r.text,media:r.media };
     case "imessage":
       return {
         ...base,

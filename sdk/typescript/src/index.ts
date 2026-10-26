@@ -400,6 +400,7 @@ export type {
   SmsCorrespondenceItem,
   SlackCorrespondenceItem,
   IMessageCorrespondenceItem,
+  WhatsAppCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
   ContactCreatePermissions,
@@ -555,3 +556,6 @@ export type {
 
 export { BillingResource } from "./billing.js";
 export type { CatalogRate, PricingResponse, CountryAgreement, CallingCountry, CallingCountriesResponse, CountryQuote, BundleCode, BundleOffer, BundleAgreement, LineBundlesResponse, BundleQuote } from "./billing.js";
+
+export * from "./whatsapp.js";
+export type {WhatsAppWebhookEventType,WhatsAppWebhookMessage,WhatsAppWebhookRecipient,WhatsAppWebhookMedia,WhatsAppWebhookData,WhatsAppWebhookPayload} from "./webhooks/types.js";

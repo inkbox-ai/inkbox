@@ -28,6 +28,7 @@ class ContactCorrespondenceOptions:
     email_limit: int | None = None
     sms_limit: int | None = None
     imessage_limit: int | None = None
+    whatsapp_limit: int | None = None
     calls_limit: int | None = None
     cursor: str | None = None
     order: CorrespondenceOrder | str | None = None
@@ -38,7 +39,7 @@ class ContactCorrespondenceOptions:
 
     def _to_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}
-        channels = self.channels if self.channels is not None else list(CorrespondenceChannel)
+        channels = self.channels if self.channels is not None else [CorrespondenceChannel.EMAIL, CorrespondenceChannel.SMS, CorrespondenceChannel.IMESSAGE, CorrespondenceChannel.CALLS, CorrespondenceChannel.SLACK]
         params["channels"] = ",".join(str(channel) for channel in channels)
         for name in ("after", "before"):
             value = getattr(self, name)
@@ -49,6 +50,7 @@ class ContactCorrespondenceOptions:
             "email_limit",
             "sms_limit",
             "imessage_limit",
+            "whatsapp_limit",
             "calls_limit",
             "cursor",
             "order",

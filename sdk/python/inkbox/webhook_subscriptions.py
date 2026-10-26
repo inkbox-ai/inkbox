@@ -172,7 +172,7 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
         )
 
 
-_EVENT_PREFIXES = ("message.", "text.", "imessage.", "call.", "a2a.", "slack.")
+_EVENT_PREFIXES = ("message.", "text.", "imessage.", "whatsapp.", "call.", "a2a.", "slack.")
 
 
 def _assert_known_event_prefixes(event_types: list[str]) -> None:
@@ -308,7 +308,7 @@ class WebhookSubscriptionsResource:
         distinct notification event types may be combined, regardless of
         configured channels.
 
-        ``context_config`` applies only to received mail, text and iMessage
+        ``context_config`` applies only to received mail, text, iMessage and WhatsApp
         events; other events ignore it. See :class:`WebhookContextConfig`.
 
         ``auth_token`` is an optional bearer token for endpoints that
@@ -373,7 +373,7 @@ class WebhookSubscriptionsResource:
         ``context_config`` is tri-state and a field where ``None`` is
         meaningful on the wire: omitted = unchanged, ``None`` = clear
         (send JSON ``null``), a dict = validate and replace. Context applies
-        only to received mail, text and iMessage events.
+        only to received mail, text, iMessage and WhatsApp events.
 
         ``auth_token`` is tri-state the same way: omitted = unchanged,
         ``None`` = clear the delivery bearer token, a string = replace it.

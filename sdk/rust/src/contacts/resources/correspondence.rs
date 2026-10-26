@@ -23,6 +23,7 @@ pub struct CorrespondenceQuery {
     pub email_limit: Option<u64>,
     pub sms_limit: Option<u64>,
     pub imessage_limit: Option<u64>,
+    pub whatsapp_limit: Option<u64>,
     pub calls_limit: Option<u64>,
     pub cursor: Option<String>,
     pub order: Option<CorrespondenceOrder>,
@@ -68,6 +69,7 @@ impl ContactCorrespondenceResource {
         push_display(&mut params, "email_limit", query.email_limit);
         push_display(&mut params, "sms_limit", query.sms_limit);
         push_display(&mut params, "imessage_limit", query.imessage_limit);
+        push_display(&mut params, "whatsapp_limit", query.whatsapp_limit);
         push_display(&mut params, "calls_limit", query.calls_limit);
         push_option(&mut params, "cursor", query.cursor.as_ref());
         if let Some(order) = query.order {
