@@ -8,7 +8,6 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppLimits {
     pub agent_identity_id: Uuid,
-    pub cycle_start: String,
     pub limits: std::collections::HashMap<String, i64>,
     pub usage: std::collections::HashMap<String, i64>,
 }

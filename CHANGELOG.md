@@ -16,11 +16,19 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   and Rust identity struct literals remain compatible.
 - WhatsApp sends use the existing logical-send key and lookup recovery contract.
   Send acceptance, confirmed sending, delivery, and uncertain delivery stay distinct.
+- Effective WhatsApp limits expose the identity, configurable policy values, and
+  daily-only usage without a billing-cycle timestamp, monthly allowance, or
+  enabled-agent cap.
 
 - Rust exhaustive matches on correspondence channels/items or context text channels
   must handle the new WhatsApp variant. Complete `CorrespondenceQuery` struct literals
   need `whatsapp_limit: None` (or `..Default::default()`); legacy identity struct
   literals are unchanged.
+
+### Fixed
+
+- Rejected HTTP/2 tunnel streams are closed before returning an error, preventing
+  an unhandled stream error when a request races with connection shutdown.
 
 ### Availability
 

@@ -138,7 +138,11 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
-  assert.equal((await run("limits")).limits["whatsapp.future_limit"], 7);
+  const limits = await run("limits");
+  assert.deepEqual(Object.keys(limits).sort(), ["agentIdentityId", "limits", "usage"]);
+  assert.equal(limits.limits["whatsapp.future_limit"], 7);
+  assert.equal(limits.limits["whatsapp.texts_per_agent_identity_per_24h"], 1000);
+  assert.deepEqual(limits.usage, { "whatsapp.texts_per_agent_identity_per_24h": 2 });
   assert.equal(calls.at(-1).query.agent_identity_id, f.identity_id);
   assert.equal(
     (

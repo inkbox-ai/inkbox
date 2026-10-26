@@ -194,7 +194,21 @@ fn effective_limits_retain_owned_future_policy_keys() {
         .unwrap();
     let result = client.whatsapp().get_limits(Some(&owner)).unwrap();
     assert_eq!(result.agent_identity_id, owner);
+    let public = serde_json::to_value(&result).unwrap();
+    assert_eq!(public.as_object().unwrap().len(), 3);
+    assert!(public.get("cycle_start").is_none());
+    assert_eq!(
+        result.limits["whatsapp.texts_per_agent_identity_per_24h"],
+        1000
+    );
+    assert_eq!(result.limits["whatsapp.pre_reply_messages"], 3);
+    assert_eq!(result.limits["whatsapp.pre_reply_max_text_length"], 159);
+    assert_eq!(
+        result.limits["whatsapp.outbound_new_contact_min_interval_seconds"],
+        60
+    );
     assert_eq!(result.limits["whatsapp.future_limit"], 7);
     assert_eq!(result.usage["whatsapp.texts_per_agent_identity_per_24h"], 2);
+    assert_eq!(result.usage.len(), 1);
     get.assert();
 }

@@ -196,7 +196,11 @@ it("reads owned effective limits and retains unknown policy keys", async () => {
   expect(last().url.pathname).toBe("/api/v1/whatsapp/limits");
   expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
   expect(result.agentIdentityId).toBe(owner);
-  expect(result.cycleStart).toBeInstanceOf(Date);
+  expect(Object.keys(result).sort()).toEqual(["agentIdentityId", "limits", "usage"]);
+  expect(result.limits["whatsapp.texts_per_agent_identity_per_24h"]).toBe(1000);
+  expect(result.limits["whatsapp.pre_reply_messages"]).toBe(3);
+  expect(result.limits["whatsapp.pre_reply_max_text_length"]).toBe(159);
+  expect(result.limits["whatsapp.outbound_new_contact_min_interval_seconds"]).toBe(60);
   expect(result.limits["whatsapp.future_limit"]).toBe(7);
-  expect(result.usage["whatsapp.texts_per_agent_identity_per_24h"]).toBe(2);
+  expect(result.usage).toEqual({ "whatsapp.texts_per_agent_identity_per_24h": 2 });
 });
