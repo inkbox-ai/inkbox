@@ -9,6 +9,8 @@ pub enum CorrespondenceChannel {
     Email,
     Sms,
     IMessage,
+    #[serde(rename = "whatsapp")]
+    WhatsApp,
     Calls,
     Slack,
 }
@@ -19,6 +21,7 @@ impl CorrespondenceChannel {
             Self::Email => "email",
             Self::Sms => "sms",
             Self::IMessage => "imessage",
+            Self::WhatsApp => "whatsapp",
             Self::Calls => "calls",
             Self::Slack => "slack",
         }
@@ -206,6 +209,18 @@ pub struct IMessageCorrespondenceItem {
     #[serde(default)]
     pub media: Option<CorrespondenceMediaMetadata>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppCorrespondenceItem {
+    #[serde(flatten)]
+    pub common: CorrespondenceItemBase,
+    pub conversation_id: Uuid,
+    pub local_number: String,
+    pub remote_number: Option<String>,
+    pub participants: Vec<String>,
+    pub is_group: bool,
+    pub text: Option<String>,
+    pub media: Option<CorrespondenceMediaMetadata>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlackCorrespondenceItem {
@@ -259,6 +274,8 @@ pub enum CorrespondenceItem {
     Email(EmailCorrespondenceItem),
     Sms(SmsCorrespondenceItem),
     IMessage(IMessageCorrespondenceItem),
+    #[serde(rename = "whatsapp")]
+    WhatsApp(WhatsAppCorrespondenceItem),
     Calls(CallCorrespondenceItem),
     Slack(SlackCorrespondenceItem),
 }

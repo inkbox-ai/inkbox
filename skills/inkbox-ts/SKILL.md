@@ -1713,3 +1713,19 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Set `plainReplyFallback: false` on `sendIMessage` or `imessages.send` to
 require a native reply instead.
+
+## Approved dedicated WhatsApp
+
+For an approved agent with an existing dedicated personal iMessage number,
+WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
+do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
+point the user to Request Access in the console. Only one-to-one messaging is
+supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
+Send by one recipient or an existing conversation. Upload at most one attachment
+(20 MiB) first and reuse its owned media ID. Outbound text is at most 4,000 Unicode
+code points. Preserve a stable logical-send key and media ID after ambiguity;
+check message/lookup state rather than sending a duplicate. Attachment URLs expire:
+refresh metadata by media ID before downloading. Local mark-read sends no remote
+receipt. Only `whatsapp.received` is new incoming content; delivery notifications
+must not trigger replies. No groups, quoted replies, reactions, typing, voice calls,
+remote read receipts, or remote MCP WhatsApp tools are implied by this release.

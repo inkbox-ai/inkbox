@@ -23,7 +23,7 @@ class MessageSendsResource:
         self._http = http
         self._mailboxes = mailboxes
 
-    def lookup(self, *, sender_kind: Literal["mailbox", "phone_number", "imessage_identity"],
+    def lookup(self, *, sender_kind: Literal["mailbox", "phone_number", "imessage_identity", "whatsapp_identity"],
                sender_id: UUID | str, operation: str, idempotency_key: str) -> UUID:
         """Find the original ID, then use its channel's get method for current status."""
         data = self._http.get("/message-sends/lookup", params={

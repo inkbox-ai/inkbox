@@ -336,12 +336,30 @@ impl HttpTransport {
         content: Vec<u8>,
         content_type: &str,
     ) -> Result<Value> {
+        self.post_multipart_with_params(path, field_name, filename, content, content_type, NO_QUERY)
+    }
+
+    /// POST one file with optional ownership query parameters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn post_multipart_with_params(
+        &self,
+        path: &str,
+        field_name: &str,
+        filename: &str,
+        content: Vec<u8>,
+        content_type: &str,
+        params: Query,
+    ) -> Result<Value> {
         let part = reqwest::blocking::multipart::Part::bytes(content)
             .file_name(filename.to_string())
             .mime_str(content_type)
             .map_err(InkboxError::Transport)?;
         let form = reqwest::blocking::multipart::Form::new().part(field_name.to_string(), part);
-        let rb = self.client.post(self.url(path)).multipart(form);
+        let rb = self
+            .client
+            .post(self.url(path))
+            .query(params)
+            .multipart(form);
         raise_for_status(self.send(rb, &self.url(path))?)?.json_or_null()
     }
 

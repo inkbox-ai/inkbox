@@ -1,0 +1,172 @@
+{
+  "identity_id": "10000000-0000-4000-8000-000000000001",
+  "conversation": {
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "local_number": "+15555550100",
+    "remote_number": "+15555550101",
+    "participants": [
+      "+15555550101"
+    ],
+    "is_group": false,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "id": "20000000-0000-4000-8000-000000000002"
+  },
+  "conversation_summary": {
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "local_number": "+15555550100",
+    "remote_number": "+15555550101",
+    "participants": [
+      "+15555550101"
+    ],
+    "is_group": false,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "id": "20000000-0000-4000-8000-000000000002",
+    "latest_text": "Hello 👋",
+    "latest_message_at": "2026-10-01T12:00:00Z",
+    "latest_direction": "outbound",
+    "latest_has_media": false,
+    "unread_count": 2,
+    "total_count": 3
+  },
+  "message": {
+    "id": "30000000-0000-4000-8000-000000000003",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "conversation_id": "20000000-0000-4000-8000-000000000002",
+    "direction": "outbound",
+    "local_number": "+15555550100",
+    "remote_number": "+15555550101",
+    "sender_number": "+15555550100",
+    "participants": [
+      "+15555550101"
+    ],
+    "is_group": false,
+    "content": "Hello 👋",
+    "media": [],
+    "status": "sent",
+    "delivery_state": "unknown",
+    "recipients": [
+      {
+        "remote_number": "+15555550101",
+        "delivery_status": "sent",
+        "delivery_state": "unknown",
+        "error_code": null,
+        "error_detail": null,
+        "sent_at": "2026-10-01T12:00:00Z",
+        "delivered_at": null,
+        "failed_at": null
+      }
+    ],
+    "is_read": false,
+    "is_blocked": false,
+    "error_code": null,
+    "error_detail": null,
+    "source_at": null,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "sent_at": "2026-10-01T12:00:00Z",
+    "delivered_at": null,
+    "failed_at": null,
+    "status_observed_at": "2026-10-01T12:00:00Z",
+    "status_refresh_pending": false
+  },
+  "inbound_message": {
+    "id": "30000000-0000-4000-8000-000000000003",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "conversation_id": "20000000-0000-4000-8000-000000000002",
+    "direction": "inbound",
+    "local_number": "+15555550100",
+    "remote_number": "+15555550101",
+    "sender_number": "+15555550101",
+    "participants": [
+      "+15555550101"
+    ],
+    "is_group": false,
+    "content": null,
+    "media": [
+      {
+        "id": "40000000-0000-4000-8000-000000000004",
+        "filename": "image.png",
+        "content_type": "image/png",
+        "size": 3,
+        "status": "unavailable",
+        "url": null
+      }
+    ],
+    "status": "received",
+    "delivery_state": null,
+    "recipients": [],
+    "is_read": false,
+    "is_blocked": false,
+    "error_code": null,
+    "error_detail": null,
+    "source_at": null,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "sent_at": null,
+    "delivered_at": null,
+    "failed_at": null,
+    "status_observed_at": "2026-10-01T12:00:00Z",
+    "status_refresh_pending": false
+  },
+  "media": {
+    "id": "40000000-0000-4000-8000-000000000004",
+    "filename": "image.png",
+    "content_type": "image/png",
+    "size": 3,
+    "status": "ready",
+    "url": "https://media.example/image.png?temporary=1"
+  },
+  "webhook": {
+    "id": "evt_example_whatsapp_received",
+    "event_type": "whatsapp.received",
+    "timestamp": "2026-10-01T12:00:00Z",
+    "data": {
+      "message": {
+        "id": "30000000-0000-4000-8000-000000000003",
+        "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+        "conversation_id": "20000000-0000-4000-8000-000000000002",
+        "direction": "inbound",
+        "local_number": "+15555550100",
+        "remote_number": "+15555550101",
+        "sender_number": "+15555550101",
+        "participants": [
+          "+15555550101"
+        ],
+        "is_group": false,
+        "content": null,
+        "media": [
+          {
+            "id": "40000000-0000-4000-8000-000000000004",
+            "filename": "image.png",
+            "content_type": "image/png",
+            "size": 3,
+            "status": "unavailable",
+            "url": null
+          }
+        ],
+        "status": "received",
+        "delivery_state": null,
+        "recipients": [],
+        "is_read": false,
+        "error_code": null,
+        "error_detail": null,
+        "source_at": null,
+        "created_at": "2026-10-01T12:00:00Z",
+        "updated_at": "2026-10-01T12:00:00Z",
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_observed_at": "2026-10-01T12:00:00Z"
+      },
+      "contacts": [],
+      "agent_identities": []
+    }
+  },
+  "status": {
+    "enabled": true,
+    "number": "+15555550100",
+    "status": "ready"
+  }
+}

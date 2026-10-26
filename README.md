@@ -721,3 +721,96 @@ because delivery webhooks do not cover every failure before dispatch.
 ## License
 
 MIT
+
+## Dedicated WhatsApp
+
+WhatsApp is available by approval for agents that already have a dedicated
+personal iMessage number. The approved WhatsApp channel uses that same number;
+it is not a shared-number channel. Check fresh channel status instead of assuming
+an old identity snapshot grants or denies access. If access is not available,
+request it in the console. Sending does not provision or enable the channel.
+
+```python
+identity = client.get_identity("my-agent")
+status = identity.get_whatsapp_status()  # None on APIs without this channel
+message = identity.send_whatsapp(
+    to="+15555550101", text="Hello", idempotency_key="order-confirmation-123"
+)
+current = identity.get_whatsapp_message(message.id)
+```
+
+```typescript
+const identity = await client.getIdentity("my-agent");
+const status = await identity.getWhatsAppStatus(); // null on older APIs
+const message = await identity.sendWhatsApp({
+  to: "+15555550101", text: "Hello", idempotencyKey: "order-confirmation-123",
+});
+const current = await identity.getWhatsAppMessage(message.id);
+```
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let status = client.identities().get_whatsapp_status("my-agent")?;
+let message = client.whatsapp().send(&inkbox::WhatsAppSendOptions {
+    to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
+    text: Some("Hello".into()),
+    idempotency_key: Some("order-confirmation-123".into()),
+    ..Default::default()
+})?;
+# Ok(()) }
+```
+
+```bash
+inkbox whatsapp status --identity my-agent
+inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello \
+  --idempotency-key order-confirmation-123
+inkbox whatsapp conversations --identity my-agent
+inkbox whatsapp list --identity my-agent --conversation-id <conversation-id>
+```
+
+Use either one E.164 recipient (`to`) or an existing `conversation_id` /
+`conversationId`, never both. A one-element recipient array is also accepted;
+groups and fan-out are not supported. Outbound text is at most 4,000 Unicode code
+points. Each message can contain text, one owned attachment, or both.
+
+### Attachments and recovery
+
+Upload one file (maximum 20 MiB) with `upload_whatsapp_media` /
+`uploadWhatsAppMedia` / `upload_media`, then send its returned ID in `media_ids` /
+`mediaIds`. CLI: `whatsapp upload-media <file>`, then `whatsapp send --media-id <id>`.
+Uploads and sends are separate operations: persist the media ID and logical send
+key before sending. After a timeout or ambiguous outcome, reuse both; do not
+re-upload or generate a new key for that same intended message. Existing
+`message_sends.lookup` / `messageSends.lookup` uses `sender_kind=whatsapp_identity`,
+the identity UUID, and `operation=whatsapp.send`.
+
+Attachment URLs expire. `get_whatsapp_media` / `getWhatsAppMedia` / `get_media`
+reauthorizes access and returns fresh metadata and a temporary URL. Media can be
+`pending`, `ready`, or `unavailable`; retain the ID and metadata when URL is null.
+Read responses use `content` while send requests use `text`.
+
+A queued response is acceptance, not delivery. Inspect message `status` separately
+from `delivery_state` / `deliveryState`. A confirmed `sent` message with delivery
+`unknown` has not become a failed send. Do not resend automatically to chase a
+missing delivery confirmation. `mark_whatsapp_read` / `markWhatsAppRead` /
+`mark_read` updates local unread history through an exact message boundary; it
+never sends a remote read receipt.
+
+### Notifications and contact history
+
+Identity webhook subscriptions accept `whatsapp.received`, `whatsapp.sent`,
+`whatsapp.delivered`, `whatsapp.delivery_failed`, and
+`whatsapp.delivery_unconfirmed`, including subscriptions created before approval.
+Only `whatsapp.received` represents a new incoming message. Deduplicate retries by
+event ID; status notifications should update delivery state without starting an
+agent reply. Payloads keep snake_case fields and ISO timestamps. Received events
+can opt into the existing `texts` context class, whose items can have channel
+`whatsapp`. No new context class is required.
+
+Contact correspondence is explicitly opt-in: select `channels=["whatsapp"]` and
+optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp
+--whatsapp-limit 10` in the CLI). Default correspondence selectors are unchanged.
+Conversation participants contain remote numbers only, and `sender_number` /
+`senderNumber` is the actual message author. Groups, quoted replies, reactions,
+typing indicators, remote read receipts, and WhatsApp calls are not supported.

@@ -7,6 +7,7 @@
  * or tunnel create / link surface.
  */
 
+import { parseWhatsAppChannelStatus, type RawWhatsAppChannelStatus, type WhatsAppChannelStatus } from "../../whatsapp.js";
 import { HttpTransport, InkboxAPIError, validateIdempotencyKey } from "../../_http.js";
 import { parseIdentityDomainAffiliation } from "../../organization_domains/types.js";
 import type { IdentityDomainAffiliation, SetDomainAffiliationOptions } from "../../organization_domains/types.js";
@@ -29,6 +30,10 @@ import {
 } from "../types.js";
 
 export class IdentitiesResource {
+  async getWhatsAppStatus(handle:string):Promise<WhatsAppChannelStatus|null> {
+    const data = await this.http.get<{whatsapp?:RawWhatsAppChannelStatus|null}>(`/${encodeURIComponent(handle)}/channel-status`);
+    return data.whatsapp == null ? null : parseWhatsAppChannelStatus(data.whatsapp);
+  }
   constructor(private readonly http: HttpTransport) {}
 
   async getDomainAffiliation(agentHandle: string): Promise<IdentityDomainAffiliation> {

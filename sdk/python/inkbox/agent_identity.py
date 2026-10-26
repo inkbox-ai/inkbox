@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 from inkbox.phone.hosted_mcp import HostedMcpConnection, HostedMcpCreate
 
+from inkbox.whatsapp import (WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus)
 from inkbox.credentials import Credentials
 from inkbox.a2a.client import A2AClient
 from inkbox.a2a.resource import skills_wire
@@ -124,6 +125,90 @@ class AgentIdentity:
         for msg in identity.iter_emails():
             print(msg.subject)
     """
+
+    @property
+    def whatsapp_enabled(self) -> bool:
+        return self._data.whatsapp_enabled
+
+    @property
+    def whatsapp_number(self) -> str | None:
+        return self._data.whatsapp_number
+
+    def get_whatsapp_status(self) -> WhatsAppChannelStatus | None:
+        return self._inkbox.identities.get_whatsapp_status(self.agent_handle)
+
+    def send_whatsapp(
+        self,
+        *,
+        to: str | list[str] | None = None,
+        conversation_id: UUID | str | None = None,
+        text: str | None = None,
+        media_ids: list[UUID | str] | None = None,
+        idempotency_key: str | None = None,
+    ) -> WhatsAppMessage:
+        return self._inkbox.whatsapp.send(
+            to=to,
+            conversation_id=conversation_id,
+            text=text,
+            media_ids=media_ids,
+            idempotency_key=idempotency_key,
+            agent_identity_id=self.id,
+        )
+
+    def get_whatsapp_message(self, message_id: UUID | str) -> WhatsAppMessage:
+        return self._inkbox.whatsapp.get(message_id, agent_identity_id=self.id)
+
+    def list_whatsapp_messages(
+        self,
+        *,
+        conversation_id: UUID | str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        is_read: bool | None = None,
+        is_blocked: bool | None = None,
+    ) -> list[WhatsAppMessage]:
+        return self._inkbox.whatsapp.list(
+            agent_identity_id=self.id,
+            conversation_id=conversation_id,
+            limit=limit,
+            offset=offset,
+            is_read=is_read,
+            is_blocked=is_blocked,
+        )
+
+    def list_whatsapp_conversations(
+        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None
+    ) -> list[WhatsAppConversationSummary]:
+        return self._inkbox.whatsapp.list_conversations(
+            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked
+        )
+
+    def get_whatsapp_conversation(
+        self, conversation_id: UUID | str
+    ) -> WhatsAppConversation:
+        return self._inkbox.whatsapp.get_conversation(
+            conversation_id, agent_identity_id=self.id
+        )
+
+    def upload_whatsapp_media(
+        self, *, content: bytes, filename: str, content_type: str | None = None
+    ) -> WhatsAppMedia:
+        return self._inkbox.whatsapp.upload_media(
+            content=content,
+            filename=filename,
+            content_type=content_type,
+            agent_identity_id=self.id,
+        )
+
+    def get_whatsapp_media(self, media_id: UUID | str) -> WhatsAppMedia:
+        return self._inkbox.whatsapp.get_media(media_id, agent_identity_id=self.id)
+
+    def mark_whatsapp_read(
+        self, conversation_id: UUID | str, through_message_id: UUID | str
+    ) -> WhatsAppMarkReadResult:
+        return self._inkbox.whatsapp.mark_read(
+            conversation_id, through_message_id, agent_identity_id=self.id
+        )
 
     def __init__(self, data: _AgentIdentityData, inkbox: Inkbox) -> None:
         self._data = data
