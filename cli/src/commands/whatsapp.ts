@@ -80,6 +80,21 @@ export function registerWhatsAppCommands(program: Command): void {
     }),
   );
 
+  identityCommand(
+    "limits",
+    "Read effective server policy limits and independent usage",
+  ).action(
+    withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this);
+      output(
+        await (
+          await createClient(global).getIdentity(opts.identity)
+        ).getWhatsAppLimits(),
+        { json: !!global.json },
+      );
+    }),
+  );
+
   for (const [name, description, method] of [
     [
       "get <message-id>",

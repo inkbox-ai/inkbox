@@ -176,3 +176,25 @@ fn fresh_status_missing_on_older_api_is_none_and_webhooks_are_typed() {
     assert!(payload.data.message.media[0].url.is_none());
     assert_eq!(payload.data.message.sender_number, "+15555550101");
 }
+
+#[test]
+fn effective_limits_retain_owned_future_policy_keys() {
+    let f = fixture();
+    let server = MockServer::start();
+    let owner = Uuid::parse_str(f["identity_id"].as_str().unwrap()).unwrap();
+    let get = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/limits")
+            .query_param("agent_identity_id", owner.to_string());
+        then.status(200).json_body(f["limits"].clone());
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let result = client.whatsapp().get_limits(Some(&owner)).unwrap();
+    assert_eq!(result.agent_identity_id, owner);
+    assert_eq!(result.limits["whatsapp.future_limit"], 7);
+    assert_eq!(result.usage["whatsapp.texts_per_agent_identity_per_24h"], 2);
+    get.assert();
+}

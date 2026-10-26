@@ -68,6 +68,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       "/api/v1/whatsapp/messages":
         req.method === "POST" ? { message: f.message } : [f.inbound_message],
       [`/api/v1/whatsapp/messages/${f.message.id}`]: f.message,
+      "/api/v1/whatsapp/limits": f.limits,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
       "/api/v1/whatsapp/mark-read": {
@@ -137,6 +138,8 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
+  assert.equal((await run("limits")).limits["whatsapp.future_limit"], 7);
+  assert.equal(calls.at(-1).query.agent_identity_id, f.identity_id);
   assert.equal(
     (
       await run(

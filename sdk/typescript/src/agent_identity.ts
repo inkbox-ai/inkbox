@@ -123,6 +123,9 @@ export class AgentIdentity {
   get whatsappNumber(): string | null {
     return this._data.whatsappNumber ?? null;
   }
+  getWhatsAppLimits() {
+    return this._inkbox.whatsapp.getLimits({ agentIdentityId: this.id });
+  }
   getWhatsAppStatus() {
     return this._inkbox.identities.getWhatsAppStatus(this.agentHandle);
   }

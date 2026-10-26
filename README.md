@@ -814,3 +814,5 @@ optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp
 Conversation participants contain remote numbers only, and `sender_number` /
 `senderNumber` is the actual message author. Groups, quoted replies, reactions,
 typing indicators, remote read receipts, and WhatsApp calls are not supported.
+
+Effective WhatsApp policy limits and usage are independent from iMessage. Read them with Python `identity.get_whatsapp_limits()`, TypeScript `identity.getWhatsAppLimits()`, Rust `identity.get_whatsapp_limits()`, or `inkbox whatsapp limits -i agent-handle`. The returned public `whatsapp.*` maps retain future policy keys. The 4,000-character / 20 MiB transport ceilings do not promise that a particular identity's effective limits are that high; the server enforces its current configured policy.

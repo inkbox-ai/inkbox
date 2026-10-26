@@ -159,17 +159,15 @@ describe("WhatsApp public wire", () => {
   it("queries fresh status and does not deny sends from an older disabled snapshot", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          ok({
-            id: owner,
-            organization_id: "org_example",
-            agent_handle: "agent",
-            created_at: f.message.created_at,
-            updated_at: f.message.updated_at,
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        ok({
+          id: owner,
+          organization_id: "org_example",
+          agent_handle: "agent",
+          created_at: f.message.created_at,
+          updated_at: f.message.updated_at,
+        }),
+      ),
     );
     const client = new Inkbox({ apiKey: "test-only" });
     const identity = await client.getIdentity("agent");
@@ -190,4 +188,15 @@ describe("WhatsApp public wire", () => {
       parseWhatsAppMessage(f.message as RawWhatsAppMessage).createdAt,
     ).toBeInstanceOf(Date);
   });
+});
+
+it("reads owned effective limits and retains unknown policy keys", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.limits)));
+  const result = await resource().getLimits({ agentIdentityId: owner });
+  expect(last().url.pathname).toBe("/api/v1/whatsapp/limits");
+  expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+  expect(result.agentIdentityId).toBe(owner);
+  expect(result.cycleStart).toBeInstanceOf(Date);
+  expect(result.limits["whatsapp.future_limit"]).toBe(7);
+  expect(result.usage["whatsapp.texts_per_agent_identity_per_24h"]).toBe(2);
 });

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 from inkbox.phone.hosted_mcp import HostedMcpConnection, HostedMcpCreate
 
-from inkbox.whatsapp import (WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus)
+from inkbox.whatsapp import (WhatsAppLimits, WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus)
 from inkbox.credentials import Credentials
 from inkbox.a2a.client import A2AClient
 from inkbox.a2a.resource import skills_wire
@@ -133,6 +133,9 @@ class AgentIdentity:
     @property
     def whatsapp_number(self) -> str | None:
         return self._data.whatsapp_number
+
+    def get_whatsapp_limits(self) -> WhatsAppLimits:
+        return self._inkbox.whatsapp.get_limits(agent_identity_id=self.id)
 
     def get_whatsapp_status(self) -> WhatsAppChannelStatus | None:
         return self._inkbox.identities.get_whatsapp_status(self.agent_handle)

@@ -203,8 +203,7 @@ export interface WhatsAppConversationSummary extends WhatsAppConversation {
   unreadCount: number;
   totalCount: number;
 }
-export interface RawWhatsAppConversationSummary
-  extends RawWhatsAppConversation {
+export interface RawWhatsAppConversationSummary extends RawWhatsAppConversation {
   latest_text: string | null;
   latest_message_at: string | null;
   latest_direction: WhatsAppDirection | null;
@@ -283,6 +282,26 @@ export type WhatsAppConversationListOptions = Omit<
 >;
 const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
+export interface WhatsAppLimits {
+  agentIdentityId: string;
+  cycleStart: Date;
+  limits: Record<string, number>;
+  usage: Record<string, number>;
+}
+export interface RawWhatsAppLimits {
+  agent_identity_id: string;
+  cycle_start: string;
+  limits: Record<string, number>;
+  usage: Record<string, number>;
+}
+export function parseWhatsAppLimits(row: RawWhatsAppLimits): WhatsAppLimits {
+  return {
+    agentIdentityId: row.agent_identity_id,
+    cycleStart: new Date(row.cycle_start),
+    limits: { ...row.limits },
+    usage: { ...row.usage },
+  };
+}
 export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
   /** Queue one message. Reuse its key and owned media IDs after uncertainty. */
@@ -411,6 +430,17 @@ export class WhatsAppResource {
           through_message_id: throughMessageId,
         },
         { params: owner(o.agentIdentityId) },
+      ),
+    );
+  }
+  /** Effective server limits and independent usage; protocol maxima are not entitlements. */
+  async getLimits(
+    o: { agentIdentityId?: string } = {},
+  ): Promise<WhatsAppLimits> {
+    return parseWhatsAppLimits(
+      await this.http.get<RawWhatsAppLimits>(
+        "/limits",
+        owner(o.agentIdentityId),
       ),
     );
   }
