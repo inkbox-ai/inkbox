@@ -1318,7 +1318,19 @@ Preserve the query and filters when following a cursor.
 
 ## Dedicated WhatsApp
 
-`client.whatsapp().send(&WhatsAppSendOptions { /* one recipient, text or media ID */ ..Default::default() })`
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let status = identity.get_whatsapp_status()?;
+let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
+    to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
+    text: Some("Hello".into()),
+    idempotency_key: Some("order-confirmation-123".into()),
+    ..Default::default()
+})?;
+# Ok(()) }
+```
 
 Available by approval on the same number as an existing dedicated personal
 iMessage line; not a shared channel. Read fresh WhatsApp channel status and

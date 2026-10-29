@@ -150,3 +150,11 @@ def test_reaction_webhook_uses_its_receipt_and_keeps_unknown_actor_null():
     reaction = WhatsAppReaction._from_dict(event["data"]["reaction"])
     assert reaction.remote_number is None
     assert str(reaction.target_message_id) == F["message"]["id"]
+
+
+def test_reaction_fixture_preserves_one_actor_per_receipt():
+    data = F["reaction_webhook"]["data"]
+    receipts = {}
+    for reaction in [data["reaction"], *data["message"]["reactions"]]:
+        actor = (reaction["direction"], reaction["remote_number"], reaction["target_message_id"])
+        assert receipts.setdefault(reaction["id"], actor) == actor

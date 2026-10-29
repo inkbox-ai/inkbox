@@ -42,6 +42,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Fixed
 
+- WhatsApp CLI list selectors reject conflicting flags before network access, and conversation history uses the same table columns as message lists.
+- WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
 - Python and TypeScript WhatsApp sends retain their request key when a successful
   response cannot be decoded, without automatically sending another request.
 - Rejected HTTP/2 tunnel streams are closed before returning an error, preventing

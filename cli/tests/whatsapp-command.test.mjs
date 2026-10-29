@@ -199,6 +199,15 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal(calls.at(-1).query.thread_id, v2.thread.thread_id);
   await run("conversations", "--direct-only");
   assert.equal(calls.at(-1).query.include_groups, "false");
+  for (const command of ["list", "conversations"]) {
+    const beforeConflictingFlags = calls.length;
+    await assert.rejects(() => run(command, "--include-groups", "--direct-only"));
+    assert.equal(calls.length, beforeConflictingFlags, "invalid flags must not request the identity");
+  }
+  const plain = await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "whatsapp", "conversation", f.conversation.id,
+    "--identity", "agent"], { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 });
+  assert.match(plain.stdout.split("\n")[0], /^id\s+conversationId\s+direction\s+remoteNumber\s+content\s+status\s+deliveryState$/);
   const beforeEmptyQuote = calls.length;
   for (const selector of [["--conversation-id", f.conversation.id], ["--to", "+15555550101"]]) {
     await assert.rejects(() => run("send", ...selector, "--reply-to-message-id", "", "--text", "Do not silently send plain"));
