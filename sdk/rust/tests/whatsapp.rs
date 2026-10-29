@@ -385,12 +385,14 @@ fn whatsapp_correspondence_omitted_and_null_options_deserialize_without_source_c
 }
 
 #[test]
-fn reaction_notification_preserves_unknown_actor_without_a_fake_message() {
+fn reaction_notification_preserves_unknown_actor_and_original_target_message() {
     let f: Value =
         serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
     let event: WhatsAppWebhookPayload =
         serde_json::from_value(f["reaction_webhook"].clone()).unwrap();
-    assert!(event.data.message.is_none());
+    let target = event.data.message.as_ref().unwrap();
+    assert_eq!(target.id.to_string(), f["message"]["id"].as_str().unwrap());
+    assert_eq!(target.direction, inkbox::WhatsAppDirection::Outbound);
     let reaction = event.data.reaction.unwrap();
     assert!(reaction.remote_number.is_none());
     assert_eq!(
