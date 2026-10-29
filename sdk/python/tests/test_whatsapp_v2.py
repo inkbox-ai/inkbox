@@ -13,10 +13,10 @@ from inkbox.whatsapp import (
 )
 
 F = json.loads(
-    (Path(__file__).parents[3] / "tests/fixtures/whatsapp-v2.json").read_text()
+    (Path(__file__).parents[3] / "tests/fixtures/whatsapp-v2.json").read_text(encoding="utf-8")
 )
 OLD = json.loads(
-    (Path(__file__).parents[3] / "tests/fixtures/whatsapp.json").read_text()
+    (Path(__file__).parents[3] / "tests/fixtures/whatsapp.json").read_text(encoding="utf-8")
 )
 
 
