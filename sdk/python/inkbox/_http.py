@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.metadata
 from copy import copy
+from functools import lru_cache
 from typing import Any
 
 import httpx
@@ -32,6 +33,7 @@ _DEFAULT_TIMEOUT = 30.0
 CONNECT_RETRIES = 2
 
 
+@lru_cache(maxsize=1)
 def _sdk_version() -> str:
     try:
         return importlib.metadata.version("inkbox")

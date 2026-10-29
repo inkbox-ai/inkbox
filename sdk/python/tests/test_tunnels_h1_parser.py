@@ -58,7 +58,14 @@ async def _drive_parser(
 
     pump = asyncio.create_task(parser.pump_outbound(_send))
     await parser.feed(request_bytes)
-    # Wait for the pump to drain (pump returns when sentinel is pushed).
+    # A kept-open connection never pushes the sentinel; wait for the
+    # dispatch to finish, then close so the pump drains and returns.
+    serve = parser._serve_task
+    await asyncio.wait(
+        {pump} if serve is None else {pump, serve},
+        timeout=timeout, return_when=asyncio.FIRST_COMPLETED,
+    )
+    await parser.aclose()
     try:
         await asyncio.wait_for(pump, timeout=timeout)
     except asyncio.TimeoutError:

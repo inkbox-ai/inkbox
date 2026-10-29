@@ -31,6 +31,14 @@ from inkbox.vault.types import (
 VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
 
+@pytest.fixture(autouse=True)
+def _cheap_kdf(monkeypatch):
+    """Resource tests derive and verify within the same process, so a
+    minimal Argon2 cost keeps them fast; test_vault_crypto runs the real cost."""
+    monkeypatch.setattr("inkbox.vault.crypto.ARGON2_TIME_COST", 1)
+    monkeypatch.setattr("inkbox.vault.crypto.ARGON2_MEMORY_COST", 8)
+
+
 def _resource():
     http = MagicMock()
     api_http = MagicMock()

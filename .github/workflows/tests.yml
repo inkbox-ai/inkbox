@@ -31,8 +31,12 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Python Tests
+            coverage: true
+          # Windows keeps the full suite for platform signal; lint and the
+          # coverage gate are OS-independent, so they only run on Linux.
           - os: windows-latest
             name: Python Tests (Windows)
+            coverage: false
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -56,12 +60,17 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint
+        if: matrix.coverage
         run: ruff check .
 
-      # See the rationale above the typescript-tests step. 80% is the
-      # realistic sustainable bar across both SDKs at this stage.
+      # 80% is the realistic sustainable bar across both SDKs at this stage.
       - name: Run Python tests
+        if: matrix.coverage
         run: pytest --cov --cov-report=term-missing --cov-fail-under=80
+
+      - name: Run Python tests (no coverage)
+        if: ${{ !matrix.coverage }}
+        run: pytest
 
   typescript-tests:
     name: TypeScript Tests
@@ -77,14 +86,14 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Build and check public type contracts
+      # `npm run build` is `tsc` over the same project, so it is the type check.
+      - name: Type check, build, and check public type contracts
         run: npm run build && npx tsc --noEmit -p tsconfig.contract-tests.json
 
       - name: Run TypeScript tests
@@ -110,22 +119,20 @@ jobs:
         with:
           workspaces: sdk/rust
 
-      - name: Build (default + tunnels-runtime)
-        run: |
-          cargo build
-          cargo build --features tunnels-runtime
+      - name: Format check
+        run: cargo fmt --check
 
-      - name: Run tests (default features)
-        run: cargo test
+      # Features are additive and no test is gated on the feature being off,
+      # so one test run with tunnels-runtime covers the default-feature tests;
+      # clippy on the default set keeps its build checked.
+      - name: Clippy (default features)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Clippy (tunnels-runtime)
+        run: cargo clippy --all-targets --features tunnels-runtime -- -D warnings
 
       - name: Run tests (tunnels-runtime)
         run: cargo test --features tunnels-runtime
-
-      - name: Clippy
-        run: cargo clippy --all-targets --features tunnels-runtime -- -D warnings
-
-      - name: Format check
-        run: cargo fmt --check
 
   cli-tests:
     name: CLI Tests
@@ -140,6 +147,10 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            sdk/typescript/package-lock.json
+            cli/package-lock.json
 
       - name: Build TypeScript SDK
         working-directory: sdk/typescript

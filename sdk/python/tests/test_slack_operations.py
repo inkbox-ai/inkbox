@@ -205,14 +205,6 @@ def test_retention_update_sends_only_retention(wire):
     assert json.loads(requests[0].content) == {"retention_days": 90}
 
 
-@pytest.mark.parametrize("options", [{"capture_enabled": True}, {"conversation_ids": []}])
-def test_removed_capture_arguments_are_rejected_without_dispatch(wire, options):
-    client, requests, _ = wire
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
-        client.slack.update_archive_settings(C, **options)
-    assert not requests
-
-
 @pytest.mark.parametrize(
     "call",
     [

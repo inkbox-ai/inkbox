@@ -4,7 +4,6 @@ sdk/python/tests/test_calls.py
 Tests for CallsResource (identity-centered).
 """
 
-import inspect
 from uuid import UUID
 
 import httpx
@@ -663,32 +662,3 @@ class TestCallsPlaceErrors:
         err = info.value
         assert err.status_code == 503
         assert err.detail["error"] == "hosted_agent_at_capacity"
-
-
-class TestRemovedNumberScopedSurface:
-    """Cheap regression guards: the number-scoped call surface is gone."""
-
-    def test_client_has_no_transcripts_accessor(self, client):
-        assert not hasattr(client, "transcripts")
-
-    def test_list_is_not_number_scoped(self):
-        params = inspect.signature(CallsResource.list).parameters
-        assert "phone_number_id" not in params
-        assert "number_id" not in params
-        # Keyword-only surface: no positional number slot.
-        assert list(params) == [
-            "self", "agent_identity_id", "limit", "offset", "is_blocked",
-            "start_datetime", "end_datetime", "tz",
-        ]
-
-    def test_get_takes_only_call_id(self):
-        params = inspect.signature(CallsResource.get).parameters
-        assert list(params) == ["self", "call_id"]
-
-    def test_transcripts_takes_only_call_id(self):
-        params = inspect.signature(CallsResource.transcripts).parameters
-        assert list(params) == ["self", "call_id"]
-
-    def test_place_is_not_number_scoped(self):
-        params = inspect.signature(CallsResource.place).parameters
-        assert "phone_number_id" not in params

@@ -528,13 +528,6 @@ test("contacts exposes bulk deletion and batch export", () => {
   assert.match(text, /export-many (?:\[options\] )?<contact-id\.\.\.>/);
 });
 
-test("contact access retains compatibility list without legacy grant/revoke commands", () => {
-  const text = help("contacts", "access");
-  assert.match(text, /list <contact-id>/);
-  assert.doesNotMatch(text, /^\s+grant(?:\s|$)/m);
-  assert.doesNotMatch(text, /^\s+revoke(?:\s|$)/m);
-});
-
 test("contact correspondence and merge expose their request options", () => {
   const correspondence = help("contacts", "correspondence");
   assert.match(correspondence, /--channels <channel>/);

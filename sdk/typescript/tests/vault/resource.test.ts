@@ -13,6 +13,17 @@ import {
 } from "../../src/vault/crypto.js";
 import type { RawVaultInfo, RawVaultKey, RawVaultSecret } from "../../src/vault/types.js";
 
+// Resource tests derive and verify in-process, so a minimal Argon2 cost keeps
+// them fast; crypto.test.ts runs the real cost.
+vi.mock("hash-wasm", async (importOriginal) => {
+  const real = await importOriginal<typeof import("hash-wasm")>();
+  return {
+    ...real,
+    argon2id: (options: Parameters<typeof real.argon2id>[0]) =>
+      real.argon2id({ ...options, iterations: 1, memorySize: 8 }),
+  };
+});
+
 const VALID_VAULT_KEY = "Test-Passw0rd!xy";
 
 function mockHttp() {

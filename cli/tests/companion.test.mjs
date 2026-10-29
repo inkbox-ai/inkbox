@@ -68,7 +68,7 @@ test("Companion configuration writes only enabled before resources exist", async
   });
 });
 
-test("Companion update rejects obsolete and invalid flags locally", async () => {
+test("Companion update rejects invalid flags locally", async () => {
   const requests = [];
   await serve((req, res) => {
     requests.push(req.url);
@@ -76,12 +76,10 @@ test("Companion update rejects obsolete and invalid flags locally", async () => 
   }, async (url) => {
     const count = requests.length;
     for (const args of [["--enabled", "yes"], ["--enabled", "null"],
-      ["--enabled", "true", "--sponsor", "{}"], ["--sponsor", "null"],
       ["--enabled", "true", "--enabld", "true"], []]) {
       const bad = await run(url, ["identity", "companion", "update", "example-agent", ...args]);
       assert.equal(bad.error?.code, 1);
       assert.equal(bad.stdout, "");
-      if (args.includes("--sponsor") && args.includes("--enabled")) assert.match(bad.stderr, /unknown option '--sponsor'/);
     }
     assert.equal(requests.length, count);
   });

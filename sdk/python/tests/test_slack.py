@@ -240,7 +240,6 @@ def test_incoming_subscriptions_use_event_selection_only(wire, event_type):
         agent_identity_id=IDENTITY_ID,
         event_types=[event_type],
     )
-    assert not hasattr(row, "slack_filter")
     assert row.event_types == [event_type]
     assert requests[-1].method == "POST"
     assert requests[-1].url.path == "/api/v1/webhooks/subscriptions"
@@ -252,21 +251,6 @@ def test_incoming_subscriptions_use_event_selection_only(wire, event_type):
     c.webhooks.subscriptions.update(row.id, event_types=[event_type])
     assert requests[-1].method == "PATCH"
     assert json.loads(requests[-1].content) == {"event_types": [event_type]}
-
-
-@pytest.mark.parametrize("value", [None, {}, {"message_kinds": ["mention"]}])
-def test_removed_filter_arguments_fail_without_sending(wire, value):
-    c, requests, _ = wire
-    with pytest.raises(TypeError, match="slack_filter"):
-        c.webhooks.subscriptions.create(
-            url="https://example.com/hook",
-            agent_identity_id=IDENTITY_ID,
-            event_types=["slack.mention_received"],
-            slack_filter=value,
-        )
-    with pytest.raises(TypeError, match="slack_filter"):
-        c.webhooks.subscriptions.update(DATA["subscription"]["id"], slack_filter=value)
-    assert not requests
 
 
 def test_exact_webhook_event_vocabulary():

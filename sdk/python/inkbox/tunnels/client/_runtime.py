@@ -413,14 +413,6 @@ class TunnelRuntime:
         return self._ensure_active().bridge_stream_ids
 
     @property
-    def _window_events(self) -> dict[int, asyncio.Event]:
-        return self._ensure_active().window_events
-
-    @property
-    def _conn_window_event(self) -> asyncio.Event:
-        return self._ensure_active().conn_window_event
-
-    @property
     def _owner_token(self) -> str | None:
         return self._active.owner_token if self._active is not None else None
 
@@ -1136,9 +1128,6 @@ class TunnelRuntime:
         })
         conn.h2.initiate_connection()
         await self._flush_conn(conn)
-
-    async def _flush(self) -> None:
-        await self._flush_conn(self._active)
 
     async def _flush_conn(self, conn: _Connection | None) -> None:
         if conn is None or conn.h2 is None or conn.writer is None:
