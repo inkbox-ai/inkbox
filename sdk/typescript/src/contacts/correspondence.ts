@@ -303,7 +303,7 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
         media: r.media,
       };
     case "whatsapp":
-      return { ...base, channel:r.channel, conversationId:r.conversation_id,localNumber:r.local_number,remoteNumber:r.remote_number,participants:r.participants,isGroup:r.is_group,text:r.text,media:r.media };
+      return { ...base, channel:r.channel, conversationId:r.conversation_id,localNumber:r.local_number,remoteNumber:r.remote_number ?? null,participants:r.participants,isGroup:r.is_group,text:r.text ?? null,media:r.media ?? null };
     case "imessage":
       return {
         ...base,
