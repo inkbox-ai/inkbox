@@ -312,7 +312,7 @@ class WhatsAppLimits:
 
 
 class WhatsAppResource:
-    """One-to-one WhatsApp on an approved dedicated number.
+    """Direct and group WhatsApp on an approved dedicated number.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
     and owned media IDs after an uncertain outcome; never re-upload to retry it.

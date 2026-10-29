@@ -15,3 +15,7 @@ webhook.data.message!.is_blocked;
 declare const history: WhatsAppCorrespondenceItem;
 const channel: "whatsapp" = history.channel;
 void [message,attachment,status,direct,event,url,channel];
+const reactionTarget: string | undefined = webhook.data.reaction?.target_message_id;
+const reactionActor: string | null | undefined = webhook.data.reaction?.remote_number;
+const reactionEvent: WhatsAppWebhookPayload = { id: "evt-reaction", event_type: "whatsapp.reaction_received", timestamp: "2026-10-01T12:00:00Z", data: { reaction: null, contacts: [], agent_identities: [] } };
+void [reactionTarget, reactionActor, reactionEvent];

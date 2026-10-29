@@ -469,3 +469,34 @@ def test_slack_correspondence_metadata_and_public_export(optional):
     assert isinstance(item, ExportedItem)
     assert item.text is item.thread_ts is item.media is item.sender_access is None
     assert not item.text_truncated
+
+
+def test_whatsapp_limit_preserves_the_complete_legacy_positional_constructor():
+    options = ContactCorrespondenceOptions(
+        ["calls"],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        1,
+        "cursor-original",
+        "asc",
+        "metadata",
+        "none",
+        True,
+        CONTACT_ID,
+        whatsapp_limit=3,
+    )
+    assert options._to_params() == {
+        "channels": "calls",
+        "calls_limit": 1,
+        "cursor": "cursor-original",
+        "order": "asc",
+        "content": "metadata",
+        "transcripts": "none",
+        "include_failed": True,
+        "identity_id": CONTACT_ID,
+        "whatsapp_limit": 3,
+    }

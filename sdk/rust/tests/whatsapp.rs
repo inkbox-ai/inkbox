@@ -359,3 +359,72 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
     react.assert();
     remove.assert();
 }
+
+#[test]
+fn whatsapp_correspondence_omitted_and_null_options_deserialize_without_source_changes() {
+    let mut wire = json!({"channel":"whatsapp", "source_id":"30000000-0000-4000-8000-000000000003",
+        "direction":"inbound", "occurred_at":"2026-10-01T12:00:00Z", "identity_id":"10000000-0000-4000-8000-000000000001",
+        "conversation_id":"20000000-0000-4000-8000-000000000002", "local_number":"+15555550100", "participants":["+15555550101"], "is_group":false});
+    for explicit_null in [false, true] {
+        if explicit_null {
+            for name in ["remote_number", "text", "media"] {
+                wire[name] = Value::Null;
+            }
+        }
+        let item: inkbox::contacts::CorrespondenceItem =
+            serde_json::from_value(wire.clone()).unwrap();
+        match item {
+            inkbox::contacts::CorrespondenceItem::WhatsApp(item) => {
+                assert!(item.remote_number.is_none());
+                assert!(item.text.is_none());
+                assert!(item.media.is_none());
+            }
+            _ => panic!("wrong correspondence channel"),
+        }
+    }
+}
+
+#[test]
+fn reaction_notification_preserves_unknown_actor_without_a_fake_message() {
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let event: WhatsAppWebhookPayload =
+        serde_json::from_value(f["reaction_webhook"].clone()).unwrap();
+    assert!(event.data.message.is_none());
+    let reaction = event.data.reaction.unwrap();
+    assert!(reaction.remote_number.is_none());
+    assert_eq!(
+        reaction.target_message_id.to_string(),
+        f["message"]["id"].as_str().unwrap()
+    );
+}
+
+#[test]
+fn documented_identity_bound_rust_send_selects_the_agent_for_organization_keys() {
+    let f = fixture();
+    let server = MockServer::start();
+    let owner = f["identity_id"].as_str().unwrap();
+    let identity_get = server.mock(|when,then| { when.method(GET).path("/api/v1/identities/my-agent");
+        then.status(200).json_body(json!({"id":owner,"organization_id":"org_example","agent_handle":"my-agent","created_at":"2026-10-01T12:00:00Z","updated_at":"2026-10-01T12:00:00Z"})); });
+    let send = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/messages")
+            .query_param("agent_identity_id", owner);
+        then.status(201).json_body(json!({"message":f["message"]}));
+    });
+    let client = Inkbox::builder("organization-test-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let identity = client.get_identity("my-agent").unwrap();
+    identity
+        .send_whatsapp(&WhatsAppSendOptions {
+            to: Some(WhatsAppRecipients::One("+15555550101".into())),
+            text: Some("Hello".into()),
+            idempotency_key: Some("order-confirmation-123".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    identity_get.assert();
+    send.assert();
+}

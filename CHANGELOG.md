@@ -27,6 +27,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   daily-only usage without a billing-cycle timestamp, monthly allowance, or
   enabled-agent cap.
 
+### Changed
+
 - Rust exhaustive matches on correspondence channels/items or context text channels
   must handle the new WhatsApp variant. Complete `CorrespondenceQuery` struct literals
   need `whatsapp_limit: None` (or `..Default::default()`); legacy identity struct
