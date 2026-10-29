@@ -4,13 +4,20 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## Unreleased - Dedicated WhatsApp
+## 0.7.24 - WhatsApp conversations (unreleased)
 
 ### Added
 
-- Python, TypeScript, Rust, and CLI support for approved dedicated one-to-one
+- Python, TypeScript, Rust, and CLI support for approved dedicated direct and group
   WhatsApp: send and read messages, list conversations, upload owned attachments,
   renew temporary media access, and mark only local history read.
+- Native quoted replies and chronological cursor-based thread reads. Whole-message
+  named/custom reactions have explicit logical-write keys and versioned receipts;
+  stale removal cannot remove a newer reaction. Queued and uncertain receipts remain
+  distinct from applied message reactions.
+- Group creation accepts 2–8 distinct E.164 recipients with an optional creation-only
+  name. Existing groups retain conversation IDs, observed membership, and uncertain
+  creation status. Message and conversation lists include groups by default.
 - Typed WhatsApp notification payloads, fresh identity channel-status reads, and
   explicit opt-in WhatsApp contact correspondence. Existing correspondence defaults
   and Rust identity struct literals remain compatible.
@@ -33,8 +40,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Availability
 
 - WhatsApp requires approval and an existing dedicated iMessage number. It is not
-  a shared channel. This release does not add group sends, reactions, voice calls,
-  remote read receipts, or self-service number provisioning.
+  a shared channel. Voice calls, remote read receipts, typing, and self-service
+  number provisioning are not supported.
 
 ## 0.7.24 - Voice AI external connections and OAuth (unreleased)
 

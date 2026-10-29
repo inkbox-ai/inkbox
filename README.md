@@ -770,13 +770,15 @@ inkbox whatsapp list --identity my-agent --conversation-id <conversation-id>
 ```
 
 Use either one E.164 recipient (`to`) or an existing `conversation_id` /
-`conversationId`, never both. A one-element recipient array is also accepted;
-groups and fan-out are not supported. Outbound text is at most 4,000 Unicode code
+`conversationId`, never both. A one-element recipient array is also accepted.
+Use 2–8 unique E.164 recipients to select or create a group, not direct-message
+fan-out. Existing groups can have more participants and are addressed by conversation ID.
+An optional `group_name` / `groupName` only names a newly created group; it never renames an existing group. Outbound text is at most 4,000 Unicode code
 points. Each message can contain text, one owned attachment, or both.
 
 ### Attachments and recovery
 
-Upload one file (maximum 20 MiB) with `upload_whatsapp_media` /
+Upload one file (default policy 5 MiB, hard ceiling 20 MiB) with `upload_whatsapp_media` /
 `uploadWhatsAppMedia` / `upload_media`, then send its returned ID in `media_ids` /
 `mediaIds`. CLI: `whatsapp upload-media <file>`, then `whatsapp send --media-id <id>`.
 Uploads and sends are separate operations: persist the media ID and logical send
@@ -801,7 +803,7 @@ never sends a remote read receipt.
 
 Identity webhook subscriptions accept `whatsapp.received`, `whatsapp.sent`,
 `whatsapp.delivered`, `whatsapp.delivery_failed`, and
-`whatsapp.delivery_unconfirmed`, including subscriptions created before approval.
+`whatsapp.delivery_unconfirmed`, plus `whatsapp.reaction_received`, including subscriptions created before approval.
 Only `whatsapp.received` represents a new incoming message. Deduplicate retries by
 event ID; status notifications should update delivery state without starting an
 agent reply. Payloads keep snake_case fields and ISO timestamps. Received events
@@ -812,8 +814,69 @@ Contact correspondence is explicitly opt-in: select `channels=["whatsapp"]` and
 optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp
 --whatsapp-limit 10` in the CLI). Default correspondence selectors are unchanged.
 Conversation participants contain remote numbers only, and `sender_number` /
-`senderNumber` is the actual message author. Groups, quoted replies, reactions,
-typing indicators, remote read receipts, and WhatsApp calls are not supported.
+`senderNumber` is the actual message author. Typing indicators, remote read
+receipts, and WhatsApp calls are not supported.
+
+### Groups, native quotes, and reactions
+
+Groups use the same approved dedicated number and all-participant phone contact
+rules. Conversation metadata exposes `group_creation_status` / `groupCreationStatus`
+and `unresolved_participant_count` / `unresolvedParticipantCount`. Send only when a
+group is ready and its participants are resolved. An uncertain group creation
+must keep its original send key and conversation ID, never a replacement request.
+Message and conversation lists include groups by default; use `include_groups=False`
+(Python), `includeGroups: false` (TypeScript), or CLI `--direct-only` to exclude them.
+
+Quote an existing authorized message with `reply_to_message_id` /
+`replyToMessageId`, always together with its `conversation_id` / `conversationId`.
+There is no silent unquoted-message fallback. Read chronological quote chains with
+`get_whatsapp_thread` / `getWhatsAppThread` or `get_whatsapp_conversation_thread` /
+`getWhatsAppConversationThread`. Both return conversation, thread, root message,
+messages, and an opaque next cursor. A message-list `thread_id` / `threadId` filter
+also requires the conversation ID.
+
+```python
+reply = identity.send_whatsapp(
+    conversation_id=incoming.conversation_id,
+    reply_to_message_id=incoming.id,
+    text="I will review this milestone.",
+    idempotency_key="milestone-quoted-reply",
+)
+receipt = identity.send_whatsapp_reaction(
+    message_id=incoming.id, reaction="like", idempotency_key="milestone-reaction",
+)
+current = identity.get_whatsapp_reaction(receipt.id)
+removed = identity.remove_whatsapp_reaction(receipt.id, idempotency_key="milestone-reaction-removal")
+```
+
+```typescript
+const reply = await identity.sendWhatsApp({
+  conversationId: incoming.conversationId, replyToMessageId: incoming.id,
+  text: "I will review this milestone.", idempotencyKey: "milestone-quoted-reply",
+});
+const receipt = await identity.sendWhatsAppReaction({
+  messageId: incoming.id, reaction: "like", idempotencyKey: "milestone-reaction",
+});
+const current = await identity.getWhatsAppReaction(receipt.id);
+const removed = await identity.removeWhatsAppReaction(receipt.id, "milestone-reaction-removal");
+```
+
+Named reactions are `love`, `like`, `dislike`, `laugh`, `emphasize`, `question`, and
+`eyes`. Alternatively supply `custom_emoji` / `customEmoji`, exclusively. Reactions
+apply to the whole message; there is no part index. Each mutation requires an
+explicit stable key. POST, GET, and DELETE return a versioned receipt. Receipt states
+are queued, sending, applied, removed, failed, uncertain, or superseded. Message
+reaction arrays contain only live applied reactions. A queued or uncertain reaction
+must not appear applied. Removing an old receipt never removes a newer reaction.
+Reaction notifications carry `data.reaction` and do not represent a new text turn.
+
+CLI: `whatsapp send --to +15555550101,+15555550102 --group-name "Project team"`,
+`whatsapp send --conversation-id <id> --reply-to-message-id <id>`,
+`whatsapp react <message-id> --reaction like --idempotency-key <key>`,
+`whatsapp get-reaction <reaction-id>`, `whatsapp remove-reaction <reaction-id>
+--idempotency-key <key>`, `whatsapp thread <message-id>`, and
+`whatsapp conversation-thread <conversation-id> <thread-id>`. All require `--identity`.
+
 
 Effective WhatsApp policy limits and usage are independent from iMessage. Read them with Python `identity.get_whatsapp_limits()`, TypeScript `identity.getWhatsAppLimits()`, Rust `identity.get_whatsapp_limits()`, or `inkbox whatsapp limits -i agent-handle`. The returned public `whatsapp.*` maps retain future policy keys. The 4,000-character / 20 MiB transport ceilings do not promise that a particular identity's effective limits are that high; the server enforces its current configured policy.
 

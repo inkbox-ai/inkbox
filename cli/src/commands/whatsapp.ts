@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import { Command } from "commander";
-import type { WhatsAppSendOptions } from "@inkbox/sdk";
+import type { WhatsAppSendOptions, WhatsAppReactionType } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -9,6 +9,8 @@ import { withErrorHandler } from "../errors.js";
 export function buildWhatsAppSendOptions(options: {
   to?: string;
   conversationId?: string;
+  replyToMessageId?: string;
+  groupName?: string;
   text?: string;
   mediaId?: string;
   idempotencyKey?: string;
@@ -19,15 +21,19 @@ export function buildWhatsAppSendOptions(options: {
     .filter(Boolean);
   if (!!recipients?.length === !!options.conversationId)
     throw new Error("Pass exactly one of --to or --conversation-id.");
-  if (recipients && recipients.length !== 1)
-    throw new Error("WhatsApp supports exactly one recipient.");
+  if (recipients && (recipients.length < 1 || recipients.length > 8 || new Set(recipients).size !== recipients.length || recipients.some(value => !/^\+[1-9][0-9]{6,14}$/.test(value))))
+    throw new Error("Provide 1–8 unique E.164 recipients.");
+  if (options.replyToMessageId && !options.conversationId) throw new Error("--reply-to-message-id requires --conversation-id.");
+  if (options.groupName !== undefined && (!recipients || recipients.length < 2 || !options.groupName.trim() || Array.from(options.groupName).length > 100)) throw new Error("--group-name requires 2–8 recipients and 1–100 characters.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
   return {
-    ...(recipients?.length ? { to: recipients[0] } : {}),
+    ...(recipients?.length ? { to: recipients.length === 1 ? recipients[0] : recipients } : {}),
     ...(options.conversationId
       ? { conversationId: options.conversationId }
       : {}),
+    ...(options.replyToMessageId ? { replyToMessageId: options.replyToMessageId } : {}),
+    ...(options.groupName !== undefined ? { groupName: options.groupName } : {}),
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
     ...(options.idempotencyKey !== undefined
@@ -39,7 +45,7 @@ export function buildWhatsAppSendOptions(options: {
 export function registerWhatsAppCommands(program: Command): void {
   const whatsapp = program
     .command("whatsapp")
-    .description("Approved dedicated one-to-one WhatsApp messaging");
+    .description("Approved WhatsApp conversations, quoted replies, and reactions");
   const identityCommand = (name: string, description: string) =>
     whatsapp
       .command(name)
@@ -50,7 +56,9 @@ export function registerWhatsAppCommands(program: Command): void {
     "send",
     "Queue a message (acceptance is not delivery confirmation)",
   )
-    .option("--to <number>", "One E.164 recipient")
+    .option("--to <numbers>", "One E.164 recipient, or 2–8 comma-separated group recipients")
+    .option("--group-name <name>", "Creation-only group name; does not rename an existing group")
+    .option("--reply-to-message-id <id>", "Quote a message in --conversation-id")
     .option("--conversation-id <id>", "Existing conversation ID")
     .option("--text <text>", "Message text (at most 4000 characters)")
     .option("--media-id <id>", "Owned attachment ID from upload-media")
@@ -107,6 +115,11 @@ export function registerWhatsAppCommands(program: Command): void {
       "getWhatsAppConversation",
     ],
     [
+      "get-reaction <reaction-id>",
+      "Read the current versioned reaction receipt",
+      "getWhatsAppReaction",
+    ],
+    [
       "get-media <media-id>",
       "Get fresh temporary attachment access",
       "getWhatsAppMedia",
@@ -123,6 +136,8 @@ export function registerWhatsAppCommands(program: Command): void {
 
   identityCommand("list", "List messages, newest first")
     .option("--conversation-id <id>", "Filter by conversation")
+    .option("--thread-id <id>", "Filter a conversation by quote-chain thread")
+    .option("--direct-only", "Exclude group conversations")
     .option("--limit <n>", "Maximum results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--unread", "Only locally unread messages")
@@ -133,6 +148,8 @@ export function registerWhatsAppCommands(program: Command): void {
         output(
           await identity.listWhatsAppMessages({
             conversationId: opts.conversationId,
+            threadId: opts.threadId,
+            ...(opts.directOnly ? { includeGroups: false } : {}),
             limit: Number(opts.limit),
             offset: Number(opts.offset),
             ...(opts.unread ? { isRead: false } : {}),
@@ -153,10 +170,38 @@ export function registerWhatsAppCommands(program: Command): void {
       }),
     );
 
+  identityCommand("react <message-id>", "Submit a reaction; acceptance is not an applied reaction")
+    .option("--reaction <name>", "love, like, dislike, laugh, emphasize, question, or eyes")
+    .option("--custom-emoji <emoji>", "Exact custom emoji; exclusive with --reaction")
+    .requiredOption("--idempotency-key <key>", "Stable key; reuse it after uncertainty")
+    .action(withErrorHandler(async function (this: Command, messageId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.sendWhatsAppReaction({ messageId, reaction: opts.reaction as WhatsAppReactionType | undefined, customEmoji: opts.customEmoji, idempotencyKey: opts.idempotencyKey }), { json: !!global.json });
+    }));
+  identityCommand("remove-reaction <reaction-id>", "Remove this version of your reaction, without affecting a newer one")
+    .requiredOption("--idempotency-key <key>", "Stable removal key; reuse it after uncertainty")
+    .action(withErrorHandler(async function (this: Command, reactionId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.removeWhatsAppReaction(reactionId, opts.idempotencyKey), { json: !!global.json });
+    }));
+  identityCommand("thread <message-id>", "Read chronological visible replies to a quote-chain root")
+    .option("--limit <n>", "Maximum results, 1–200", "50").option("--cursor <cursor>", "Opaque cursor from this thread")
+    .action(withErrorHandler(async function (this: Command, messageId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.getWhatsAppThread(messageId, { limit: Number(opts.limit), cursor: opts.cursor }), { json: !!global.json });
+    }));
+  identityCommand("conversation-thread <conversation-id> <thread-id>", "Read a quote chain by conversation and thread ID")
+    .option("--limit <n>", "Maximum results, 1–200", "50").option("--cursor <cursor>", "Opaque cursor from this thread")
+    .action(withErrorHandler(async function (this: Command, conversationId: string, threadId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.getWhatsAppConversationThread(conversationId, threadId, { limit: Number(opts.limit), cursor: opts.cursor }), { json: !!global.json });
+    }));
+
   identityCommand(
     "conversations",
     "List conversations with local unread counts",
   )
+    .option("--direct-only", "Exclude group conversations")
     .option("--limit <n>", "Maximum results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(
@@ -165,6 +210,7 @@ export function registerWhatsAppCommands(program: Command): void {
         const identity = await createClient(global).getIdentity(opts.identity);
         output(
           await identity.listWhatsAppConversations({
+            ...(opts.directOnly ? { includeGroups: false } : {}),
             limit: Number(opts.limit),
             offset: Number(opts.offset),
           }),

@@ -9,7 +9,7 @@
  * address or phone number ID explicitly.
  */
 
-import type { WhatsAppSendOptions, WhatsAppListOptions, WhatsAppConversationListOptions } from "./whatsapp.js";
+import type { WhatsAppSendOptions, WhatsAppListOptions, WhatsAppConversationListOptions, WhatsAppReactionOptions, WhatsAppThreadOptions } from "./whatsapp.js";
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
 import type { HostedMcpConnection, HostedMcpCreate } from "./phone/hostedMcp.js";
@@ -161,6 +161,11 @@ export class AgentIdentity {
       agentIdentityId: this.id,
     });
   }
+  getWhatsAppThread(id: string, o: Omit<WhatsAppThreadOptions, "agentIdentityId"> = {}) { return this._inkbox.whatsapp.getThread(id, { ...o, agentIdentityId: this.id }); }
+  getWhatsAppConversationThread(conversationId: string, threadId: string, o: Omit<WhatsAppThreadOptions, "agentIdentityId"> = {}) { return this._inkbox.whatsapp.getConversationThread(conversationId, threadId, { ...o, agentIdentityId: this.id }); }
+  sendWhatsAppReaction(o: Omit<WhatsAppReactionOptions, "agentIdentityId">) { return this._inkbox.whatsapp.sendReaction({ ...o, agentIdentityId: this.id }); }
+  getWhatsAppReaction(id: string) { return this._inkbox.whatsapp.getReaction(id, { agentIdentityId: this.id }); }
+  removeWhatsAppReaction(id: string, idempotencyKey: string) { return this._inkbox.whatsapp.removeReaction(id, { idempotencyKey, agentIdentityId: this.id }); }
   getWhatsAppMedia(id: string) {
     return this._inkbox.whatsapp.getMedia(id, { agentIdentityId: this.id });
   }

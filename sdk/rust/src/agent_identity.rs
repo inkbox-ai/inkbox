@@ -2281,6 +2281,47 @@ impl AgentIdentity {
             .whatsapp()
             .get_conversation(id, Some(&self.id()))
     }
+    pub fn get_whatsapp_thread(
+        &self,
+        id: &Uuid,
+        options: &crate::whatsapp::WhatsAppThreadOptions,
+    ) -> Result<crate::whatsapp::WhatsAppThread> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().get_thread(id, &options)
+    }
+    pub fn get_whatsapp_conversation_thread(
+        &self,
+        conversation: &Uuid,
+        thread: &Uuid,
+        options: &crate::whatsapp::WhatsAppThreadOptions,
+    ) -> Result<crate::whatsapp::WhatsAppThread> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox
+            .whatsapp()
+            .get_conversation_thread(conversation, thread, &options)
+    }
+    pub fn send_whatsapp_reaction(
+        &self,
+        options: &crate::whatsapp::WhatsAppReactionOptions,
+    ) -> Result<crate::whatsapp::WhatsAppReaction> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().send_reaction(&options)
+    }
+    pub fn get_whatsapp_reaction(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppReaction> {
+        self.inkbox.whatsapp().get_reaction(id, Some(&self.id()))
+    }
+    pub fn remove_whatsapp_reaction(
+        &self,
+        id: &Uuid,
+        key: &str,
+    ) -> Result<crate::whatsapp::WhatsAppReaction> {
+        self.inkbox
+            .whatsapp()
+            .remove_reaction(id, key, Some(&self.id()))
+    }
     pub fn upload_whatsapp_media(
         &self,
         content: Vec<u8>,

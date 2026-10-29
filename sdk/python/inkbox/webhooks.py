@@ -941,7 +941,7 @@ class SlackWebhookPayload(TypedDict):
     data: SlackWebhookData
 
 
-WhatsAppWebhookEventType = Literal["whatsapp.received", "whatsapp.sent", "whatsapp.delivered", "whatsapp.delivery_failed", "whatsapp.delivery_unconfirmed"]
+WhatsAppWebhookEventType = Literal["whatsapp.received", "whatsapp.sent", "whatsapp.delivered", "whatsapp.delivery_failed", "whatsapp.delivery_unconfirmed", "whatsapp.reaction_received"]
 WhatsAppMessageStatusWire = Literal["received", "queued", "sending", "sent", "delivered", "failed", "uncertain", "cancelled"]
 WhatsAppDeliveryStateWire = Literal["pending", "delivered", "unknown"]
 WhatsAppMediaStatusWire = Literal["pending", "ready", "unavailable"]
@@ -992,10 +992,32 @@ class WhatsAppWebhookMessage(TypedDict):
     delivered_at: str | None
     failed_at: str | None
     status_observed_at: str | None
+    reply_to_message_id: NotRequired[str | None]
+    thread_id: NotRequired[str | None]
+    thread_root_message_id: NotRequired[str | None]
+    reactions: NotRequired[list["WhatsAppWebhookReaction"]]
+
+
+class WhatsAppWebhookReaction(TypedDict):
+    id: str
+    target_message_id: str
+    conversation_id: str
+    agent_identity_id: str
+    direction: Literal["inbound", "outbound"]
+    remote_number: str | None
+    reaction: Literal["love", "like", "dislike", "laugh", "emphasize", "question", "eyes", "custom"]
+    custom_emoji: str | None
+    emoji: str
+    status: Literal["queued", "sending", "applied", "removed", "failed", "uncertain", "superseded"]
+    revision: int
+    created_at: str
+    updated_at: str
+    removed_at: str | None
 
 
 class WhatsAppWebhookData(TypedDict):
-    message: WhatsAppWebhookMessage
+    message: NotRequired[WhatsAppWebhookMessage | None]
+    reaction: NotRequired[WhatsAppWebhookReaction | None]
     contacts: list[WebhookContact]
     agent_identities: list[WebhookAgentIdentity]
     context: NotRequired[WebhookContextWire]

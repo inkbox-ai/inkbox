@@ -889,9 +889,10 @@ export interface SlackWebhookPayload {
 }
 
 
-export type WhatsAppWebhookEventType = "whatsapp.received" | "whatsapp.sent" | "whatsapp.delivered" | "whatsapp.delivery_failed" | "whatsapp.delivery_unconfirmed";
+export type WhatsAppWebhookEventType = "whatsapp.received" | "whatsapp.sent" | "whatsapp.delivered" | "whatsapp.delivery_failed" | "whatsapp.delivery_unconfirmed" | "whatsapp.reaction_received";
 export type WhatsAppWebhookMessage = Omit<import("../whatsapp.js").RawWhatsAppMessage,"is_blocked"|"status_refresh_pending">;
 export type WhatsAppWebhookRecipient = import("../whatsapp.js").RawWhatsAppRecipient;
 export type WhatsAppWebhookMedia = import("../whatsapp.js").RawWhatsAppMedia;
-export interface WhatsAppWebhookData { message: WhatsAppWebhookMessage; contacts: WebhookContact[]; agent_identities: WebhookAgentIdentity[]; context?: WebhookContext; }
+export type WhatsAppWebhookReaction = import("../whatsapp.js").RawWhatsAppReaction;
+export interface WhatsAppWebhookData { message?: WhatsAppWebhookMessage | null; reaction?: WhatsAppWebhookReaction | null; contacts: WebhookContact[]; agent_identities: WebhookAgentIdentity[]; context?: WebhookContext; }
 export interface WhatsAppWebhookPayload { id:string;event_type:WhatsAppWebhookEventType;timestamp:string;data:WhatsAppWebhookData; }

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+import re
+import unicodedata
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
@@ -34,6 +36,35 @@ class WhatsAppDeliveryState(StrEnum):
     PENDING = "pending"
     DELIVERED = "delivered"
     UNKNOWN = "unknown"
+
+
+class WhatsAppReactionType(StrEnum):
+    LOVE = "love"
+    LIKE = "like"
+    DISLIKE = "dislike"
+    LAUGH = "laugh"
+    EMPHASIZE = "emphasize"
+    QUESTION = "question"
+    EYES = "eyes"
+    CUSTOM = "custom"
+
+
+class WhatsAppReactionStatus(StrEnum):
+    QUEUED = "queued"
+    SENDING = "sending"
+    APPLIED = "applied"
+    REMOVED = "removed"
+    FAILED = "failed"
+    UNCERTAIN = "uncertain"
+    SUPERSEDED = "superseded"
+
+
+class WhatsAppGroupCreationStatus(StrEnum):
+    PENDING = "pending"
+    CREATING = "creating"
+    READY = "ready"
+    UNCERTAIN = "uncertain"
+    FAILED = "failed"
 
 
 class WhatsAppMediaStatus(StrEnum):
@@ -93,6 +124,36 @@ class WhatsAppRecipient:
 
 
 @dataclass
+class WhatsAppReaction:
+    """A versioned reaction receipt; queued and uncertain are not applied reactions."""
+
+    id: UUID
+    target_message_id: UUID
+    conversation_id: UUID
+    agent_identity_id: UUID
+    direction: WhatsAppDirection
+    remote_number: str | None
+    reaction: WhatsAppReactionType
+    custom_emoji: str | None
+    emoji: str
+    status: WhatsAppReactionStatus
+    revision: int
+    created_at: datetime
+    updated_at: datetime
+    removed_at: datetime | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppReaction:
+        return cls(id=UUID(d["id"]), target_message_id=UUID(d["target_message_id"]),
+            conversation_id=UUID(d["conversation_id"]), agent_identity_id=UUID(d["agent_identity_id"]),
+            direction=WhatsAppDirection(d["direction"]), remote_number=d.get("remote_number"),
+            reaction=WhatsAppReactionType(d["reaction"]), custom_emoji=d.get("custom_emoji"), emoji=d["emoji"],
+            status=WhatsAppReactionStatus(d["status"]), revision=d["revision"],
+            created_at=datetime.fromisoformat(d["created_at"]), updated_at=datetime.fromisoformat(d["updated_at"]),
+            removed_at=_dt(d.get("removed_at")))
+
+
+@dataclass
 class WhatsAppMessage:
     id: UUID
     agent_identity_id: UUID
@@ -120,6 +181,10 @@ class WhatsAppMessage:
     failed_at: datetime | None
     status_observed_at: datetime | None
     status_refresh_pending: bool
+    reply_to_message_id: UUID | None = None
+    thread_id: UUID | None = None
+    thread_root_message_id: UUID | None = None
+    reactions: list[WhatsAppReaction] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMessage:
@@ -152,6 +217,10 @@ class WhatsAppMessage:
             failed_at=_dt(d.get("failed_at")),
             status_observed_at=_dt(d.get("status_observed_at")),
             status_refresh_pending=d.get("status_refresh_pending", False),
+            reply_to_message_id=UUID(d["reply_to_message_id"]) if d.get("reply_to_message_id") else None,
+            thread_id=UUID(d["thread_id"]) if d.get("thread_id") else None,
+            thread_root_message_id=UUID(d["thread_root_message_id"]) if d.get("thread_root_message_id") else None,
+            reactions=[WhatsAppReaction._from_dict(row) for row in d.get("reactions", [])],
         )
 
 
@@ -165,6 +234,9 @@ class WhatsAppConversation:
     is_group: bool
     created_at: datetime
     updated_at: datetime
+    group_name: str | None = field(default=None, kw_only=True)
+    group_creation_status: WhatsAppGroupCreationStatus | None = field(default=None, kw_only=True)
+    unresolved_participant_count: int = field(default=0, kw_only=True)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConversation:
@@ -177,6 +249,9 @@ class WhatsAppConversation:
             d["is_group"],
             datetime.fromisoformat(d["created_at"]),
             datetime.fromisoformat(d["updated_at"]),
+            group_name=d.get("group_name"),
+            group_creation_status=WhatsAppGroupCreationStatus(d["group_creation_status"]) if d.get("group_creation_status") else None,
+            unresolved_participant_count=d.get("unresolved_participant_count", 0),
         )
 
 
@@ -251,20 +326,32 @@ class WhatsAppResource:
         *,
         to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
+        reply_to_message_id: UUID | str | None = None,
+        group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
     ) -> WhatsAppMessage:
-        """Queue a message by one E.164 recipient or an existing conversation.
+        """Queue a direct/group message or native quoted reply, without assuming delivery.
 
-        Text is optional with one owned media ID. Groups are not supported.
-        Approval is checked by the API, not a cached identity capability.
+        Use a conversation ID for existing groups of any supported size. A group
+        name is only a creation hint; selecting a group never renames it. Preserve
+        the logical key after uncertainty rather than starting another operation.
         """
         if (to is None) == (conversation_id is None):
             raise ValueError("Specify exactly one of to or conversation_id")
-        if isinstance(to, list) and len(to) != 1:
-            raise ValueError("WhatsApp supports exactly one recipient")
+        recipients = [to] if isinstance(to, str) else to
+        if to is not None and (not isinstance(recipients, list) or not 1 <= len(recipients) <= 8
+                or any(not isinstance(value, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", value) for value in recipients)
+                or len(set(recipients)) != len(recipients)):
+            raise ValueError("Provide 1–8 unique E.164 recipients")
+        if reply_to_message_id is not None:
+            if conversation_id is None:
+                raise ValueError("reply_to_message_id requires conversation_id")
+            UUID(str(reply_to_message_id))
+        if group_name is not None and (not isinstance(to, list) or len(to) < 2 or not group_name.strip() or len(group_name) > 100):
+            raise ValueError("group_name requires a recipient-list group and 1–100 characters")
         if media_ids is not None and len(media_ids) > 1:
             raise ValueError("WhatsApp supports at most one attachment")
         if not (text and text.strip()) and not media_ids:
@@ -276,6 +363,10 @@ class WhatsAppResource:
             body["to"] = to
         if conversation_id is not None:
             body["conversation_id"] = str(conversation_id)
+        if reply_to_message_id is not None:
+            body["reply_to_message_id"] = str(reply_to_message_id)
+        if group_name is not None:
+            body["group_name"] = group_name
         if text is not None:
             body["text"] = text
         if media_ids is not None:
@@ -302,6 +393,8 @@ class WhatsAppResource:
         *,
         agent_identity_id: UUID | str | None = None,
         conversation_id: UUID | str | None = None,
+        thread_id: UUID | str | None = None,
+        include_groups: bool | None = None,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
@@ -314,6 +407,12 @@ class WhatsAppResource:
         }
         if conversation_id is not None:
             params["conversation_id"] = str(conversation_id)
+        if thread_id is not None:
+            if conversation_id is None:
+                raise ValueError("thread_id requires conversation_id")
+            params["thread_id"] = str(thread_id)
+        if include_groups is not None:
+            params["include_groups"] = include_groups
         if is_read is not None:
             params["is_read"] = is_read
         if is_blocked is not None:
@@ -327,6 +426,7 @@ class WhatsAppResource:
         self,
         *,
         agent_identity_id: UUID | str | None = None,
+        include_groups: bool | None = None,
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
@@ -336,6 +436,8 @@ class WhatsAppResource:
             "limit": limit,
             "offset": offset,
         }
+        if include_groups is not None:
+            params["include_groups"] = include_groups
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
         return [
@@ -354,6 +456,53 @@ class WhatsAppResource:
                 f"/conversations/{conversation_id}", params=_owner(agent_identity_id)
             )
         )
+
+    def get_thread(self, message_id: UUID | str, *, limit: int = 50, cursor: str | None = None,
+                   agent_identity_id: UUID | str | None = None) -> WhatsAppThread:
+        """Read a chronological page of visible messages sharing a quote-chain root."""
+        return self._thread_page(f"/messages/{message_id}/thread", limit, cursor, agent_identity_id)
+
+    def get_conversation_thread(self, conversation_id: UUID | str, thread_id: UUID | str, *,
+                                limit: int = 50, cursor: str | None = None,
+                                agent_identity_id: UUID | str | None = None) -> WhatsAppThread:
+        """Read the same bounded thread through its conversation and stable thread ID."""
+        return self._thread_page(f"/conversations/{conversation_id}/threads/{thread_id}", limit, cursor, agent_identity_id)
+
+    def _thread_page(self, path: str, limit: int, cursor: str | None, identity: UUID | str | None) -> WhatsAppThread:
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError("Thread limit must be 1–200")
+        params = {**_owner(identity), "limit": limit}
+        if cursor is not None:
+            params["cursor"] = cursor
+        return WhatsAppThread._from_dict(self._http.get(path, params=params))
+
+    def send_reaction(self, *, message_id: UUID | str, reaction: WhatsAppReactionType | str | None = None,
+                      custom_emoji: str | None = None, idempotency_key: str,
+                      agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
+        """Submit one versioned reaction, retaining its key after an uncertain response."""
+        UUID(str(message_id))
+        if (reaction is None) == (custom_emoji is None):
+            raise ValueError("Provide exactly one of reaction or custom_emoji")
+        if reaction is not None and (str(reaction) not in {item.value for item in WhatsAppReactionType} or str(reaction) == "custom"):
+            raise ValueError("Unsupported named WhatsApp reaction")
+        if custom_emoji is not None and (not isinstance(custom_emoji, str) or not 1 <= len(custom_emoji) <= 32
+                or any(char.isspace() or unicodedata.category(char) in {"Cc", "Cs"} for char in custom_emoji)):
+            raise ValueError("custom_emoji must contain 1–32 non-whitespace characters")
+        body = {"message_id": str(message_id), **({"reaction": str(reaction)} if reaction is not None else {"custom_emoji": custom_emoji})}
+        result = self._http.post("/reactions", json=body, params=_owner(agent_identity_id), headers=_reaction_headers(idempotency_key))
+        return WhatsAppReaction._from_dict(result["reaction"])
+
+    def get_reaction(self, reaction_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
+        """Read queued, applied or uncertain state without repeating the operation."""
+        result = self._http.get(f"/reactions/{reaction_id}", params=_owner(agent_identity_id))
+        return WhatsAppReaction._from_dict(result["reaction"])
+
+    def remove_reaction(self, reaction_id: UUID | str, *, idempotency_key: str,
+                        agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
+        """Return the removal receipt; a stale receipt never removes a newer reaction."""
+        result = self._http.delete_with_response(f"/reactions/{reaction_id}", params=_owner(agent_identity_id),
+            headers=_reaction_headers(idempotency_key))
+        return WhatsAppReaction._from_dict(result["reaction"])
 
     def upload_media(
         self,
@@ -407,3 +556,24 @@ class WhatsAppResource:
     def get_limits(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppLimits:
         """Read effective server limits and independent usage; transport maxima are not entitlements."""
         return WhatsAppLimits._from_dict(self._http.get("/limits", params=_owner(agent_identity_id)))
+
+
+@dataclass
+class WhatsAppThread:
+    conversation_id: UUID
+    thread_id: UUID | None
+    thread_root_message_id: UUID | None
+    messages: list[WhatsAppMessage]
+    next_cursor: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppThread:
+        return cls(UUID(d["conversation_id"]), UUID(d["thread_id"]) if d.get("thread_id") else None,
+            UUID(d["thread_root_message_id"]) if d.get("thread_root_message_id") else None,
+            [WhatsAppMessage._from_dict(row) for row in d["messages"]], d["next_cursor"])
+
+
+def _reaction_headers(key: str) -> dict[str, str]:
+    if not isinstance(key, str) or not key.strip() or len(key) > 255:
+        raise ValueError("A stable idempotency_key is required")
+    return {"Idempotency-Key": key}

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 from inkbox.phone.hosted_mcp import HostedMcpConnection, HostedMcpCreate
 
-from inkbox.whatsapp import (WhatsAppLimits, WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus)
+from inkbox.whatsapp import (WhatsAppLimits, WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus, WhatsAppReaction, WhatsAppThread)
 from inkbox.credentials import Credentials
 from inkbox.a2a.client import A2AClient
 from inkbox.a2a.resource import skills_wire
@@ -145,6 +145,8 @@ class AgentIdentity:
         *,
         to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
+        reply_to_message_id: UUID | str | None = None,
+        group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         idempotency_key: str | None = None,
@@ -152,11 +154,29 @@ class AgentIdentity:
         return self._inkbox.whatsapp.send(
             to=to,
             conversation_id=conversation_id,
+            reply_to_message_id=reply_to_message_id,
+            group_name=group_name,
             text=text,
             media_ids=media_ids,
             idempotency_key=idempotency_key,
             agent_identity_id=self.id,
         )
+
+    def get_whatsapp_thread(self, message_id: UUID | str, *, limit: int = 50, cursor: str | None = None) -> WhatsAppThread:
+        return self._inkbox.whatsapp.get_thread(message_id, limit=limit, cursor=cursor, agent_identity_id=self.id)
+
+    def get_whatsapp_conversation_thread(self, conversation_id: UUID | str, thread_id: UUID | str, *, limit: int = 50, cursor: str | None = None) -> WhatsAppThread:
+        return self._inkbox.whatsapp.get_conversation_thread(conversation_id, thread_id, limit=limit, cursor=cursor, agent_identity_id=self.id)
+
+    def send_whatsapp_reaction(self, *, message_id: UUID | str, reaction: str | None = None, custom_emoji: str | None = None, idempotency_key: str) -> WhatsAppReaction:
+        return self._inkbox.whatsapp.send_reaction(message_id=message_id, reaction=reaction, custom_emoji=custom_emoji,
+            idempotency_key=idempotency_key, agent_identity_id=self.id)
+
+    def get_whatsapp_reaction(self, reaction_id: UUID | str) -> WhatsAppReaction:
+        return self._inkbox.whatsapp.get_reaction(reaction_id, agent_identity_id=self.id)
+
+    def remove_whatsapp_reaction(self, reaction_id: UUID | str, *, idempotency_key: str) -> WhatsAppReaction:
+        return self._inkbox.whatsapp.remove_reaction(reaction_id, idempotency_key=idempotency_key, agent_identity_id=self.id)
 
     def get_whatsapp_message(self, message_id: UUID | str) -> WhatsAppMessage:
         return self._inkbox.whatsapp.get(message_id, agent_identity_id=self.id)
@@ -165,6 +185,8 @@ class AgentIdentity:
         self,
         *,
         conversation_id: UUID | str | None = None,
+        thread_id: UUID | str | None = None,
+        include_groups: bool | None = None,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
@@ -173,6 +195,8 @@ class AgentIdentity:
         return self._inkbox.whatsapp.list(
             agent_identity_id=self.id,
             conversation_id=conversation_id,
+            thread_id=thread_id,
+            include_groups=include_groups,
             limit=limit,
             offset=offset,
             is_read=is_read,
@@ -180,10 +204,10 @@ class AgentIdentity:
         )
 
     def list_whatsapp_conversations(
-        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None
+        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None, include_groups: bool | None = None
     ) -> list[WhatsAppConversationSummary]:
         return self._inkbox.whatsapp.list_conversations(
-            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked
+            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked, include_groups=include_groups
         )
 
     def get_whatsapp_conversation(

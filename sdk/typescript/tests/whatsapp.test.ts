@@ -69,7 +69,7 @@ describe("WhatsApp public wire", () => {
       {},
       { to: "+15555550101", conversationId: conv, text: "hi" },
       { to: [], text: "hi" },
-      { to: ["+15555550101", "+15555550102"], text: "hi" },
+      { to: ["+15555550101", "+15555550101"], text: "hi" },
       { to: "+15555550101", text: " " },
       { to: "+15555550101", text: "😀".repeat(4001) },
       { to: "+15555550101", mediaIds: [media, media] },
@@ -182,8 +182,8 @@ describe("WhatsApp public wire", () => {
   });
   it("exports raw webhook payloads without converting received URLs or timestamps", () => {
     const webhook: WhatsAppWebhookPayload = f.webhook;
-    expect(webhook.data.message.sender_number).toBe("+15555550101");
-    expect(webhook.data.message.media[0].url).toBeNull();
+    expect(webhook.data.message!.sender_number).toBe("+15555550101");
+    expect(webhook.data.message!.media[0].url).toBeNull();
     expect(
       parseWhatsAppMessage(f.message as RawWhatsAppMessage).createdAt,
     ).toBeInstanceOf(Date);
