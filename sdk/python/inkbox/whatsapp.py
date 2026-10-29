@@ -10,7 +10,7 @@ import unicodedata
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
-from inkbox._message_requests import post_message
+from inkbox._message_requests import post_message, send_key
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -379,14 +379,20 @@ class WhatsAppResource:
             body["text"] = text
         if media_ids is not None:
             body["media_ids"] = [str(value) for value in media_ids]
+        key = send_key(idempotency_key)
         data = post_message(
             self._http,
             "/messages",
             json=body,
             params=_owner(agent_identity_id),
-            idempotency_key=idempotency_key,
+            idempotency_key=key,
         )
-        return WhatsAppMessage._from_dict(data["message"])
+        try:
+            return WhatsAppMessage._from_dict(data["message"])
+        except Exception as error:
+            # A successful HTTP response may still be unreadable; keep its recovery key.
+            error.idempotency_key = key
+            raise
 
     def get(
         self, message_id: UUID | str, *, agent_identity_id: UUID | str | None = None

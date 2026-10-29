@@ -308,3 +308,34 @@ def test_reply_option_rejects_non_boolean_before_http(invalid):
     with pytest.raises(ValueError, match="boolean"):
         WhatsAppResource(http).send(to="+15555550101", text="Hello", plain_reply_fallback=invalid)
     http.post.assert_not_called()
+
+
+@pytest.mark.parametrize("key", [None, "saved-logical-send"])
+@pytest.mark.parametrize("malformation", ["missing_message", "invalid_id", "invalid_media"])
+def test_post_accept_decode_failure_retains_request_key_without_resend(key, malformation):
+    import copy
+    body = {"message": copy.deepcopy(F["message"])}
+    expected_error = ValueError
+    if malformation == "missing_message":
+        body = {}
+        expected_error = KeyError
+    elif malformation == "invalid_id":
+        body["message"]["id"] = "not-a-uuid"
+    else:
+        body["message"]["media"] = None
+        expected_error = TypeError
+    http = MagicMock()
+    http.post.return_value = body
+    resource = WhatsAppResource(http)
+    with pytest.raises(expected_error) as failure:
+        resource.send(conversation_id=CONV, text="One logical message", idempotency_key=key)
+    http.post.assert_called_once()
+    original = http.post.call_args
+    retained = failure.value.idempotency_key
+    assert retained == original.kwargs["headers"]["Idempotency-Key"]
+    if key is not None:
+        assert retained == key
+    http.post.return_value = {"message": F["message"]}
+    resource.send(conversation_id=CONV, text="One logical message", idempotency_key=retained)
+    assert http.post.call_count == 2
+    assert http.post.call_args == original

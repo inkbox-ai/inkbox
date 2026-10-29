@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   Inkbox,
+  getMessageRequestKey,
   WhatsAppResource,
   parseWhatsAppMessage,
 } from "../src/index.js";
@@ -240,4 +241,30 @@ it("preserves legacy quote/default bodies and binds only an explicit native requ
     await expect(resource().send({to: "+15555550101", text: "Hello", plainReplyFallback: invalid as unknown as boolean})).rejects.toThrow("boolean");
   }
   expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+
+it.each([
+  { key: undefined, missing: true },
+  { key: "saved-logical-send", missing: true },
+  { key: undefined, missing: false },
+  { key: "saved-logical-send", missing: false },
+])("retains a decode failure key without another send (%j)", async ({ key, missing }) => {
+  const body = missing ? {} : { message: { ...f.message, media: {} } };
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok(body, 201)));
+  let failure: unknown;
+  try {
+    await resource().send({ conversationId: conv, text: "One logical message", idempotencyKey: key });
+  } catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(TypeError);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const original = last();
+  const retained = getMessageRequestKey(failure);
+  expect(retained).toBe(new Headers(original.init.headers).get("Idempotency-Key"));
+  if (key !== undefined) expect(retained).toBe(key);
+  vi.mocked(fetch).mockImplementation(async () => ok({ message: f.message }, 201));
+  await resource().send({ conversationId: conv, text: "One logical message", idempotencyKey: retained });
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(last().body).toEqual(original.body);
+  expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe(retained);
 });

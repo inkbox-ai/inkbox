@@ -42,6 +42,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Fixed
 
+- Python and TypeScript WhatsApp sends retain their request key when a successful
+  response cannot be decoded, without automatically sending another request.
 - Rejected HTTP/2 tunnel streams are closed before returning an error, preventing
   an unhandled stream error when a request races with connection shutdown.
 
