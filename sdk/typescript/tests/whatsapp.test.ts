@@ -204,3 +204,17 @@ it("reads owned effective limits and retains unknown policy keys", async () => {
   expect(result.limits["whatsapp.future_limit"]).toBe(7);
   expect(result.usage).toEqual({ "whatsapp.texts_per_agent_identity_per_24h": 2 });
 });
+
+
+it.each(["", "binary/octet-stream"])("uses explicit MIME for a Blob with existing type %j", async (type) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
+  await resource().uploadMedia({content: new Blob([new Uint8Array([1, 2, 3])], {type}), filename: "image.png", contentType: "image/png", agentIdentityId: owner});
+  const file = (last().body as FormData).get("file") as File;
+  expect(file.type).toBe("image/png"); expect(file.name).toBe("image.png");
+  expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+});
+it("retains a Blob MIME when no explicit override is supplied", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
+  await resource().uploadMedia({content: new Blob(["image-bytes"], {type: "image/jpeg"}), filename: "image.jpg"});
+  expect(((last().body as FormData).get("file") as File).type).toBe("image/jpeg");
+});

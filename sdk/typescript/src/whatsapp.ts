@@ -494,7 +494,9 @@ export class WhatsAppResource {
       {
         fieldName: "file",
         filename: o.filename,
-        content: o.content,
+        content: o.content instanceof Blob && o.contentType !== undefined
+          ? new Blob([o.content], { type: o.contentType })
+          : o.content,
         contentType: o.contentType ?? "application/octet-stream",
       },
       { params: owner(o.agentIdentityId) },
