@@ -185,6 +185,11 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal(calls.at(-1).query.thread_id, v2.thread.thread_id);
   await run("conversations", "--direct-only");
   assert.equal(calls.at(-1).query.include_groups, "false");
+  const beforeEmptyQuote = calls.length;
+  for (const selector of [["--conversation-id", f.conversation.id], ["--to", "+15555550101"]]) {
+    await assert.rejects(() => run("send", ...selector, "--reply-to-message-id", "", "--text", "Do not silently send plain"));
+  }
+  assert.equal(calls.length, beforeEmptyQuote);
 });
 
 test("shared group selectors, quoted replies, and creation-only names", () => {
@@ -194,4 +199,11 @@ test("shared group selectors, quoted replies, and creation-only names", () => {
     if (item.valid) assert.doesNotThrow(() => buildWhatsAppSendOptions(options), item.name);
     else assert.throws(() => buildWhatsAppSendOptions(options), undefined, item.name);
   }
+});
+
+test("an explicitly empty quote target is rejected instead of becoming a plain send", () => {
+  for (const selector of [{ conversationId: f.conversation.id }, { to: "+15555550101" }]) {
+    assert.throws(() => buildWhatsAppSendOptions({ ...selector, replyToMessageId: "", text: "Reply" }), /requires/);
+  }
+  assert.deepEqual(buildWhatsAppSendOptions({ conversationId: f.conversation.id, text: "Plain" }), { conversationId: f.conversation.id, text: "Plain" });
 });
