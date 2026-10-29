@@ -751,8 +751,9 @@ const current = await identity.getWhatsAppMessage(message.id);
 ```rust,no_run
 # fn example() -> inkbox::Result<()> {
 let client = inkbox::Inkbox::builder("your-api-key").build()?;
-let status = client.identities().get_whatsapp_status("my-agent")?;
-let message = client.whatsapp().send(&inkbox::WhatsAppSendOptions {
+let identity = client.get_identity("my-agent")?;
+let status = identity.get_whatsapp_status()?;
+let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
     to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
     text: Some("Hello".into()),
     idempotency_key: Some("order-confirmation-123".into()),
@@ -883,7 +884,11 @@ Effective WhatsApp policy limits and usage are independent from iMessage. Read t
 The limits response contains the agent identity, effective `limits`, and daily-only
 `usage`; it has no billing-cycle timestamp, monthly allowance, or enabled-agent
 cap. Current defaults allow 1,000 outbound messages per identity in a rolling
-24-hour window and three messages of at most 159 characters before the recipient
-replies, with 60 seconds between new contacts. Before a reply, links, phone numbers, email addresses,
-and media are not allowed. Read the effective limits rather than assuming these
+24-hour window. Direct conversations allow 10 new contacts per day, with 60 seconds
+between new contacts, three openings of at most 159 characters before the first
+reply, and 15 consecutive unanswered messages. Before the first direct reply,
+links, phone numbers, email addresses, and media are not allowed. Groups instead
+allow three conversation openings and 15 unanswered messages, without those direct
+introduction-content restrictions. New agent-created groups have a separate
+configurable rolling daily allowance, initially five (`whatsapp.new_groups_per_24h`). Read the effective limits rather than assuming these
 defaults apply to every identity.

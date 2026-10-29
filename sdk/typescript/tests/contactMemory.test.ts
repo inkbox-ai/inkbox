@@ -402,3 +402,16 @@ describe("contact memory", () => {
     expect(result.errors.map((item) => item.index)).toEqual([1]);
   });
 });
+
+it("explicit WhatsApp correspondence limits and nullable peer fields remain opt-in", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeOkResponse({ contact_id: "contact-1", identity_id: "identity-1", channels: [], next_cursor: null,
+    items: [{ channel: "whatsapp", source_id: "message-1", identity_id: "identity-1", direction: "inbound", occurred_at: "2026-10-01T12:00:00Z", status: "received", detail_url: null,
+      conversation_id: "conversation-1", local_number: "+15555550100", remote_number: null, participants: ["+15555550101"], is_group: false, text: null, media: null }] })));
+  try {
+    const resource = new ContactsResource(new HttpTransport("test-key", BASE));
+    const result = await resource.correspondence.get("contact-1", { channels: ["whatsapp"], whatsappLimit: 3 });
+    const query = new URL(String(vi.mocked(fetch).mock.calls[0][0])).searchParams;
+    expect(query.getAll("channels")).toEqual(["whatsapp"]); expect(query.get("whatsapp_limit")).toBe("3");
+    expect(result.items[0]).toMatchObject({ channel: "whatsapp", remoteNumber: null, localNumber: "+15555550100", text: null });
+  } finally { vi.restoreAllMocks(); }
+});

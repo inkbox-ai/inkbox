@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WhatsAppResource, parseWhatsAppMessage, parseWhatsAppConversation } from "../src/whatsapp.js";
+import { WhatsAppResource, parseWhatsAppMessage, parseWhatsAppConversation, parseWhatsAppReaction } from "../src/whatsapp.js";
 import { HttpTransport } from "../src/_http.js";
 const f = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp-v2.json", import.meta.url), "utf8"));
 const old = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp.json", import.meta.url), "utf8"));
@@ -55,4 +55,12 @@ describe("WhatsApp v2 shared wire contract", () => {
     }
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+it("reaction notifications preserve nullable actors without a fabricated message", () => {
+  const event = f.reaction_webhook;
+  expect(event.event_type).toBe("whatsapp.reaction_received");
+  expect(event.data.message).toBeUndefined();
+  const reaction = parseWhatsAppReaction(event.data.reaction);
+  expect(reaction.remoteNumber).toBeNull(); expect(reaction.targetMessageId).toBe(f.message.id);
 });

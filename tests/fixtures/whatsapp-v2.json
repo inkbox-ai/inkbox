@@ -88,13 +88,13 @@
     }
   ],
   "named_emoji": {
-    "love": "❤️",
-    "like": "👍",
-    "dislike": "👎",
-    "laugh": "😂",
-    "emphasize": "‼️",
-    "question": "❓",
-    "eyes": "👀"
+    "love": "\u2764\ufe0f",
+    "like": "\ud83d\udc4d",
+    "dislike": "\ud83d\udc4e",
+    "laugh": "\ud83d\ude02",
+    "emphasize": "\u203c\ufe0f",
+    "question": "\u2753",
+    "eyes": "\ud83d\udc40"
   },
   "message": {
     "id": "30000000-0000-4000-8000-000000000003",
@@ -108,7 +108,7 @@
       "+15555550101"
     ],
     "is_group": false,
-    "content": "Hello 👋",
+    "content": "Hello \ud83d\udc4b",
     "media": [],
     "status": "sent",
     "delivery_state": "unknown",
@@ -136,9 +136,9 @@
     "failed_at": null,
     "status_observed_at": "2026-10-01T12:00:00Z",
     "status_refresh_pending": false,
-    "reply_to_message_id": "30000000-0000-4000-8000-000000000003",
-    "thread_id": "30000000-0000-4000-8000-000000000003",
-    "thread_root_message_id": "30000000-0000-4000-8000-000000000003",
+    "reply_to_message_id": "30000000-0000-4000-8000-000000000004",
+    "thread_id": "30000000-0000-4000-8000-000000000004",
+    "thread_root_message_id": "30000000-0000-4000-8000-000000000004",
     "reactions": [
       {
         "id": "55555555-5555-4555-8555-555555555555",
@@ -149,7 +149,7 @@
         "remote_number": "+15555550100",
         "reaction": "love",
         "custom_emoji": null,
-        "emoji": "❤️",
+        "emoji": "\u2764\ufe0f",
         "status": "applied",
         "revision": 1,
         "created_at": "2026-10-01T12:00:00Z",
@@ -183,7 +183,7 @@
     "remote_number": "+15555550100",
     "reaction": "love",
     "custom_emoji": null,
-    "emoji": "❤️",
+    "emoji": "\u2764\ufe0f",
     "status": "applied",
     "revision": 1,
     "created_at": "2026-10-01T12:00:00Z",
@@ -199,7 +199,7 @@
     "remote_number": "+15555550100",
     "reaction": "love",
     "custom_emoji": null,
-    "emoji": "❤️",
+    "emoji": "\u2764\ufe0f",
     "status": "uncertain",
     "revision": 2,
     "created_at": "2026-10-01T12:00:00Z",
@@ -215,7 +215,7 @@
     "remote_number": "+15555550100",
     "reaction": "love",
     "custom_emoji": null,
-    "emoji": "❤️",
+    "emoji": "\u2764\ufe0f",
     "status": "removed",
     "revision": 2,
     "created_at": "2026-10-01T12:00:00Z",
@@ -224,11 +224,11 @@
   },
   "thread": {
     "conversation_id": "20000000-0000-4000-8000-000000000002",
-    "thread_id": "30000000-0000-4000-8000-000000000003",
-    "thread_root_message_id": "30000000-0000-4000-8000-000000000003",
+    "thread_id": "30000000-0000-4000-8000-000000000004",
+    "thread_root_message_id": "30000000-0000-4000-8000-000000000004",
     "messages": [
       {
-        "id": "30000000-0000-4000-8000-000000000003",
+        "id": "30000000-0000-4000-8000-000000000004",
         "agent_identity_id": "10000000-0000-4000-8000-000000000001",
         "conversation_id": "20000000-0000-4000-8000-000000000002",
         "direction": "inbound",
@@ -239,17 +239,8 @@
           "+15555550101"
         ],
         "is_group": false,
-        "content": null,
-        "media": [
-          {
-            "id": "40000000-0000-4000-8000-000000000004",
-            "filename": "image.png",
-            "content_type": "image/png",
-            "size": 3,
-            "status": "unavailable",
-            "url": null
-          }
-        ],
+        "content": "Original group question",
+        "media": [],
         "status": "received",
         "delivery_state": null,
         "recipients": [],
@@ -258,13 +249,17 @@
         "error_code": null,
         "error_detail": null,
         "source_at": null,
-        "created_at": "2026-10-01T12:00:00Z",
+        "created_at": "2026-10-01T11:59:00Z",
         "updated_at": "2026-10-01T12:00:00Z",
         "sent_at": null,
         "delivered_at": null,
         "failed_at": null,
         "status_observed_at": "2026-10-01T12:00:00Z",
-        "status_refresh_pending": false
+        "status_refresh_pending": false,
+        "reply_to_message_id": null,
+        "thread_id": "30000000-0000-4000-8000-000000000004",
+        "thread_root_message_id": "30000000-0000-4000-8000-000000000004",
+        "reactions": []
       },
       {
         "id": "30000000-0000-4000-8000-000000000003",
@@ -278,7 +273,7 @@
           "+15555550101"
         ],
         "is_group": false,
-        "content": "Hello 👋",
+        "content": "Hello \ud83d\udc4b",
         "media": [],
         "status": "sent",
         "delivery_state": "unknown",
@@ -306,9 +301,9 @@
         "failed_at": null,
         "status_observed_at": "2026-10-01T12:00:00Z",
         "status_refresh_pending": false,
-        "reply_to_message_id": "30000000-0000-4000-8000-000000000003",
-        "thread_id": "30000000-0000-4000-8000-000000000003",
-        "thread_root_message_id": "30000000-0000-4000-8000-000000000003",
+        "reply_to_message_id": "30000000-0000-4000-8000-000000000004",
+        "thread_id": "30000000-0000-4000-8000-000000000004",
+        "thread_root_message_id": "30000000-0000-4000-8000-000000000004",
         "reactions": [
           {
             "id": "55555555-5555-4555-8555-555555555555",
@@ -319,7 +314,7 @@
             "remote_number": "+15555550100",
             "reaction": "love",
             "custom_emoji": null,
-            "emoji": "❤️",
+            "emoji": "\u2764\ufe0f",
             "status": "applied",
             "revision": 1,
             "created_at": "2026-10-01T12:00:00Z",
@@ -330,5 +325,30 @@
       }
     ],
     "next_cursor": "opaque+/cursor="
+  },
+  "reaction_webhook": {
+    "id": "evt-whatsapp-reaction-example",
+    "event_type": "whatsapp.reaction_received",
+    "timestamp": "2026-10-01T12:00:00Z",
+    "data": {
+      "reaction": {
+        "id": "55555555-5555-4555-8555-555555555555",
+        "target_message_id": "30000000-0000-4000-8000-000000000003",
+        "conversation_id": "20000000-0000-4000-8000-000000000002",
+        "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+        "direction": "inbound",
+        "remote_number": null,
+        "reaction": "love",
+        "custom_emoji": null,
+        "emoji": "\u2764\ufe0f",
+        "status": "applied",
+        "revision": 1,
+        "created_at": "2026-10-01T12:00:00Z",
+        "updated_at": "2026-10-01T12:00:00Z",
+        "removed_at": null
+      },
+      "contacts": [],
+      "agent_identities": []
+    }
   }
 }

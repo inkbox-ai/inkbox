@@ -28,7 +28,6 @@ class ContactCorrespondenceOptions:
     email_limit: int | None = None
     sms_limit: int | None = None
     imessage_limit: int | None = None
-    whatsapp_limit: int | None = None
     calls_limit: int | None = None
     cursor: str | None = None
     order: CorrespondenceOrder | str | None = None
@@ -36,6 +35,7 @@ class ContactCorrespondenceOptions:
     transcripts: CorrespondenceTranscriptMode | str | None = None
     include_failed: bool | None = None
     identity_id: UUID | str | None = None
+    whatsapp_limit: int | None = None
 
     def _to_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}

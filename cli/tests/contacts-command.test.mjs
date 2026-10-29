@@ -619,3 +619,19 @@ test("contact correspondence selects all channels by default and preserves Slack
     await new Promise((resolve) => mock.server.close(resolve));
   }
 });
+
+test("WhatsApp correspondence is explicit and preserves its independent limit and nullable peer", async () => {
+  let query;
+  const mock = await listen((req, res) => {
+    query = new URL(req.url, "http://localhost").searchParams;
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ contact_id: "contact-1", identity_id: "identity-1", channels: [], next_cursor: null,
+      items: [{ channel: "whatsapp", source_id: "message-1", identity_id: "identity-1", direction: "inbound", occurred_at: "2026-10-01T12:00:00Z", status: "received", detail_url: null,
+        conversation_id: "conversation-1", local_number: "+15555550100", remote_number: null, participants: ["+15555550101"], is_group: false, text: null, media: null }] }));
+  });
+  try {
+    const result = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "correspondence", "contact-1", "--channels", "whatsapp", "--whatsapp-limit", "3"]);
+    assert.ifError(result.error); assert.deepEqual(query.getAll("channels"), ["whatsapp"]); assert.equal(query.get("whatsapp_limit"), "3");
+    assert.equal(JSON.parse(result.stdout).items[0].remoteNumber, null);
+  } finally { await new Promise(resolve => mock.server.close(resolve)); }
+});

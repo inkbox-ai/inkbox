@@ -135,3 +135,16 @@ def test_invalid_reaction_does_not_contact_transport(options):
             )
         )
     http.post.assert_not_called()
+
+
+def test_reaction_webhook_uses_its_receipt_and_keeps_unknown_actor_null():
+    from typing import get_args
+    from inkbox.webhooks import WhatsAppWebhookEventType
+    from inkbox.whatsapp import WhatsAppReaction
+
+    event = F["reaction_webhook"]
+    assert event["event_type"] in get_args(WhatsAppWebhookEventType)
+    assert "message" not in event["data"]
+    reaction = WhatsAppReaction._from_dict(event["data"]["reaction"])
+    assert reaction.remote_number is None
+    assert str(reaction.target_message_id) == F["message"]["id"]

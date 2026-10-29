@@ -219,6 +219,10 @@ export function registerWhatsAppCommands(program: Command): void {
             columns: [
               "id",
               "remoteNumber",
+              "participants",
+              "isGroup",
+              "groupCreationStatus",
+              "unresolvedParticipantCount",
               "latestText",
               "unreadCount",
               "latestMessageAt",
