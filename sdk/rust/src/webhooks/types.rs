@@ -1711,6 +1711,8 @@ pub enum WhatsAppWebhookEventType {
     DeliveryFailed,
     #[serde(rename = "whatsapp.delivery_unconfirmed")]
     DeliveryUnconfirmed,
+    #[serde(rename = "whatsapp.reaction_received")]
+    ReactionReceived,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1761,11 +1763,22 @@ pub struct WhatsAppWebhookMessage {
     pub delivered_at: Option<String>,
     pub failed_at: Option<String>,
     pub status_observed_at: Option<String>,
+    #[serde(default)]
+    pub reply_to_message_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub thread_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub thread_root_message_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub reactions: Vec<crate::whatsapp::WhatsAppReaction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppWebhookData {
-    pub message: WhatsAppWebhookMessage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<WhatsAppWebhookMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reaction: Option<crate::whatsapp::WhatsAppReaction>,
     pub contacts: Vec<WebhookContact>,
     pub agent_identities: Vec<WebhookAgentIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

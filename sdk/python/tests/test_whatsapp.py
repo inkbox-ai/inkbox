@@ -65,7 +65,7 @@ def test_uncertainty_reuses_exact_payload_and_key(monkeypatch):
         {},
         {"to": "+15555550101", "conversation_id": CONV, "text": "hi"},
         {"to": [], "text": "hi"},
-        {"to": ["+15555550101", "+15555550102"], "text": "hi"},
+        {"to": ["+15555550101", "+15555550101"], "text": "hi"},
         {"to": "+15555550101", "text": " "},
         {"to": "+15555550101", "text": "😀" * 4001},
         {"to": "+15555550101", "media_ids": [MEDIA, MEDIA]},

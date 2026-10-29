@@ -12,6 +12,7 @@ const f = JSON.parse(
     "utf8",
   ),
 );
+const v2 = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-v2.json", import.meta.url), "utf8"));
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 test("one-to-one send selectors and owned attachment options", () => {
@@ -29,8 +30,8 @@ test("one-to-one send selectors and owned attachment options", () => {
   );
   assert.throws(
     () =>
-      buildWhatsAppSendOptions({ to: "+15555550101,+15555550102", text: "hi" }),
-    /one recipient/,
+      buildWhatsAppSendOptions({ to: "+15555550101,+15555550101", text: "hi" }),
+    /unique E.164/,
   );
   assert.throws(
     () =>
@@ -68,6 +69,10 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       "/api/v1/whatsapp/messages":
         req.method === "POST" ? { message: f.message } : [f.inbound_message],
       [`/api/v1/whatsapp/messages/${f.message.id}`]: f.message,
+      "/api/v1/whatsapp/reactions": { reaction: v2.reaction },
+      [`/api/v1/whatsapp/reactions/${v2.reaction.id}`]: { reaction: req.method === "DELETE" ? v2.removed_reaction : v2.reaction },
+      [`/api/v1/whatsapp/messages/${v2.message.id}/thread`]: v2.thread,
+      [`/api/v1/whatsapp/conversations/${v2.thread.conversation_id}/threads/${v2.thread.thread_id}`]: v2.thread,
       "/api/v1/whatsapp/limits": f.limits,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
@@ -160,4 +165,33 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
     conversation_id: f.conversation.id,
     through_message_id: f.message.id,
   });
+  await run("send", "--to", "+15555550101,+15555550102", "--group-name", "Project team", "--text", "Hello", "--idempotency-key", "group-stable");
+  assert.deepEqual(calls.at(-1).body, { to: ["+15555550101", "+15555550102"], group_name: "Project team", text: "Hello" });
+  await run("send", "--conversation-id", f.conversation.id, "--reply-to-message-id", v2.message.id, "--text", "Quoted", "--idempotency-key", "quote-stable");
+  assert.equal(calls.at(-1).body.reply_to_message_id, v2.message.id);
+  assert.equal((await run("react", v2.message.id, "--reaction", "love", "--idempotency-key", "reaction-stable")).status, "applied");
+  assert.deepEqual(calls.at(-1).body, { message_id: v2.message.id, reaction: "love" });
+  assert.equal(calls.at(-1).key, "reaction-stable");
+  assert.equal(calls.at(-1).query.agent_identity_id, f.identity_id);
+  assert.equal((await run("get-reaction", v2.reaction.id)).id, v2.reaction.id);
+  assert.equal((await run("remove-reaction", v2.reaction.id, "--idempotency-key", "remove-stable")).status, "removed");
+  assert.equal(calls.at(-1).method, "DELETE");
+  assert.equal(calls.at(-1).key, "remove-stable");
+  assert.equal((await run("thread", v2.message.id, "--cursor", "opaque+cursor")).threadId, v2.thread.thread_id);
+  assert.equal(calls.at(-1).query.cursor, "opaque+cursor");
+  assert.equal((await run("conversation-thread", v2.thread.conversation_id, v2.thread.thread_id)).threadRootMessageId, v2.thread.thread_root_message_id);
+  await run("list", "--conversation-id", f.conversation.id, "--thread-id", v2.thread.thread_id, "--direct-only");
+  assert.equal(calls.at(-1).query.include_groups, "false");
+  assert.equal(calls.at(-1).query.thread_id, v2.thread.thread_id);
+  await run("conversations", "--direct-only");
+  assert.equal(calls.at(-1).query.include_groups, "false");
+});
+
+test("shared group selectors, quoted replies, and creation-only names", () => {
+  for (const item of v2.send_cases) {
+    const body = item.body;
+    const options = { to: Array.isArray(body.to) ? body.to.join(",") : body.to, conversationId: body.conversation_id, replyToMessageId: body.reply_to_message_id, groupName: body.group_name, text: body.text };
+    if (item.valid) assert.doesNotThrow(() => buildWhatsAppSendOptions(options), item.name);
+    else assert.throws(() => buildWhatsAppSendOptions(options), undefined, item.name);
+  }
 });

@@ -314,7 +314,7 @@ impl HttpTransport {
         self.delete_with_response_params_and_headers(path, NO_QUERY, headers)
     }
 
-    fn delete_with_response_params_and_headers(
+    pub fn delete_with_response_params_and_headers(
         &self,
         path: &str,
         params: Query,

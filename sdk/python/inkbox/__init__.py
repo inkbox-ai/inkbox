@@ -2,7 +2,7 @@
 inkbox — Python SDK for the Inkbox APIs.
 """
 
-from inkbox.webhooks import WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
+from inkbox.webhooks import WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
 from inkbox.whatsapp import (
     WhatsAppLimits,
     WhatsAppDirection,
@@ -535,7 +535,11 @@ from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
+from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppGroupCreationStatus, WhatsAppThread
+
 __all__ = [
+    "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppGroupCreationStatus", "WhatsAppThread",
+    "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",
     "WhatsAppWebhookData",
     "WhatsAppWebhookMessage",
