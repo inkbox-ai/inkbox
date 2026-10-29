@@ -139,6 +139,15 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       .media[0].status,
     "unavailable",
   );
+  await run("list", "--include-groups", "--unread-only", "--start-datetime", "2026-03-08", "--end-datetime", "2026-03-08", "--tz", "America/New_York");
+  assert.equal(calls.at(-1).query.include_groups, "true");
+  assert.equal(calls.at(-1).query.is_read, "false");
+  assert.equal(calls.at(-1).query.start_datetime, "2026-03-08");
+  assert.equal(calls.at(-1).query.tz, "America/New_York");
+  await run("conversation", f.conversation.id, "--limit", "10");
+  assert.equal(calls.at(-1).path, "/api/v1/whatsapp/messages");
+  assert.equal(calls.at(-1).query.conversation_id, f.conversation.id);
+  assert.equal(calls.at(-1).query.include_groups, "true");
   assert.equal((await run("get", f.message.id)).id, f.message.id);
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
@@ -169,6 +178,8 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.deepEqual(calls.at(-1).body, { to: ["+15555550101", "+15555550102"], group_name: "Project team", text: "Hello" });
   await run("send", "--conversation-id", f.conversation.id, "--reply-to-message-id", v2.message.id, "--text", "Quoted", "--idempotency-key", "quote-stable");
   assert.equal(calls.at(-1).body.reply_to_message_id, v2.message.id);
+  await run("send", "--conversation-id", f.conversation.id, "--reply-to-message-id", v2.message.id, "--text", "Native", "--no-plain-reply-fallback", "--idempotency-key", "native-required");
+  assert.equal(calls.at(-1).body.plain_reply_fallback, false);
   assert.equal((await run("react", v2.message.id, "--reaction", "love", "--idempotency-key", "reaction-stable")).status, "applied");
   assert.deepEqual(calls.at(-1).body, { message_id: v2.message.id, reaction: "love" });
   assert.equal(calls.at(-1).key, "reaction-stable");
@@ -177,6 +188,9 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("remove-reaction", v2.reaction.id, "--idempotency-key", "remove-stable")).status, "removed");
   assert.equal(calls.at(-1).method, "DELETE");
   assert.equal(calls.at(-1).key, "remove-stable");
+  assert.equal((await run("unreact", v2.reaction.id, "--idempotency-key", "remove-alias")).status, "removed");
+  assert.equal(calls.at(-1).method, "DELETE");
+  assert.equal(calls.at(-1).key, "remove-alias");
   assert.equal((await run("thread", v2.message.id, "--cursor", "opaque+cursor")).threadId, v2.thread.thread_id);
   assert.equal(calls.at(-1).query.cursor, "opaque+cursor");
   assert.equal((await run("conversation-thread", v2.thread.conversation_id, v2.thread.thread_id)).threadRootMessageId, v2.thread.thread_root_message_id);
@@ -206,4 +220,17 @@ test("an explicitly empty quote target is rejected instead of becoming a plain s
     assert.throws(() => buildWhatsAppSendOptions({ ...selector, replyToMessageId: "", text: "Reply" }), /requires/);
   }
   assert.deepEqual(buildWhatsAppSendOptions({ conversationId: f.conversation.id, text: "Plain" }), { conversationId: f.conversation.id, text: "Plain" });
+});
+
+test("list selectors use explicit group opt-in and preserve dates", async () => {
+  const { buildWhatsAppListOptions } = await import("../dist/commands/whatsapp.js");
+  assert.deepEqual(buildWhatsAppListOptions({}), {includeGroups: false});
+  assert.deepEqual(buildWhatsAppListOptions({includeGroups: true, startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"}), {includeGroups: true, startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
+  assert.throws(() => buildWhatsAppListOptions({includeGroups: true, directOnly: true}), /not both/);
+});
+
+test("native reply requirement is explicit and irrelevant without a quote", () => {
+  const quoted = buildWhatsAppSendOptions({conversationId: f.conversation.id, replyToMessageId: f.message.id, text: "Reply", plainReplyFallback: false});
+  assert.equal(quoted.plainReplyFallback, false);
+  assert.equal(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "Hello", plainReplyFallback: false}).plainReplyFallback, undefined);
 });

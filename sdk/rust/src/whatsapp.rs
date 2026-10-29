@@ -246,6 +246,9 @@ pub struct WhatsAppSendOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_to_message_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Defaults to true. False requires native quoting; unavailable evidence or uncertain sends never trigger a plain replacement.
+    pub plain_reply_fallback: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub group_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
@@ -262,6 +265,9 @@ pub struct WhatsAppListOptions {
     pub conversation_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
     pub include_groups: Option<bool>,
+    pub start_datetime: Option<String>,
+    pub end_datetime: Option<String>,
+    pub tz: Option<String>,
     pub limit: Option<u64>,
     pub offset: Option<u64>,
     pub is_read: Option<bool>,
@@ -336,9 +342,15 @@ impl WhatsAppResource {
                 "WhatsApp text must be at most 4000 characters".into(),
             ));
         }
+        let mut body = serde_json::to_value(o)?;
+        if o.reply_to_message_id.is_none() || o.plain_reply_fallback != Some(false) {
+            body.as_object_mut()
+                .expect("send options serialize to an object")
+                .remove("plain_reply_fallback");
+        }
         let data = self.http.post_message(
             "/messages",
-            &serde_json::to_value(o)?,
+            &body,
             &owner(o.agent_identity_id.as_ref()),
             o.idempotency_key.as_deref(),
         )?;
@@ -365,8 +377,18 @@ impl WhatsAppResource {
             }
             p.push(("thread_id", v.to_string()));
         }
-        if let Some(v) = o.include_groups {
-            p.push(("include_groups", v.to_string()));
+        p.push((
+            "include_groups",
+            o.include_groups.unwrap_or(false).to_string(),
+        ));
+        for (name, value) in [
+            ("start_datetime", &o.start_datetime),
+            ("end_datetime", &o.end_datetime),
+            ("tz", &o.tz),
+        ] {
+            if let Some(value) = value {
+                p.push((name, value.clone()));
+            }
         }
         if let Some(v) = o.is_read {
             p.push(("is_read", v.to_string()));
@@ -383,8 +405,18 @@ impl WhatsAppResource {
         let mut p = owner(o.agent_identity_id.as_ref());
         p.push(("limit", o.limit.unwrap_or(50).to_string()));
         p.push(("offset", o.offset.unwrap_or(0).to_string()));
-        if let Some(v) = o.include_groups {
-            p.push(("include_groups", v.to_string()));
+        p.push((
+            "include_groups",
+            o.include_groups.unwrap_or(false).to_string(),
+        ));
+        for (name, value) in [
+            ("start_datetime", &o.start_datetime),
+            ("end_datetime", &o.end_datetime),
+            ("tz", &o.tz),
+        ] {
+            if let Some(value) = value {
+                p.push((name, value.clone()));
+            }
         }
         if let Some(v) = o.is_blocked {
             p.push(("is_blocked", v.to_string()));

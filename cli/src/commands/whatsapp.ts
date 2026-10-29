@@ -10,6 +10,7 @@ export function buildWhatsAppSendOptions(options: {
   to?: string;
   conversationId?: string;
   replyToMessageId?: string;
+  plainReplyFallback?: boolean;
   groupName?: string;
   text?: string;
   mediaId?: string;
@@ -33,12 +34,28 @@ export function buildWhatsAppSendOptions(options: {
       ? { conversationId: options.conversationId }
       : {}),
     ...(options.replyToMessageId !== undefined ? { replyToMessageId: options.replyToMessageId } : {}),
+    ...(options.replyToMessageId !== undefined && options.plainReplyFallback === false ? { plainReplyFallback: false } : {}),
     ...(options.groupName !== undefined ? { groupName: options.groupName } : {}),
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
     ...(options.idempotencyKey !== undefined
       ? { idempotencyKey: options.idempotencyKey }
       : {}),
+  };
+}
+
+/** Validate list selectors before making an API request. */
+export function buildWhatsAppListOptions(options: {
+  includeGroups?: boolean; directOnly?: boolean; startDatetime?: string;
+  endDatetime?: string; tz?: string;
+}) {
+  if (options.includeGroups && options.directOnly)
+    throw new Error("Choose --include-groups or --direct-only, not both.");
+  return {
+    includeGroups: options.includeGroups ?? false,
+    ...(options.startDatetime !== undefined ? { startDatetime: options.startDatetime } : {}),
+    ...(options.endDatetime !== undefined ? { endDatetime: options.endDatetime } : {}),
+    ...(options.tz !== undefined ? { tz: options.tz } : {}),
   };
 }
 
@@ -59,6 +76,7 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--to <numbers>", "One E.164 recipient, or 2–8 comma-separated group recipients")
     .option("--group-name <name>", "Creation-only group name; does not rename an existing group")
     .option("--reply-to-message-id <id>", "Quote a message in --conversation-id")
+    .option("--no-plain-reply-fallback", "Require a native quoted reply; never resend an uncertain quote as plain")
     .option("--conversation-id <id>", "Existing conversation ID")
     .option("--text <text>", "Message text (at most 4000 characters)")
     .option("--media-id <id>", "Owned attachment ID from upload-media")
@@ -138,9 +156,14 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--conversation-id <id>", "Filter by conversation")
     .option("--thread-id <id>", "Filter a conversation by quote-chain thread")
     .option("--direct-only", "Exclude group conversations")
+    .option("--include-groups", "Include group conversations")
+    .option("--start-datetime <date>", "Inclusive creation date or instant")
+    .option("--end-datetime <date>", "Inclusive creation date or instant; bare dates include the whole day")
+    .option("--tz <zone>", "IANA timezone for zone-less dates (default UTC)")
     .option("--limit <n>", "Maximum results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--unread", "Only locally unread messages")
+    .option("--unread-only", "Only locally unread messages")
     .action(
       withErrorHandler(async function (this: Command, opts) {
         const global = getGlobalOpts(this);
@@ -149,10 +172,10 @@ export function registerWhatsAppCommands(program: Command): void {
           await identity.listWhatsAppMessages({
             conversationId: opts.conversationId,
             threadId: opts.threadId,
-            ...(opts.directOnly ? { includeGroups: false } : {}),
+            ...buildWhatsAppListOptions(opts),
             limit: Number(opts.limit),
             offset: Number(opts.offset),
-            ...(opts.unread ? { isRead: false } : {}),
+            ...(opts.unread || opts.unreadOnly ? { isRead: false } : {}),
           }),
           {
             json: !!global.json,
@@ -170,6 +193,16 @@ export function registerWhatsAppCommands(program: Command): void {
       }),
     );
 
+  identityCommand("conversation <conversation-id>", "Read messages in a conversation, newest first")
+    .option("--thread-id <id>", "Filter by reply thread")
+    .option("--limit <n>", "Maximum results", "50")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(withErrorHandler(async function (this: Command, conversationId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.listWhatsAppMessages({ conversationId, threadId: opts.threadId,
+        includeGroups: true, limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json });
+    }));
+
   identityCommand("react <message-id>", "Submit a reaction; acceptance is not an applied reaction")
     .option("--reaction <name>", "love, like, dislike, laugh, emphasize, question, or eyes")
     .option("--custom-emoji <emoji>", "Exact custom emoji; exclusive with --reaction")
@@ -179,6 +212,7 @@ export function registerWhatsAppCommands(program: Command): void {
       output(await identity.sendWhatsAppReaction({ messageId, reaction: opts.reaction as WhatsAppReactionType | undefined, customEmoji: opts.customEmoji, idempotencyKey: opts.idempotencyKey }), { json: !!global.json });
     }));
   identityCommand("remove-reaction <reaction-id>", "Remove this version of your reaction, without affecting a newer one")
+    .alias("unreact")
     .requiredOption("--idempotency-key <key>", "Stable removal key; reuse it after uncertainty")
     .action(withErrorHandler(async function (this: Command, reactionId: string, opts) {
       const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
@@ -202,6 +236,10 @@ export function registerWhatsAppCommands(program: Command): void {
     "List conversations with local unread counts",
   )
     .option("--direct-only", "Exclude group conversations")
+    .option("--include-groups", "Include group conversations")
+    .option("--start-datetime <date>", "Inclusive creation date or instant")
+    .option("--end-datetime <date>", "Inclusive creation date or instant; bare dates include the whole day")
+    .option("--tz <zone>", "IANA timezone for zone-less dates (default UTC)")
     .option("--limit <n>", "Maximum results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(
@@ -210,7 +248,7 @@ export function registerWhatsAppCommands(program: Command): void {
         const identity = await createClient(global).getIdentity(opts.identity);
         output(
           await identity.listWhatsAppConversations({
-            ...(opts.directOnly ? { includeGroups: false } : {}),
+            ...buildWhatsAppListOptions(opts),
             limit: Number(opts.limit),
             offset: Number(opts.offset),
           }),

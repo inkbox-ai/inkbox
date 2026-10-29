@@ -105,6 +105,7 @@ def test_reads_and_local_mark_read_keep_owner_and_pagination():
         params={
             "agent_identity_id": OWNER,
             "conversation_id": CONV,
+            "include_groups": False,
             "limit": 10,
             "offset": 4,
             "is_read": False,
@@ -271,3 +272,39 @@ def test_effective_limits_are_owned_typed_and_preserve_future_policy_keys():
     assert result.limits["whatsapp.future_limit"] == 7
     assert result.usage == {"whatsapp.texts_per_agent_identity_per_24h": 2}
     http.get.assert_called_once_with("/limits", params={"agent_identity_id": OWNER})
+
+@pytest.mark.parametrize("method", ["list", "list_conversations"])
+def test_list_date_filters_and_direct_default(method):
+    http = MagicMock()
+    http.get.return_value = []
+    resource = WhatsAppResource(http)
+    getattr(resource, method)(start_datetime="2026-03-08", end_datetime="2026-03-08", tz="America/New_York")
+    assert http.get.call_args.kwargs["params"] == {
+        "limit": 50, "offset": 0, "include_groups": False,
+        "start_datetime": "2026-03-08", "end_datetime": "2026-03-08", "tz": "America/New_York",
+    }
+    getattr(resource, method)(include_groups=True)
+    assert http.get.call_args.kwargs["params"]["include_groups"] is True
+
+@pytest.mark.parametrize("fallback", [True, False])
+@pytest.mark.parametrize("quoted", [True, False])
+def test_reply_fallback_wire_preserves_legacy_default(fallback, quoted):
+    http = MagicMock()
+    http.post.return_value = {"message": F["message"]}
+    WhatsAppResource(http).send(conversation_id=CONV, text="Reply", reply_to_message_id=MESSAGE if quoted else None,
+                               plain_reply_fallback=fallback, idempotency_key="same-operation")
+    expected = {"conversation_id": CONV, "text": "Reply"}
+    if quoted:
+        expected["reply_to_message_id"] = MESSAGE
+    if quoted and not fallback:
+        expected["plain_reply_fallback"] = False
+    assert http.post.call_args.kwargs["json"] == expected
+    assert http.post.call_args.kwargs["headers"]["Idempotency-Key"] == "same-operation"
+
+
+@pytest.mark.parametrize("invalid", [None, 0, 1, "false"])
+def test_reply_option_rejects_non_boolean_before_http(invalid):
+    http = MagicMock()
+    with pytest.raises(ValueError, match="boolean"):
+        WhatsAppResource(http).send(to="+15555550101", text="Hello", plain_reply_fallback=invalid)
+    http.post.assert_not_called()

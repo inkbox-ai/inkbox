@@ -146,6 +146,7 @@ class AgentIdentity:
         to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
         group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
@@ -155,6 +156,7 @@ class AgentIdentity:
             to=to,
             conversation_id=conversation_id,
             reply_to_message_id=reply_to_message_id,
+            plain_reply_fallback=plain_reply_fallback,
             group_name=group_name,
             text=text,
             media_ids=media_ids,
@@ -186,11 +188,14 @@ class AgentIdentity:
         *,
         conversation_id: UUID | str | None = None,
         thread_id: UUID | str | None = None,
-        include_groups: bool | None = None,
+        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[WhatsAppMessage]:
         return self._inkbox.whatsapp.list(
             agent_identity_id=self.id,
@@ -201,13 +206,16 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+            start_datetime=start_datetime, end_datetime=end_datetime, tz=tz,
         )
 
     def list_whatsapp_conversations(
-        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None, include_groups: bool | None = None
+        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None, include_groups: bool | None = False,
+        start_datetime: str | None = None, end_datetime: str | None = None, tz: str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         return self._inkbox.whatsapp.list_conversations(
-            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked, include_groups=include_groups
+            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked, include_groups=include_groups,
+            start_datetime=start_datetime, end_datetime=end_datetime, tz=tz,
         )
 
     def get_whatsapp_conversation(

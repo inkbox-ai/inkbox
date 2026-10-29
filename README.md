@@ -825,12 +825,18 @@ rules. Conversation metadata exposes `group_creation_status` / `groupCreationSta
 and `unresolved_participant_count` / `unresolvedParticipantCount`. Send only when a
 group is ready and its participants are resolved. An uncertain group creation
 must keep its original send key and conversation ID, never a replacement request.
-Message and conversation lists include groups by default; use `include_groups=False`
-(Python), `includeGroups: false` (TypeScript), or CLI `--direct-only` to exclude them.
+Message and conversation lists default to direct conversations; use `include_groups=True`
+(Python), `includeGroups: true` (TypeScript), or CLI `--include-groups` to include groups.
+An explicit conversation ID reads that conversation, including a group. Lists also
+accept creation-date bounds (`start_datetime` / `startDatetime`, `end_datetime` /
+`endDatetime`) and an optional IANA `tz`; a bare end date includes the whole day.
 
 Quote an existing authorized message with `reply_to_message_id` /
 `replyToMessageId`, always together with its `conversation_id` / `conversationId`.
-There is no silent unquoted-message fallback. Read chronological quote chains with
+`plain_reply_fallback` / `plainReplyFallback` defaults to true; false explicitly
+requires native quoting. All currently supported WhatsApp targets support native
+quotes, so no current target uses plain fallback. Missing evidence, rejected sends,
+and uncertain sends never trigger an unquoted replacement. Read chronological quote chains with
 `get_whatsapp_thread` / `getWhatsAppThread` or `get_whatsapp_conversation_thread` /
 `getWhatsAppConversationThread`. Both return conversation, thread, root message,
 messages, and an opaque next cursor. A message-list `thread_id` / `threadId` filter

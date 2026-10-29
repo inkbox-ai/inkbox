@@ -92,6 +92,7 @@ describe("WhatsApp public wire", () => {
     expect(Object.fromEntries(last().url.searchParams)).toEqual({
       agent_identity_id: owner,
       conversation_id: conv,
+      include_groups: "false",
       limit: "10",
       offset: "4",
       is_read: "false",
@@ -217,4 +218,26 @@ it("retains a Blob MIME when no explicit override is supplied", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
   await resource().uploadMedia({content: new Blob(["image-bytes"], {type: "image/jpeg"}), filename: "image.jpg"});
   expect(((last().body as FormData).get("file") as File).type).toBe("image/jpeg");
+});
+
+it("forwards date filters and makes group inclusion explicit for both lists", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok([])));
+  for (const method of ["list", "listConversations"] as const) {
+    await resource()[method]({startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
+    expect(Object.fromEntries(last().url.searchParams)).toEqual({limit: "50", offset: "0", include_groups: "false", start_datetime: "2026-03-08", end_datetime: "2026-03-08", tz: "America/New_York"});
+    await resource()[method]({includeGroups: true});
+    expect(last().url.searchParams.get("include_groups")).toBe("true");
+  }
+});
+
+it("preserves legacy quote/default bodies and binds only an explicit native requirement", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok({message: f.message}, 201)));
+  for (const quoted of [false, true]) for (const fallback of [false, true]) {
+    await resource().send({conversationId: conv, text: "Reply", ...(quoted ? {replyToMessageId: f.message.id} : {}), plainReplyFallback: fallback, idempotencyKey: "same-operation"});
+    expect(last().body).toEqual({conversation_id: conv, text: "Reply", ...(quoted ? {reply_to_message_id: f.message.id} : {}), ...(quoted && !fallback ? {plain_reply_fallback: false} : {})});
+  }
+  for (const invalid of [null, 0, 1, "false"]) {
+    await expect(resource().send({to: "+15555550101", text: "Hello", plainReplyFallback: invalid as unknown as boolean})).rejects.toThrow("boolean");
+  }
+  expect(fetch).toHaveBeenCalledTimes(4);
 });

@@ -323,6 +323,8 @@ export interface WhatsAppSendOptions {
   to?: string | string[];
   conversationId?: string;
   replyToMessageId?: string;
+  /** Defaults true; false requires native quoting. Missing evidence or uncertain sends never trigger a plain replacement. */
+  plainReplyFallback?: boolean;
   groupName?: string;
   text?: string;
   mediaIds?: string[];
@@ -334,6 +336,9 @@ export interface WhatsAppListOptions {
   conversationId?: string;
   threadId?: string;
   includeGroups?: boolean;
+  startDatetime?: string;
+  endDatetime?: string;
+  tz?: string;
   limit?: number;
   offset?: number;
   isRead?: boolean;
@@ -366,6 +371,8 @@ export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
   /** Queue one message. Reuse its key and owned media IDs after uncertainty. */
   async send(o: WhatsAppSendOptions): Promise<WhatsAppMessage> {
+    if (o.plainReplyFallback !== undefined && typeof o.plainReplyFallback !== "boolean")
+      throw new Error("plainReplyFallback must be a boolean");
     if ((o.to == null) === (o.conversationId == null))
       throw new Error("Specify exactly one of to or conversationId");
     const recipients = o.to == null ? [] : typeof o.to === "string" ? [o.to] : o.to;
@@ -385,6 +392,7 @@ export class WhatsAppResource {
         ? { conversation_id: o.conversationId }
         : {}),
       ...(o.replyToMessageId != null ? { reply_to_message_id: o.replyToMessageId } : {}),
+      ...(o.replyToMessageId != null && o.plainReplyFallback === false ? { plain_reply_fallback: false } : {}),
       ...(o.groupName != null ? { group_name: o.groupName } : {}),
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
@@ -419,7 +427,10 @@ export class WhatsAppResource {
         ? { conversation_id: o.conversationId }
         : {}),
       ...(o.threadId != null ? { thread_id: o.threadId } : {}),
-      ...(o.includeGroups != null ? { include_groups: o.includeGroups } : {}),
+      include_groups: o.includeGroups ?? false,
+      ...(o.startDatetime != null ? { start_datetime: o.startDatetime } : {}),
+      ...(o.endDatetime != null ? { end_datetime: o.endDatetime } : {}),
+      ...(o.tz != null ? { tz: o.tz } : {}),
       ...(o.isRead != null ? { is_read: o.isRead } : {}),
       ...(o.isBlocked != null ? { is_blocked: o.isBlocked } : {}),
     });
@@ -434,7 +445,10 @@ export class WhatsAppResource {
         ...owner(o.agentIdentityId),
         limit: o.limit ?? 50,
         offset: o.offset ?? 0,
-        ...(o.includeGroups != null ? { include_groups: o.includeGroups } : {}),
+        include_groups: o.includeGroups ?? false,
+        ...(o.startDatetime != null ? { start_datetime: o.startDatetime } : {}),
+        ...(o.endDatetime != null ? { end_datetime: o.endDatetime } : {}),
+        ...(o.tz != null ? { tz: o.tz } : {}),
         ...(o.isBlocked != null ? { is_blocked: o.isBlocked } : {}),
       },
     );

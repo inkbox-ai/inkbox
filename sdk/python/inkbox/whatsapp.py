@@ -327,6 +327,7 @@ class WhatsAppResource:
         to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
+        plain_reply_fallback: bool = True,
         group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
@@ -338,7 +339,12 @@ class WhatsAppResource:
         Use a conversation ID for existing groups of any supported size. A group
         name is only a creation hint; selecting a group never renames it. Preserve
         the logical key after uncertainty rather than starting another operation.
+        plain_reply_fallback defaults to True; False explicitly requires a native
+        quote. Current supported targets use native quotes; missing evidence or
+        rejected/uncertain sends never trigger a plain replacement.
         """
+        if not isinstance(plain_reply_fallback, bool):
+            raise ValueError("plain_reply_fallback must be a boolean")
         if (to is None) == (conversation_id is None):
             raise ValueError("Specify exactly one of to or conversation_id")
         recipients = [to] if isinstance(to, str) else to
@@ -365,6 +371,8 @@ class WhatsAppResource:
             body["conversation_id"] = str(conversation_id)
         if reply_to_message_id is not None:
             body["reply_to_message_id"] = str(reply_to_message_id)
+            if not plain_reply_fallback:
+                body["plain_reply_fallback"] = False
         if group_name is not None:
             body["group_name"] = group_name
         if text is not None:
@@ -394,11 +402,14 @@ class WhatsAppResource:
         agent_identity_id: UUID | str | None = None,
         conversation_id: UUID | str | None = None,
         thread_id: UUID | str | None = None,
-        include_groups: bool | None = None,
+        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[WhatsAppMessage]:
         params: dict[str, Any] = {
             **_owner(agent_identity_id),
@@ -411,6 +422,9 @@ class WhatsAppResource:
             if conversation_id is None:
                 raise ValueError("thread_id requires conversation_id")
             params["thread_id"] = str(thread_id)
+        for name, value in (("start_datetime", start_datetime), ("end_datetime", end_datetime), ("tz", tz)):
+            if value is not None:
+                params[name] = value
         if include_groups is not None:
             params["include_groups"] = include_groups
         if is_read is not None:
@@ -426,16 +440,22 @@ class WhatsAppResource:
         self,
         *,
         agent_identity_id: UUID | str | None = None,
-        include_groups: bool | None = None,
+        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         params: dict[str, Any] = {
             **_owner(agent_identity_id),
             "limit": limit,
             "offset": offset,
         }
+        for name, value in (("start_datetime", start_datetime), ("end_datetime", end_datetime), ("tz", tz)):
+            if value is not None:
+                params[name] = value
         if include_groups is not None:
             params["include_groups"] = include_groups
         if is_blocked is not None:
