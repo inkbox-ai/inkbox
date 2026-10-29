@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SDK_DIR="$REPO_ROOT/sdk/typescript"
+cd "$SCRIPT_DIR"
 
 DRY_RUN="--dry-run"
 if [[ "${1:-}" == "--prod" ]]; then
@@ -26,10 +28,16 @@ if [[ "$CLI_SDK_DEP" != "$EXPECTED_CLI_SDK_DEP" ]]; then
 fi
 
 echo "==> Cleaning previous builds"
-rm -rf dist/
+rm -rf dist/ "$SDK_DIR/dist/"
+
+echo "==> Installing SDK dependencies"
+npm ci --ignore-scripts --prefix "$SDK_DIR"
+
+echo "==> Building SDK"
+npm run build --prefix "$SDK_DIR"
 
 echo "==> Installing dependencies"
-npm install --ignore-scripts
+npm ci --ignore-scripts
 
 echo "==> Building"
 npm run build
