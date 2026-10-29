@@ -4,9 +4,33 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import httpx._transports.default as _httpx_transport
 import pytest
 
 from inkbox import Inkbox
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _shared_default_ssl_context():
+    """Build httpx's default verifying SSL context once per session.
+
+    Every ``Inkbox`` builds ~10 transports, each loading the CA bundle;
+    on Windows runners that dominated the suite's wall time.
+    """
+    real = _httpx_transport.create_ssl_context
+    cache: dict = {}
+
+    def create_ssl_context(verify=True, cert=None, trust_env=True):
+        if verify is not True or cert is not None:
+            return real(verify=verify, cert=cert, trust_env=trust_env)
+        if trust_env not in cache:
+            cache[trust_env] = real(verify=True, cert=None, trust_env=trust_env)
+        return cache[trust_env]
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_httpx_transport, "create_ssl_context", create_ssl_context)
+    yield
+    mp.undo()
 
 
 class FakeHttpTransport:

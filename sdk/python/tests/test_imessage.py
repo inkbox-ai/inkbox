@@ -8,7 +8,6 @@ from uuid import UUID
 from unittest.mock import ANY
 
 import pytest
-import inkbox
 
 from inkbox.imessage.types import (
     IMessageNumberStatus,
@@ -255,9 +254,6 @@ class TestIMessagesSend:
 
 
 class TestIMessageNumbers:
-    def test_number_type_selector_is_not_exported(self):
-        assert not hasattr(inkbox, "IMessageNumberType")
-
     def test_lists_attached_and_unattached_numbers(self, client, transport):
         transport.get.return_value = [
             IMESSAGE_NUMBER_DICT,

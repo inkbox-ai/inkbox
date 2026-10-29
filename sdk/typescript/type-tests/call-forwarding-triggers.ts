@@ -1,5 +1,5 @@
 // Existing exhaustive consumers must still compile unchanged.
-import { CallForwardingTrigger, type WebhookPhoneCallForwarding } from "../../src/index.js";
+import { CallForwardingTrigger, type WebhookPhoneCallForwarding } from "../dist/index.js";
 
 const wireTrigger: WebhookPhoneCallForwarding["trigger"] = "incoming_action";
 function legacyTriggerLabel(trigger: CallForwardingTrigger): string {

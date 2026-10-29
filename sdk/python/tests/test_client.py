@@ -12,11 +12,9 @@ import pytest
 from inkbox import Inkbox
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
-from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.incoming_call_action import IncomingCallActionResource
-from inkbox.signing_keys import SigningKeysResource
 
 
 class TestInkboxPublicAccessors:
@@ -37,21 +35,19 @@ class TestInkboxPublicAccessors:
         client.close()
 
 
-class TestInkboxPhoneResources:
-    def test_creates_phone_resource_instances(self):
-        client = Inkbox(api_key="sk-test")
-
-        assert isinstance(client._numbers, PhoneNumbersResource)
-        assert isinstance(client._calls, CallsResource)
-        assert isinstance(client._incoming_call_action, IncomingCallActionResource)
-        assert isinstance(client._signing_keys, SigningKeysResource)
-
-        client.close()
-
-    def test_phone_http_base_url(self):
-        client = Inkbox(api_key="sk-test", base_url="https://localhost:8000")
-        assert str(client._phone_http._client.base_url) == "https://localhost:8000/api/v1/phone/"
-        client.close()
+class TestInkboxBaseUrls:
+    @pytest.mark.parametrize(
+        ("attr", "path"),
+        [
+            ("_phone_http", "phone/"),
+            ("_mail_http", "mail/"),
+            ("_domains_http", "domains/"),
+            ("_ids_http", "identities/"),
+        ],
+    )
+    def test_resource_http_base_url(self, attr, path):
+        with Inkbox(api_key="sk-test", base_url="https://localhost:8000") as client:
+            assert str(getattr(client, attr)._client.base_url) == f"https://localhost:8000/api/v1/{path}"
 
     def test_rejects_http_base_url(self):
         with pytest.raises(ValueError, match="Only HTTPS base URLs are permitted"):

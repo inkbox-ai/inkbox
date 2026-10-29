@@ -559,9 +559,9 @@ async def test_ws_accept_deadline_trips_when_app_stalls():
     """An ASGI WS handler that never calls accept must trip the deadline."""
 
     async def app(scope, receive, send):
-        # Receive websocket.connect, then stall.
+        # Receive websocket.connect, then stall until the disconnect.
         await receive()
-        await asyncio.sleep(60)
+        await receive()
 
     session = WSASGISession(
         app=app,
@@ -997,7 +997,7 @@ async def test_dispatch_ws_upgrade_callable_resets_bridge_on_open_failure():
         # the run_until_accept gate. Then stall.
         await receive()
         await send({"type": "websocket.accept"})
-        await asyncio.sleep(60)
+        await receive()
 
     runtime = _make_runtime(forward_to=app)
     runtime._response_deadline_seconds = 0.05
@@ -1145,11 +1145,13 @@ async def test_open_ws_upstream_handshake_timeout():
         open_ws_upstream,
     )
 
+    release = asyncio.Event()
+
     async def stall(reader, writer):
         # Read the request, then never write anything.
         try:
             await reader.read(4096)
-            await asyncio.sleep(60)
+            await release.wait()
         finally:
             writer.close()
 
@@ -1170,6 +1172,7 @@ async def test_open_ws_upstream_handshake_timeout():
         assert ei.value.status == 504
         assert "timeout" in ei.value.reason.lower()
     finally:
+        release.set()
         serve.cancel()
         try:
             await serve
