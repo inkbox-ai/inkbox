@@ -152,10 +152,10 @@ jobs:
             sdk/typescript/package-lock.json
             cli/package-lock.json
 
-      - name: Build TypeScript SDK
-        working-directory: sdk/typescript
-        run: npm ci && npm run build
+      - name: Validate CLI publish dry run from a clean checkout
+        working-directory: cli
+        run: ./publish.sh
 
       - name: Run CLI tests against the local SDK
         working-directory: cli
-        run: npm ci && npm test
+        run: npm test

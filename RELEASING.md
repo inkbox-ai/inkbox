@@ -28,6 +28,10 @@ in backticks, followed by a colon and space: `` `0.0.0`: PR title ``.
 
 The CLI declares `@inkbox/sdk: ^<version>` and `cli/publish.sh` refuses to publish unless that matches `sdk/typescript`'s version — so bump it too.
 
+The CLI lockfile links the local TypeScript SDK. `cli/publish.sh` installs locked
+dependencies and rebuilds that SDK before building the CLI, so a clean checkout
+or stale SDK build works without a manual build step. CI checks the publish dry run.
+
 The plugin isn't published to a registry, but its version is the cache key Claude
 Code uses to decide whether an installed copy is out of date. Leaving it behind
 means people who already installed the plugin keep the old skills no matter how
@@ -64,7 +68,10 @@ of maintaining duplicate feature lists.
 
 ## 3. Publish — order matters
 
-Publish the **TypeScript SDK before the CLI** (the CLI depends on it; its `publish.sh` runs `npm install`, which resolves the just-published `@inkbox/sdk`). Python and Rust have no cross-deps and can go anytime.
+Publish the **TypeScript SDK before the CLI**. The CLI builds against the local
+SDK, but its published dependency resolves from npm when users install it, so the
+matching SDK release must already be available. Python and Rust have no
+cross-deps and can go anytime.
 
 Run all four from the repo root, in this order:
 
