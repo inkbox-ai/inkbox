@@ -144,7 +144,9 @@ def test_reaction_webhook_uses_its_receipt_and_keeps_unknown_actor_null():
 
     event = F["reaction_webhook"]
     assert event["event_type"] in get_args(WhatsAppWebhookEventType)
-    assert "message" not in event["data"]
+    assert event["data"]["message"]["id"] == F["message"]["id"]
+    assert event["data"]["message"]["direction"] == "outbound"
+    assert "is_blocked" not in event["data"]["message"]
     reaction = WhatsAppReaction._from_dict(event["data"]["reaction"])
     assert reaction.remote_number is None
     assert str(reaction.target_message_id) == F["message"]["id"]

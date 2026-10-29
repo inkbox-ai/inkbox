@@ -58,10 +58,12 @@ describe("WhatsApp v2 shared wire contract", () => {
   });
 });
 
-it("reaction notifications preserve nullable actors without a fabricated message", () => {
+it("reaction notifications preserve nullable actors and the original target message", () => {
   const event = f.reaction_webhook;
   expect(event.event_type).toBe("whatsapp.reaction_received");
-  expect(event.data.message).toBeUndefined();
+  expect(event.data.message.id).toBe(f.message.id);
+  expect(event.data.message.direction).toBe("outbound");
+  expect(event.data.message.is_blocked).toBeUndefined();
   const reaction = parseWhatsAppReaction(event.data.reaction);
   expect(reaction.remoteNumber).toBeNull(); expect(reaction.targetMessageId).toBe(f.message.id);
 });
