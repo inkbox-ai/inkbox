@@ -1,6 +1,6 @@
 /** Approved WhatsApp conversations, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
-import { postMessage } from "./message_sends.js";
+import { messageKey, postMessage } from "./message_sends.js";
 export type WhatsAppDirection = "inbound" | "outbound";
 export type WhatsAppMessageStatus =
   | "received"
@@ -397,14 +397,21 @@ export class WhatsAppResource {
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
     };
+    const key = messageKey(o.idempotencyKey);
     const data = await postMessage<{ message: RawWhatsAppMessage }>(
       this.http,
       "/messages",
       body,
-      o.idempotencyKey,
+      key,
       owner(o.agentIdentityId),
     );
-    return parseWhatsAppMessage(data.message);
+    try {
+      return parseWhatsAppMessage(data.message);
+    } catch (error) {
+      // Keep recovery possible when an accepted response cannot be decoded.
+      if (error instanceof Error) Object.assign(error, { idempotencyKey: key });
+      throw error;
+    }
   }
   async get(
     id: string,
