@@ -23,7 +23,7 @@ export function buildWhatsAppSendOptions(options: {
     throw new Error("Pass exactly one of --to or --conversation-id.");
   if (recipients && (recipients.length < 1 || recipients.length > 8 || new Set(recipients).size !== recipients.length || recipients.some(value => !/^\+[1-9][0-9]{6,14}$/.test(value))))
     throw new Error("Provide 1–8 unique E.164 recipients.");
-  if (options.replyToMessageId && !options.conversationId) throw new Error("--reply-to-message-id requires --conversation-id.");
+  if (options.replyToMessageId !== undefined && (!options.replyToMessageId || !options.conversationId)) throw new Error("--reply-to-message-id requires --conversation-id.");
   if (options.groupName !== undefined && (!recipients || recipients.length < 2 || !options.groupName.trim() || Array.from(options.groupName).length > 100)) throw new Error("--group-name requires 2–8 recipients and 1–100 characters.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
@@ -32,7 +32,7 @@ export function buildWhatsAppSendOptions(options: {
     ...(options.conversationId
       ? { conversationId: options.conversationId }
       : {}),
-    ...(options.replyToMessageId ? { replyToMessageId: options.replyToMessageId } : {}),
+    ...(options.replyToMessageId !== undefined ? { replyToMessageId: options.replyToMessageId } : {}),
     ...(options.groupName !== undefined ? { groupName: options.groupName } : {}),
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
