@@ -430,3 +430,77 @@ fn documented_identity_bound_rust_send_selects_the_agent_for_organization_keys()
     identity_get.assert();
     send.assert();
 }
+
+#[test]
+fn list_date_filters_and_group_default() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    for path in ["messages", "conversations"] {
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/whatsapp/{path}"))
+                .query_param("include_groups", "false")
+                .query_param("start_datetime", "2026-03-08")
+                .query_param("end_datetime", "2026-03-08")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        let options = WhatsAppListOptions {
+            start_datetime: Some("2026-03-08".into()),
+            end_datetime: Some("2026-03-08".into()),
+            tz: Some("America/New_York".into()),
+            ..Default::default()
+        };
+        if path == "messages" {
+            client.whatsapp().list(&options).unwrap();
+        } else {
+            client.whatsapp().list_conversations(&options).unwrap();
+        }
+        mock.assert();
+    }
+}
+
+#[test]
+fn reply_fallback_wire_preserves_legacy_default() {
+    let f = fixture();
+    let conversation = Uuid::parse_str(f["conversation"]["id"].as_str().unwrap()).unwrap();
+    let message = Uuid::parse_str(f["message"]["id"].as_str().unwrap()).unwrap();
+    for quoted in [false, true] {
+        for fallback in [false, true] {
+            let server = MockServer::start();
+            let mut expected = json!({"conversation_id":conversation,"text":"Reply"});
+            if quoted {
+                expected["reply_to_message_id"] = json!(message);
+            }
+            if quoted && !fallback {
+                expected["plain_reply_fallback"] = json!(false);
+            }
+            let mock = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/whatsapp/messages")
+                    .header("Idempotency-Key", "same-operation")
+                    .json_body(expected);
+                then.status(201).json_body(json!({"message":f["message"]}));
+            });
+            let client = Inkbox::builder("test-only")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            client
+                .whatsapp()
+                .send(&WhatsAppSendOptions {
+                    conversation_id: Some(conversation),
+                    reply_to_message_id: if quoted { Some(message) } else { None },
+                    plain_reply_fallback: Some(fallback),
+                    text: Some("Reply".into()),
+                    idempotency_key: Some("same-operation".into()),
+                    ..Default::default()
+                })
+                .unwrap();
+            mock.assert();
+        }
+    }
+}

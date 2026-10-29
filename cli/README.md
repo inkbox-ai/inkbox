@@ -1456,3 +1456,17 @@ The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-what
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Groups of 2–8 recipients, native quoted replies, and versioned whole-message
 reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+
+### WhatsApp history filters
+
+`inkbox whatsapp list` and `conversations` default to direct conversations. Add
+`--include-groups` for groups, `--start-datetime` / `--end-datetime` for creation-date
+bounds, and `--tz` for zone-less dates. `--unread-only` is an alias of `--unread`
+on message lists. `inkbox whatsapp conversation <conversation-id>` reads messages
+in an existing conversation, including groups; `get-conversation` still returns
+metadata. `unreact` and `remove-reaction` are equivalent and require the original
+reaction ID and a stable removal idempotency key.
+
+For quoted sends, `--no-plain-reply-fallback` explicitly requires a native quote.
+All currently supported WhatsApp targets support native quotes; missing evidence
+or rejected/uncertain sends never trigger a plain replacement.

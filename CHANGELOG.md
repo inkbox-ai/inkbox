@@ -17,7 +17,13 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   distinct from applied message reactions.
 - Group creation accepts 2–8 distinct E.164 recipients with an optional creation-only
   name. Existing groups retain conversation IDs, observed membership, and uncertain
-  creation status. Message and conversation lists include groups by default.
+  creation status. Message and conversation lists default to direct conversations;
+  group inclusion is explicit, while a selected conversation always retains its history.
+- Creation-date filters and timezone-aware bounds across message/conversation lists.
+  CLI aliases include `--unread-only`, `unreact`, and a `conversation` history command.
+- Strict `plain_reply_fallback` / `plainReplyFallback` send option, default true; false
+  explicitly requires native quoting. All current WhatsApp targets support native
+  quotes; missing evidence or rejected/uncertain sends never cause a plain replacement.
 - Typed WhatsApp notification payloads, fresh identity channel-status reads, and
   explicit opt-in WhatsApp contact correspondence. Existing correspondence defaults
   and Rust identity struct literals remain compatible.
