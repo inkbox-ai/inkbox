@@ -24,7 +24,8 @@ export function buildWhatsAppSendOptions(options: {
     throw new Error("Pass exactly one of --to or --conversation-id.");
   if (recipients && (recipients.length < 1 || recipients.length > 8 || new Set(recipients).size !== recipients.length || recipients.some(value => !/^\+[1-9][0-9]{6,14}$/.test(value))))
     throw new Error("Provide 1–8 unique E.164 recipients.");
-  if (options.replyToMessageId !== undefined && (!options.replyToMessageId || !options.conversationId)) throw new Error("--reply-to-message-id requires --conversation-id.");
+  if (options.replyToMessageId !== undefined && !options.replyToMessageId) throw new Error("--reply-to-message-id requires a non-empty message ID.");
+  if (options.replyToMessageId !== undefined && !options.conversationId) throw new Error("--reply-to-message-id requires --conversation-id.");
   if (options.groupName !== undefined && (!recipients || recipients.length < 2 || !options.groupName.trim() || Array.from(options.groupName).length > 100)) throw new Error("--group-name requires 2–8 recipients and 1–100 characters.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
@@ -58,6 +59,10 @@ export function buildWhatsAppListOptions(options: {
     ...(options.tz !== undefined ? { tz: options.tz } : {}),
   };
 }
+
+const WHATSAPP_MESSAGE_COLUMNS = [
+  "id", "conversationId", "direction", "remoteNumber", "content", "status", "deliveryState",
+];
 
 export function registerWhatsAppCommands(program: Command): void {
   const whatsapp = program
@@ -166,28 +171,21 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--unread-only", "Only locally unread messages")
     .action(
       withErrorHandler(async function (this: Command, opts) {
+        const listOptions = buildWhatsAppListOptions(opts);
         const global = getGlobalOpts(this);
         const identity = await createClient(global).getIdentity(opts.identity);
         output(
           await identity.listWhatsAppMessages({
             conversationId: opts.conversationId,
             threadId: opts.threadId,
-            ...buildWhatsAppListOptions(opts),
+            ...listOptions,
             limit: Number(opts.limit),
             offset: Number(opts.offset),
             ...(opts.unread || opts.unreadOnly ? { isRead: false } : {}),
           }),
           {
             json: !!global.json,
-            columns: [
-              "id",
-              "conversationId",
-              "direction",
-              "remoteNumber",
-              "content",
-              "status",
-              "deliveryState",
-            ],
+            columns: WHATSAPP_MESSAGE_COLUMNS,
           },
         );
       }),
@@ -200,7 +198,7 @@ export function registerWhatsAppCommands(program: Command): void {
     .action(withErrorHandler(async function (this: Command, conversationId: string, opts) {
       const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
       output(await identity.listWhatsAppMessages({ conversationId, threadId: opts.threadId,
-        includeGroups: true, limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json });
+        includeGroups: true, limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json, columns: WHATSAPP_MESSAGE_COLUMNS });
     }));
 
   identityCommand("react <message-id>", "Submit a reaction; acceptance is not an applied reaction")
@@ -244,11 +242,12 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--offset <n>", "Pagination offset", "0")
     .action(
       withErrorHandler(async function (this: Command, opts) {
+        const listOptions = buildWhatsAppListOptions(opts);
         const global = getGlobalOpts(this);
         const identity = await createClient(global).getIdentity(opts.identity);
         output(
           await identity.listWhatsAppConversations({
-            ...buildWhatsAppListOptions(opts),
+            ...listOptions,
             limit: Number(opts.limit),
             offset: Number(opts.offset),
           }),
