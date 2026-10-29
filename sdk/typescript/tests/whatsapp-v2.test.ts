@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WhatsAppResource, parseWhatsAppMessage, parseWhatsAppConversation, parseWhatsAppReaction } from "../src/whatsapp.js";
+import { parseCorrespondenceItem } from "../src/contacts/correspondence.js";
 import { HttpTransport } from "../src/_http.js";
 const f = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp-v2.json", import.meta.url), "utf8"));
 const old = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp.json", import.meta.url), "utf8"));
@@ -63,4 +64,17 @@ it("reaction notifications preserve nullable actors without a fabricated message
   expect(event.data.message).toBeUndefined();
   const reaction = parseWhatsAppReaction(event.data.reaction);
   expect(reaction.remoteNumber).toBeNull(); expect(reaction.targetMessageId).toBe(f.message.id);
+});
+
+
+it("normalizes omitted nullable WhatsApp correspondence fields without changing default channels", () => {
+  const base = {channel: "whatsapp", source_id: f.message.id, direction: "inbound", occurred_at: f.message.created_at,
+    identity_id: f.message.agent_identity_id, conversation_id: f.message.conversation_id,
+    local_number: f.message.local_number, participants: f.message.participants, is_group: true};
+  for (const wire of [base, {...base, remote_number: null, text: null, media: null}]) {
+    const item = parseCorrespondenceItem(wire as never);
+    expect(item.channel).toBe("whatsapp");
+    if (item.channel !== "whatsapp") throw new Error("Incorrect correspondence channel");
+    expect(item.remoteNumber).toBeNull(); expect(item.text).toBeNull(); expect(item.media).toBeNull();
+  }
 });

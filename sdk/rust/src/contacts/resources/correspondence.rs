@@ -15,7 +15,8 @@ const BASE: &str = "/contacts";
 
 #[derive(Debug, Clone, Default)]
 pub struct CorrespondenceQuery {
-    /// Channels to retrieve; empty selects all supported channels, including Slack.
+    /// Channels to retrieve; empty selects email, SMS, iMessage, calls, and Slack.
+    /// Include WhatsApp explicitly to retrieve WhatsApp correspondence.
     pub channels: Vec<CorrespondenceChannel>,
     pub after: Option<String>,
     pub before: Option<String>,
