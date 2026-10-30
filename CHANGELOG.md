@@ -25,6 +25,13 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Voice AI tool history now includes built-in and external MCP invocations with
+  source, connection, server URL, observation coverage, and payload availability.
+  The MCP-only activity endpoint remains available.
+- **Source-breaking for tool-history consumers:** handle the new `unknown` status
+  and nullable start time, using `observed_at` / `observedAt` when no start was seen.
+  Rust struct literals must include the added provenance fields and page `incomplete`.
+
 - Rust `McpContextSelections` adds optional `mode`; struct literals can use
   `..Default::default()` to preserve explicit-selection behavior.
 - **Source-breaking for manually constructed voice options:**
