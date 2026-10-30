@@ -60,6 +60,7 @@ class McpSkillSelection(TypedDict):
 
 
 class McpContextSelections(TypedDict, total=False):
+    mode: Literal["selected", "all"]
     prompts: list[McpPromptSelection]
     resources: list[str]
     skills: list[McpSkillSelection]

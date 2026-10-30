@@ -14,6 +14,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Configure bearer or custom-header authentication, tool allowlists, and selected
   prompts, resources, and instruction-only Skills. CLI configuration reads from
   a JSON file or stdin.
+- Set `context.mode` to `all` for automatic access to discovered prompts,
+  resources, and instruction-only skills during voice calls, including prompts
+  with conversation-supplied arguments. Existing explicit selections remain supported.
 - Voice catalogs expose `mcp_supported` (Python/Rust) or `mcpSupported`
   (TypeScript) so clients can check compatibility.
 - OAuth configuration and browser authorization start, status, cancel, and disconnect methods in Python, TypeScript, and Rust.
@@ -22,6 +25,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Rust `McpContextSelections` adds optional `mode`; struct literals can use
+  `..Default::default()` to preserve explicit-selection behavior.
 - **Source-breaking for manually constructed voice options:**
   `HostedAgentVoiceOption` adds required `mcpSupported` in TypeScript and
   `mcp_supported` in Rust struct literals. Parsed older responses default to false.

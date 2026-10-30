@@ -32,6 +32,7 @@ export function parseHostedMcpAuthorization(r: RawHostedMcpAuthorization): Hoste
     configVersion: r.config_version, requestedScopes: r.requested_scopes, errorCode: r.error_code };
 }
 export interface McpContextSelections {
+  mode?: "selected" | "all";
   prompts?: Array<{ name: string; arguments?: Record<string, string> }>;
   resources?: string[];
   skills?: Array<{ uri: string; manifestDigest: string }>;
@@ -75,7 +76,7 @@ export interface RawHostedMcpConnection {
     requested_scopes?: string[]; granted_scopes?: string[]; error_code?: string | null;
     issuer?: string | null; callback_uri?: string | null };
   enabled: boolean; allowed_tools: string[] | null;
-  context: { prompts?: McpContextSelections["prompts"]; resources?: string[]; skills?: Array<{ uri: string; manifest_digest: string }> };
+  context: { mode?: McpContextSelections["mode"]; prompts?: McpContextSelections["prompts"]; resources?: string[]; skills?: Array<{ uri: string; manifest_digest: string }> };
   config_version: number; preparation_status: HostedMcpConnection["preparationStatus"];
   health_code: string | null; capabilities: Record<string, boolean>; catalog_version: string | null; catalog_fetched_at: string | null;
 }
@@ -105,7 +106,7 @@ export function mcpBody(body: HostedMcpCreate | HostedMcpUpdate): Record<string,
     auth: auth?.type === "header" ? { type: auth.type, token: auth.token, header_name: auth.headerName, value_prefix: auth.valuePrefix } :
       auth?.type === "oauth" ? { type: auth.type, issuer: auth.issuer, scopes: auth.scopes, client_id: auth.clientId,
         client_secret: auth.clientSecret, token_endpoint_auth_method: auth.tokenEndpointAuthMethod, profile: auth.profile } : auth,
-    context: body.context === undefined ? undefined : { prompts: body.context.prompts, resources: body.context.resources,
+    context: body.context === undefined ? undefined : { mode: body.context.mode, prompts: body.context.prompts, resources: body.context.resources,
       skills: body.context.skills?.map(s => ({ uri: s.uri, manifest_digest: s.manifestDigest })) },
   };
 }
@@ -118,6 +119,6 @@ export function parseHostedMcpConnection(r: RawHostedMcpConnection): HostedMcpCo
     enabled: r.enabled, allowedTools: r.allowed_tools, configVersion: r.config_version, preparationStatus: r.preparation_status,
     healthCode: r.health_code, capabilities: r.capabilities, catalogVersion: r.catalog_version,
     catalogFetchedAt: r.catalog_fetched_at ? new Date(r.catalog_fetched_at) : null,
-    context: { prompts: r.context.prompts, resources: r.context.resources,
+    context: { mode: r.context.mode, prompts: r.context.prompts, resources: r.context.resources,
       skills: r.context.skills?.map(s => ({ uri: s.uri, manifestDigest: s.manifest_digest })) } };
 }

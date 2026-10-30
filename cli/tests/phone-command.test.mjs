@@ -37,10 +37,10 @@ test("MCP file writes preserve grants, idempotency, and credential omission", as
     assert.equal(created.body.auth.token, "synthetic-secret");
     assert.equal(created.body.auth.header_name, "X-Example-Key");
     assert.doesNotMatch(result.stdout + result.stderr, /synthetic-secret/);
-    await writeFile(file, JSON.stringify({ expectedVersion: 1, allowedTools: null }));
+    await writeFile(file, JSON.stringify({ expectedVersion: 1, allowedTools: null, context: { mode: "all" } }));
     result = await runCli([...args, "update", connection.id, "--file", file]);
     assert.ifError(result.error);
-    assert.deepEqual(requests.at(-1).body, { expected_version: 1, allowed_tools: null });
+    assert.deepEqual(requests.at(-1).body, { expected_version: 1, allowed_tools: null, context: { mode: "all" } });
     const count = requests.length;
     await writeFile(file, JSON.stringify({ expectedVersion: 1, allowed_tools: ["lookup"] }));
     result = await runCli([...args, "update", connection.id, "--file", file]);

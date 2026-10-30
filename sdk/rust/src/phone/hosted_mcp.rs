@@ -78,8 +78,17 @@ pub enum McpTransport {
     Sse,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum McpContextMode {
+    Selected,
+    All,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct McpContextSelections {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<McpContextMode>,
     #[serde(default)]
     pub prompts: Vec<McpPromptSelection>,
     #[serde(default)]
@@ -218,6 +227,20 @@ pub struct HostedMcpActivityPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn automatic_context_roundtrips_and_legacy_requests_omit_mode() {
+        let context = McpContextSelections {
+            mode: Some(McpContextMode::All),
+            ..Default::default()
+        };
+        let wire = serde_json::to_value(&context).unwrap();
+        assert_eq!(wire["mode"], "all");
+        let parsed: McpContextSelections = serde_json::from_value(wire).unwrap();
+        assert!(matches!(parsed.mode, Some(McpContextMode::All)));
+        let legacy = serde_json::to_value(McpContextSelections::default()).unwrap();
+        assert!(legacy.get("mode").is_none());
+    }
 
     #[test]
     fn oauth_serialization_preserves_auth_method_and_hides_debug_secret() {

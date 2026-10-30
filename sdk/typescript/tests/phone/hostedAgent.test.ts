@@ -22,6 +22,17 @@ function mockHttp() {
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 
 describe("MCP connection grants", () => {
+  it("preserves automatic context mode on requests and responses", async () => {
+    const http = mockHttp();
+    const resource = new HostedAgentConfigResource(http);
+    vi.mocked(http.post).mockResolvedValue({ id: IDENTITY_ID, agent_identity_id: IDENTITY_ID,
+      label: "Calendar", url: "https://calendar.example/mcp", transport: "streamable_http",
+      auth: { type: "none", configured: false }, context: { mode: "all" }, allowed_tools: null });
+    const connection = await resource.createMcpServer({ label: "Calendar", url: "https://calendar.example/mcp",
+      allowedTools: null, context: { mode: "all" } }, { idempotencyKey: "automatic-context" });
+    expect(connection.context.mode).toBe("all");
+    expect(JSON.parse(JSON.stringify(vi.mocked(http.post).mock.calls[0][1])).context).toEqual({ mode: "all" });
+  });
   it("serializes OAuth settings and parses browser authorization status", async () => {
     const http = mockHttp();
     const resource = new HostedAgentConfigResource(http);

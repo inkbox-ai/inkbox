@@ -51,9 +51,12 @@ def test_mcp_patch_preserves_omission_and_explicit_grant_removal(client, transpo
     assert "allowed_tools" not in transport.patch.call_args.kwargs["json"]
     client._hosted_agent.update_mcp_server(IDENTITY_ID, {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None})
     assert transport.patch.call_args.kwargs["json"] == {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None}
-    transport.post.return_value = response
+    transport.post.return_value = {**response, "context": {"mode": "all"}}
     created = client._hosted_agent.create_mcp_server({"label": "Calendar", "url": "https://tools.example/mcp",
-        "auth": {"type": "header", "header_name": "X-Example-Key", "value_prefix": "Token ", "token": "synthetic"}}, idempotency_key="stable-create")
+        "auth": {"type": "header", "header_name": "X-Example-Key", "value_prefix": "Token ", "token": "synthetic"},
+        "context": {"mode": "all"}}, idempotency_key="stable-create")
+    assert created.context == {"mode": "all"}
+    assert transport.post.call_args.kwargs["json"]["context"] == {"mode": "all"}
     assert transport.post.call_args.kwargs["headers"] == {"Idempotency-Key": "stable-create"}
     assert transport.post.call_args.kwargs["json"]["auth"]["token"] == "synthetic"
     assert "synthetic" not in repr(created)

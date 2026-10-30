@@ -21,7 +21,7 @@ export async function readMcpBody(file: string): Promise<Record<string, unknown>
   if (result.auth !== undefined) checkFields(result.auth, ["type", "token", "headerName", "valuePrefix", "issuer", "scopes",
     "clientId", "clientSecret", "tokenEndpointAuthMethod", "profile"]);
   if (result.context !== undefined) {
-    checkFields(result.context, ["prompts", "resources", "skills"]);
+    checkFields(result.context, ["mode", "prompts", "resources", "skills"]);
     const context = result.context as Record<string, unknown>;
     for (const [name, fields] of [["skills", ["uri", "manifestDigest"]], ["prompts", ["name", "arguments"]]] as const) {
       if (context[name] !== undefined) {
