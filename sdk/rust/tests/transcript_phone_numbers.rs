@@ -54,3 +54,25 @@ fn dedicated_local_number_and_unavailable_attribution() {
         assert!(webhook.phone_number.is_none());
     }
 }
+
+#[test]
+fn external_tool_history_preserves_provenance_and_missing_payloads() {
+    use inkbox::phone::{HostedAgentToolInvocationPage, HostedAgentToolInvocationStatus};
+    let page: HostedAgentToolInvocationPage = serde_json::from_value(json!({
+        "items": [{"id":"00000000-0000-4000-8000-000000000001", "call_id":"00000000-0000-4000-8000-000000000002",
+            "tool_name":"search", "status":"unknown", "source":"external_mcp", "server_url":"https://mcp.example.com/mcp",
+            "started_at":null, "observed_at":"2026-10-30T00:00:00Z", "arguments_available":false, "result_available":false}],
+        "limit":50, "offset":0, "has_more":false, "incomplete":true
+    })).unwrap();
+    assert!(page.incomplete);
+    let tool = &page.items[0];
+    assert_eq!(tool.status, HostedAgentToolInvocationStatus::Unknown);
+    assert_eq!(tool.source, "external_mcp");
+    assert_eq!(
+        tool.server_url.as_deref(),
+        Some("https://mcp.example.com/mcp")
+    );
+    assert!(tool.started_at.is_none() && tool.observed_at.is_some());
+    assert_eq!(tool.arguments_available, Some(false));
+    assert_eq!(tool.result_available, Some(false));
+}

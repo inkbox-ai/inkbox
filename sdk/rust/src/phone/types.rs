@@ -872,6 +872,7 @@ pub enum HostedAgentToolInvocationStatus {
     Started,
     Succeeded,
     Failed,
+    Unknown,
 }
 
 /// Safe activity record for one Voice AI tool invocation.
@@ -883,9 +884,29 @@ pub struct HostedAgentToolInvocation {
     pub status: HostedAgentToolInvocationStatus,
     #[serde(default)]
     pub result: Option<serde_json::Map<String, serde_json::Value>>,
-    pub started_at: String,
+    pub started_at: Option<String>,
     #[serde(default)]
     pub completed_at: Option<String>,
+    #[serde(default = "default_tool_source")]
+    pub source: String,
+    #[serde(default)]
+    pub connection_id: Option<Uuid>,
+    #[serde(default)]
+    pub config_version: Option<i64>,
+    #[serde(default)]
+    pub connection_label: Option<String>,
+    #[serde(default)]
+    pub server_url: Option<String>,
+    #[serde(default)]
+    pub error_code: Option<String>,
+    #[serde(default)]
+    pub observation_coverage: Option<String>,
+    #[serde(default)]
+    pub arguments_available: Option<bool>,
+    #[serde(default)]
+    pub result_available: Option<bool>,
+    #[serde(default)]
+    pub observed_at: Option<String>,
 }
 
 /// A page of Voice AI tool activity for one call.
@@ -895,6 +916,12 @@ pub struct HostedAgentToolInvocationPage {
     pub limit: i64,
     pub offset: i64,
     pub has_more: bool,
+    #[serde(default)]
+    pub incomplete: bool,
+}
+
+fn default_tool_source() -> String {
+    "builtin".into()
 }
 
 /// A per-(org, receiver) SMS consent row.

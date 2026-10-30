@@ -662,3 +662,20 @@ class TestCallsPlaceErrors:
         err = info.value
         assert err.status_code == 503
         assert err.detail["error"] == "hosted_agent_at_capacity"
+
+
+def test_external_tool_history_keeps_source_unknown_and_missing_payloads():
+    from inkbox.phone.types import HostedAgentToolInvocationPage
+
+    page = HostedAgentToolInvocationPage._from_dict({"items": [{
+        "id": CALL_ID, "call_id": CALL_ID, "tool_name": "search", "status": "unknown", "result": None,
+        "started_at": None, "completed_at": None, "source": "external_mcp", "connection_id": CALL_ID,
+        "server_url": "https://mcp.example.com/mcp", "arguments_available": False, "result_available": False,
+        "observed_at": "2026-10-30T00:00:00+00:00",
+    }], "limit": 50, "offset": 0, "has_more": False, "incomplete": True})
+    assert page.incomplete
+    tool = page.items[0]
+    assert tool.status.value == "unknown" and tool.source == "external_mcp"
+    assert tool.server_url == "https://mcp.example.com/mcp"
+    assert tool.started_at is None and tool.observed_at is not None
+    assert tool.arguments_available is False and tool.result_available is False
