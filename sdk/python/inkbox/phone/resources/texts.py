@@ -6,6 +6,8 @@ Text message (SMS/MMS) operations: list, get, update, search, conversations.
 
 from __future__ import annotations
 
+from inkbox._conversation_filters import conversation_filter_params
+
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from inkbox._message_requests import post_message
@@ -222,6 +224,8 @@ class TextsResource:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> list[TextConversationSummary]:
         """List conversation summaries with latest message preview.
 
@@ -234,6 +238,9 @@ class TextsResource:
         of blocked rows.
 
         Args:
+            participants: Match any email address or E.164 phone number (1–100).
+            contact_id: Match all accessible active identifiers of this contact;
+                mutually exclusive with participants.
             phone_number_id: UUID of the phone number.
             limit: Max results to return (1–200).
             offset: Pagination offset.
@@ -251,7 +258,7 @@ class TextsResource:
             tz: IANA timezone name (str) governing zone-less values;
                 ``None`` means UTC.
         """
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset, **conversation_filter_params(participants, contact_id)}
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
         if include_groups:

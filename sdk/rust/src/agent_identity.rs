@@ -1267,6 +1267,29 @@ impl AgentIdentity {
         )
     }
 
+    /// List text conversations matching any participant or a saved contact.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_text_conversations_matching(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+        filter: &DateRangeFilter,
+        participants: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<TextConversationSummary>> {
+        let number_id = self.require_phone_id()?;
+        self.inkbox.texts().list_conversations_matching(
+            &number_id,
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
+            filter,
+            participants,
+        )
+    }
+
     /// Get all messages in a conversation.
     ///
     /// # Arguments
@@ -1681,6 +1704,29 @@ impl AgentIdentity {
                 filter,
                 include_groups,
             )
+    }
+
+    /// List iMessage conversations matching any participant or a saved contact.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessage_conversations_matching(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+        participants: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        self.require_imessage()?;
+        self.inkbox.imessages().list_conversations_matching(
+            Some(&self.id()),
+            limit,
+            offset,
+            is_blocked,
+            filter,
+            include_groups,
+            participants,
+        )
     }
 
     /// List this identity's iMessage conversations, additionally narrowed by a

@@ -150,6 +150,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
+- Filter email, SMS, and iMessage conversations by any participant or all active
+  identifiers of a saved contact across Python, TypeScript, and Rust. The text
+  and iMessage CLI conversation commands expose `--participants` and `--contact-id`.
+
 - Manage up to three MCP connections per identity through Python, TypeScript, Rust,
   and `inkbox phone hosted-agent mcp`. Create, inspect, update, delete, test, and
   refresh connections; browse catalogs and read external call activity.

@@ -273,6 +273,29 @@ impl TextsResource {
         include_groups: bool,
         filter: &DateRangeFilter,
     ) -> Result<Vec<TextConversationSummary>> {
+        self.list_conversations_matching(
+            phone_number_id,
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
+            filter,
+            None,
+        )
+    }
+
+    /// List conversations matching any participant or a saved contact.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_conversations_matching(
+        &self,
+        phone_number_id: &str,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+        filter: &DateRangeFilter,
+        participants: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<TextConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
         if let Some(b) = is_blocked {
@@ -282,6 +305,9 @@ impl TextsResource {
             params.push(("include_groups", true.to_string()));
         }
         filter.apply(&mut params);
+        if let Some(selector) = participants {
+            selector.apply(&mut params)?;
+        }
         let data = self.http.get(
             &format!("/numbers/{phone_number_id}/texts/conversations"),
             &params,
