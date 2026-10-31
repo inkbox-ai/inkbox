@@ -1438,3 +1438,35 @@ Slack sponsorship covers the channel or group DM, including all its threads.
 A new participant joining or the sponsor leaving requires fresh sponsorship;
 another participant leaving alone does not. Explicit blocks still apply.
 Optional `threadTs` in reply context selects a reply thread; it does not limit sponsorship.
+
+## Dedicated WhatsApp
+
+`inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello --idempotency-key stable-key`
+
+Available by approval on the same number as an existing dedicated personal
+iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+request access in the console when unavailable. Direct and group messages support text
+(up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
+Upload media first, preserve its ID and a stable logical-send key before sending,
+and reuse both after an uncertain outcome. Refresh expired attachment URLs by
+media ID. Send acceptance and confirmed sending are separate from delivery;
+unknown delivery does not mean a send failed. Mark-read updates only local history.
+
+The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
+covers resource/identity methods, CLI commands, typed notifications, and explicit
+opt-in contact correspondence. Groups of 2–8 recipients, native quoted replies, and versioned whole-message
+reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+
+### WhatsApp history filters
+
+`inkbox whatsapp list` and `conversations` default to direct conversations. Add
+`--include-groups` for groups, `--start-datetime` / `--end-datetime` for creation-date
+bounds, and `--tz` for zone-less dates. `--unread-only` is an alias of `--unread`
+on message lists. `inkbox whatsapp conversation <conversation-id>` reads messages
+in an existing conversation, including groups; `get-conversation` still returns
+metadata. `unreact` and `remove-reaction` are equivalent and require the original
+reaction ID and a stable removal idempotency key.
+
+For quoted sends, `--no-plain-reply-fallback` explicitly requires a native quote.
+All currently supported WhatsApp targets support native quotes; missing evidence
+or rejected/uncertain sends never trigger a plain replacement.

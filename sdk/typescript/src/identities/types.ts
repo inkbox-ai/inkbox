@@ -189,6 +189,9 @@ export interface AgentIdentitySummary {
   description: string | null;
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
+  /** Approved dedicated WhatsApp capability; omitted on older responses. */
+  whatsappEnabled?: boolean;
+  whatsappNumber?: string | null;
   /**
    * Whether this identity can be reached over iMessage. A detailed identity
    * may also carry an attached dedicated line.
@@ -299,6 +302,8 @@ export interface RawAgentIdentitySummary {
   display_name: string | null;
   description: string | null;
   email_address: string | null;
+  whatsapp_enabled?: boolean;
+  whatsapp_number?: string | null;
   imessage_enabled?: boolean;
   contact_sharing_enabled?: boolean;
   imessage_filter_mode?: string | null;
@@ -388,6 +393,8 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     displayName: r.display_name ?? null,
     description: r.description ?? null,
     emailAddress: r.email_address,
+    whatsappEnabled: r.whatsapp_enabled ?? false,
+    whatsappNumber: r.whatsapp_number ?? null,
     imessageEnabled: r.imessage_enabled ?? false,
     contactSharingEnabled: r.contact_sharing_enabled ?? true,
     imessageFilterMode: (r.imessage_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,

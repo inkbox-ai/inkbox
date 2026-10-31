@@ -208,6 +208,8 @@ pub enum WebhookContextSkipReasonWire {
 pub enum WebhookContextTextChannelWire {
     Sms,
     Imessage,
+    #[serde(rename = "whatsapp")]
+    WhatsApp,
 }
 
 /// Slim mail context item: metadata + snippet only; bodies are omitted.
@@ -1695,4 +1697,97 @@ pub struct SlackWebhookPayload {
     pub event_type: SlackWebhookEventType,
     pub timestamp: String,
     pub data: SlackWebhookData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WhatsAppWebhookEventType {
+    #[serde(rename = "whatsapp.received")]
+    Received,
+    #[serde(rename = "whatsapp.sent")]
+    Sent,
+    #[serde(rename = "whatsapp.delivered")]
+    Delivered,
+    #[serde(rename = "whatsapp.delivery_failed")]
+    DeliveryFailed,
+    #[serde(rename = "whatsapp.delivery_unconfirmed")]
+    DeliveryUnconfirmed,
+    #[serde(rename = "whatsapp.reaction_received")]
+    ReactionReceived,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppWebhookMedia {
+    pub id: String,
+    pub filename: String,
+    pub content_type: String,
+    pub size: Option<u64>,
+    pub status: crate::whatsapp::WhatsAppMediaStatus,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppWebhookRecipient {
+    pub remote_number: String,
+    pub delivery_status: crate::whatsapp::WhatsAppMessageStatus,
+    pub delivery_state: crate::whatsapp::WhatsAppDeliveryState,
+    pub error_code: Option<String>,
+    pub error_detail: Option<String>,
+    pub sent_at: Option<String>,
+    pub delivered_at: Option<String>,
+    pub failed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppWebhookMessage {
+    pub id: String,
+    pub agent_identity_id: String,
+    pub conversation_id: String,
+    pub direction: crate::whatsapp::WhatsAppDirection,
+    pub local_number: String,
+    pub remote_number: Option<String>,
+    pub sender_number: String,
+    pub participants: Vec<String>,
+    pub is_group: bool,
+    pub content: Option<String>,
+    pub media: Vec<WhatsAppWebhookMedia>,
+    pub status: crate::whatsapp::WhatsAppMessageStatus,
+    pub delivery_state: Option<crate::whatsapp::WhatsAppDeliveryState>,
+    pub recipients: Vec<WhatsAppWebhookRecipient>,
+    pub is_read: bool,
+    pub error_code: Option<String>,
+    pub error_detail: Option<String>,
+    pub source_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub sent_at: Option<String>,
+    pub delivered_at: Option<String>,
+    pub failed_at: Option<String>,
+    pub status_observed_at: Option<String>,
+    #[serde(default)]
+    pub reply_to_message_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub thread_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub thread_root_message_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub reactions: Vec<crate::whatsapp::WhatsAppReaction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppWebhookData {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<WhatsAppWebhookMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reaction: Option<crate::whatsapp::WhatsAppReaction>,
+    pub contacts: Vec<WebhookContact>,
+    pub agent_identities: Vec<WebhookAgentIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<WebhookContext>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppWebhookPayload {
+    pub id: String,
+    pub event_type: WhatsAppWebhookEventType,
+    pub timestamp: String,
+    pub data: WhatsAppWebhookData,
 }

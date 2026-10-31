@@ -13,6 +13,7 @@ from inkbox.organization_domains.types import IdentityDomainAffiliation, parse_i
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
+from inkbox.whatsapp import WhatsAppChannelStatus
 from inkbox.exceptions import InkboxAPIError
 from inkbox.identities.exceptions import map_identity_conflict_error
 from inkbox.identities.types import (
@@ -32,6 +33,12 @@ if TYPE_CHECKING:
 
 
 class IdentitiesResource:
+    def get_whatsapp_status(self, agent_handle: str) -> WhatsAppChannelStatus | None:
+        """Read fresh WhatsApp availability; None means the API omitted the channel."""
+        data = self._http.get(f"/{quote(agent_handle, safe='')}/channel-status")
+        value = data.get("whatsapp")
+        return WhatsAppChannelStatus._from_dict(value) if value is not None else None
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 

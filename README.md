@@ -721,3 +721,180 @@ because delivery webhooks do not cover every failure before dispatch.
 ## License
 
 MIT
+
+## Dedicated WhatsApp
+
+WhatsApp is available by approval for agents that already have a dedicated
+personal iMessage number. The approved WhatsApp channel uses that same number;
+it is not a shared-number channel. Check fresh channel status instead of assuming
+an old identity snapshot grants or denies access. If access is not available,
+request it in the console. Sending does not provision or enable the channel.
+
+```python
+identity = client.get_identity("my-agent")
+status = identity.get_whatsapp_status()  # None on APIs without this channel
+message = identity.send_whatsapp(
+    to="+15555550101", text="Hello", idempotency_key="order-confirmation-123"
+)
+current = identity.get_whatsapp_message(message.id)
+```
+
+```typescript
+const identity = await client.getIdentity("my-agent");
+const status = await identity.getWhatsAppStatus(); // null on older APIs
+const message = await identity.sendWhatsApp({
+  to: "+15555550101", text: "Hello", idempotencyKey: "order-confirmation-123",
+});
+const current = await identity.getWhatsAppMessage(message.id);
+```
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let status = identity.get_whatsapp_status()?;
+let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
+    to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
+    text: Some("Hello".into()),
+    idempotency_key: Some("order-confirmation-123".into()),
+    ..Default::default()
+})?;
+# Ok(()) }
+```
+
+```bash
+inkbox whatsapp status --identity my-agent
+inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello \
+  --idempotency-key order-confirmation-123
+inkbox whatsapp conversations --identity my-agent
+inkbox whatsapp list --identity my-agent --conversation-id <conversation-id>
+```
+
+Use either one E.164 recipient (`to`) or an existing `conversation_id` /
+`conversationId`, never both. A one-element recipient array is also accepted.
+Use 2–8 unique E.164 recipients to select or create a group, not direct-message
+fan-out. Existing groups can have more participants and are addressed by conversation ID.
+An optional `group_name` / `groupName` only names a newly created group; it never renames an existing group. Outbound text is at most 4,000 Unicode code
+points. Each message can contain text, one owned attachment, or both.
+
+### Attachments and recovery
+
+Upload one file (default policy 5 MiB, hard ceiling 20 MiB) with `upload_whatsapp_media` /
+`uploadWhatsAppMedia` / `upload_media`, then send its returned ID in `media_ids` /
+`mediaIds`. CLI: `whatsapp upload-media <file>`, then `whatsapp send --media-id <id>`.
+Uploads and sends are separate operations: persist the media ID and logical send
+key before sending. After a timeout or ambiguous outcome, reuse both; do not
+re-upload or generate a new key for that same intended message. Existing
+`message_sends.lookup` / `messageSends.lookup` uses `sender_kind=whatsapp_identity`,
+the identity UUID, and `operation=whatsapp.send`.
+
+Attachment URLs expire. `get_whatsapp_media` / `getWhatsAppMedia` / `get_media`
+reauthorizes access and returns fresh metadata and a temporary URL. Media can be
+`pending`, `ready`, or `unavailable`; retain the ID and metadata when URL is null.
+Read responses use `content` while send requests use `text`.
+
+A queued response is acceptance, not delivery. Inspect message `status` separately
+from `delivery_state` / `deliveryState`. A confirmed `sent` message with delivery
+`unknown` has not become a failed send. Do not resend automatically to chase a
+missing delivery confirmation. `mark_whatsapp_read` / `markWhatsAppRead` /
+`mark_read` updates local unread history through an exact message boundary; it
+never sends a remote read receipt.
+
+### Notifications and contact history
+
+Identity webhook subscriptions accept `whatsapp.received`, `whatsapp.sent`,
+`whatsapp.delivered`, `whatsapp.delivery_failed`, and
+`whatsapp.delivery_unconfirmed`, plus `whatsapp.reaction_received`, including subscriptions created before approval.
+Only `whatsapp.received` represents a new incoming message. Deduplicate retries by
+event ID; status notifications should update delivery state without starting an
+agent reply. Payloads keep snake_case fields and ISO timestamps. Received events
+can opt into the existing `texts` context class, whose items can have channel
+`whatsapp`. No new context class is required.
+
+Contact correspondence is explicitly opt-in: select `channels=["whatsapp"]` and
+optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp
+--whatsapp-limit 10` in the CLI). Default correspondence selectors are unchanged.
+Conversation participants contain remote numbers only, and `sender_number` /
+`senderNumber` is the actual message author. Typing indicators, remote read
+receipts, and WhatsApp calls are not supported.
+
+### Groups, native quotes, and reactions
+
+Groups use the same approved dedicated number and all-participant phone contact
+rules. Conversation metadata exposes `group_creation_status` / `groupCreationStatus`
+and `unresolved_participant_count` / `unresolvedParticipantCount`. Send only when a
+group is ready and its participants are resolved. An uncertain group creation
+must keep its original send key and conversation ID, never a replacement request.
+Message and conversation lists default to direct conversations; use `include_groups=True`
+(Python), `includeGroups: true` (TypeScript), or CLI `--include-groups` to include groups.
+An explicit conversation ID reads that conversation, including a group. Lists also
+accept creation-date bounds (`start_datetime` / `startDatetime`, `end_datetime` /
+`endDatetime`) and an optional IANA `tz`; a bare end date includes the whole day.
+
+Quote an existing authorized message with `reply_to_message_id` /
+`replyToMessageId`, always together with its `conversation_id` / `conversationId`.
+`plain_reply_fallback` / `plainReplyFallback` defaults to true; false explicitly
+requires native quoting. All currently supported WhatsApp targets support native
+quotes, so no current target uses plain fallback. Missing evidence, rejected sends,
+and uncertain sends never trigger an unquoted replacement. Read chronological quote chains with
+`get_whatsapp_thread` / `getWhatsAppThread` or `get_whatsapp_conversation_thread` /
+`getWhatsAppConversationThread`. Both return conversation, thread, root message,
+messages, and an opaque next cursor. A message-list `thread_id` / `threadId` filter
+also requires the conversation ID.
+
+```python
+reply = identity.send_whatsapp(
+    conversation_id=incoming.conversation_id,
+    reply_to_message_id=incoming.id,
+    text="I will review this milestone.",
+    idempotency_key="milestone-quoted-reply",
+)
+receipt = identity.send_whatsapp_reaction(
+    message_id=incoming.id, reaction="like", idempotency_key="milestone-reaction",
+)
+current = identity.get_whatsapp_reaction(receipt.id)
+removed = identity.remove_whatsapp_reaction(receipt.id, idempotency_key="milestone-reaction-removal")
+```
+
+```typescript
+const reply = await identity.sendWhatsApp({
+  conversationId: incoming.conversationId, replyToMessageId: incoming.id,
+  text: "I will review this milestone.", idempotencyKey: "milestone-quoted-reply",
+});
+const receipt = await identity.sendWhatsAppReaction({
+  messageId: incoming.id, reaction: "like", idempotencyKey: "milestone-reaction",
+});
+const current = await identity.getWhatsAppReaction(receipt.id);
+const removed = await identity.removeWhatsAppReaction(receipt.id, "milestone-reaction-removal");
+```
+
+Named reactions are `love`, `like`, `dislike`, `laugh`, `emphasize`, `question`, and
+`eyes`. Alternatively supply `custom_emoji` / `customEmoji`, exclusively. Reactions
+apply to the whole message; there is no part index. Each mutation requires an
+explicit stable key. POST, GET, and DELETE return a versioned receipt. Receipt states
+are queued, sending, applied, removed, failed, uncertain, or superseded. Message
+reaction arrays contain only live applied reactions. A queued or uncertain reaction
+must not appear applied. Removing an old receipt never removes a newer reaction.
+Reaction notifications carry `data.reaction` and do not represent a new text turn.
+
+CLI: `whatsapp send --to +15555550101,+15555550102 --group-name "Project team"`,
+`whatsapp send --conversation-id <id> --reply-to-message-id <id>`,
+`whatsapp react <message-id> --reaction like --idempotency-key <key>`,
+`whatsapp get-reaction <reaction-id>`, `whatsapp remove-reaction <reaction-id>
+--idempotency-key <key>`, `whatsapp thread <message-id>`, and
+`whatsapp conversation-thread <conversation-id> <thread-id>`. All require `--identity`.
+
+
+Effective WhatsApp policy limits and usage are independent from iMessage. Read them with Python `identity.get_whatsapp_limits()`, TypeScript `identity.getWhatsAppLimits()`, Rust `identity.get_whatsapp_limits()`, or `inkbox whatsapp limits -i agent-handle`. The returned public `whatsapp.*` maps retain future policy keys. The 4,000-character / 20 MiB transport ceilings do not promise that a particular identity's effective limits are that high; the server enforces its current configured policy.
+
+The limits response contains the agent identity, effective `limits`, and daily-only
+`usage`; it has no billing-cycle timestamp, monthly allowance, or enabled-agent
+cap. Current defaults allow 1,000 outbound messages per identity in a rolling
+24-hour window. Direct conversations allow 10 new contacts per day, with 60 seconds
+between new contacts, three openings of at most 159 characters before the first
+reply, and 15 consecutive unanswered messages. Before the first direct reply,
+links, phone numbers, email addresses, and media are not allowed. Groups instead
+allow three conversation openings and 15 unanswered messages, without those direct
+introduction-content restrictions. New agent-created groups have a separate
+configurable rolling daily allowance, initially five (`whatsapp.new_groups_per_24h`). Read the effective limits rather than assuming these
+defaults apply to every identity.

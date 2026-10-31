@@ -152,7 +152,7 @@ class WebhookAgentIdentity(TypedDict):
 WebhookContextScopeWire = Literal["thread", "conversation", "contact"]
 WebhookContextModeWire = Literal["count", "window"]
 WebhookContextSkipReasonWire = Literal["no_contact", "no_resource", "unavailable"]
-WebhookContextTextChannelWire = Literal["sms", "imessage"]
+WebhookContextTextChannelWire = Literal["sms", "imessage", "whatsapp"]
 
 
 class WebhookContextTextMediaWire(TypedDict):
@@ -939,3 +939,92 @@ class SlackWebhookPayload(TypedDict):
     event_type: SlackWebhookEventType
     timestamp: str
     data: SlackWebhookData
+
+
+WhatsAppWebhookEventType = Literal["whatsapp.received", "whatsapp.sent", "whatsapp.delivered", "whatsapp.delivery_failed", "whatsapp.delivery_unconfirmed", "whatsapp.reaction_received"]
+WhatsAppMessageStatusWire = Literal["received", "queued", "sending", "sent", "delivered", "failed", "uncertain", "cancelled"]
+WhatsAppDeliveryStateWire = Literal["pending", "delivered", "unknown"]
+WhatsAppMediaStatusWire = Literal["pending", "ready", "unavailable"]
+
+
+class WhatsAppWebhookMedia(TypedDict):
+    id: str
+    filename: str
+    content_type: str
+    size: int | None
+    status: WhatsAppMediaStatusWire
+    url: str | None
+
+
+class WhatsAppWebhookRecipient(TypedDict):
+    remote_number: str
+    delivery_status: WhatsAppMessageStatusWire
+    delivery_state: WhatsAppDeliveryStateWire
+    error_code: str | None
+    error_detail: str | None
+    sent_at: str | None
+    delivered_at: str | None
+    failed_at: str | None
+
+
+class WhatsAppWebhookMessage(TypedDict):
+    id: str
+    agent_identity_id: str
+    conversation_id: str
+    direction: str
+    local_number: str
+    remote_number: str | None
+    sender_number: str
+    participants: list[str]
+    is_group: bool
+    content: str | None
+    media: list[WhatsAppWebhookMedia]
+    status: WhatsAppMessageStatusWire
+    delivery_state: WhatsAppDeliveryStateWire | None
+    recipients: list[WhatsAppWebhookRecipient]
+    is_read: bool
+    error_code: str | None
+    error_detail: str | None
+    source_at: str | None
+    created_at: str
+    updated_at: str
+    sent_at: str | None
+    delivered_at: str | None
+    failed_at: str | None
+    status_observed_at: str | None
+    reply_to_message_id: NotRequired[str | None]
+    thread_id: NotRequired[str | None]
+    thread_root_message_id: NotRequired[str | None]
+    reactions: NotRequired[list["WhatsAppWebhookReaction"]]
+
+
+class WhatsAppWebhookReaction(TypedDict):
+    id: str
+    target_message_id: str
+    conversation_id: str
+    agent_identity_id: str
+    direction: Literal["inbound", "outbound"]
+    remote_number: str | None
+    reaction: Literal["love", "like", "dislike", "laugh", "emphasize", "question", "eyes", "custom"]
+    custom_emoji: str | None
+    emoji: str
+    status: Literal["queued", "sending", "applied", "removed", "failed", "uncertain", "superseded"]
+    revision: int
+    created_at: str
+    updated_at: str
+    removed_at: str | None
+
+
+class WhatsAppWebhookData(TypedDict):
+    message: NotRequired[WhatsAppWebhookMessage | None]
+    reaction: NotRequired[WhatsAppWebhookReaction | None]
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]
+    context: NotRequired[WebhookContextWire]
+
+
+class WhatsAppWebhookPayload(TypedDict):
+    id: str
+    event_type: WhatsAppWebhookEventType
+    timestamp: str
+    data: WhatsAppWebhookData

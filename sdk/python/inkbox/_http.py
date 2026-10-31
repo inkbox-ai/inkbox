@@ -187,13 +187,14 @@ class HttpTransport:
         filename: str,
         content: bytes,
         content_type: str,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         """POST one file as multipart/form-data.
 
         Used for media uploads. The response is decoded as JSON.
         """
         files = {field_name: (filename, content, content_type)}
-        resp = self._send("POST", path, files=files)
+        resp = self._send("POST", path, files=files, **({"params": params} if params else {}))
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None

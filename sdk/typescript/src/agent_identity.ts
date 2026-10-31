@@ -9,6 +9,7 @@
  * address or phone number ID explicitly.
  */
 
+import type { WhatsAppSendOptions, WhatsAppListOptions, WhatsAppConversationListOptions, WhatsAppReactionOptions, WhatsAppThreadOptions } from "./whatsapp.js";
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
 import type { HostedMcpConnection, HostedMcpCreate } from "./phone/hostedMcp.js";
@@ -116,6 +117,63 @@ export class AgentIdentity {
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
+  get whatsappEnabled(): boolean {
+    return this._data.whatsappEnabled ?? false;
+  }
+  get whatsappNumber(): string | null {
+    return this._data.whatsappNumber ?? null;
+  }
+  getWhatsAppLimits() {
+    return this._inkbox.whatsapp.getLimits({ agentIdentityId: this.id });
+  }
+  getWhatsAppStatus() {
+    return this._inkbox.identities.getWhatsAppStatus(this.agentHandle);
+  }
+  sendWhatsApp(o: Omit<WhatsAppSendOptions, "agentIdentityId">) {
+    return this._inkbox.whatsapp.send({ ...o, agentIdentityId: this.id });
+  }
+  getWhatsAppMessage(id: string) {
+    return this._inkbox.whatsapp.get(id, { agentIdentityId: this.id });
+  }
+  listWhatsAppMessages(o: Omit<WhatsAppListOptions, "agentIdentityId"> = {}) {
+    return this._inkbox.whatsapp.list({ ...o, agentIdentityId: this.id });
+  }
+  listWhatsAppConversations(
+    o: Omit<WhatsAppConversationListOptions, "agentIdentityId"> = {},
+  ) {
+    return this._inkbox.whatsapp.listConversations({
+      ...o,
+      agentIdentityId: this.id,
+    });
+  }
+  getWhatsAppConversation(id: string) {
+    return this._inkbox.whatsapp.getConversation(id, {
+      agentIdentityId: this.id,
+    });
+  }
+  uploadWhatsAppMedia(o: {
+    content: Uint8Array | Blob;
+    filename: string;
+    contentType?: string;
+  }) {
+    return this._inkbox.whatsapp.uploadMedia({
+      ...o,
+      agentIdentityId: this.id,
+    });
+  }
+  getWhatsAppThread(id: string, o: Omit<WhatsAppThreadOptions, "agentIdentityId"> = {}) { return this._inkbox.whatsapp.getThread(id, { ...o, agentIdentityId: this.id }); }
+  getWhatsAppConversationThread(conversationId: string, threadId: string, o: Omit<WhatsAppThreadOptions, "agentIdentityId"> = {}) { return this._inkbox.whatsapp.getConversationThread(conversationId, threadId, { ...o, agentIdentityId: this.id }); }
+  sendWhatsAppReaction(o: Omit<WhatsAppReactionOptions, "agentIdentityId">) { return this._inkbox.whatsapp.sendReaction({ ...o, agentIdentityId: this.id }); }
+  getWhatsAppReaction(id: string) { return this._inkbox.whatsapp.getReaction(id, { agentIdentityId: this.id }); }
+  removeWhatsAppReaction(id: string, idempotencyKey: string) { return this._inkbox.whatsapp.removeReaction(id, { idempotencyKey, agentIdentityId: this.id }); }
+  getWhatsAppMedia(id: string) {
+    return this._inkbox.whatsapp.getMedia(id, { agentIdentityId: this.id });
+  }
+  markWhatsAppRead(conversationId: string, throughMessageId: string) {
+    return this._inkbox.whatsapp.markRead(conversationId, throughMessageId, {
+      agentIdentityId: this.id,
+    });
+  }
   constructor(data: _AgentIdentityData, inkbox: Inkbox) {
     this._data              = data;
     this._inkbox            = inkbox;

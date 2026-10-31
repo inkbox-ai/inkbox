@@ -2287,3 +2287,21 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Set `plain_reply_fallback=False` on `send_imessage` or `imessages.send` to
 require a native reply instead.
+
+## Dedicated WhatsApp
+
+`identity.send_whatsapp(to="+15555550101", text="Hello", idempotency_key="stable-key")`
+
+Available by approval on the same number as an existing dedicated personal
+iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+request access in the console when unavailable. Direct and group messages support text
+(up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
+Upload media first, preserve its ID and a stable logical-send key before sending,
+and reuse both after an uncertain outcome. Refresh expired attachment URLs by
+media ID. Send acceptance and confirmed sending are separate from delivery;
+unknown delivery does not mean a send failed. Mark-read updates only local history.
+
+The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
+covers resource/identity methods, CLI commands, typed notifications, and explicit
+opt-in contact correspondence. Groups of 2–8 recipients, native quoted replies, and versioned whole-message
+reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.

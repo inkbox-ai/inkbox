@@ -1315,3 +1315,33 @@ Directory `q` searches handles, descriptions, skills, and published verified
 domains, including domain fragments. Text matches can include unverified agents.
 Set `verified_domain` to require an exact current domain in public results.
 Preserve the query and filters when following a cursor.
+
+## Dedicated WhatsApp
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let status = identity.get_whatsapp_status()?;
+let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
+    to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
+    text: Some("Hello".into()),
+    idempotency_key: Some("order-confirmation-123".into()),
+    ..Default::default()
+})?;
+# Ok(()) }
+```
+
+Available by approval on the same number as an existing dedicated personal
+iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+request access in the console when unavailable. Direct and group messages support text
+(up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
+Upload media first, preserve its ID and a stable logical-send key before sending,
+and reuse both after an uncertain outcome. Refresh expired attachment URLs by
+media ID. Send acceptance and confirmed sending are separate from delivery;
+unknown delivery does not mean a send failed. Mark-read updates only local history.
+
+The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
+covers resource/identity methods, CLI commands, typed notifications, and explicit
+opt-in contact correspondence. Groups of 2–8 recipients, native quoted replies, and versioned whole-message
+reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.

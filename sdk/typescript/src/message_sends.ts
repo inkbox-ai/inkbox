@@ -38,7 +38,7 @@ export async function postMessage<T>(http: HttpTransport, path: string, body: un
 }
 
 export interface MessageSendLookupOptions {
-  senderKind: "mailbox" | "phone_number" | "imessage_identity";
+  senderKind: "mailbox" | "phone_number" | "imessage_identity" | "whatsapp_identity";
   senderId: string;
   operation: string;
   idempotencyKey: string;

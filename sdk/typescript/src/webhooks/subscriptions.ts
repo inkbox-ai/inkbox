@@ -174,7 +174,7 @@ function assertNoIncomingCall(eventTypes: string[]): void {
   }
 }
 
-const EVENT_PREFIXES = ["message.", "text.", "imessage.", "call.", "a2a.", "slack."];
+const EVENT_PREFIXES = ["message.", "text.", "imessage.", "whatsapp.", "call.", "a2a.", "slack."];
 
 function assertKnownEventPrefixes(eventTypes: string[]): void {
   for (const eventType of eventTypes) {

@@ -4,6 +4,57 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.24 - WhatsApp conversations (unreleased)
+
+### Added
+
+- Python, TypeScript, Rust, and CLI support for approved dedicated direct and group
+  WhatsApp: send and read messages, list conversations, upload owned attachments,
+  renew temporary media access, and mark only local history read.
+- Native quoted replies and chronological cursor-based thread reads. Whole-message
+  named/custom reactions have explicit logical-write keys and versioned receipts;
+  stale removal cannot remove a newer reaction. Queued and uncertain receipts remain
+  distinct from applied message reactions.
+- Group creation accepts 2–8 distinct E.164 recipients with an optional creation-only
+  name. Existing groups retain conversation IDs, observed membership, and uncertain
+  creation status. Message and conversation lists default to direct conversations;
+  group inclusion is explicit, while a selected conversation always retains its history.
+- Creation-date filters and timezone-aware bounds across message/conversation lists.
+  CLI aliases include `--unread-only`, `unreact`, and a `conversation` history command.
+- Strict `plain_reply_fallback` / `plainReplyFallback` send option, default true; false
+  explicitly requires native quoting. All current WhatsApp targets support native
+  quotes; missing evidence or rejected/uncertain sends never cause a plain replacement.
+- Typed WhatsApp notification payloads, fresh identity channel-status reads, and
+  explicit opt-in WhatsApp contact correspondence. Existing correspondence defaults
+  and Rust identity struct literals remain compatible.
+- WhatsApp sends use the existing logical-send key and lookup recovery contract.
+  Send acceptance, confirmed sending, delivery, and uncertain delivery stay distinct.
+- Effective WhatsApp limits expose the identity, configurable policy values, and
+  daily-only usage without a billing-cycle timestamp, monthly allowance, or
+  enabled-agent cap.
+
+### Changed
+
+- Rust exhaustive matches on correspondence channels/items or context text channels
+  must handle the new WhatsApp variant. Complete `CorrespondenceQuery` struct literals
+  need `whatsapp_limit: None` (or `..Default::default()`); legacy identity struct
+  literals are unchanged.
+
+### Fixed
+
+- WhatsApp CLI list selectors reject conflicting flags before network access, and conversation history uses the same table columns as message lists.
+- WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
+- Python and TypeScript WhatsApp sends retain their request key when a successful
+  response cannot be decoded, without automatically sending another request.
+- Rejected HTTP/2 tunnel streams are closed before returning an error, preventing
+  an unhandled stream error when a request races with connection shutdown.
+
+### Availability
+
+- WhatsApp requires approval and an existing dedicated iMessage number. It is not
+  a shared channel. Voice calls, remote read receipts, typing, and self-service
+  number provisioning are not supported.
+
 ## 0.7.24 - Voice AI external connections and OAuth (unreleased)
 
 ### Added

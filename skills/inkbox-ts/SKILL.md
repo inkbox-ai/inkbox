@@ -1713,3 +1713,27 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 
 Set `plainReplyFallback: false` on `sendIMessage` or `imessages.send` to
 require a native reply instead.
+
+## Approved dedicated WhatsApp
+
+For an approved agent with an existing dedicated personal iMessage number,
+WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
+do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
+point the user to Request Access in the console. Direct conversations, groups, native quotes, and whole-message reactions are
+supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
+Send by 1–8 unique E.164 recipients or an existing conversation. Two or more
+recipients create/select a group, never fan out into direct messages. Upload at most one attachment
+(default policy 5 MiB, hard ceiling 20 MiB) first and reuse its owned media ID. Outbound text is at most 4,000 Unicode
+code points. Preserve a stable logical-send key and media ID after ambiguity;
+check message/lookup state rather than sending a duplicate. Attachment URLs expire:
+refresh metadata by media ID before downloading. Local mark-read sends no remote
+receipt. Only `whatsapp.received` is new incoming content; delivery notifications
+must not trigger replies. Quote only an authorized message in the selected conversation using
+reply_to_message_id / replyToMessageId. Never silently fall back to a plain send.
+Read quote chains with the thread helpers. React with named love/like/dislike/laugh/
+emphasize/question/eyes or exclusive custom emoji and an explicit stable key.
+Keep pending/uncertain receipts separate from live applied reactions. Remove only
+the selected receipt version. Group uncertainty must retain the original send key
+and conversation ID; do not create a replacement. Group sends require known,
+permitted participants. Reaction notifications are not new text-reply turns.
+Typing, voice calls, and remote read receipts are not supported.

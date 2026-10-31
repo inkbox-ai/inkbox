@@ -56,6 +56,7 @@ use crate::tunnels::resources::tunnels::TunnelsResource;
 use crate::vault::resources::vault::VaultResource;
 use crate::webhooks::deliveries::WebhookDeliveriesResource;
 use crate::webhooks::subscriptions::WebhookSubscriptionsResource;
+use crate::whatsapp::WhatsAppResource;
 use crate::whoami::types::{parse_whoami, WhoamiResponse};
 
 /// Default API base URL. Override via [`InkboxBuilder::base_url`] for
@@ -169,7 +170,8 @@ pub struct Inkbox {
     mail_identity_contact_rules: MailIdentityContactRulesResource,
     phone_identity_contact_rules: PhoneIdentityContactRulesResource,
 
-    // iMessage
+    // Dedicated WhatsApp and iMessage
+    whatsapp: WhatsAppResource,
     imessages: IMessagesResource,
     imessage_contact_rules: IMessageContactRulesResource,
 
@@ -309,6 +311,7 @@ impl Inkbox {
             mail_identity_contact_rules: MailIdentityContactRulesResource::new(api_http.clone()),
             phone_identity_contact_rules: PhoneIdentityContactRulesResource::new(api_http.clone()),
 
+            whatsapp: WhatsAppResource::new(mk(&format!("{api_root}/whatsapp"))),
             imessages: IMessagesResource::new(imessage_http.clone()),
             imessage_contact_rules: IMessageContactRulesResource::new(imessage_http.clone()),
 
@@ -458,6 +461,10 @@ impl Inkbox {
     /// Webhook signing key management (per-identity create/rotate/status).
     pub fn signing_keys(&self) -> &SigningKeysResource {
         &self.signing_keys
+    }
+
+    pub fn whatsapp(&self) -> &WhatsAppResource {
+        &self.whatsapp
     }
 
     pub fn imessages(&self) -> &IMessagesResource {

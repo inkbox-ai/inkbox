@@ -2,6 +2,23 @@
 inkbox — Python SDK for the Inkbox APIs.
 """
 
+from inkbox.webhooks import WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
+from inkbox.whatsapp import (
+    WhatsAppLimits,
+    WhatsAppDirection,
+    WhatsAppResource,
+    WhatsAppMessage,
+    WhatsAppConversation,
+    WhatsAppConversationSummary,
+    WhatsAppMedia,
+    WhatsAppRecipient,
+    WhatsAppMessageStatus,
+    WhatsAppDeliveryState,
+    WhatsAppMediaStatus,
+    WhatsAppMarkReadResult,
+    WhatsAppChannelStatus,
+)
+
 from inkbox.slack_rules import SlackContactRule, SlackContactRulesResource, SlackRuleAction, SlackRuleMatchType
 from inkbox.slack_cache import (
     SlackArchiveInclude,
@@ -329,6 +346,7 @@ from inkbox.contacts.types import (
     CorrespondenceTranscriptMode,
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
+    WhatsAppCorrespondenceItem,
     SmsCorrespondenceItem,
     SlackCorrespondenceItem,
 )
@@ -517,7 +535,32 @@ from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
+from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppGroupCreationStatus, WhatsAppThread
+
 __all__ = [
+    "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppGroupCreationStatus", "WhatsAppThread",
+    "WhatsAppWebhookReaction",
+    "WhatsAppWebhookPayload",
+    "WhatsAppWebhookData",
+    "WhatsAppWebhookMessage",
+    "WhatsAppWebhookMedia",
+    "WhatsAppWebhookRecipient",
+    "WhatsAppWebhookEventType",
+
+    "WhatsAppLimits",
+    "WhatsAppDirection",
+    "WhatsAppResource",
+    "WhatsAppMessage",
+    "WhatsAppConversation",
+    "WhatsAppConversationSummary",
+    "WhatsAppMedia",
+    "WhatsAppRecipient",
+    "WhatsAppMessageStatus",
+    "WhatsAppDeliveryState",
+    "WhatsAppMediaStatus",
+    "WhatsAppMarkReadResult",
+    "WhatsAppChannelStatus",
+
     "SlackContactRule", "SlackContactRulesResource", "SlackRuleAction", "SlackRuleMatchType",
     "SenderAccess",
     "DEFAULT_COMPANION_MAX_BYTES",
@@ -825,6 +868,7 @@ __all__ = [
     "CorrespondenceTranscriptMode",
     "EmailCorrespondenceItem",
     "IMessageCorrespondenceItem",
+    "WhatsAppCorrespondenceItem",
     "SmsCorrespondenceItem",
     "SlackCorrespondenceItem",
     "CallCorrespondenceItem",

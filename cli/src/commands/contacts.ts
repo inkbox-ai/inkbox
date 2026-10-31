@@ -470,6 +470,7 @@ export function registerContactsCommands(program: Command): void {
     .option("--limit-per-channel <n>", "Default limit per channel", (v) => parseInt(v, 10))
     .option("--email-limit <n>", "Email limit", (v) => parseInt(v, 10))
     .option("--sms-limit <n>", "SMS limit", (v) => parseInt(v, 10))
+    .option("--whatsapp-limit <n>", "WhatsApp limit (include --channels whatsapp)", (v) => parseInt(v, 10))
     .option("--imessage-limit <n>", "iMessage limit", (v) => parseInt(v, 10))
     .option("--calls-limit <n>", "Call limit", (v) => parseInt(v, 10))
     .option("--cursor <cursor>", "Pagination cursor")
@@ -490,6 +491,7 @@ export function registerContactsCommands(program: Command): void {
           emailLimit?: number;
           smsLimit?: number;
           imessageLimit?: number;
+          whatsappLimit?: number;
           callsLimit?: number;
           cursor?: string;
           order?: string;

@@ -194,7 +194,9 @@ def test_identity_bound_resource_and_all_subtransports_observe_responses():
         for transport in client.__dict__.values():
             if isinstance(transport, HttpTransport):
                 transport.get("/example")
-        assert len(observed) == 12
+        whatsapp = client.with_response_metadata(lambda scoped: scoped.whatsapp.list())
+        assert whatsapp.data == [] and whatsapp.notices == [ResponseNotice(**NOTICE)]
+        assert len(observed) == 14
 
 
 def test_completed_scope_metadata_cannot_change_through_returned_client():

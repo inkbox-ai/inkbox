@@ -35,10 +35,11 @@ class ContactCorrespondenceOptions:
     transcripts: CorrespondenceTranscriptMode | str | None = None
     include_failed: bool | None = None
     identity_id: UUID | str | None = None
+    whatsapp_limit: int | None = None
 
     def _to_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}
-        channels = self.channels if self.channels is not None else list(CorrespondenceChannel)
+        channels = self.channels if self.channels is not None else [CorrespondenceChannel.EMAIL, CorrespondenceChannel.SMS, CorrespondenceChannel.IMESSAGE, CorrespondenceChannel.CALLS, CorrespondenceChannel.SLACK]
         params["channels"] = ",".join(str(channel) for channel in channels)
         for name in ("after", "before"):
             value = getattr(self, name)
@@ -49,6 +50,7 @@ class ContactCorrespondenceOptions:
             "email_limit",
             "sms_limit",
             "imessage_limit",
+            "whatsapp_limit",
             "calls_limit",
             "cursor",
             "order",

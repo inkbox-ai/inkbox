@@ -1,0 +1,270 @@
+import { readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  Inkbox,
+  getMessageRequestKey,
+  WhatsAppResource,
+  parseWhatsAppMessage,
+} from "../src/index.js";
+import { HttpTransport } from "../src/_http.js";
+import type {
+  RawWhatsAppMessage,
+  WhatsAppWebhookPayload,
+} from "../src/index.js";
+const f = JSON.parse(
+  readFileSync(
+    new URL("../../../tests/fixtures/whatsapp.json", import.meta.url),
+    "utf8",
+  ),
+);
+const owner = f.identity_id,
+  conv = f.conversation.id,
+  media = f.media.id;
+const ok = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+const last = () => {
+  const [url, init] = vi.mocked(fetch).mock.calls.at(-1)!;
+  return {
+    url: new URL(String(url)),
+    init: init!,
+    body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
+  };
+};
+const resource = () =>
+  new WhatsAppResource(
+    new HttpTransport("test-only", "https://inkbox.ai/api/v1/whatsapp"),
+  );
+afterEach(() => vi.restoreAllMocks());
+describe("WhatsApp public wire", () => {
+  it("keeps ownership out of body and confirmed sent distinct from unknown delivery", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(ok({ message: f.message }, 201)),
+    );
+    const message = await resource().send({
+      to: ["+15555550101"],
+      text: "Hello",
+      mediaIds: [media],
+      agentIdentityId: owner,
+      idempotencyKey: "logical-send",
+    });
+    expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+    expect(last().body).toEqual({
+      to: ["+15555550101"],
+      text: "Hello",
+      media_ids: [media],
+    });
+    expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe(
+      "logical-send",
+    );
+    expect(message.status).toBe("sent");
+    expect(message.deliveryState).toBe("unknown");
+    expect(message.failedAt).toBeNull();
+  });
+  it("rejects invalid sends before I/O and counts Unicode code points", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    for (const options of [
+      {},
+      { to: "+15555550101", conversationId: conv, text: "hi" },
+      { to: [], text: "hi" },
+      { to: ["+15555550101", "+15555550101"], text: "hi" },
+      { to: "+15555550101", text: " " },
+      { to: "+15555550101", text: "😀".repeat(4001) },
+      { to: "+15555550101", mediaIds: [media, media] },
+    ])
+      await expect(resource().send(options)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    vi.mocked(fetch).mockResolvedValue(ok({ message: f.message }, 201));
+    await resource().send({ conversationId: conv, text: "😀".repeat(4000) });
+  });
+  it("retains bare array pagination and unavailable attachment identity", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok([f.inbound_message])));
+    const rows = await resource().list({
+      agentIdentityId: owner,
+      conversationId: conv,
+      limit: 10,
+      offset: 4,
+      isRead: false,
+      isBlocked: false,
+    });
+    expect(Object.fromEntries(last().url.searchParams)).toEqual({
+      agent_identity_id: owner,
+      conversation_id: conv,
+      include_groups: "false",
+      limit: "10",
+      offset: "4",
+      is_read: "false",
+      is_blocked: "false",
+    });
+    expect(rows[0].media[0]).toMatchObject({
+      id: media,
+      status: "unavailable",
+      url: null,
+    });
+    vi.mocked(fetch).mockResolvedValue(ok(f.message));
+    expect(
+      (await resource().get(f.message.id, { agentIdentityId: owner })).id,
+    ).toBe(f.message.id);
+    vi.mocked(fetch).mockResolvedValue(ok([f.conversation_summary]));
+    expect(
+      (await resource().listConversations({ agentIdentityId: owner }))[0]
+        .unreadCount,
+    ).toBe(2);
+    vi.mocked(fetch).mockResolvedValue(ok(f.conversation));
+    expect((await resource().getConversation(conv)).participants).toEqual([
+      "+15555550101",
+    ]);
+  });
+  it("owns multipart uploads and renews URLs through GET without re-uploading", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
+    await resource().uploadMedia({
+      content: new Uint8Array([1, 2, 3]),
+      filename: "image.png",
+      contentType: "image/png",
+      agentIdentityId: owner,
+    });
+    expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+    expect(last().body).toBeInstanceOf(FormData);
+    expect((last().body as FormData).get("file")).toBeInstanceOf(Blob);
+    await expect(
+      resource().uploadMedia({
+        content: new Uint8Array(20 * 1024 * 1024 + 1),
+        filename: "large",
+      }),
+    ).rejects.toThrow("20 MiB");
+    vi.mocked(fetch).mockResolvedValue(
+      ok({ ...f.media, url: "https://media.example/fresh" }),
+    );
+    expect(
+      (await resource().getMedia(media, { agentIdentityId: owner })).url,
+    ).toContain("fresh");
+    expect(last().url.pathname).toContain(`/media/${media}`);
+  });
+  it("marks local read state through an exact visible boundary", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(ok({ conversation_id: conv, updated_count: 2 })),
+    );
+    expect(
+      await resource().markRead(conv, f.message.id, { agentIdentityId: owner }),
+    ).toEqual({ conversationId: conv, updatedCount: 2 });
+    expect(last().body).toEqual({
+      conversation_id: conv,
+      through_message_id: f.message.id,
+    });
+  });
+  it("queries fresh status and does not deny sends from an older disabled snapshot", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        ok({
+          id: owner,
+          organization_id: "org_example",
+          agent_handle: "agent",
+          created_at: f.message.created_at,
+          updated_at: f.message.updated_at,
+        }),
+      ),
+    );
+    const client = new Inkbox({ apiKey: "test-only" });
+    const identity = await client.getIdentity("agent");
+    expect(identity.whatsappEnabled).toBe(false);
+    vi.mocked(fetch).mockResolvedValue(ok({ message: f.message }, 201));
+    await identity.sendWhatsApp({ to: "+15555550101", text: "Hi" });
+    expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+    vi.mocked(fetch).mockResolvedValue(ok({ whatsapp: f.status }));
+    expect((await identity.getWhatsAppStatus())?.enabled).toBe(true);
+    vi.mocked(fetch).mockResolvedValue(ok({ imessage: {} }));
+    expect(await identity.getWhatsAppStatus()).toBeNull();
+  });
+  it("exports raw webhook payloads without converting received URLs or timestamps", () => {
+    const webhook: WhatsAppWebhookPayload = f.webhook;
+    expect(webhook.data.message!.sender_number).toBe("+15555550101");
+    expect(webhook.data.message!.media[0].url).toBeNull();
+    expect(
+      parseWhatsAppMessage(f.message as RawWhatsAppMessage).createdAt,
+    ).toBeInstanceOf(Date);
+  });
+});
+
+it("reads owned effective limits and retains unknown policy keys", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.limits)));
+  const result = await resource().getLimits({ agentIdentityId: owner });
+  expect(last().url.pathname).toBe("/api/v1/whatsapp/limits");
+  expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+  expect(result.agentIdentityId).toBe(owner);
+  expect(Object.keys(result).sort()).toEqual(["agentIdentityId", "limits", "usage"]);
+  expect(result.limits["whatsapp.texts_per_agent_identity_per_24h"]).toBe(1000);
+  expect(result.limits["whatsapp.pre_reply_messages"]).toBe(3);
+  expect(result.limits["whatsapp.pre_reply_max_text_length"]).toBe(159);
+  expect(result.limits["whatsapp.outbound_new_contact_min_interval_seconds"]).toBe(60);
+  expect(result.limits["whatsapp.future_limit"]).toBe(7);
+  expect(result.usage).toEqual({ "whatsapp.texts_per_agent_identity_per_24h": 2 });
+});
+
+
+it.each(["", "binary/octet-stream"])("uses explicit MIME for a Blob with existing type %j", async (type) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
+  await resource().uploadMedia({content: new Blob([new Uint8Array([1, 2, 3])], {type}), filename: "image.png", contentType: "image/png", agentIdentityId: owner});
+  const file = (last().body as FormData).get("file") as File;
+  expect(file.type).toBe("image/png"); expect(file.name).toBe("image.png");
+  expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+});
+it("retains a Blob MIME when no explicit override is supplied", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(f.media, 201)));
+  await resource().uploadMedia({content: new Blob(["image-bytes"], {type: "image/jpeg"}), filename: "image.jpg"});
+  expect(((last().body as FormData).get("file") as File).type).toBe("image/jpeg");
+});
+
+it("forwards date filters and makes group inclusion explicit for both lists", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok([])));
+  for (const method of ["list", "listConversations"] as const) {
+    await resource()[method]({startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
+    expect(Object.fromEntries(last().url.searchParams)).toEqual({limit: "50", offset: "0", include_groups: "false", start_datetime: "2026-03-08", end_datetime: "2026-03-08", tz: "America/New_York"});
+    await resource()[method]({includeGroups: true});
+    expect(last().url.searchParams.get("include_groups")).toBe("true");
+  }
+});
+
+it("preserves legacy quote/default bodies and binds only an explicit native requirement", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok({message: f.message}, 201)));
+  for (const quoted of [false, true]) for (const fallback of [false, true]) {
+    await resource().send({conversationId: conv, text: "Reply", ...(quoted ? {replyToMessageId: f.message.id} : {}), plainReplyFallback: fallback, idempotencyKey: "same-operation"});
+    expect(last().body).toEqual({conversation_id: conv, text: "Reply", ...(quoted ? {reply_to_message_id: f.message.id} : {}), ...(quoted && !fallback ? {plain_reply_fallback: false} : {})});
+  }
+  for (const invalid of [null, 0, 1, "false"]) {
+    await expect(resource().send({to: "+15555550101", text: "Hello", plainReplyFallback: invalid as unknown as boolean})).rejects.toThrow("boolean");
+  }
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+
+it.each([
+  { key: undefined, missing: true },
+  { key: "saved-logical-send", missing: true },
+  { key: undefined, missing: false },
+  { key: "saved-logical-send", missing: false },
+])("retains a decode failure key without another send (%j)", async ({ key, missing }) => {
+  const body = missing ? {} : { message: { ...f.message, media: {} } };
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok(body, 201)));
+  let failure: unknown;
+  try {
+    await resource().send({ conversationId: conv, text: "One logical message", idempotencyKey: key });
+  } catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(TypeError);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const original = last();
+  const retained = getMessageRequestKey(failure);
+  expect(retained).toBe(new Headers(original.init.headers).get("Idempotency-Key"));
+  if (key !== undefined) expect(retained).toBe(key);
+  vi.mocked(fetch).mockImplementation(async () => ok({ message: f.message }, 201));
+  await resource().send({ conversationId: conv, text: "One logical message", idempotencyKey: retained });
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(last().body).toEqual(original.body);
+  expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe(retained);
+});
