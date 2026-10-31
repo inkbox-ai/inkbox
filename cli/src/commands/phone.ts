@@ -12,6 +12,7 @@ import {
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+import { registerPhoneMcpCommands } from "./phone-mcp.js";
 
 interface PlaceCallCommandOptions {
   identity: string;
@@ -428,6 +429,8 @@ export function registerPhoneCommands(program: Command): void {
     .command("hosted-agent")
     .description("Inkbox Voice AI configuration and voice discovery");
 
+  registerPhoneMcpCommands(hostedAgent);
+
   hostedAgent
     .command("voices")
     .description("List voices, selection availability, and preview URLs")
@@ -442,7 +445,7 @@ export function registerPhoneCommands(program: Command): void {
         printStatus(`Default voice: ${catalog.defaultVoice}`);
         output(catalog.voices, {
           json: false,
-          columns: ["id", "name", "description", "available", "previewUrl"],
+          columns: ["id", "name", "description", "available", "mcpSupported", "previewUrl"],
         });
       }),
     );

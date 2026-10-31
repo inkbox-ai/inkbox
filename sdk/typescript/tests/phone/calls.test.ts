@@ -638,3 +638,16 @@ describe("CallsResource surface (identity-centered, v1.0.0)", () => {
     ]);
   });
 });
+
+it("keeps external tool provenance, unknown outcomes, and unavailable payloads", async () => {
+  const http = mockHttp();
+  vi.mocked(http.get).mockResolvedValue({ items: [{ id: CALL_ID, call_id: CALL_ID, tool_name: "search", status: "unknown",
+    source: "external_mcp", connection_id: CALL_ID, server_url: "https://mcp.example.com/mcp", started_at: null,
+    completed_at: null, observed_at: "2026-10-30T00:00:00Z", result: null, arguments_available: false, result_available: false }],
+    limit: 50, offset: 0, has_more: false, incomplete: true });
+  const page = await new CallsResource(http).toolInvocations(CALL_ID);
+  expect(page.incomplete).toBe(true);
+  expect(page.items[0]).toMatchObject({ source: "external_mcp", status: "unknown", startedAt: null,
+    serverUrl: "https://mcp.example.com/mcp", argumentsAvailable: false, resultAvailable: false,
+    observedAt: new Date("2026-10-30T00:00:00Z") });
+});

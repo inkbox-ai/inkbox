@@ -1032,6 +1032,22 @@ impl AgentIdentity {
             .get_config(Some(&self.id().to_string()))
     }
 
+    pub fn list_mcp_servers(&self) -> Result<Vec<crate::phone::HostedMcpConnection>> {
+        self.inkbox.hosted_agent().list_mcp_servers(Some(self.id()))
+    }
+
+    pub fn create_mcp_server(
+        &self,
+        body: &crate::phone::HostedMcpCreate,
+        idempotency_key: &str,
+    ) -> Result<crate::phone::HostedMcpConnection> {
+        let mut body = body.clone();
+        body.agent_identity_id = Some(self.id());
+        self.inkbox
+            .hosted_agent()
+            .create_mcp_server(&body, idempotency_key)
+    }
+
     /// Set this identity's Inkbox Voice AI config (full replace).
     ///
     /// Voice and instructions left `None` reset to their defaults. The model

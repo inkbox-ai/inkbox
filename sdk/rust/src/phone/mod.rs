@@ -5,9 +5,11 @@
 //! TypeScript SDKs exactly.
 
 pub mod exceptions;
+pub mod hosted_mcp;
 pub mod resources;
 pub mod types;
 
+pub use hosted_mcp::*;
 pub use types::*;
 
 pub use resources::calls::CallsResource;

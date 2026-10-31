@@ -1,2 +1,2 @@
 // Keep in sync with package.json "version".
-export const VERSION = "0.7.23";
+export const VERSION = "0.7.24";

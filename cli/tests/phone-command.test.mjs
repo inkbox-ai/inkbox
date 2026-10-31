@@ -4,15 +4,93 @@ import { execFile, execFileSync } from "node:child_process";
 import http from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { buildPlaceCallOptions } from "../dist/commands/phone.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+test("MCP file writes preserve grants, idempotency, and credential omission", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "mcp-cli-"));
+  const file = join(dir, "connection.json");
+  const requests = [];
+  const connection = { id: "connection-one", agent_identity_id: IDENTITY.id, label: "Calendar", url: "https://tools.example/mcp",
+    transport: "streamable_http", auth: { type: "header", configured: true }, enabled: true, allowed_tools: ["lookup"],
+    context: {}, config_version: 1, preparation_status: "pending" };
+  const mock = await listen(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({ method: req.method, url: req.url, key: req.headers["idempotency-key"], body: body ? JSON.parse(body) : null });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(req.url.includes("identities") ? IDENTITY : connection));
+  });
+  const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "phone", "hosted-agent", "mcp"];
+  try {
+    await writeFile(file, JSON.stringify({ label: "Calendar", url: connection.url, allowedTools: ["lookup"],
+      auth: { type: "header", token: "synthetic-secret", headerName: "X-Example-Key" } }));
+    let result = await runCli([...args, "create", "-i", "support-bot", "--file", file, "--idempotency-key", "create-one"]);
+    assert.ifError(result.error);
+    const created = requests.find(request => request.method === "POST");
+    assert.equal(created.key, "create-one");
+    assert.deepEqual(created.body.allowed_tools, ["lookup"]);
+    assert.equal(created.body.auth.token, "synthetic-secret");
+    assert.equal(created.body.auth.header_name, "X-Example-Key");
+    assert.doesNotMatch(result.stdout + result.stderr, /synthetic-secret/);
+    await writeFile(file, JSON.stringify({ expectedVersion: 1, allowedTools: null, context: { mode: "all" } }));
+    result = await runCli([...args, "update", connection.id, "--file", file]);
+    assert.ifError(result.error);
+    assert.deepEqual(requests.at(-1).body, { expected_version: 1, allowed_tools: null, context: { mode: "all" } });
+    const count = requests.length;
+    await writeFile(file, JSON.stringify({ expectedVersion: 1, allowed_tools: ["lookup"] }));
+    result = await runCli([...args, "update", connection.id, "--file", file]);
+    assert.ok(result.error);
+    assert.equal(requests.length, count);
+  } finally {
+    mock.server.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 function help(...args) {
   return execFileSync(process.execPath, [cli, ...args, "--help"], {
     encoding: "utf8",
   });
 }
+
+test("OAuth commands preserve version fences and emit one JSON result while waiting", async () => {
+  const requests = [];
+  const authorization = { id: IDENTITY.id, connection_id: IDENTITY.id, agent_identity_id: IDENTITY.id,
+    status: "pending", expires_at: "2026-10-27T20:00:00Z", config_version: null, requested_scopes: ["read"],
+    connect_url: "https://inkbox.ai/console/mcp-connections/oauth/connect", error_code: null };
+  const mock = await listen(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({ method: req.method, url: req.url, key: req.headers["idempotency-key"], body: body ? JSON.parse(body) : null });
+    if (req.method === "DELETE") { res.writeHead(204); res.end(); return; }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(req.url.endsWith("/disconnect") ? { success: true, code: "disconnected", config_version: 4 }
+      : req.method === "GET" ? { ...authorization, status: "completed", connect_url: null } : authorization));
+  });
+  const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "phone", "hosted-agent", "mcp", "oauth"];
+  try {
+    const result = await runCli([...args, "connect", IDENTITY.id, "--expected-version", "3", "--idempotency-key", "connect", "--wait", "5"]);
+    assert.ifError(result.error);
+    assert.equal(JSON.parse(result.stdout).status, "completed");
+    assert.match(result.stderr, /Open this URL/);
+    assert.deepEqual(requests[0].body, { expected_version: 3 });
+    assert.equal(requests[0].key, "connect");
+    assert.equal(requests.filter(r => r.method === "POST").length, 1);
+    for (const command of [["status", IDENTITY.id, IDENTITY.id], ["cancel", IDENTITY.id, IDENTITY.id],
+      ["disconnect", IDENTITY.id, "--expected-version", "4", "--idempotency-key", "disconnect"]]) {
+      assert.ifError((await runCli([...args, ...command])).error);
+    }
+    assert.equal(requests.at(-1).key, "disconnect");
+    const count = requests.length;
+    assert.ok((await runCli([...args, "connect", IDENTITY.id, "--expected-version", "0", "--idempotency-key", "bad"])).error);
+    assert.equal(requests.length, count);
+  } finally { mock.server.close(); }
+});
 
 function runCli(args) {
   return new Promise((resolve) => {
@@ -127,7 +205,7 @@ test("hosted-agent voices requires no identity and preserves the full JSON catal
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       voices: [
-        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, preview_url: "https://example.com/voice.wav" },
+        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, preview_url: "https://example.com/voice.wav", mcp_supported: true },
         { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, preview_url: null },
         { id: "no-preview", name: "No Preview", description: "Calm", available: true },
       ],
@@ -143,9 +221,9 @@ test("hosted-agent voices requires no identity and preserves the full JSON catal
     assert.deepEqual(requests, [{ method: "GET", url: "/api/v1/phone/hosted-agent-voices", apiKey: "test-key" }]);
     assert.deepEqual(JSON.parse(result.stdout), {
       voices: [
-        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, previewUrl: "https://example.com/voice.wav" },
-        { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, previewUrl: null },
-        { id: "no-preview", name: "No Preview", description: "Calm", available: true, previewUrl: null },
+        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, previewUrl: "https://example.com/voice.wav", mcpSupported: true },
+        { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, previewUrl: null, mcpSupported: false },
+        { id: "no-preview", name: "No Preview", description: "Calm", available: true, previewUrl: null, mcpSupported: false },
       ],
       defaultVoice: "future-voice",
     });

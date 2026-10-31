@@ -393,6 +393,7 @@ export enum HostedAgentToolInvocationStatus {
   STARTED = "started",
   SUCCEEDED = "succeeded",
   FAILED = "failed",
+  UNKNOWN = "unknown",
 }
 
 export type HostedAgentToolResultValue = string | number | boolean | null;
@@ -404,8 +405,19 @@ export interface HostedAgentToolInvocation {
   toolName: string;
   status: HostedAgentToolInvocationStatus;
   result: Record<string, HostedAgentToolResultValue> | null;
-  startedAt: Date;
+  startedAt: Date | null;
   completedAt: Date | null;
+  source?: string;
+  connectionId?: string | null;
+  configVersion?: number | null;
+  connectionLabel?: string | null;
+  serverUrl?: string | null;
+  errorCode?: string | null;
+  observationCoverage?: string | null;
+  argumentsAvailable?: boolean | null;
+  resultAvailable?: boolean | null;
+  observedAt?: Date | null;
+
 }
 
 /** A page of Voice AI tool activity for one call. */
@@ -414,6 +426,7 @@ export interface HostedAgentToolInvocationPage {
   limit: number;
   offset: number;
   hasMore: boolean;
+  incomplete?: boolean;
 }
 
 /**
@@ -486,6 +499,7 @@ export interface HostedAgentVoiceOption {
   description: string;
   available: boolean;
   previewUrl: string | null;
+  mcpSupported: boolean;
 }
 
 /** Organization-scoped Voice AI choices, including unavailable voices. */
@@ -772,8 +786,19 @@ export interface RawHostedAgentToolInvocation {
   tool_name: string;
   status: string;
   result: Record<string, HostedAgentToolResultValue> | null;
-  started_at: string;
+  started_at: string | null;
   completed_at: string | null;
+  source?: string;
+  connection_id?: string | null;
+  config_version?: number | null;
+  connection_label?: string | null;
+  server_url?: string | null;
+  error_code?: string | null;
+  observation_coverage?: string | null;
+  arguments_available?: boolean | null;
+  result_available?: boolean | null;
+  observed_at?: string | null;
+
 }
 
 export interface RawHostedAgentToolInvocationPage {
@@ -781,6 +806,7 @@ export interface RawHostedAgentToolInvocationPage {
   limit: number;
   offset: number;
   has_more: boolean;
+  incomplete?: boolean;
 }
 
 export interface RawIncomingCallActionConfig {
@@ -837,6 +863,7 @@ export interface RawHostedAgentVoiceCatalog {
     description: string;
     available: boolean;
     preview_url?: string | null;
+    mcp_supported?: boolean;
   }[];
   default_voice: string;
 }
@@ -1003,8 +1030,18 @@ export function parseHostedAgentToolInvocation(
     toolName: r.tool_name,
     status: r.status as HostedAgentToolInvocationStatus,
     result: r.result,
-    startedAt: new Date(r.started_at),
+    startedAt: r.started_at ? new Date(r.started_at) : null,
     completedAt: r.completed_at ? new Date(r.completed_at) : null,
+    source: r.source ?? "builtin",
+    connectionId: r.connection_id ?? null,
+    configVersion: r.config_version ?? null,
+    connectionLabel: r.connection_label ?? null,
+    serverUrl: r.server_url ?? null,
+    errorCode: r.error_code ?? null,
+    observationCoverage: r.observation_coverage ?? null,
+    argumentsAvailable: r.arguments_available ?? null,
+    resultAvailable: r.result_available ?? null,
+    observedAt: r.observed_at ? new Date(r.observed_at) : null,
   };
 }
 
@@ -1016,6 +1053,7 @@ export function parseHostedAgentToolInvocationPage(
     limit: r.limit,
     offset: r.offset,
     hasMore: r.has_more,
+    incomplete: r.incomplete ?? false,
   };
 }
 
@@ -1076,6 +1114,7 @@ export function parseHostedAgentVoiceCatalog(
       description: voice.description,
       available: voice.available,
       previewUrl: voice.preview_url ?? null,
+      mcpSupported: voice.mcp_supported ?? false,
     })),
     defaultVoice: r.default_voice,
   };

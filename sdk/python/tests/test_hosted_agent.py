@@ -24,6 +24,44 @@ from sample_data_identities import IDENTITY_DETAIL_DICT
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 
 
+def test_oauth_authorization_contract(client, transport):
+    resource = client._hosted_agent
+    result = {"id": IDENTITY_ID, "status": "pending", "connect_url": "https://inkbox.ai/console/mcp-connections/oauth/connect"}
+    transport.post.return_value = result
+    assert resource.start_mcp_authorization(IDENTITY_ID, expected_version=3, idempotency_key="connect") == result
+    transport.post.assert_called_with(f"/hosted-agent-config/mcp-servers/{IDENTITY_ID}/oauth/authorizations",
+        json={"expected_version": 3}, headers={"Idempotency-Key": "connect"})
+    transport.get.return_value = result
+    assert resource.get_mcp_authorization(IDENTITY_ID, IDENTITY_ID) == result
+    transport.get.assert_called_with(f"/hosted-agent-config/mcp-servers/{IDENTITY_ID}/oauth/authorizations/{IDENTITY_ID}")
+    resource.cancel_mcp_authorization(IDENTITY_ID, IDENTITY_ID)
+    transport.delete.assert_called_with(f"/hosted-agent-config/mcp-servers/{IDENTITY_ID}/oauth/authorizations/{IDENTITY_ID}")
+    resource.disconnect_mcp_server(IDENTITY_ID, expected_version=3, idempotency_key="disconnect")
+    transport.post.assert_called_with(f"/hosted-agent-config/mcp-servers/{IDENTITY_ID}/oauth/disconnect",
+        json={"expected_version": 3}, headers={"Idempotency-Key": "disconnect"})
+
+
+def test_mcp_patch_preserves_omission_and_explicit_grant_removal(client, transport):
+    response = {"id": IDENTITY_ID, "agent_identity_id": IDENTITY_ID, "label": "Calendar",
+                "url": "https://tools.example/mcp", "transport": "streamable_http", "auth": {"type": "bearer", "configured": True},
+                "enabled": True, "allowed_tools": None, "context": {}, "config_version": 2, "preparation_status": "pending"}
+    transport.patch.return_value = response
+    client._hosted_agent.update_mcp_server(IDENTITY_ID, {"expected_version": 1, "label": "Calendar"})
+    assert "auth" not in transport.patch.call_args.kwargs["json"]
+    assert "allowed_tools" not in transport.patch.call_args.kwargs["json"]
+    client._hosted_agent.update_mcp_server(IDENTITY_ID, {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None})
+    assert transport.patch.call_args.kwargs["json"] == {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None}
+    transport.post.return_value = {**response, "context": {"mode": "all"}}
+    created = client._hosted_agent.create_mcp_server({"label": "Calendar", "url": "https://tools.example/mcp",
+        "auth": {"type": "header", "header_name": "X-Example-Key", "value_prefix": "Token ", "token": "synthetic"},
+        "context": {"mode": "all"}}, idempotency_key="stable-create")
+    assert created.context == {"mode": "all"}
+    assert transport.post.call_args.kwargs["json"]["context"] == {"mode": "all"}
+    assert transport.post.call_args.kwargs["headers"] == {"Idempotency-Key": "stable-create"}
+    assert transport.post.call_args.kwargs["json"]["auth"]["token"] == "synthetic"
+    assert "synthetic" not in repr(created)
+
+
 class TestHostedAgentGetConfig:
     def test_get_no_identity(self, client, transport):
         transport.get.return_value = HOSTED_AGENT_CONFIG_DICT

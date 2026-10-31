@@ -42,8 +42,14 @@ from inkbox.phone.types import (
     VoicemailDetection,
 )
 from inkbox.signing_keys import SigningKey
+from inkbox.phone.hosted_mcp import (
+    McpAuth, McpOAuthAuth, HostedMcpAuthorization, McpContextSelections, HostedMcpCreate, HostedMcpUpdate,
+    HostedMcpConnection, HostedMcpCatalog, HostedMcpTestResult, HostedMcpActivityPage,
+)
 
 __all__ = [
+    "McpAuth", "McpOAuthAuth", "HostedMcpAuthorization", "McpContextSelections", "HostedMcpCreate", "HostedMcpUpdate",
+    "HostedMcpConnection", "HostedMcpCatalog", "HostedMcpTestResult", "HostedMcpActivityPage",
     "ContactRuleDirection",
     "InkboxError",
     "InkboxAPIError",

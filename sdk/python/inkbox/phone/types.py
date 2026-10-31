@@ -655,6 +655,7 @@ class HostedAgentToolInvocationStatus(StrEnum):
     STARTED = "started"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -666,8 +667,18 @@ class HostedAgentToolInvocation:
     tool_name: str
     status: HostedAgentToolInvocationStatus
     result: dict[str, str | int | bool | None] | None
-    started_at: datetime
+    started_at: datetime | None
     completed_at: datetime | None
+    source: str = "builtin"
+    connection_id: UUID | None = None
+    config_version: int | None = None
+    connection_label: str | None = None
+    server_url: str | None = None
+    error_code: str | None = None
+    observation_coverage: str | None = None
+    arguments_available: bool | None = None
+    result_available: bool | None = None
+    observed_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocation:
@@ -677,8 +688,19 @@ class HostedAgentToolInvocation:
             tool_name=d["tool_name"],
             status=HostedAgentToolInvocationStatus(d["status"]),
             result=d.get("result"),
-            started_at=datetime.fromisoformat(d["started_at"]),
+            started_at=_dt(d.get("started_at")),
             completed_at=_dt(d.get("completed_at")),
+            source=d.get("source", "builtin"),
+            connection_id=UUID(d["connection_id"]) if d.get("connection_id") else None,
+            config_version=d.get("config_version"),
+            connection_label=d.get("connection_label"),
+            server_url=d.get("server_url"),
+            error_code=d.get("error_code"),
+            observation_coverage=d.get("observation_coverage"),
+            arguments_available=d.get("arguments_available"),
+            result_available=d.get("result_available"),
+            observed_at=_dt(d.get("observed_at")),
+
         )
 
 
@@ -690,6 +712,7 @@ class HostedAgentToolInvocationPage:
     limit: int
     offset: int
     has_more: bool
+    incomplete: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocationPage:
@@ -701,6 +724,7 @@ class HostedAgentToolInvocationPage:
             limit=d["limit"],
             offset=d["offset"],
             has_more=d["has_more"],
+            incomplete=d.get("incomplete", False),
         )
 
 
@@ -751,6 +775,7 @@ class HostedAgentVoiceOption:
     description: str
     available: bool
     preview_url: str | None = None
+    mcp_supported: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentVoiceOption:
@@ -760,6 +785,7 @@ class HostedAgentVoiceOption:
             description=d["description"],
             available=d["available"],
             preview_url=d.get("preview_url"),
+            mcp_supported=d.get("mcp_supported", False),
         )
 
 

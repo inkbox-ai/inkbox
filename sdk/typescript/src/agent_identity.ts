@@ -11,6 +11,7 @@
 
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
+import type { HostedMcpConnection, HostedMcpCreate } from "./phone/hostedMcp.js";
 import type { ContactCommunicationPolicyPage } from "./contacts/resources/communicationPolicy.js";
 import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
@@ -718,6 +719,14 @@ export class AgentIdentity {
   /** Get this identity's Inkbox Voice AI config. */
   async getHostedAgentConfig(): Promise<HostedAgentConfig> {
     return this._inkbox._hostedAgent.getConfig({ agentIdentityId: this.id });
+  }
+
+  async listMcpServers(): Promise<HostedMcpConnection[]> {
+    return this._inkbox._hostedAgent.listMcpServers({ agentIdentityId: this.id });
+  }
+
+  async createMcpServer(body: Omit<HostedMcpCreate, "agentIdentityId">, options: { idempotencyKey: string }): Promise<HostedMcpConnection> {
+    return this._inkbox._hostedAgent.createMcpServer({ ...body, agentIdentityId: this.id }, options);
   }
 
   /**

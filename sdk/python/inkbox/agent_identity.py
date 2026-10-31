@@ -16,6 +16,7 @@ from inkbox.contacts.resources.communication_policy import ContactCommunicationP
 
 from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
+from inkbox.phone.hosted_mcp import HostedMcpConnection, HostedMcpCreate
 
 from inkbox.credentials import Credentials
 from inkbox.a2a.client import A2AClient
@@ -1003,6 +1004,14 @@ class AgentIdentity:
     def get_hosted_agent_config(self) -> HostedAgentConfig:
         """Get this identity's Inkbox Voice AI config."""
         return self._inkbox._hosted_agent.get_config(agent_identity_id=self.id)
+
+    def list_mcp_servers(self) -> list[HostedMcpConnection]:
+        """List this identity's Voice AI external connections."""
+        return self._inkbox._hosted_agent.list_mcp_servers(agent_identity_id=self.id)
+
+    def create_mcp_server(self, body: HostedMcpCreate, *, idempotency_key: str) -> HostedMcpConnection:
+        """Create a connection owned by this identity."""
+        return self._inkbox._hosted_agent.create_mcp_server({**body, "agent_identity_id": str(self.id)}, idempotency_key=idempotency_key)
 
     def set_hosted_agent_config(
         self,

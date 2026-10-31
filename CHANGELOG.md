@@ -4,6 +4,41 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.24 - Voice AI external connections and OAuth (unreleased)
+
+### Added
+
+- Manage up to three MCP connections per identity through Python, TypeScript, Rust,
+  and `inkbox phone hosted-agent mcp`. Create, inspect, update, delete, test, and
+  refresh connections; browse catalogs and read external call activity.
+- Configure bearer or custom-header authentication, tool allowlists, and selected
+  prompts, resources, and instruction-only Skills. CLI configuration reads from
+  a JSON file or stdin.
+- Set `context.mode` to `all` for automatic access to discovered prompts,
+  resources, and instruction-only skills during voice calls, including prompts
+  with conversation-supplied arguments. Existing explicit selections remain supported.
+- Voice catalogs expose `mcp_supported` (Python/Rust) or `mcpSupported`
+  (TypeScript) so clients can check compatibility.
+- OAuth configuration and browser authorization start, status, cancel, and disconnect methods in Python, TypeScript, and Rust.
+- `inkbox phone hosted-agent mcp oauth` commands for browser approval and bounded status polling.
+- Connection authorization status, expiry, requested and granted scopes, and reconnect guidance.
+
+### Changed
+
+- Voice AI tool history now includes built-in and external MCP invocations with
+  source, connection, server URL, observation coverage, and payload availability.
+  The MCP-only activity endpoint remains available.
+- **Source-breaking for tool-history consumers:** handle the new `unknown` status
+  and nullable start time, using `observed_at` / `observedAt` when no start was seen.
+  Rust struct literals must include the added provenance fields and page `incomplete`.
+
+- Rust `McpContextSelections` adds optional `mode`; struct literals can use
+  `..Default::default()` to preserve explicit-selection behavior.
+- **Source-breaking for manually constructed voice options:**
+  `HostedAgentVoiceOption` adds required `mcpSupported` in TypeScript and
+  `mcp_supported` in Rust struct literals. Parsed older responses default to false.
+- Authentication views accept additional modes. Rust callers constructing `HostedMcpAuthView` directly must supply the new status fields, and exhaustive `McpAuth` matches must handle `OAuth`.
+
 ## 0.7.23 - Slack app removal (unreleased)
 
 ### Added
