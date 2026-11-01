@@ -243,3 +243,14 @@ test("native reply requirement is explicit and irrelevant without a quote", () =
   assert.equal(quoted.plainReplyFallback, false);
   assert.equal(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "Hello", plainReplyFallback: false}).plainReplyFallback, undefined);
 });
+
+test("bundled WhatsApp skills teach the scalar direct-message contract", () => {
+  for (const name of ["inkbox-cli", "inkbox-python", "inkbox-ts", "inkbox-all"]) {
+    const document = readFileSync(new URL(`../../skills/${name}/SKILL.md`, import.meta.url), "utf8");
+    const section = document.split("## Approved dedicated WhatsApp\n")[1]?.split("\n## ")[0];
+    assert.ok(section, `missing WhatsApp section in ${name}`);
+    assert.match(section, /one E\.164 string or an existing direct-message conversation/);
+    assert.match(section, /arrays, including singleton arrays, and comma-separated lists are rejected/);
+    assert.doesNotMatch(section, /1–8 unique|create\/select a group|Group uncertainty|Group sends require/);
+  }
+});
