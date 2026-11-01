@@ -770,12 +770,10 @@ inkbox whatsapp conversations --identity my-agent
 inkbox whatsapp list --identity my-agent --conversation-id <conversation-id>
 ```
 
-Use either one E.164 recipient (`to`) or an existing `conversation_id` /
-`conversationId`, never both. A one-element recipient array is also accepted.
-Use 2–8 unique E.164 recipients to select or create a group, not direct-message
-fan-out. Existing groups can have more participants and are addressed by conversation ID.
-An optional `group_name` / `groupName` only names a newly created group; it never renames an existing group. Outbound text is at most 4,000 Unicode code
-points. Each message can contain text, one owned attachment, or both.
+Use either one E.164 recipient string (`to`) or an existing direct `conversation_id` /
+`conversationId`, never both. Recipient arrays are not supported. WhatsApp supports
+one-to-one conversations only. Outbound text is at most 4,000 Unicode code points.
+Each message can contain text, one owned attachment, or both.
 
 ### Attachments and recovery
 
@@ -818,18 +816,11 @@ Conversation participants contain remote numbers only, and `sender_number` /
 `senderNumber` is the actual message author. Typing indicators, remote read
 receipts, and WhatsApp calls are not supported.
 
-### Groups, native quotes, and reactions
+### Native quotes and reactions
 
-Groups use the same approved dedicated number and all-participant phone contact
-rules. Conversation metadata exposes `group_creation_status` / `groupCreationStatus`
-and `unresolved_participant_count` / `unresolvedParticipantCount`. Send only when a
-group is ready and its participants are resolved. An uncertain group creation
-must keep its original send key and conversation ID, never a replacement request.
-Message and conversation lists default to direct conversations; use `include_groups=True`
-(Python), `includeGroups: true` (TypeScript), or CLI `--include-groups` to include groups.
-An explicit conversation ID reads that conversation, including a group. Lists also
-accept creation-date bounds (`start_datetime` / `startDatetime`, `end_datetime` /
-`endDatetime`) and an optional IANA `tz`; a bare end date includes the whole day.
+Message and conversation lists accept creation-date bounds (`start_datetime` /
+`startDatetime`, `end_datetime` / `endDatetime`) and an optional IANA `tz`;
+a bare end date includes the whole day.
 
 Quote an existing authorized message with `reply_to_message_id` /
 `replyToMessageId`, always together with its `conversation_id` / `conversationId`.
@@ -877,7 +868,7 @@ reaction arrays contain only live applied reactions. A queued or uncertain react
 must not appear applied. Removing an old receipt never removes a newer reaction.
 Reaction notifications carry `data.reaction` and do not represent a new text turn.
 
-CLI: `whatsapp send --to +15555550101,+15555550102 --group-name "Project team"`,
+CLI: `whatsapp send --to +15555550101 --text "Hello"`,
 `whatsapp send --conversation-id <id> --reply-to-message-id <id>`,
 `whatsapp react <message-id> --reaction like --idempotency-key <key>`,
 `whatsapp get-reaction <reaction-id>`, `whatsapp remove-reaction <reaction-id>
@@ -893,8 +884,4 @@ cap. Current defaults allow 1,000 outbound messages per identity in a rolling
 24-hour window. Direct conversations allow 10 new contacts per day, with 60 seconds
 between new contacts, three openings of at most 159 characters before the first
 reply, and 15 consecutive unanswered messages. Before the first direct reply,
-links, phone numbers, email addresses, and media are not allowed. Groups instead
-allow three conversation openings and 15 unanswered messages, without those direct
-introduction-content restrictions. New agent-created groups have a separate
-configurable rolling daily allowance, initially five (`whatsapp.new_groups_per_24h`). Read the effective limits rather than assuming these
-defaults apply to every identity.
+links, phone numbers, email addresses, and media are not allowed. Read the effective limits rather than assuming these defaults apply to every identity.

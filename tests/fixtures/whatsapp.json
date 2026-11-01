@@ -7,7 +7,6 @@
     "participants": [
       "+15555550101"
     ],
-    "is_group": false,
     "created_at": "2026-10-01T12:00:00Z",
     "updated_at": "2026-10-01T12:00:00Z",
     "id": "20000000-0000-4000-8000-000000000002"
@@ -19,11 +18,10 @@
     "participants": [
       "+15555550101"
     ],
-    "is_group": false,
     "created_at": "2026-10-01T12:00:00Z",
     "updated_at": "2026-10-01T12:00:00Z",
     "id": "20000000-0000-4000-8000-000000000002",
-    "latest_text": "Hello \ud83d\udc4b",
+    "latest_text": "Hello 👋",
     "latest_message_at": "2026-10-01T12:00:00Z",
     "latest_direction": "outbound",
     "latest_has_media": false,
@@ -41,8 +39,7 @@
     "participants": [
       "+15555550101"
     ],
-    "is_group": false,
-    "content": "Hello \ud83d\udc4b",
+    "content": "Hello 👋",
     "media": [],
     "status": "sent",
     "delivery_state": "unknown",
@@ -82,7 +79,6 @@
     "participants": [
       "+15555550101"
     ],
-    "is_group": false,
     "content": null,
     "media": [
       {
@@ -134,7 +130,6 @@
         "participants": [
           "+15555550101"
         ],
-        "is_group": false,
         "content": null,
         "media": [
           {

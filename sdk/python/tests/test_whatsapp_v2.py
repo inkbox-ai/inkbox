@@ -1,4 +1,4 @@
-"""Shared group, quote-chain and versioned reaction wire contracts."""
+"""Direct message, quote-chain and versioned reaction wire contracts."""
 
 import json
 from pathlib import Path
@@ -44,11 +44,9 @@ def test_projections_preserve_uncertainty_and_do_not_invent_legacy_quotes():
         and legacy.thread_id is None
         and legacy.reactions == []
     )
-    group = WhatsAppConversation._from_dict(F["conversation"])
-    assert (
-        group.group_creation_status == "uncertain"
-        and group.unresolved_participant_count == 1
-    )
+    conversation = WhatsAppConversation._from_dict(F["conversation"])
+    assert conversation.remote_number == F["conversation"]["remote_number"]
+
 
 
 def test_both_thread_routes_keep_chronological_envelope_and_cursor():
@@ -158,18 +156,3 @@ def test_reaction_fixture_preserves_one_actor_per_receipt():
     for reaction in [data["reaction"], *data["message"]["reactions"]]:
         actor = (reaction["direction"], reaction["remote_number"], reaction["target_message_id"])
         assert receipts.setdefault(reaction["id"], actor) == actor
-
-
-def test_incomplete_group_retains_participant_results_and_legacy_defaults():
-    wire = {**F["incomplete_group"], "group_participant_results": [
-        {**item, "future_field": "ignored"} for item in F["incomplete_group"]["group_participant_results"]
-    ]}
-    group = WhatsAppConversation._from_dict(wire)
-    assert group.group_creation_status == "uncertain"
-    assert group.group_creation_issue == "membership_incomplete"
-    assert [(item.number, item.status) for item in group.group_participant_results] == [
-        ("+15555550101", "joined"), ("+15555550102", "not_joined")
-    ]
-    legacy = WhatsAppConversation._from_dict(OLD["conversation"])
-    assert legacy.group_creation_issue is None
-    assert legacy.group_participant_results == []

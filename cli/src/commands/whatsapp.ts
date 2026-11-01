@@ -11,32 +11,25 @@ export function buildWhatsAppSendOptions(options: {
   conversationId?: string;
   replyToMessageId?: string;
   plainReplyFallback?: boolean;
-  groupName?: string;
   text?: string;
   mediaId?: string;
   idempotencyKey?: string;
 }): WhatsAppSendOptions {
-  const recipients = options.to
-    ?.split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (!!recipients?.length === !!options.conversationId)
+  if ((options.to == null) === (options.conversationId == null))
     throw new Error("Pass exactly one of --to or --conversation-id.");
-  if (recipients && (recipients.length < 1 || recipients.length > 8 || new Set(recipients).size !== recipients.length || recipients.some(value => !/^\+[1-9][0-9]{6,14}$/.test(value))))
-    throw new Error("Provide 1–8 unique E.164 recipients.");
+  if (options.to != null && (typeof options.to !== "string" || !/^\+[1-9][0-9]{6,14}$/.test(options.to)))
+    throw new Error("Provide one E.164 recipient.");
   if (options.replyToMessageId !== undefined && !options.replyToMessageId) throw new Error("--reply-to-message-id requires a non-empty message ID.");
   if (options.replyToMessageId !== undefined && !options.conversationId) throw new Error("--reply-to-message-id requires --conversation-id.");
-  if (options.groupName !== undefined && (!recipients || recipients.length < 2 || !options.groupName.trim() || Array.from(options.groupName).length > 100)) throw new Error("--group-name requires 2–8 recipients and 1–100 characters.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
   return {
-    ...(recipients?.length ? { to: recipients.length === 1 ? recipients[0] : recipients } : {}),
+    ...(options.to != null ? { to: options.to } : {}),
     ...(options.conversationId
       ? { conversationId: options.conversationId }
       : {}),
     ...(options.replyToMessageId !== undefined ? { replyToMessageId: options.replyToMessageId } : {}),
     ...(options.replyToMessageId !== undefined && options.plainReplyFallback === false ? { plainReplyFallback: false } : {}),
-    ...(options.groupName !== undefined ? { groupName: options.groupName } : {}),
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
     ...(options.idempotencyKey !== undefined
@@ -47,13 +40,10 @@ export function buildWhatsAppSendOptions(options: {
 
 /** Validate list selectors before making an API request. */
 export function buildWhatsAppListOptions(options: {
-  includeGroups?: boolean; directOnly?: boolean; startDatetime?: string;
+  startDatetime?: string;
   endDatetime?: string; tz?: string;
 }) {
-  if (options.includeGroups && options.directOnly)
-    throw new Error("Choose --include-groups or --direct-only, not both.");
   return {
-    includeGroups: options.includeGroups ?? false,
     ...(options.startDatetime !== undefined ? { startDatetime: options.startDatetime } : {}),
     ...(options.endDatetime !== undefined ? { endDatetime: options.endDatetime } : {}),
     ...(options.tz !== undefined ? { tz: options.tz } : {}),
@@ -78,8 +68,7 @@ export function registerWhatsAppCommands(program: Command): void {
     "send",
     "Queue a message (acceptance is not delivery confirmation)",
   )
-    .option("--to <numbers>", "One E.164 recipient, or 2–8 comma-separated group recipients")
-    .option("--group-name <name>", "Creation-only group name; does not rename an existing group")
+    .option("--to <number>", "One E.164 recipient")
     .option("--reply-to-message-id <id>", "Quote a message in --conversation-id")
     .option("--no-plain-reply-fallback", "Require a native quoted reply; never resend an uncertain quote as plain")
     .option("--conversation-id <id>", "Existing conversation ID")
@@ -160,8 +149,6 @@ export function registerWhatsAppCommands(program: Command): void {
   identityCommand("list", "List messages, newest first")
     .option("--conversation-id <id>", "Filter by conversation")
     .option("--thread-id <id>", "Filter a conversation by quote-chain thread")
-    .option("--direct-only", "Exclude group conversations")
-    .option("--include-groups", "Include group conversations")
     .option("--start-datetime <date>", "Inclusive creation date or instant")
     .option("--end-datetime <date>", "Inclusive creation date or instant; bare dates include the whole day")
     .option("--tz <zone>", "IANA timezone for zone-less dates (default UTC)")
@@ -198,7 +185,7 @@ export function registerWhatsAppCommands(program: Command): void {
     .action(withErrorHandler(async function (this: Command, conversationId: string, opts) {
       const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
       output(await identity.listWhatsAppMessages({ conversationId, threadId: opts.threadId,
-        includeGroups: true, limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json, columns: WHATSAPP_MESSAGE_COLUMNS });
+        limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json, columns: WHATSAPP_MESSAGE_COLUMNS });
     }));
 
   identityCommand("react <message-id>", "Submit a reaction; acceptance is not an applied reaction")
@@ -233,8 +220,6 @@ export function registerWhatsAppCommands(program: Command): void {
     "conversations",
     "List conversations with local unread counts",
   )
-    .option("--direct-only", "Exclude group conversations")
-    .option("--include-groups", "Include group conversations")
     .option("--start-datetime <date>", "Inclusive creation date or instant")
     .option("--end-datetime <date>", "Inclusive creation date or instant; bare dates include the whole day")
     .option("--tz <zone>", "IANA timezone for zone-less dates (default UTC)")
@@ -257,9 +242,6 @@ export function registerWhatsAppCommands(program: Command): void {
               "id",
               "remoteNumber",
               "participants",
-              "isGroup",
-              "groupCreationStatus",
-              "unresolvedParticipantCount",
               "latestText",
               "unreadCount",
               "latestMessageAt",

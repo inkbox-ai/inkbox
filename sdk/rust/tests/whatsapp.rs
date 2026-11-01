@@ -1,8 +1,7 @@
 use httpmock::prelude::*;
 use inkbox::webhooks::WhatsAppWebhookPayload;
 use inkbox::{
-    Inkbox, WhatsAppDeliveryState, WhatsAppListOptions, WhatsAppMessageStatus, WhatsAppRecipients,
-    WhatsAppSendOptions,
+    Inkbox, WhatsAppDeliveryState, WhatsAppListOptions, WhatsAppMessageStatus, WhatsAppSendOptions,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -20,7 +19,7 @@ fn send_ownership_idempotency_and_uncertain_delivery_are_independent() {
             .path("/api/v1/whatsapp/messages")
             .query_param("agent_identity_id", owner.to_string())
             .header("Idempotency-Key", "logical-send")
-            .json_body(json!({"to":["+15555550101"],"text":"Hello","media_ids":[media]}));
+            .json_body(json!({"to":"+15555550101","text":"Hello","media_ids":[media]}));
         then.status(201).json_body(json!({"message":f["message"]}));
     });
     let client = Inkbox::builder("test-only")
@@ -30,7 +29,7 @@ fn send_ownership_idempotency_and_uncertain_delivery_are_independent() {
     let message = client
         .whatsapp()
         .send(&WhatsAppSendOptions {
-            to: Some(WhatsAppRecipients::Many(vec!["+15555550101".into()])),
+            to: Some("+15555550101".into()),
             text: Some("Hello".into()),
             media_ids: Some(vec![media]),
             agent_identity_id: Some(owner),
@@ -43,10 +42,7 @@ fn send_ownership_idempotency_and_uncertain_delivery_are_independent() {
     assert!(message.failed_at.is_none());
     send.assert();
     let invalid = WhatsAppSendOptions {
-        to: Some(WhatsAppRecipients::Many(vec![
-            "+15555550101".into(),
-            "+15555550101".into(),
-        ])),
+        to: Some("+15555550101,+15555550101".into()),
         text: Some("Hello".into()),
         ..Default::default()
     };
@@ -130,7 +126,10 @@ fn reads_media_and_local_mark_read_use_exact_owner_and_boundary() {
         r.list_conversations(&Default::default()).unwrap()[0].unread_count,
         2
     );
-    assert!(!r.get_conversation(&conv, None).unwrap().is_group);
+    assert_eq!(
+        r.get_conversation(&conv, None).unwrap().participants.len(),
+        1
+    );
     assert_eq!(
         r.upload_media(
             b"png".to_vec(),
@@ -235,6 +234,11 @@ fn v2_shared_send_vectors_and_legacy_quotes_are_preserved() {
     let mut valid = 0;
     for case in data["send_cases"].as_array().unwrap() {
         let body = &case["body"];
+        if body["to"].is_array() {
+            assert!(!case["valid"].as_bool().unwrap());
+            assert!(serde_json::from_value::<String>(body["to"].clone()).is_err());
+            continue;
+        }
         let options = WhatsAppSendOptions {
             to: body
                 .get("to")
@@ -245,7 +249,6 @@ fn v2_shared_send_vectors_and_legacy_quotes_are_preserved() {
             reply_to_message_id: body["reply_to_message_id"]
                 .as_str()
                 .map(|value| Uuid::parse_str(value).unwrap()),
-            group_name: body["group_name"].as_str().map(String::from),
             text: body["text"].as_str().map(String::from),
             idempotency_key: Some(case["name"].as_str().unwrap().into()),
             ..Default::default()
@@ -264,12 +267,9 @@ fn v2_shared_send_vectors_and_legacy_quotes_are_preserved() {
     let legacy: inkbox::WhatsAppMessage =
         serde_json::from_value(fixture()["message"].clone()).unwrap();
     assert!(legacy.reply_to_message_id.is_none() && legacy.reactions.is_empty());
-    let group: inkbox::WhatsAppConversation =
+    let conversation: inkbox::WhatsAppConversation =
         serde_json::from_value(data["conversation"].clone()).unwrap();
-    assert_eq!(
-        group.group_creation_status,
-        Some(inkbox::WhatsAppGroupCreationStatus::Uncertain)
-    );
+    assert_eq!(conversation.participants.len(), 1);
 }
 
 #[test]
@@ -421,7 +421,7 @@ fn documented_identity_bound_rust_send_selects_the_agent_for_organization_keys()
     let identity = client.get_identity("my-agent").unwrap();
     identity
         .send_whatsapp(&WhatsAppSendOptions {
-            to: Some(WhatsAppRecipients::One("+15555550101".into())),
+            to: Some("+15555550101".into()),
             text: Some("Hello".into()),
             idempotency_key: Some("order-confirmation-123".into()),
             ..Default::default()
@@ -432,7 +432,7 @@ fn documented_identity_bound_rust_send_selects_the_agent_for_organization_keys()
 }
 
 #[test]
-fn list_date_filters_and_group_default() {
+fn list_direct_message_date_filters() {
     let server = MockServer::start();
     let client = Inkbox::builder("test-only")
         .base_url(server.base_url())
@@ -442,7 +442,6 @@ fn list_date_filters_and_group_default() {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path(format!("/api/v1/whatsapp/{path}"))
-                .query_param("include_groups", "false")
                 .query_param("start_datetime", "2026-03-08")
                 .query_param("end_datetime", "2026-03-08")
                 .query_param("tz", "America/New_York");
@@ -503,33 +502,4 @@ fn reply_fallback_wire_preserves_legacy_default() {
             mock.assert();
         }
     }
-}
-
-#[test]
-fn incomplete_group_retains_participant_results_and_legacy_defaults() {
-    use inkbox::{
-        WhatsAppConversation, WhatsAppGroupCreationIssue, WhatsAppGroupParticipantStatus,
-    };
-    let f: Value =
-        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
-    let group: WhatsAppConversation =
-        serde_json::from_value(f["incomplete_group"].clone()).unwrap();
-    assert_eq!(
-        group.group_creation_issue,
-        Some(WhatsAppGroupCreationIssue::MembershipIncomplete)
-    );
-    assert_eq!(group.group_participant_results.len(), 2);
-    assert_eq!(group.group_participant_results[0].number, "+15555550101");
-    assert_eq!(
-        group.group_participant_results[0].status,
-        WhatsAppGroupParticipantStatus::Joined
-    );
-    assert_eq!(
-        group.group_participant_results[1].status,
-        WhatsAppGroupParticipantStatus::NotJoined
-    );
-    let legacy: WhatsAppConversation =
-        serde_json::from_value(fixture()["conversation"].clone()).unwrap();
-    assert!(legacy.group_creation_issue.is_none());
-    assert!(legacy.group_participant_results.is_empty());
 }

@@ -25,7 +25,7 @@ def test_send_owner_query_and_acceptance_not_delivery():
     http = MagicMock()
     http.post.return_value = {"message": F["message"]}
     message = WhatsAppResource(http).send(
-        to=["+15555550101"],
+        to="+15555550101",
         text="Hello",
         media_ids=[MEDIA],
         agent_identity_id=OWNER,
@@ -36,7 +36,7 @@ def test_send_owner_query_and_acceptance_not_delivery():
     assert message.failed_at is None
     http.post.assert_called_once_with(
         "/messages",
-        json={"to": ["+15555550101"], "text": "Hello", "media_ids": [MEDIA]},
+        json={"to": "+15555550101", "text": "Hello", "media_ids": [MEDIA]},
         params={"agent_identity_id": OWNER},
         headers={"Idempotency-Key": "logical-send", "Prefer": "idempotency-replay"},
     )
@@ -105,7 +105,7 @@ def test_reads_and_local_mark_read_keep_owner_and_pagination():
         params={
             "agent_identity_id": OWNER,
             "conversation_id": CONV,
-            "include_groups": False,
+
             "limit": 10,
             "offset": 4,
             "is_read": False,
@@ -280,11 +280,10 @@ def test_list_date_filters_and_direct_default(method):
     resource = WhatsAppResource(http)
     getattr(resource, method)(start_datetime="2026-03-08", end_datetime="2026-03-08", tz="America/New_York")
     assert http.get.call_args.kwargs["params"] == {
-        "limit": 50, "offset": 0, "include_groups": False,
+        "limit": 50, "offset": 0,
         "start_datetime": "2026-03-08", "end_datetime": "2026-03-08", "tz": "America/New_York",
     }
-    getattr(resource, method)(include_groups=True)
-    assert http.get.call_args.kwargs["params"]["include_groups"] is True
+    assert "include_groups" not in http.get.call_args.kwargs["params"]
 
 @pytest.mark.parametrize("fallback", [True, False])
 @pytest.mark.parametrize("quoted", [True, False])

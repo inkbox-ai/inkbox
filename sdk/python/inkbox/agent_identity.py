@@ -143,11 +143,10 @@ class AgentIdentity:
     def send_whatsapp(
         self,
         *,
-        to: str | list[str] | None = None,
+        to: str | None = None,
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
-        group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         idempotency_key: str | None = None,
@@ -157,7 +156,6 @@ class AgentIdentity:
             conversation_id=conversation_id,
             reply_to_message_id=reply_to_message_id,
             plain_reply_fallback=plain_reply_fallback,
-            group_name=group_name,
             text=text,
             media_ids=media_ids,
             idempotency_key=idempotency_key,
@@ -188,7 +186,6 @@ class AgentIdentity:
         *,
         conversation_id: UUID | str | None = None,
         thread_id: UUID | str | None = None,
-        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
@@ -201,7 +198,6 @@ class AgentIdentity:
             agent_identity_id=self.id,
             conversation_id=conversation_id,
             thread_id=thread_id,
-            include_groups=include_groups,
             limit=limit,
             offset=offset,
             is_read=is_read,
@@ -210,11 +206,11 @@ class AgentIdentity:
         )
 
     def list_whatsapp_conversations(
-        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None, include_groups: bool | None = False,
+        self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None,
         start_datetime: str | None = None, end_datetime: str | None = None, tz: str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         return self._inkbox.whatsapp.list_conversations(
-            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked, include_groups=include_groups,
+            agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked,
             start_datetime=start_datetime, end_datetime=end_datetime, tz=tz,
         )
 

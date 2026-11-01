@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 import re
 import unicodedata
-from typing import Any, Literal, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
 from inkbox._message_requests import post_message, send_key
@@ -57,14 +57,6 @@ class WhatsAppReactionStatus(StrEnum):
     FAILED = "failed"
     UNCERTAIN = "uncertain"
     SUPERSEDED = "superseded"
-
-
-class WhatsAppGroupCreationStatus(StrEnum):
-    PENDING = "pending"
-    CREATING = "creating"
-    READY = "ready"
-    UNCERTAIN = "uncertain"
-    FAILED = "failed"
 
 
 class WhatsAppMediaStatus(StrEnum):
@@ -160,10 +152,9 @@ class WhatsAppMessage:
     conversation_id: UUID
     direction: WhatsAppDirection
     local_number: str
-    remote_number: str | None
+    remote_number: str
     sender_number: str
     participants: list[str]
-    is_group: bool
     content: str | None
     media: list[WhatsAppMedia]
     status: WhatsAppMessageStatus
@@ -194,10 +185,9 @@ class WhatsAppMessage:
             conversation_id=UUID(d["conversation_id"]),
             direction=WhatsAppDirection(d["direction"]),
             local_number=d["local_number"],
-            remote_number=d.get("remote_number"),
+            remote_number=d["remote_number"],
             sender_number=d["sender_number"],
             participants=d["participants"],
-            is_group=d["is_group"],
             content=d.get("content"),
             media=[WhatsAppMedia._from_dict(x) for x in d["media"]],
             status=WhatsAppMessageStatus(d["status"]),
@@ -225,28 +215,14 @@ class WhatsAppMessage:
 
 
 @dataclass
-class WhatsAppGroupParticipantResult:
-    """Observed outcome for a requested group participant."""
-
-    number: str
-    status: Literal["joined", "not_joined"]
-
-
-@dataclass
 class WhatsAppConversation:
     id: UUID
     agent_identity_id: UUID
     local_number: str
-    remote_number: str | None
+    remote_number: str
     participants: list[str]
-    is_group: bool
     created_at: datetime
     updated_at: datetime
-    group_name: str | None = field(default=None, kw_only=True)
-    group_creation_status: WhatsAppGroupCreationStatus | None = field(default=None, kw_only=True)
-    group_creation_issue: Literal["membership_incomplete"] | None = field(default=None, kw_only=True)
-    group_participant_results: list[WhatsAppGroupParticipantResult] = field(default_factory=list, kw_only=True)
-    unresolved_participant_count: int = field(default=0, kw_only=True)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConversation:
@@ -254,17 +230,10 @@ class WhatsAppConversation:
             UUID(d["id"]),
             UUID(d["agent_identity_id"]),
             d["local_number"],
-            d.get("remote_number"),
+            d["remote_number"],
             d["participants"],
-            d["is_group"],
             datetime.fromisoformat(d["created_at"]),
             datetime.fromisoformat(d["updated_at"]),
-            group_name=d.get("group_name"),
-            group_creation_status=WhatsAppGroupCreationStatus(d["group_creation_status"]) if d.get("group_creation_status") else None,
-            group_creation_issue=d.get("group_creation_issue"),
-            group_participant_results=[WhatsAppGroupParticipantResult(number=item["number"], status=item["status"])
-                                       for item in d.get("group_participant_results", [])],
-            unresolved_participant_count=d.get("unresolved_participant_count", 0),
         )
 
 
@@ -325,7 +294,7 @@ class WhatsAppLimits:
 
 
 class WhatsAppResource:
-    """Direct and group WhatsApp on an approved dedicated number.
+    """Direct WhatsApp on an approved dedicated number.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
     and owned media IDs after an uncertain outcome; never re-upload to retry it.
@@ -337,21 +306,18 @@ class WhatsAppResource:
     def send(
         self,
         *,
-        to: str | list[str] | None = None,
+        to: str | None = None,
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
-        group_name: str | None = None,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
     ) -> WhatsAppMessage:
-        """Queue a direct/group message or native quoted reply, without assuming delivery.
+        """Queue a direct message or native quoted reply, without assuming delivery.
 
-        Use a conversation ID for existing groups of any supported size. A group
-        name is only a creation hint; selecting a group never renames it. Preserve
-        the logical key after uncertainty rather than starting another operation.
+        Preserve the logical key after uncertainty rather than starting another operation.
         plain_reply_fallback defaults to True; False explicitly requires a native
         quote. Current supported targets use native quotes; missing evidence or
         rejected/uncertain sends never trigger a plain replacement.
@@ -360,17 +326,12 @@ class WhatsAppResource:
             raise ValueError("plain_reply_fallback must be a boolean")
         if (to is None) == (conversation_id is None):
             raise ValueError("Specify exactly one of to or conversation_id")
-        recipients = [to] if isinstance(to, str) else to
-        if to is not None and (not isinstance(recipients, list) or not 1 <= len(recipients) <= 8
-                or any(not isinstance(value, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", value) for value in recipients)
-                or len(set(recipients)) != len(recipients)):
-            raise ValueError("Provide 1–8 unique E.164 recipients")
+        if to is not None and (not isinstance(to, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", to)):
+            raise ValueError("Provide one E.164 recipient")
         if reply_to_message_id is not None:
             if conversation_id is None:
                 raise ValueError("reply_to_message_id requires conversation_id")
             UUID(str(reply_to_message_id))
-        if group_name is not None and (not isinstance(to, list) or len(to) < 2 or not group_name.strip() or len(group_name) > 100):
-            raise ValueError("group_name requires a recipient-list group and 1–100 characters")
         if media_ids is not None and len(media_ids) > 1:
             raise ValueError("WhatsApp supports at most one attachment")
         if not (text and text.strip()) and not media_ids:
@@ -386,8 +347,6 @@ class WhatsAppResource:
             body["reply_to_message_id"] = str(reply_to_message_id)
             if not plain_reply_fallback:
                 body["plain_reply_fallback"] = False
-        if group_name is not None:
-            body["group_name"] = group_name
         if text is not None:
             body["text"] = text
         if media_ids is not None:
@@ -421,7 +380,6 @@ class WhatsAppResource:
         agent_identity_id: UUID | str | None = None,
         conversation_id: UUID | str | None = None,
         thread_id: UUID | str | None = None,
-        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
@@ -444,8 +402,6 @@ class WhatsAppResource:
         for name, value in (("start_datetime", start_datetime), ("end_datetime", end_datetime), ("tz", tz)):
             if value is not None:
                 params[name] = value
-        if include_groups is not None:
-            params["include_groups"] = include_groups
         if is_read is not None:
             params["is_read"] = is_read
         if is_blocked is not None:
@@ -459,7 +415,6 @@ class WhatsAppResource:
         self,
         *,
         agent_identity_id: UUID | str | None = None,
-        include_groups: bool | None = False,
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
@@ -475,8 +430,6 @@ class WhatsAppResource:
         for name, value in (("start_datetime", start_datetime), ("end_datetime", end_datetime), ("tz", tz)):
             if value is not None:
                 params[name] = value
-        if include_groups is not None:
-            params["include_groups"] = include_groups
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
         return [

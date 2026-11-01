@@ -217,7 +217,6 @@ pub struct WhatsAppCorrespondenceItem {
     pub local_number: String,
     pub remote_number: Option<String>,
     pub participants: Vec<String>,
-    pub is_group: bool,
     pub text: Option<String>,
     pub media: Option<CorrespondenceMediaMetadata>,
 }

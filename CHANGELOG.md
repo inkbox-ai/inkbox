@@ -8,17 +8,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Python, TypeScript, Rust, and CLI support for approved dedicated direct and group
+- Python, TypeScript, Rust, and CLI support for approved dedicated one-to-one
   WhatsApp: send and read messages, list conversations, upload owned attachments,
   renew temporary media access, and mark only local history read.
 - Native quoted replies and chronological cursor-based thread reads. Whole-message
   named/custom reactions have explicit logical-write keys and versioned receipts;
   stale removal cannot remove a newer reaction. Queued and uncertain receipts remain
   distinct from applied message reactions.
-- Group creation accepts 2–8 distinct E.164 recipients with an optional creation-only
-  name. Existing groups retain conversation IDs, observed membership, and uncertain
-  creation status. Message and conversation lists default to direct conversations;
-  group inclusion is explicit, while a selected conversation always retains its history.
+- Sends accept one E.164 recipient string or an existing direct conversation.
+  Recipient arrays are rejected, including one-element arrays.
 - Creation-date filters and timezone-aware bounds across message/conversation lists.
   CLI aliases include `--unread-only`, `unreact`, and a `conversation` history command.
 - Strict `plain_reply_fallback` / `plainReplyFallback` send option, default true; false
@@ -42,7 +40,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Fixed
 
-- WhatsApp CLI list selectors reject conflicting flags before network access, and conversation history uses the same table columns as message lists.
+- WhatsApp conversation history uses the same table columns as message lists.
 - WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
 - Python and TypeScript WhatsApp sends retain their request key when a successful
   response cannot be decoded, without automatically sending another request.

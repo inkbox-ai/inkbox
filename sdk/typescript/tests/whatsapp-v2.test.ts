@@ -13,13 +13,13 @@ describe("WhatsApp v2 shared wire contract", () => {
   it("runs every send fixture without changing legacy direct payloads", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok({ message: f.message }))));
     for (const item of f.send_cases) {
-      const b = item.body, options = { to: b.to, conversationId: b.conversation_id, replyToMessageId: b.reply_to_message_id, groupName: b.group_name, text: b.text, idempotencyKey: item.name };
+      const b = item.body, options = { to: b.to, conversationId: b.conversation_id, replyToMessageId: b.reply_to_message_id, text: b.text, idempotencyKey: item.name };
       const count = vi.mocked(fetch).mock.calls.length;
       if (!item.valid) { await expect(api().send(options)).rejects.toThrow(); expect(fetch).toHaveBeenCalledTimes(count); }
       else { await api().send(options); expect(request().body).toEqual(b); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe(item.name); }
     }
   });
-  it("retains group uncertainty and actual quote/reaction identities without backfilling legacy history", () => {
+  it("retains direct conversation and actual quote/reaction identities without backfilling legacy history", () => {
     const message = parseWhatsAppMessage(f.message);
     expect(message.replyToMessageId).toBe(f.message.reply_to_message_id);
     expect(message.threadRootMessageId).toBe(f.message.thread_root_message_id);
@@ -27,7 +27,7 @@ describe("WhatsApp v2 shared wire contract", () => {
     const legacy = parseWhatsAppMessage(old.message);
     expect(legacy.replyToMessageId).toBeNull(); expect(legacy.threadId).toBeNull(); expect(legacy.reactions).toEqual([]);
     const conversation = parseWhatsAppConversation(f.conversation);
-    expect(conversation.groupCreationStatus).toBe("uncertain"); expect(conversation.unresolvedParticipantCount).toBe(1);
+    expect(conversation.remoteNumber).toBe(f.conversation.remote_number);
   });
   it("reads both chronological thread endpoints with the same opaque cursor and exact envelope", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok(f.thread))));
@@ -72,24 +72,11 @@ it("reaction notifications preserve nullable actors and the original target mess
 it("normalizes omitted nullable WhatsApp correspondence fields without changing default channels", () => {
   const base = {channel: "whatsapp", source_id: f.message.id, direction: "inbound", occurred_at: f.message.created_at,
     identity_id: f.message.agent_identity_id, conversation_id: f.message.conversation_id,
-    local_number: f.message.local_number, participants: f.message.participants, is_group: true};
+    local_number: f.message.local_number, participants: f.message.participants};
   for (const wire of [base, {...base, remote_number: null, text: null, media: null}]) {
     const item = parseCorrespondenceItem(wire as never);
     expect(item.channel).toBe("whatsapp");
     if (item.channel !== "whatsapp") throw new Error("Incorrect correspondence channel");
     expect(item.remoteNumber).toBeNull(); expect(item.text).toBeNull(); expect(item.media).toBeNull();
   }
-});
-
-it("retains incomplete group participant results and legacy defaults", () => {
-  const group = parseWhatsAppConversation(f.incomplete_group);
-  expect(group.groupCreationStatus).toBe("uncertain");
-  expect(group.groupCreationIssue).toBe("membership_incomplete");
-  expect(group.groupParticipantResults).toEqual([
-    {number: "+15555550101", status: "joined"},
-    {number: "+15555550102", status: "not_joined"},
-  ]);
-  const legacy = parseWhatsAppConversation(old.conversation);
-  expect(legacy.groupCreationIssue).toBeNull();
-  expect(legacy.groupParticipantResults).toEqual([]);
 });

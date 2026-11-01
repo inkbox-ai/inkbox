@@ -45,15 +45,6 @@ pub enum WhatsAppMediaStatus {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum WhatsAppGroupCreationStatus {
-    Pending,
-    Creating,
-    Ready,
-    Uncertain,
-    Failed,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum WhatsAppReactionType {
     Love,
     Like,
@@ -161,10 +152,9 @@ pub struct WhatsAppMessage {
     pub conversation_id: Uuid,
     pub direction: WhatsAppDirection,
     pub local_number: String,
-    pub remote_number: Option<String>,
+    pub remote_number: String,
     pub sender_number: String,
     pub participants: Vec<String>,
-    pub is_group: bool,
     pub content: Option<String>,
     pub media: Vec<WhatsAppMedia>,
     pub status: WhatsAppMessageStatus,
@@ -191,40 +181,13 @@ pub struct WhatsAppMessage {
     #[serde(default)]
     pub reactions: Vec<WhatsAppReaction>,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WhatsAppGroupCreationIssue {
-    MembershipIncomplete,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WhatsAppGroupParticipantStatus {
-    Joined,
-    NotJoined,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WhatsAppGroupParticipantResult {
-    pub number: String,
-    pub status: WhatsAppGroupParticipantStatus,
-}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConversation {
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub local_number: String,
-    pub remote_number: Option<String>,
+    pub remote_number: String,
     pub participants: Vec<String>,
-    pub is_group: bool,
-    #[serde(default)]
-    pub group_name: Option<String>,
-    #[serde(default)]
-    pub group_creation_status: Option<WhatsAppGroupCreationStatus>,
-    #[serde(default)]
-    pub group_creation_issue: Option<WhatsAppGroupCreationIssue>,
-    #[serde(default)]
-    pub group_participant_results: Vec<WhatsAppGroupParticipantResult>,
-    #[serde(default)]
-    pub unresolved_participant_count: u64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -251,16 +214,10 @@ pub struct WhatsAppChannelStatus {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum WhatsAppRecipients {
-    One(String),
-    Many(Vec<String>),
-}
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct WhatsAppSendOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub to: Option<WhatsAppRecipients>,
+    pub to: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,8 +225,6 @@ pub struct WhatsAppSendOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Defaults to true. False requires native quoting; unavailable evidence or uncertain sends never trigger a plain replacement.
     pub plain_reply_fallback: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub group_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -284,7 +239,6 @@ pub struct WhatsAppListOptions {
     pub agent_identity_id: Option<Uuid>,
     pub conversation_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
-    pub include_groups: Option<bool>,
     pub start_datetime: Option<String>,
     pub end_datetime: Option<String>,
     pub tz: Option<String>,
@@ -311,39 +265,15 @@ impl WhatsAppResource {
                 "Specify exactly one of to or conversation_id".into(),
             ));
         }
-        let recipients: Vec<&str> = match &o.to {
-            Some(WhatsAppRecipients::One(value)) => vec![value],
-            Some(WhatsAppRecipients::Many(values)) => values.iter().map(String::as_str).collect(),
-            None => vec![],
-        };
-        if o.to.is_some()
-            && (recipients.is_empty()
-                || recipients.len() > 8
-                || recipients.iter().any(|value| !valid_phone(value))
-                || recipients
-                    .iter()
-                    .collect::<std::collections::HashSet<_>>()
-                    .len()
-                    != recipients.len())
-        {
+        if o.to.as_ref().is_some_and(|value| !valid_phone(value)) {
             return Err(InkboxError::InvalidArgument(
-                "Provide 1–8 unique E.164 recipients".into(),
+                "Provide one E.164 recipient".into(),
             ));
         }
         if o.reply_to_message_id.is_some() && o.conversation_id.is_none() {
             return Err(InkboxError::InvalidArgument(
                 "reply_to_message_id requires conversation_id".into(),
             ));
-        }
-        if let Some(name) = &o.group_name {
-            if !matches!(&o.to, Some(WhatsAppRecipients::Many(values)) if values.len() >= 2)
-                || name.trim().is_empty()
-                || name.chars().count() > 100
-            {
-                return Err(InkboxError::InvalidArgument(
-                    "group_name requires a recipient-list group and 1–100 characters".into(),
-                ));
-            }
         }
         if o.media_ids.as_ref().is_some_and(|v| v.len() > 1) {
             return Err(InkboxError::InvalidArgument(
@@ -397,10 +327,6 @@ impl WhatsAppResource {
             }
             p.push(("thread_id", v.to_string()));
         }
-        p.push((
-            "include_groups",
-            o.include_groups.unwrap_or(false).to_string(),
-        ));
         for (name, value) in [
             ("start_datetime", &o.start_datetime),
             ("end_datetime", &o.end_datetime),
@@ -425,10 +351,6 @@ impl WhatsAppResource {
         let mut p = owner(o.agent_identity_id.as_ref());
         p.push(("limit", o.limit.unwrap_or(50).to_string()));
         p.push(("offset", o.offset.unwrap_or(0).to_string()));
-        p.push((
-            "include_groups",
-            o.include_groups.unwrap_or(false).to_string(),
-        ));
         for (name, value) in [
             ("start_datetime", &o.start_datetime),
             ("end_datetime", &o.end_datetime),

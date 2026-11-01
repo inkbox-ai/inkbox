@@ -45,7 +45,7 @@ describe("WhatsApp public wire", () => {
       vi.fn().mockResolvedValue(ok({ message: f.message }, 201)),
     );
     const message = await resource().send({
-      to: ["+15555550101"],
+      to: "+15555550101",
       text: "Hello",
       mediaIds: [media],
       agentIdentityId: owner,
@@ -53,7 +53,7 @@ describe("WhatsApp public wire", () => {
     });
     expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
     expect(last().body).toEqual({
-      to: ["+15555550101"],
+      to: "+15555550101",
       text: "Hello",
       media_ids: [media],
     });
@@ -93,7 +93,6 @@ describe("WhatsApp public wire", () => {
     expect(Object.fromEntries(last().url.searchParams)).toEqual({
       agent_identity_id: owner,
       conversation_id: conv,
-      include_groups: "false",
       limit: "10",
       offset: "4",
       is_read: "false",
@@ -221,13 +220,12 @@ it("retains a Blob MIME when no explicit override is supplied", async () => {
   expect(((last().body as FormData).get("file") as File).type).toBe("image/jpeg");
 });
 
-it("forwards date filters and makes group inclusion explicit for both lists", async () => {
+it("forwards date filters for both direct-message lists", async () => {
   vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok([])));
   for (const method of ["list", "listConversations"] as const) {
     await resource()[method]({startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
-    expect(Object.fromEntries(last().url.searchParams)).toEqual({limit: "50", offset: "0", include_groups: "false", start_datetime: "2026-03-08", end_datetime: "2026-03-08", tz: "America/New_York"});
-    await resource()[method]({includeGroups: true});
-    expect(last().url.searchParams.get("include_groups")).toBe("true");
+    expect(Object.fromEntries(last().url.searchParams)).toEqual({limit: "50", offset: "0", start_datetime: "2026-03-08", end_datetime: "2026-03-08", tz: "America/New_York"});
+    expect(last().url.searchParams.has("include_groups")).toBe(false);
   }
 });
 

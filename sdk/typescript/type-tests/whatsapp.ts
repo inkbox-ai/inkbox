@@ -1,7 +1,7 @@
 import type { Inkbox, AgentIdentity, WhatsAppMessage, WhatsAppMedia, WhatsAppWebhookPayload, WhatsAppCorrespondenceItem, WhatsAppChannelStatus } from "../dist/index.js";
 declare const client: Inkbox;
 declare const identity: AgentIdentity;
-const message: Promise<WhatsAppMessage> = identity.sendWhatsApp({to:["+15555550101"],text:"Hello",mediaIds:["owned-media-id"],idempotencyKey:"stable-key"});
+const message: Promise<WhatsAppMessage> = identity.sendWhatsApp({to:"+15555550101",text:"Hello",mediaIds:["owned-media-id"],idempotencyKey:"stable-key"});
 const attachment: Promise<WhatsAppMedia> = identity.getWhatsAppMedia("owned-media-id");
 const status: Promise<WhatsAppChannelStatus|null> = identity.getWhatsAppStatus();
 const direct: Promise<WhatsAppMessage> = client.whatsapp.send({conversationId:"conversation-id",text:"Hello",agentIdentityId:"identity-id"});
@@ -19,3 +19,6 @@ const reactionTarget: string | undefined = webhook.data.reaction?.target_message
 const reactionActor: string | null | undefined = webhook.data.reaction?.remote_number;
 const reactionEvent: WhatsAppWebhookPayload = { id: "evt-reaction", event_type: "whatsapp.reaction_received", timestamp: "2026-10-01T12:00:00Z", data: { reaction: null, contacts: [], agent_identities: [] } };
 void [reactionTarget, reactionActor, reactionEvent];
+
+// @ts-expect-error WhatsApp accepts one recipient string, not a recipient array.
+identity.sendWhatsApp({to:["+15555550101"],text:"Hello"});

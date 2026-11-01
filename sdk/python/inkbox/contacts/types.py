@@ -695,7 +695,6 @@ class WhatsAppCorrespondenceItem(CorrespondenceItem):
     local_number: str
     remote_number: str | None
     participants: list[str]
-    is_group: bool
     text: str | None = None
     media: CorrespondenceMediaMetadata | None = None
 
@@ -820,7 +819,7 @@ def _parse_correspondence_item(d: dict[str, Any]) -> CorrespondenceItem:
     if channel is CorrespondenceChannel.WHATSAPP:
         return WhatsAppCorrespondenceItem(**common, conversation_id=UUID(d["conversation_id"]),
             local_number=d["local_number"], remote_number=d.get("remote_number"),
-            participants=d["participants"], is_group=d["is_group"], text=d.get("text"), media=parsed_media)
+            participants=d["participants"], text=d.get("text"), media=parsed_media)
     if channel is CorrespondenceChannel.SLACK:
         return SlackCorrespondenceItem(
             **common,

@@ -973,10 +973,9 @@ class WhatsAppWebhookMessage(TypedDict):
     conversation_id: str
     direction: str
     local_number: str
-    remote_number: str | None
+    remote_number: str
     sender_number: str
     participants: list[str]
-    is_group: bool
     content: str | None
     media: list[WhatsAppWebhookMedia]
     status: WhatsAppMessageStatusWire

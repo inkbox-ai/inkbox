@@ -2297,7 +2297,7 @@ require a native reply instead.
 
 Available by approval on the same number as an existing dedicated personal
 iMessage line; not a shared channel. Read fresh WhatsApp channel status and
-request access in the console when unavailable. Direct and group messages support text
+request access in the console when unavailable. One-to-one messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
@@ -2306,5 +2306,5 @@ unknown delivery does not mean a send failed. Mark-read updates only local histo
 
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
-opt-in contact correspondence. Groups of 2–8 recipients, native quoted replies, and versioned whole-message
+opt-in contact correspondence. Native quoted replies and versioned whole-message
 reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.

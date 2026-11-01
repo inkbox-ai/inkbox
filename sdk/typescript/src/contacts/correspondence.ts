@@ -82,7 +82,6 @@ export interface WhatsAppCorrespondenceItem extends CorrespondenceItemBase {
   localNumber: string;
   remoteNumber: string | null;
   participants: string[];
-  isGroup: boolean;
   text: string | null;
   media: CorrespondenceMediaMetadata | null;
 }
@@ -192,7 +191,6 @@ export interface RawWhatsAppCorrespondenceItem extends RawCorrespondenceItemBase
   local_number: string;
   remote_number: string | null;
   participants: string[];
-  is_group: boolean;
   text: string | null;
   media: CorrespondenceMediaMetadata | null;
 }
@@ -303,7 +301,7 @@ export function parseCorrespondenceItem(r: RawCorrespondenceItem): Correspondenc
         media: r.media,
       };
     case "whatsapp":
-      return { ...base, channel:r.channel, conversationId:r.conversation_id,localNumber:r.local_number,remoteNumber:r.remote_number ?? null,participants:r.participants,isGroup:r.is_group,text:r.text ?? null,media:r.media ?? null };
+      return { ...base, channel:r.channel, conversationId:r.conversation_id,localNumber:r.local_number,remoteNumber:r.remote_number ?? null,participants:r.participants,text:r.text ?? null,media:r.media ?? null };
     case "imessage":
       return {
         ...base,

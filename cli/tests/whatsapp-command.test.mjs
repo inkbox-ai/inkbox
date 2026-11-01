@@ -31,7 +31,7 @@ test("one-to-one send selectors and owned attachment options", () => {
   assert.throws(
     () =>
       buildWhatsAppSendOptions({ to: "+15555550101,+15555550101", text: "hi" }),
-    /unique E.164/,
+    /one E.164/,
   );
   assert.throws(
     () =>
@@ -139,15 +139,15 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       .media[0].status,
     "unavailable",
   );
-  await run("list", "--include-groups", "--unread-only", "--start-datetime", "2026-03-08", "--end-datetime", "2026-03-08", "--tz", "America/New_York");
-  assert.equal(calls.at(-1).query.include_groups, "true");
+  await run("list", "--unread-only", "--start-datetime", "2026-03-08", "--end-datetime", "2026-03-08", "--tz", "America/New_York");
+  assert.equal(calls.at(-1).query.include_groups, undefined);
   assert.equal(calls.at(-1).query.is_read, "false");
   assert.equal(calls.at(-1).query.start_datetime, "2026-03-08");
   assert.equal(calls.at(-1).query.tz, "America/New_York");
   await run("conversation", f.conversation.id, "--limit", "10");
   assert.equal(calls.at(-1).path, "/api/v1/whatsapp/messages");
   assert.equal(calls.at(-1).query.conversation_id, f.conversation.id);
-  assert.equal(calls.at(-1).query.include_groups, "true");
+  assert.equal(calls.at(-1).query.include_groups, undefined);
   assert.equal((await run("get", f.message.id)).id, f.message.id);
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
@@ -174,8 +174,9 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
     conversation_id: f.conversation.id,
     through_message_id: f.message.id,
   });
-  await run("send", "--to", "+15555550101,+15555550102", "--group-name", "Project team", "--text", "Hello", "--idempotency-key", "group-stable");
-  assert.deepEqual(calls.at(-1).body, { to: ["+15555550101", "+15555550102"], group_name: "Project team", text: "Hello" });
+  const beforeMultipleRecipients = calls.length;
+  await assert.rejects(() => run("send", "--to", "+15555550101,+15555550102", "--text", "Hello"));
+  assert.equal(calls.length, beforeMultipleRecipients);
   await run("send", "--conversation-id", f.conversation.id, "--reply-to-message-id", v2.message.id, "--text", "Quoted", "--idempotency-key", "quote-stable");
   assert.equal(calls.at(-1).body.reply_to_message_id, v2.message.id);
   await run("send", "--conversation-id", f.conversation.id, "--reply-to-message-id", v2.message.id, "--text", "Native", "--no-plain-reply-fallback", "--idempotency-key", "native-required");
@@ -194,11 +195,11 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("thread", v2.message.id, "--cursor", "opaque+cursor")).threadId, v2.thread.thread_id);
   assert.equal(calls.at(-1).query.cursor, "opaque+cursor");
   assert.equal((await run("conversation-thread", v2.thread.conversation_id, v2.thread.thread_id)).threadRootMessageId, v2.thread.thread_root_message_id);
-  await run("list", "--conversation-id", f.conversation.id, "--thread-id", v2.thread.thread_id, "--direct-only");
-  assert.equal(calls.at(-1).query.include_groups, "false");
+  await run("list", "--conversation-id", f.conversation.id, "--thread-id", v2.thread.thread_id);
+  assert.equal(calls.at(-1).query.include_groups, undefined);
   assert.equal(calls.at(-1).query.thread_id, v2.thread.thread_id);
-  await run("conversations", "--direct-only");
-  assert.equal(calls.at(-1).query.include_groups, "false");
+  await run("conversations");
+  assert.equal(calls.at(-1).query.include_groups, undefined);
   for (const command of ["list", "conversations"]) {
     const beforeConflictingFlags = calls.length;
     await assert.rejects(() => run(command, "--include-groups", "--direct-only"));
@@ -215,10 +216,10 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal(calls.length, beforeEmptyQuote);
 });
 
-test("shared group selectors, quoted replies, and creation-only names", () => {
+test("direct recipient selectors and quoted replies", () => {
   for (const item of v2.send_cases) {
     const body = item.body;
-    const options = { to: Array.isArray(body.to) ? body.to.join(",") : body.to, conversationId: body.conversation_id, replyToMessageId: body.reply_to_message_id, groupName: body.group_name, text: body.text };
+    const options = { to: body.to, conversationId: body.conversation_id, replyToMessageId: body.reply_to_message_id, text: body.text };
     if (item.valid) assert.doesNotThrow(() => buildWhatsAppSendOptions(options), item.name);
     else assert.throws(() => buildWhatsAppSendOptions(options), undefined, item.name);
   }
@@ -231,11 +232,10 @@ test("an explicitly empty quote target is rejected instead of becoming a plain s
   assert.deepEqual(buildWhatsAppSendOptions({ conversationId: f.conversation.id, text: "Plain" }), { conversationId: f.conversation.id, text: "Plain" });
 });
 
-test("list selectors use explicit group opt-in and preserve dates", async () => {
+test("list selectors preserve dates", async () => {
   const { buildWhatsAppListOptions } = await import("../dist/commands/whatsapp.js");
-  assert.deepEqual(buildWhatsAppListOptions({}), {includeGroups: false});
-  assert.deepEqual(buildWhatsAppListOptions({includeGroups: true, startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"}), {includeGroups: true, startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
-  assert.throws(() => buildWhatsAppListOptions({includeGroups: true, directOnly: true}), /not both/);
+  assert.deepEqual(buildWhatsAppListOptions({}), {});
+  assert.deepEqual(buildWhatsAppListOptions({startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"}), {startDatetime: "2026-03-08", endDatetime: "2026-03-08", tz: "America/New_York"});
 });
 
 test("native reply requirement is explicit and irrelevant without a quote", () => {

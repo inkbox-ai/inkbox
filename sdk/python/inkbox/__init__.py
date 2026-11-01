@@ -9,7 +9,6 @@ from inkbox.whatsapp import (
     WhatsAppResource,
     WhatsAppMessage,
     WhatsAppConversation,
-    WhatsAppGroupParticipantResult,
     WhatsAppConversationSummary,
     WhatsAppMedia,
     WhatsAppRecipient,
@@ -536,10 +535,10 @@ from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
-from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppGroupCreationStatus, WhatsAppThread
+from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppThread
 
 __all__ = [
-    "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppGroupCreationStatus", "WhatsAppThread",
+    "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppThread",
     "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",
     "WhatsAppWebhookData",
@@ -553,7 +552,6 @@ __all__ = [
     "WhatsAppResource",
     "WhatsAppMessage",
     "WhatsAppConversation",
-    "WhatsAppGroupParticipantResult",
     "WhatsAppConversationSummary",
     "WhatsAppMedia",
     "WhatsAppRecipient",

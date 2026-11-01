@@ -12,7 +12,6 @@ export type WhatsAppMessageStatus =
   | "uncertain"
   | "cancelled";
 export type WhatsAppDeliveryState = "pending" | "delivered" | "unknown";
-export type WhatsAppGroupCreationStatus = "pending" | "creating" | "ready" | "uncertain" | "failed";
 export type WhatsAppReactionType = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question" | "eyes";
 export type WhatsAppReactionStatus = "queued" | "sending" | "applied" | "removed" | "failed" | "uncertain" | "superseded";
 export interface WhatsAppReaction {
@@ -117,10 +116,9 @@ export interface WhatsAppMessage {
   conversationId: string;
   direction: WhatsAppDirection;
   localNumber: string;
-  remoteNumber: string | null;
+  remoteNumber: string;
   senderNumber: string;
   participants: string[];
-  isGroup: boolean;
   content: string | null;
   media: WhatsAppMedia[];
   status: WhatsAppMessageStatus;
@@ -149,10 +147,9 @@ export interface RawWhatsAppMessage {
   conversation_id: string;
   direction: WhatsAppDirection;
   local_number: string;
-  remote_number: string | null;
+  remote_number: string;
   sender_number: string;
   participants: string[];
-  is_group: boolean;
   content: string | null;
   media: RawWhatsAppMedia[];
   status: WhatsAppMessageStatus;
@@ -185,7 +182,6 @@ export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
     remoteNumber: r.remote_number,
     senderNumber: r.sender_number,
     participants: r.participants,
-    isGroup: r.is_group,
     content: r.content,
     media: r.media.map(parseWhatsAppMedia),
     status: r.status,
@@ -211,22 +207,12 @@ export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
     reactions: (r.reactions ?? []).map(parseWhatsAppReaction),
   };
 }
-export interface WhatsAppGroupParticipantResult {
-  number: string;
-  status: "joined" | "not_joined";
-}
 export interface WhatsAppConversation {
   id: string;
   agentIdentityId: string;
   localNumber: string;
-  remoteNumber: string | null;
+  remoteNumber: string;
   participants: string[];
-  isGroup: boolean;
-  groupName: string | null;
-  groupCreationStatus: WhatsAppGroupCreationStatus | null;
-  groupCreationIssue?: "membership_incomplete" | null;
-  groupParticipantResults?: WhatsAppGroupParticipantResult[];
-  unresolvedParticipantCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -234,14 +220,8 @@ export interface RawWhatsAppConversation {
   id: string;
   agent_identity_id: string;
   local_number: string;
-  remote_number: string | null;
+  remote_number: string;
   participants: string[];
-  is_group: boolean;
-  group_name?: string | null;
-  group_creation_status?: WhatsAppGroupCreationStatus | null;
-  group_creation_issue?: "membership_incomplete" | null;
-  group_participant_results?: WhatsAppGroupParticipantResult[];
-  unresolved_participant_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -254,12 +234,6 @@ export function parseWhatsAppConversation(
     localNumber: r.local_number,
     remoteNumber: r.remote_number,
     participants: r.participants,
-    isGroup: r.is_group,
-    groupName: r.group_name ?? null,
-    groupCreationStatus: r.group_creation_status ?? null,
-    groupCreationIssue: r.group_creation_issue ?? null,
-    groupParticipantResults: r.group_participant_results ?? [],
-    unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -330,12 +304,11 @@ export function parseWhatsAppChannelStatus(
 }
 
 export interface WhatsAppSendOptions {
-  to?: string | string[];
+  to?: string;
   conversationId?: string;
   replyToMessageId?: string;
   /** Defaults true; false requires native quoting. Missing evidence or uncertain sends never trigger a plain replacement. */
   plainReplyFallback?: boolean;
-  groupName?: string;
   text?: string;
   mediaIds?: string[];
   agentIdentityId?: string;
@@ -345,7 +318,6 @@ export interface WhatsAppListOptions {
   agentIdentityId?: string;
   conversationId?: string;
   threadId?: string;
-  includeGroups?: boolean;
   startDatetime?: string;
   endDatetime?: string;
   tz?: string;
@@ -385,11 +357,9 @@ export class WhatsAppResource {
       throw new Error("plainReplyFallback must be a boolean");
     if ((o.to == null) === (o.conversationId == null))
       throw new Error("Specify exactly one of to or conversationId");
-    const recipients = o.to == null ? [] : typeof o.to === "string" ? [o.to] : o.to;
-    if (o.to != null && (!Array.isArray(recipients) || recipients.length < 1 || recipients.length > 8 || recipients.some(value => typeof value !== "string" || !validPhone(value)) || new Set(recipients).size !== recipients.length))
-      throw new Error("Provide 1–8 unique E.164 recipients");
+    if (o.to != null && (typeof o.to !== "string" || !validPhone(o.to)))
+      throw new Error("Provide one E.164 recipient");
     if (o.replyToMessageId != null && (!o.conversationId || !validUuid(o.replyToMessageId))) throw new Error("replyToMessageId requires conversationId and a valid message UUID");
-    if (o.groupName != null && (!Array.isArray(o.to) || o.to.length < 2 || !o.groupName.trim() || Array.from(o.groupName).length > 100)) throw new Error("groupName requires a new recipient-list group and 1–100 characters");
     if ((o.mediaIds?.length ?? 0) > 1)
       throw new Error("WhatsApp supports at most one attachment");
     if (!o.text?.trim() && !o.mediaIds?.length)
@@ -403,7 +373,6 @@ export class WhatsAppResource {
         : {}),
       ...(o.replyToMessageId != null ? { reply_to_message_id: o.replyToMessageId } : {}),
       ...(o.replyToMessageId != null && o.plainReplyFallback === false ? { plain_reply_fallback: false } : {}),
-      ...(o.groupName != null ? { group_name: o.groupName } : {}),
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
     };
@@ -444,7 +413,6 @@ export class WhatsAppResource {
         ? { conversation_id: o.conversationId }
         : {}),
       ...(o.threadId != null ? { thread_id: o.threadId } : {}),
-      include_groups: o.includeGroups ?? false,
       ...(o.startDatetime != null ? { start_datetime: o.startDatetime } : {}),
       ...(o.endDatetime != null ? { end_datetime: o.endDatetime } : {}),
       ...(o.tz != null ? { tz: o.tz } : {}),
@@ -462,7 +430,6 @@ export class WhatsAppResource {
         ...owner(o.agentIdentityId),
         limit: o.limit ?? 50,
         offset: o.offset ?? 0,
-        include_groups: o.includeGroups ?? false,
         ...(o.startDatetime != null ? { start_datetime: o.startDatetime } : {}),
         ...(o.endDatetime != null ? { end_datetime: o.endDatetime } : {}),
         ...(o.tz != null ? { tz: o.tz } : {}),
