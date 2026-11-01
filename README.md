@@ -754,7 +754,7 @@ let client = inkbox::Inkbox::builder("your-api-key").build()?;
 let identity = client.get_identity("my-agent")?;
 let status = identity.get_whatsapp_status()?;
 let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
-    to: Some(inkbox::WhatsAppRecipients::One("+15555550101".into())),
+    to: Some("+15555550101".into()),
     text: Some("Hello".into()),
     idempotency_key: Some("order-confirmation-123".into()),
     ..Default::default()
