@@ -161,7 +161,10 @@ def test_reaction_fixture_preserves_one_actor_per_receipt():
 
 
 def test_incomplete_group_retains_participant_results_and_legacy_defaults():
-    group = WhatsAppConversation._from_dict(F["incomplete_group"])
+    wire = {**F["incomplete_group"], "group_participant_results": [
+        {**item, "future_field": "ignored"} for item in F["incomplete_group"]["group_participant_results"]
+    ]}
+    group = WhatsAppConversation._from_dict(wire)
     assert group.group_creation_status == "uncertain"
     assert group.group_creation_issue == "membership_incomplete"
     assert [(item.number, item.status) for item in group.group_participant_results] == [

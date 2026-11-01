@@ -262,7 +262,8 @@ class WhatsAppConversation:
             group_name=d.get("group_name"),
             group_creation_status=WhatsAppGroupCreationStatus(d["group_creation_status"]) if d.get("group_creation_status") else None,
             group_creation_issue=d.get("group_creation_issue"),
-            group_participant_results=[WhatsAppGroupParticipantResult(**item) for item in d.get("group_participant_results", [])],
+            group_participant_results=[WhatsAppGroupParticipantResult(number=item["number"], status=item["status"])
+                                       for item in d.get("group_participant_results", [])],
             unresolved_participant_count=d.get("unresolved_participant_count", 0),
         )
 
