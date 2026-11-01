@@ -211,6 +211,10 @@ export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
     reactions: (r.reactions ?? []).map(parseWhatsAppReaction),
   };
 }
+export interface WhatsAppGroupParticipantResult {
+  number: string;
+  status: "joined" | "not_joined";
+}
 export interface WhatsAppConversation {
   id: string;
   agentIdentityId: string;
@@ -220,6 +224,8 @@ export interface WhatsAppConversation {
   isGroup: boolean;
   groupName: string | null;
   groupCreationStatus: WhatsAppGroupCreationStatus | null;
+  groupCreationIssue?: "membership_incomplete" | null;
+  groupParticipantResults?: WhatsAppGroupParticipantResult[];
   unresolvedParticipantCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -233,6 +239,8 @@ export interface RawWhatsAppConversation {
   is_group: boolean;
   group_name?: string | null;
   group_creation_status?: WhatsAppGroupCreationStatus | null;
+  group_creation_issue?: "membership_incomplete" | null;
+  group_participant_results?: WhatsAppGroupParticipantResult[];
   unresolved_participant_count?: number;
   created_at: string;
   updated_at: string;
@@ -249,6 +257,8 @@ export function parseWhatsAppConversation(
     isGroup: r.is_group,
     groupName: r.group_name ?? null,
     groupCreationStatus: r.group_creation_status ?? null,
+    groupCreationIssue: r.group_creation_issue ?? null,
+    groupParticipantResults: r.group_participant_results ?? [],
     unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

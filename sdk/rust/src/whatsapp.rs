@@ -191,6 +191,22 @@ pub struct WhatsAppMessage {
     #[serde(default)]
     pub reactions: Vec<WhatsAppReaction>,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WhatsAppGroupCreationIssue {
+    MembershipIncomplete,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WhatsAppGroupParticipantStatus {
+    Joined,
+    NotJoined,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppGroupParticipantResult {
+    pub number: String,
+    pub status: WhatsAppGroupParticipantStatus,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConversation {
     pub id: Uuid,
@@ -203,6 +219,10 @@ pub struct WhatsAppConversation {
     pub group_name: Option<String>,
     #[serde(default)]
     pub group_creation_status: Option<WhatsAppGroupCreationStatus>,
+    #[serde(default)]
+    pub group_creation_issue: Option<WhatsAppGroupCreationIssue>,
+    #[serde(default)]
+    pub group_participant_results: Vec<WhatsAppGroupParticipantResult>,
     #[serde(default)]
     pub unresolved_participant_count: u64,
     pub created_at: String,

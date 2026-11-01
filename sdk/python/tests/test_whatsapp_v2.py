@@ -158,3 +158,15 @@ def test_reaction_fixture_preserves_one_actor_per_receipt():
     for reaction in [data["reaction"], *data["message"]["reactions"]]:
         actor = (reaction["direction"], reaction["remote_number"], reaction["target_message_id"])
         assert receipts.setdefault(reaction["id"], actor) == actor
+
+
+def test_incomplete_group_retains_participant_results_and_legacy_defaults():
+    group = WhatsAppConversation._from_dict(F["incomplete_group"])
+    assert group.group_creation_status == "uncertain"
+    assert group.group_creation_issue == "membership_incomplete"
+    assert [(item.number, item.status) for item in group.group_participant_results] == [
+        ("+15555550101", "joined"), ("+15555550102", "not_joined")
+    ]
+    legacy = WhatsAppConversation._from_dict(OLD["conversation"])
+    assert legacy.group_creation_issue is None
+    assert legacy.group_participant_results == []

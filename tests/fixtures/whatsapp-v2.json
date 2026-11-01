@@ -410,5 +410,31 @@
         ]
       }
     }
+  },
+  "incomplete_group": {
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "local_number": "+15555550100",
+    "remote_number": null,
+    "participants": [
+      "+15555550101"
+    ],
+    "is_group": true,
+    "created_at": "2026-10-01T12:00:00Z",
+    "updated_at": "2026-10-01T12:00:00Z",
+    "id": "20000000-0000-4000-8000-000000000002",
+    "group_name": "Example group",
+    "group_creation_status": "uncertain",
+    "unresolved_participant_count": 0,
+    "group_creation_issue": "membership_incomplete",
+    "group_participant_results": [
+      {
+        "number": "+15555550101",
+        "status": "joined"
+      },
+      {
+        "number": "+15555550102",
+        "status": "not_joined"
+      }
+    ]
   }
 }

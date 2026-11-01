@@ -504,3 +504,32 @@ fn reply_fallback_wire_preserves_legacy_default() {
         }
     }
 }
+
+#[test]
+fn incomplete_group_retains_participant_results_and_legacy_defaults() {
+    use inkbox::{
+        WhatsAppConversation, WhatsAppGroupCreationIssue, WhatsAppGroupParticipantStatus,
+    };
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let group: WhatsAppConversation =
+        serde_json::from_value(f["incomplete_group"].clone()).unwrap();
+    assert_eq!(
+        group.group_creation_issue,
+        Some(WhatsAppGroupCreationIssue::MembershipIncomplete)
+    );
+    assert_eq!(group.group_participant_results.len(), 2);
+    assert_eq!(group.group_participant_results[0].number, "+15555550101");
+    assert_eq!(
+        group.group_participant_results[0].status,
+        WhatsAppGroupParticipantStatus::Joined
+    );
+    assert_eq!(
+        group.group_participant_results[1].status,
+        WhatsAppGroupParticipantStatus::NotJoined
+    );
+    let legacy: WhatsAppConversation =
+        serde_json::from_value(fixture()["conversation"].clone()).unwrap();
+    assert!(legacy.group_creation_issue.is_none());
+    assert!(legacy.group_participant_results.is_empty());
+}

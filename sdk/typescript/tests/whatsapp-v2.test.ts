@@ -80,3 +80,16 @@ it("normalizes omitted nullable WhatsApp correspondence fields without changing 
     expect(item.remoteNumber).toBeNull(); expect(item.text).toBeNull(); expect(item.media).toBeNull();
   }
 });
+
+it("retains incomplete group participant results and legacy defaults", () => {
+  const group = parseWhatsAppConversation(f.incomplete_group);
+  expect(group.groupCreationStatus).toBe("uncertain");
+  expect(group.groupCreationIssue).toBe("membership_incomplete");
+  expect(group.groupParticipantResults).toEqual([
+    {number: "+15555550101", status: "joined"},
+    {number: "+15555550102", status: "not_joined"},
+  ]);
+  const legacy = parseWhatsAppConversation(old.conversation);
+  expect(legacy.groupCreationIssue).toBeNull();
+  expect(legacy.groupParticipantResults).toEqual([]);
+});

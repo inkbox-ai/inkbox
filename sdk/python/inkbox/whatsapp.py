@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 import re
 import unicodedata
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
 from uuid import UUID
 
 from inkbox._message_requests import post_message, send_key
@@ -225,6 +225,14 @@ class WhatsAppMessage:
 
 
 @dataclass
+class WhatsAppGroupParticipantResult:
+    """Observed outcome for a requested group participant."""
+
+    number: str
+    status: Literal["joined", "not_joined"]
+
+
+@dataclass
 class WhatsAppConversation:
     id: UUID
     agent_identity_id: UUID
@@ -236,6 +244,8 @@ class WhatsAppConversation:
     updated_at: datetime
     group_name: str | None = field(default=None, kw_only=True)
     group_creation_status: WhatsAppGroupCreationStatus | None = field(default=None, kw_only=True)
+    group_creation_issue: Literal["membership_incomplete"] | None = field(default=None, kw_only=True)
+    group_participant_results: list[WhatsAppGroupParticipantResult] = field(default_factory=list, kw_only=True)
     unresolved_participant_count: int = field(default=0, kw_only=True)
 
     @classmethod
@@ -251,6 +261,8 @@ class WhatsAppConversation:
             datetime.fromisoformat(d["updated_at"]),
             group_name=d.get("group_name"),
             group_creation_status=WhatsAppGroupCreationStatus(d["group_creation_status"]) if d.get("group_creation_status") else None,
+            group_creation_issue=d.get("group_creation_issue"),
+            group_participant_results=[WhatsAppGroupParticipantResult(**item) for item in d.get("group_participant_results", [])],
             unresolved_participant_count=d.get("unresolved_participant_count", 0),
         )
 
