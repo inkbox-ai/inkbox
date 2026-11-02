@@ -651,3 +651,32 @@ it("keeps external tool provenance, unknown outcomes, and unavailable payloads",
     serverUrl: "https://mcp.example.com/mcp", argumentsAvailable: false, resultAvailable: false,
     observedAt: new Date("2026-10-30T00:00:00Z") });
 });
+
+
+describe("outbound greeting timeout", () => {
+  it.each([0, 4.5, 60])("preserves %s seconds in request and response", async (timeout) => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({ ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      outbound_greeting_timeout_seconds: timeout });
+    const result = await new CallsResource(http).place({ toNumber: "+15551234567",
+      mode: CallMode.HOSTED_AGENT, reason: "Confirm an appointment.", outboundGreetingTimeoutSeconds: timeout });
+    expect(vi.mocked(http.post).mock.calls[0][1]).toHaveProperty("outbound_greeting_timeout_seconds", timeout);
+    expect(result.outboundGreetingTimeoutSeconds).toBe(timeout);
+  });
+  it.each([undefined, null])("reads legacy or null override as null: %s", async (timeout) => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({ ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      outbound_greeting_timeout_seconds: timeout });
+    const result = await new CallsResource(http).place({ toNumber: "+15551234567" });
+    expect(vi.mocked(http.post).mock.calls[0][1]).not.toHaveProperty("outbound_greeting_timeout_seconds");
+    expect(result.outboundGreetingTimeoutSeconds).toBeNull();
+  });
+});
+
+
+it.each([NaN, Infinity, -Infinity])("rejects non-finite opening timeout %s before HTTP", async (timeout) => {
+  const http = mockHttp();
+  await expect(new CallsResource(http).place({ toNumber: "+15551234567", mode: CallMode.HOSTED_AGENT,
+    reason: "Confirm an appointment.", outboundGreetingTimeoutSeconds: timeout })).rejects.toThrow(RangeError);
+  expect(http.post).not.toHaveBeenCalled();
+});

@@ -209,6 +209,7 @@ let call = identity.place_hosted_call_with_options(
     CallOrigin::DedicatedNumber,
     "Coordinate the appointment and send confirmations.",
     &HostedCallPlacementOptions {
+        outbound_greeting_timeout_seconds: Some(5.0),
         on_voicemail: Some(OnVoicemail::LeaveMessage),
         voicemail_message: Some("Hi, this is Ava about your appointment. Please call us back.".into()),
         ..Default::default()

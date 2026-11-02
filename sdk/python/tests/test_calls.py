@@ -679,3 +679,25 @@ def test_external_tool_history_keeps_source_unknown_and_missing_payloads():
     assert tool.server_url == "https://mcp.example.com/mcp"
     assert tool.started_at is None and tool.observed_at is not None
     assert tool.arguments_available is False and tool.result_available is False
+
+
+@pytest.mark.parametrize("timeout", [0, 4.5, 60])
+def test_outbound_greeting_timeout_roundtrip(client, transport, timeout):
+    transport.post.return_value = {**PHONE_CALL_DICT, "outbound_greeting_timeout_seconds": timeout}
+    result = client._calls.place(to_number="+15551234567", mode=CallMode.HOSTED_AGENT,
+                                 reason="Confirm an appointment.", outbound_greeting_timeout_seconds=timeout)
+    assert transport.post.call_args.kwargs["json"]["outbound_greeting_timeout_seconds"] == timeout
+    assert result.outbound_greeting_timeout_seconds == timeout
+
+
+@pytest.mark.parametrize("fields", [{}, {"outbound_greeting_timeout_seconds": None}])
+def test_outbound_greeting_timeout_legacy_response(fields):
+    assert PhoneCall._from_dict({**PHONE_CALL_DICT, **fields}).outbound_greeting_timeout_seconds is None
+
+
+@pytest.mark.parametrize("timeout", [float("nan"), float("inf"), -float("inf")])
+def test_nonfinite_opening_timeout_rejected_before_http(client, transport, timeout):
+    with pytest.raises(ValueError, match="must be finite"):
+        client._calls.place(to_number="+15551234567", mode=CallMode.HOSTED_AGENT,
+                            reason="Confirm an appointment.", outbound_greeting_timeout_seconds=timeout)
+    transport.post.assert_not_called()

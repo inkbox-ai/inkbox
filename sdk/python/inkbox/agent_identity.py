@@ -979,6 +979,7 @@ class AgentIdentity:
         voicemail_detection: VoicemailDetection | str | None = None,
         on_voicemail: OnVoicemail | str | None = None,
         voicemail_message: str | None = None,
+        outbound_greeting_timeout_seconds: float | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call as this identity.
@@ -1008,6 +1009,9 @@ class AgentIdentity:
                 otherwise).
             voicemail_message: What Voice AI says on the voicemail (max
                 1000 characters); requires ``on_voicemail=leave_message``.
+            outbound_greeting_timeout_seconds: Seconds to wait for an outbound
+                recipient before opening (0–60). Omit for 1.5 seconds; zero
+                requests an immediate opening. Only valid with hosted-agent mode.
             reason: Voice AI's task brief for the call. Required
                 with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
@@ -1036,6 +1040,8 @@ class AgentIdentity:
                 call_options["on_voicemail"] = on_voicemail
             if voicemail_message is not None:
                 call_options["voicemail_message"] = voicemail_message
+            if outbound_greeting_timeout_seconds is not None:
+                call_options["outbound_greeting_timeout_seconds"] = outbound_greeting_timeout_seconds
             return self._inkbox._calls.place(**call_options)
         # iMessage origination scopes by identity id, no from_number.
         call_options = {
@@ -1054,6 +1060,8 @@ class AgentIdentity:
             call_options["on_voicemail"] = on_voicemail
         if voicemail_message is not None:
             call_options["voicemail_message"] = voicemail_message
+        if outbound_greeting_timeout_seconds is not None:
+            call_options["outbound_greeting_timeout_seconds"] = outbound_greeting_timeout_seconds
         return self._inkbox._calls.place(**call_options)
 
     def list_calls(

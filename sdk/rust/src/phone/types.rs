@@ -236,8 +236,11 @@ pub struct CallPlacementOptions {
 }
 
 /// Optional controls for an Inkbox Voice AI outbound call.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct HostedCallPlacementOptions {
+    /// Seconds to wait before an outbound opening (0–60). Omit for 1.5 seconds;
+    /// zero requests an immediate opening.
+    pub outbound_greeting_timeout_seconds: Option<f64>,
     /// Omit to inherit the identity's saved Voice AI authority.
     ///
     /// An explicit `ContactScoped` downscopes the call. An explicit `Yolo`
@@ -579,6 +582,9 @@ pub struct PhoneCall {
     /// behavior for compatibility with older responses.
     #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
     pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
+    /// Explicit outbound opening wait; None means the default applies.
+    #[serde(default)]
+    pub outbound_greeting_timeout_seconds: Option<f64>,
     /// Whether voicemail detection ran. Missing/null legacy values retain the
     /// server default.
     #[serde(
@@ -1236,6 +1242,16 @@ mod tests {
         let forwarding: PhoneCallForwarding =
             serde_json::from_value(fixture["forwarding"].clone()).unwrap();
         assert_eq!(forwarding.status, CallForwardingStatus::Forwarded);
+    }
+
+    #[test]
+    fn opening_timeout_absent_or_null_remains_unset() {
+        let mut value = call_json();
+        let call: PhoneCall = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(call.outbound_greeting_timeout_seconds, None);
+        value["outbound_greeting_timeout_seconds"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(value).unwrap();
+        assert_eq!(call.outbound_greeting_timeout_seconds, None);
     }
 
     #[test]

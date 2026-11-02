@@ -160,6 +160,8 @@ export class CallsResource {
    *   (max 1000 characters). Valid only with `onVoicemail=leave_message`
    *   (server 422 otherwise). When omitted the agent composes a short
    *   message from `reason`.
+   * @param options.outboundGreetingTimeoutSeconds - Outbound opening wait in seconds
+   *   (0–60); omit for 1.5 seconds, or use zero for an immediate opening. Hosted calls only.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
@@ -175,6 +177,7 @@ export class CallsResource {
     voicemailDetection?: VoicemailDetection;
     onVoicemail?: OnVoicemail;
     voicemailMessage?: string;
+    outboundGreetingTimeoutSeconds?: number;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
@@ -204,6 +207,12 @@ export class CallsResource {
     }
     if (options.clientWebsocketUrl !== undefined) {
       body["client_websocket_url"] = options.clientWebsocketUrl;
+    }
+    if (options.outboundGreetingTimeoutSeconds !== undefined) {
+      if (!Number.isFinite(options.outboundGreetingTimeoutSeconds)) {
+        throw new RangeError("outboundGreetingTimeoutSeconds must be finite");
+      }
+      body["outbound_greeting_timeout_seconds"] = options.outboundGreetingTimeoutSeconds;
     }
     if (options.reason !== undefined) {
       body["reason"] = options.reason;

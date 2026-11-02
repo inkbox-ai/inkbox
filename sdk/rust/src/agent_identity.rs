@@ -2868,6 +2868,7 @@ mod tests {
                 CallOrigin::SharedImessageNumber,
                 "Leave a voicemail",
                 &HostedCallPlacementOptions {
+                    outbound_greeting_timeout_seconds: None,
                     authority_mode: None,
                     voicemail_detection: Some(VoicemailDetection::Disabled),
                     on_voicemail: None,
@@ -2891,7 +2892,8 @@ mod tests {
                     "reason": "Confirm the appointment",
                     "agent_identity_id": IDENTITY_ID,
                     "on_voicemail": "leave_message",
-                    "voicemail_message": "Please call us back."
+                    "voicemail_message": "Please call us back.",
+                    "outbound_greeting_timeout_seconds": 0.0
                 }));
             then.status(200)
                 .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
@@ -2903,6 +2905,7 @@ mod tests {
                 CallOrigin::SharedImessageNumber,
                 "Confirm the appointment",
                 &HostedCallPlacementOptions {
+                    outbound_greeting_timeout_seconds: Some(0.0),
                     on_voicemail: Some(OnVoicemail::LeaveMessage),
                     voicemail_message: Some("Please call us back.".to_string()),
                     ..Default::default()

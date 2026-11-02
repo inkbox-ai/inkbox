@@ -718,6 +718,14 @@ supported target can still fail if native delivery becomes unavailable; fallback
 does not resend rejected replies. Read the queued message status and error fields
 because delivery webhooks do not cover every failure before dispatch.
 
+### Outbound Voice AI opening wait
+
+Set `outbound_greeting_timeout_seconds` (Python/Rust),
+`outboundGreetingTimeoutSeconds` (TypeScript), or
+`--outbound-greeting-timeout-seconds` (CLI) when placing a hosted call.
+Use 0–60 seconds; omission preserves the 1.5-second default. Zero requests an
+immediate opening. This setting does not change incoming-call greetings.
+
 ## License
 
 MIT

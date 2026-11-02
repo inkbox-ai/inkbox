@@ -511,6 +511,7 @@ if selected is not None:
 hosted_call = identity.place_call(
     to_number="+15551234567",
     mode=CallMode.HOSTED_AGENT,
+    outbound_greeting_timeout_seconds=5,  # Optional: 0–60 seconds; default 1.5
     reason="Coordinate the appointment and send confirmations.",
     on_voicemail=OnVoicemail.LEAVE_MESSAGE,
     voicemail_message="Hi, this is Ava calling about your appointment. Please call us back.",

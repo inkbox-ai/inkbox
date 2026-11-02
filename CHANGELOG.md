@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.28 - Per-call Voice AI opening wait (unreleased)
+
+### Added
+
+- Set an outbound Voice AI opening wait per call with
+  `outbound_greeting_timeout_seconds` in Python and Rust,
+  `outboundGreetingTimeoutSeconds` in TypeScript, or
+  `--outbound-greeting-timeout-seconds` in the CLI. Values from 0 to 60 seconds
+  are accepted. Omission preserves the 1.5-second default.
+- Call records preserve the explicit timeout override; missing or null values
+  remain unset when reading older responses.
+
+### Changed
+
+- Rust `HostedCallPlacementOptions` adds an optional fractional-second field.
+  Use `..Default::default()` for omitted options in struct literals. The options
+  type implements `PartialEq`, but no longer `Eq` because it contains `f64`.
+
 ## 0.7.27 - Identity packs (unreleased)
 
 ### Added

@@ -964,3 +964,13 @@ describe("AgentIdentity management", () => {
     expect(ink._idsResource.delete).toHaveBeenCalledWith("sales-agent");
   });
 });
+
+
+it.each(Object.values(CallOrigin))("forwards a zero opening timeout for %s", async (origination) => {
+  const ink = mockInkbox();
+  vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+  const identity = new AgentIdentity(makeData(), ink);
+  await identity.placeCall({ toNumber: "+15551234567", origination, mode: CallMode.HOSTED_AGENT,
+    reason: "Confirm an appointment.", outboundGreetingTimeoutSeconds: 0 });
+  expect(ink._calls.place).toHaveBeenCalledWith(expect.objectContaining({ outboundGreetingTimeoutSeconds: 0 }));
+});

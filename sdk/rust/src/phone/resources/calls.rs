@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use serde_json::Map;
 
-use crate::error::Result;
+use crate::error::{InkboxError, Result};
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{
@@ -274,6 +274,14 @@ impl CallsResource {
         body.insert("origination".into(), origination.as_str().into());
         body.insert("mode".into(), "hosted_agent".into());
         body.insert("reason".into(), reason.into());
+        if let Some(timeout) = options.outbound_greeting_timeout_seconds {
+            if !timeout.is_finite() {
+                return Err(InkboxError::InvalidArgument(
+                    "outbound_greeting_timeout_seconds must be finite".into(),
+                ));
+            }
+            body.insert("outbound_greeting_timeout_seconds".into(), timeout.into());
+        }
         if let Some(authority_mode) = options.authority_mode {
             body.insert(
                 "hosted_agent_authority_mode".into(),
@@ -318,6 +326,7 @@ impl CallsResource {
             agent_identity_id,
             reason,
             &HostedCallPlacementOptions {
+                outbound_greeting_timeout_seconds: None,
                 authority_mode: Some(authority_mode),
                 voicemail_detection: None,
                 on_voicemail: None,
@@ -970,6 +979,7 @@ mod tests {
                 None,
                 "Leave the appointment details in a voicemail",
                 &HostedCallPlacementOptions {
+                    outbound_greeting_timeout_seconds: None,
                     authority_mode: Some(HostedAgentAuthorityMode::Yolo),
                     voicemail_detection: Some(VoicemailDetection::Disabled),
                     on_voicemail: None,
@@ -1013,6 +1023,7 @@ mod tests {
                 None,
                 "Confirm the appointment",
                 &HostedCallPlacementOptions {
+                    outbound_greeting_timeout_seconds: None,
                     authority_mode: None,
                     voicemail_detection: None,
                     on_voicemail: Some(OnVoicemail::LeaveMessage),
@@ -1023,6 +1034,64 @@ mod tests {
 
         mock.assert();
         assert_eq!(placed.call.on_voicemail, OnVoicemail::LeaveMessage);
+    }
+
+    #[test]
+    fn hosted_opening_timeout_rejects_nonfinite_without_a_request() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST);
+            then.status(500);
+        });
+        for timeout in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let result = client(&server).calls().place_hosted_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Confirm an appointment",
+                &HostedCallPlacementOptions {
+                    outbound_greeting_timeout_seconds: Some(timeout),
+                    ..Default::default()
+                },
+            );
+            assert!(matches!(result, Err(InkboxError::InvalidArgument(_))));
+        }
+        mock.assert_hits(0);
+    }
+
+    #[test]
+    fn hosted_opening_timeout_roundtrips_zero_and_fractional_values() {
+        for timeout in [0.0, 4.5, 60.0] {
+            let server = MockServer::start();
+            let mock =
+                server.mock(|when, then| {
+                    when.method(POST).path("/api/v1/phone/place-call").json_body(json!({
+                    "to_number": "+15550002222", "origination": "dedicated_number",
+                    "mode": "hosted_agent", "reason": "Confirm an appointment",
+                    "from_number": "+15550001111", "outbound_greeting_timeout_seconds": timeout
+                }));
+                    let mut body = placed_json("dedicated_number", json!("+15550001111"));
+                    body["outbound_greeting_timeout_seconds"] = json!(timeout);
+                    then.status(200).json_body(body);
+                });
+            let placed = client(&server)
+                .calls()
+                .place_hosted_with_options(
+                    "+15550002222",
+                    CallOrigin::DedicatedNumber,
+                    Some("+15550001111"),
+                    None,
+                    "Confirm an appointment",
+                    &HostedCallPlacementOptions {
+                        outbound_greeting_timeout_seconds: Some(timeout),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            mock.assert();
+            assert_eq!(placed.call.outbound_greeting_timeout_seconds, Some(timeout));
+        }
     }
 
     #[test]
