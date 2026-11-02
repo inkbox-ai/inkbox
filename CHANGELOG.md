@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.24 - WhatsApp conversations (unreleased)
+## 0.7.25 - WhatsApp conversations and iMessage reaction targets (unreleased)
 
 ### Added
 
@@ -40,6 +40,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Fixed
 
+- `inkbox imessage react` now includes `partIndex` alongside `targetMessageId` in
+  its output, so callers can identify the resolved message part. Existing Python,
+  TypeScript, and Rust reaction results already preserve both fields.
+- Clarify that a reaction's returned target and part can differ from the request;
+  use the returned target when reading its live reactions.
 - WhatsApp conversation history uses the same table columns as message lists.
 - WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
 - Python and TypeScript WhatsApp sends retain their request key when a successful
@@ -52,16 +57,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - WhatsApp requires approval and an existing dedicated iMessage number. It is not
   a shared channel. Voice calls, remote read receipts, typing, and self-service
   number provisioning are not supported.
-
-## 0.7.25 - iMessage reaction targets (unreleased)
-
-### Fixed
-
-- `inkbox imessage react` now includes `partIndex` alongside `targetMessageId` in
-  its output, so callers can identify the resolved message part. Existing Python,
-  TypeScript, and Rust reaction results already preserve both fields.
-- Clarify that a reaction's returned target and part can differ from the request;
-  use the returned target when reading its live reactions.
 
 ## 0.7.24 - Voice AI external connections and OAuth
 
