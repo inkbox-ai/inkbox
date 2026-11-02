@@ -23,6 +23,15 @@ pub(crate) fn parse_agent_support(envelope: Option<&Value>) -> Option<Box<str>> 
 /// Base error for all Inkbox SDK failures.
 #[derive(Debug, thiserror::Error)]
 pub enum InkboxError {
+    /// A message submission failed after its idempotency key was selected.
+    /// Reuse this key with the same request when retrying an uncertain outcome.
+    #[error("{source}")]
+    MessageSend {
+        idempotency_key: Box<str>,
+        #[source]
+        source: Box<InkboxError>,
+    },
+
     /// The API returned a 4xx or 5xx response. Carries the HTTP status code
     /// and the parsed `detail` (a plain string, or a structured object for
     /// errors that ship machine-readable fields).
@@ -205,8 +214,30 @@ pub enum InkboxError {
 }
 
 impl InkboxError {
+    /// The submitted message key, retained even when no response could be read.
+    pub fn idempotency_key(&self) -> Option<&str> {
+        match self {
+            Self::MessageSend {
+                idempotency_key, ..
+            } => Some(idempotency_key),
+            _ => None,
+        }
+    }
+
+    /// Original failure, including its API status/detail or transport/decode cause.
+    pub fn original_error(&self) -> &Self {
+        match self {
+            Self::MessageSend { source, .. } => source.original_error(),
+            _ => self,
+        }
+    }
+
     pub(crate) fn with_agent_support(mut self, support: Option<Box<str>>) -> Self {
-        match &mut self {
+        let mut error = &mut self;
+        while let Self::MessageSend { source, .. } = error {
+            error = source;
+        }
+        match error {
             InkboxError::Api { agent_support, .. }
             | InkboxError::DuplicateContactRule { agent_support, .. }
             | InkboxError::RedundantContactAccessGrant { agent_support, .. }
@@ -229,7 +260,7 @@ impl InkboxError {
     /// Returns `None` for local validation, transport, decoding, and other
     /// errors that were not created from an API error response.
     pub fn agent_support(&self) -> Option<&str> {
-        match self {
+        match self.original_error() {
             InkboxError::Api { agent_support, .. }
             | InkboxError::DuplicateContactRule { agent_support, .. }
             | InkboxError::RedundantContactAccessGrant { agent_support, .. }
@@ -246,7 +277,7 @@ impl InkboxError {
 
     /// Server-supplied retry delay, when this error exposes one.
     pub fn retry_after_seconds(&self) -> Option<u64> {
-        match self {
+        match self.original_error() {
             InkboxError::Api { detail, .. } => detail
                 .as_object()
                 .and_then(Value::as_object)
@@ -268,7 +299,7 @@ impl InkboxError {
     /// design: the client has stopped and will not reconnect. Lets callers
     /// tell a takeover apart from a transient, reconnectable tunnel error.
     pub fn is_tunnel_superseded(&self) -> bool {
-        matches!(self, InkboxError::Tunnel(m) if m.starts_with("tunnel-superseded:"))
+        matches!(self.original_error(), InkboxError::Tunnel(m) if m.starts_with("tunnel-superseded:"))
     }
 }
 

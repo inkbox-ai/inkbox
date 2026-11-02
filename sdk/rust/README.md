@@ -1345,6 +1345,13 @@ and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
 unknown delivery does not mean a send failed. Mark-read updates only local history.
 
+If submission fails, `error.idempotency_key()` returns the submitted key, including
+an automatically generated key. Retry the unchanged request with that key rather
+than starting a new logical send. Submission errors use `InkboxError::MessageSend`;
+match `error.original_error()` for the original API status, transport error, or
+decoding error. Retry-delay and support accessors preserve the original metadata.
+Local validation errors remain unchanged.
+
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message

@@ -503,3 +503,153 @@ fn reply_fallback_wire_preserves_legacy_default() {
         }
     }
 }
+
+#[test]
+fn failed_send_exposes_generated_key_after_lost_responses() {
+    use std::io::Read;
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let address = listener.local_addr().unwrap();
+    let receiver = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut requests = Vec::new();
+        while requests.len() < 3 {
+            let (mut socket, _) = match listener.accept() {
+                Ok(connection) => connection,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(std::time::Instant::now() < deadline, "missing retry");
+                    std::thread::sleep(Duration::from_millis(5));
+                    continue;
+                }
+                Err(error) => panic!("{error}"),
+            };
+            socket
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut bytes = Vec::new();
+            let mut chunk = [0; 4096];
+            loop {
+                let read = socket.read(&mut chunk).unwrap();
+                assert_ne!(read, 0);
+                bytes.extend_from_slice(&chunk[..read]);
+                if let Some(end) = bytes.windows(4).position(|v| v == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&bytes[..end]).to_lowercase();
+                    let length: usize = headers
+                        .lines()
+                        .find_map(|line| {
+                            line.strip_prefix("content-length: ")
+                                .map(|v| v.parse().unwrap())
+                        })
+                        .unwrap();
+                    if bytes.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+            }
+            requests.push(String::from_utf8(bytes).unwrap());
+            // The request was received, but no acknowledgement reaches the caller.
+            drop(socket);
+        }
+        requests
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(format!("http://{address}"))
+        .timeout_secs(2.0)
+        .build()
+        .unwrap();
+    let error = client
+        .whatsapp()
+        .send(&WhatsAppSendOptions {
+            to: Some("+15555550101".into()),
+            text: Some("Hello".into()),
+            ..Default::default()
+        })
+        .unwrap_err();
+    let key = error.idempotency_key().unwrap();
+    assert!(Uuid::parse_str(key).is_ok());
+    assert!(matches!(
+        error.original_error(),
+        inkbox::InkboxError::Transport(_)
+    ));
+    assert!(std::error::Error::source(&error).is_some());
+    let requests = receiver.join().unwrap();
+    assert_eq!(requests.len(), 3);
+    for request in &requests {
+        assert!(request
+            .to_lowercase()
+            .contains(&format!("idempotency-key: {key}\r\n")));
+        assert!(request.ends_with(r#"{"to":"+15555550101","text":"Hello"}"#));
+    }
+}
+
+#[test]
+fn failed_send_retains_key_for_json_and_typed_response_decoding() {
+    for response in ["{interrupted", r#"{"message":{}}"#] {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/whatsapp/messages");
+            then.status(201).body(response);
+        });
+        let client = Inkbox::builder("test-only")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let options = WhatsAppSendOptions {
+            to: Some("+15555550101".into()),
+            text: Some("Hello".into()),
+            ..Default::default()
+        };
+        let error = client.whatsapp().send(&options).unwrap_err();
+        let key = error.idempotency_key().unwrap();
+        assert!(Uuid::parse_str(key).is_ok());
+        assert!(matches!(
+            error.original_error(),
+            inkbox::InkboxError::Decode(_)
+        ));
+        request.assert_hits(if response == "{interrupted" { 3 } else { 1 });
+    }
+}
+
+#[test]
+fn failed_send_preserves_explicit_key_and_api_metadata() {
+    let server = MockServer::start();
+    let request = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/messages")
+            .header("Idempotency-Key", "logical-send");
+        then.status(429).header("Retry-After", "60").json_body(
+            json!({"detail":{"error":"rate_limited"},"agent_support":"Contact support."}),
+        );
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let mut options = WhatsAppSendOptions {
+        to: Some("+15555550101".into()),
+        text: Some("Hello".into()),
+        idempotency_key: Some("logical-send".into()),
+        ..Default::default()
+    };
+    let error = client.whatsapp().send(&options).unwrap_err();
+    assert_eq!(error.idempotency_key(), Some("logical-send"));
+    assert_eq!(error.retry_after_seconds(), Some(60));
+    assert_eq!(error.agent_support(), Some("Contact support."));
+    assert!(matches!(
+        error.original_error(),
+        inkbox::InkboxError::Api {
+            status_code: 429,
+            ..
+        }
+    ));
+    assert_eq!(error.to_string(), error.original_error().to_string());
+    request.assert_hits(1);
+    options.idempotency_key = Some("".into());
+    let error = client.whatsapp().send(&options).unwrap_err();
+    assert!(matches!(error, inkbox::InkboxError::InvalidArgument(_)));
+    assert_eq!(error.idempotency_key(), None);
+    request.assert_hits(1);
+}

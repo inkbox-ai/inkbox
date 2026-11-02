@@ -387,6 +387,7 @@ class AgentIdentitySummary:
 
     whatsapp_enabled: bool = False
     whatsapp_number: str | None = None
+    whatsapp_configured: bool = False
 
     def __post_init__(self) -> None:
         for channel in ("mail", "phone", "slack"):
@@ -425,6 +426,7 @@ class AgentIdentitySummary:
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             whatsapp_enabled=d.get("whatsapp_enabled", False),
+            whatsapp_configured=d.get("whatsapp_configured", False),
             whatsapp_number=d.get("whatsapp_number"),
             imessage_enabled=d.get("imessage_enabled", False),
             contact_sharing_enabled=d.get("contact_sharing_enabled", True),

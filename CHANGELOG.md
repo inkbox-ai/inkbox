@@ -33,6 +33,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Rust WhatsApp submission errors use `InkboxError::MessageSend`, retaining the
+  original failure through `original_error()` and the error source. Code matching
+  API error variants should inspect `original_error()`.
 - Rust exhaustive matches on correspondence channels/items or context text channels
   must handle the new WhatsApp variant. Complete `CorrespondenceQuery` struct literals
   need `whatsapp_limit: None` (or `..Default::default()`); legacy identity struct
@@ -40,10 +43,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Fixed
 
+- Python and TypeScript identity summaries and accessors retain `whatsapp_configured`
+  independently of sending access, defaulting to false for older responses.
 - WhatsApp conversation history uses the same table columns as message lists.
 - WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
-- Python and TypeScript WhatsApp sends retain their request key when a successful
-  response cannot be decoded, without automatically sending another request.
+- Python, TypeScript, and Rust WhatsApp sends retain their request key when a
+  successful response cannot be decoded. Rust also exposes the submitted key
+  after exhausted transport retries through `InkboxError::idempotency_key()`;
+  reuse it with the unchanged request to recover an uncertain send.
 - Rejected HTTP/2 tunnel streams are closed before returning an error, preventing
   an unhandled stream error when a request races with connection shutdown.
 

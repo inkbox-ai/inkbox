@@ -120,6 +120,9 @@ export class AgentIdentity {
   get whatsappEnabled(): boolean {
     return this._data.whatsappEnabled ?? false;
   }
+  get whatsappConfigured(): boolean {
+    return this._data.whatsappConfigured ?? false;
+  }
   get whatsappNumber(): string | null {
     return this._data.whatsappNumber ?? null;
   }

@@ -191,6 +191,8 @@ export interface AgentIdentitySummary {
   emailAddress: string | null;
   /** Approved dedicated WhatsApp capability; omitted on older responses. */
   whatsappEnabled?: boolean;
+  /** Historical WhatsApp configuration, independent of sending access. */
+  whatsappConfigured?: boolean;
   whatsappNumber?: string | null;
   /**
    * Whether this identity can be reached over iMessage. A detailed identity
@@ -303,6 +305,7 @@ export interface RawAgentIdentitySummary {
   description: string | null;
   email_address: string | null;
   whatsapp_enabled?: boolean;
+  whatsapp_configured?: boolean;
   whatsapp_number?: string | null;
   imessage_enabled?: boolean;
   contact_sharing_enabled?: boolean;
@@ -394,6 +397,7 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     description: r.description ?? null,
     emailAddress: r.email_address,
     whatsappEnabled: r.whatsapp_enabled ?? false,
+    whatsappConfigured: r.whatsapp_configured ?? false,
     whatsappNumber: r.whatsapp_number ?? null,
     imessageEnabled: r.imessage_enabled ?? false,
     contactSharingEnabled: r.contact_sharing_enabled ?? true,

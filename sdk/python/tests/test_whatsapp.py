@@ -182,6 +182,28 @@ def test_stale_disabled_snapshot_does_not_deny_fresh_api_access():
     client.close()
 
 
+@pytest.mark.parametrize("configured", [True, False, None])
+def test_identity_preserves_configured_history_without_enabling_send(configured):
+    raw = {
+        "id": OWNER,
+        "organization_id": "org_example",
+        "agent_handle": "agent",
+        "created_at": F["message"]["created_at"],
+        "updated_at": F["message"]["updated_at"],
+        "whatsapp_enabled": False,
+        "whatsapp_number": None,
+    }
+    if configured is not None:
+        raw["whatsapp_configured"] = configured
+    data = _AgentIdentityData._from_dict(raw)
+    with Inkbox(api_key="test-only") as client:
+        identity = AgentIdentity(data, client)
+        assert data.whatsapp_configured is (configured is True)
+        assert identity.whatsapp_configured is (configured is True)
+        assert identity.whatsapp_enabled is False
+        assert identity.whatsapp_number is None
+
+
 def test_correspondence_opt_in_and_new_kind():
     assert (
         ContactCorrespondenceOptions()._to_params()["channels"]

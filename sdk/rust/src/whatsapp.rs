@@ -259,6 +259,8 @@ impl WhatsAppResource {
         Self { http }
     }
     /// Queue one logical send. Reuse its key and owned media IDs after uncertainty.
+    /// Submission failures retain the key in [`InkboxError::idempotency_key`],
+    /// and the original failure in [`InkboxError::original_error`].
     pub fn send(&self, o: &WhatsAppSendOptions) -> Result<WhatsAppMessage> {
         if o.to.is_some() == o.conversation_id.is_some() {
             return Err(InkboxError::InvalidArgument(
@@ -298,13 +300,23 @@ impl WhatsAppResource {
                 .expect("send options serialize to an object")
                 .remove("plain_reply_fallback");
         }
-        let data = self.http.post_message(
-            "/messages",
-            &body,
-            &owner(o.agent_identity_id.as_ref()),
-            o.idempotency_key.as_deref(),
-        )?;
-        Ok(serde_json::from_value(data["message"].clone())?)
+        let key = o
+            .idempotency_key
+            .clone()
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        crate::http::validate_message_key(&key)?;
+        self.http
+            .post_message(
+                "/messages",
+                &body,
+                &owner(o.agent_identity_id.as_ref()),
+                Some(&key),
+            )
+            .and_then(|data| serde_json::from_value(data["message"].clone()).map_err(Into::into))
+            .map_err(|source| InkboxError::MessageSend {
+                idempotency_key: key.into(),
+                source: Box::new(source),
+            })
     }
     pub fn get(&self, id: &Uuid, identity: Option<&Uuid>) -> Result<WhatsAppMessage> {
         Ok(serde_json::from_value(

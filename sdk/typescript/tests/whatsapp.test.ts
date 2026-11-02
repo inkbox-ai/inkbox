@@ -181,6 +181,17 @@ describe("WhatsApp public wire", () => {
     vi.mocked(fetch).mockResolvedValue(ok({ imessage: {} }));
     expect(await identity.getWhatsAppStatus()).toBeNull();
   });
+  it.each([true, false, undefined])("preserves configured history (%s) without enabling sends", async configured => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok({
+      id: owner, organization_id: "org_example", agent_handle: "agent",
+      created_at: f.message.created_at, updated_at: f.message.updated_at,
+      whatsapp_configured: configured, whatsapp_enabled: false, whatsapp_number: null,
+    })));
+    const identity = await new Inkbox({ apiKey: "test-only" }).getIdentity("agent");
+    expect(identity.whatsappConfigured).toBe(configured ?? false);
+    expect(identity.whatsappEnabled).toBe(false);
+    expect(identity.whatsappNumber).toBeNull();
+  });
   it("exports raw webhook payloads without converting received URLs or timestamps", () => {
     const webhook: WhatsAppWebhookPayload = f.webhook;
     expect(webhook.data.message!.sender_number).toBe("+15555550101");

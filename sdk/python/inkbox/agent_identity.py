@@ -131,6 +131,11 @@ class AgentIdentity:
         return self._data.whatsapp_enabled
 
     @property
+    def whatsapp_configured(self) -> bool:
+        """Whether WhatsApp has been configured, independent of sending access."""
+        return self._data.whatsapp_configured
+
+    @property
     def whatsapp_number(self) -> str | None:
         return self._data.whatsapp_number
 
