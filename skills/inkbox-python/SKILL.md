@@ -610,8 +610,9 @@ if target is not None:
     if target_convo.assignment_status == "active":
         sent_reaction = identity.send_imessage_reaction(message_id=target.id, reaction="like")
 
-        # Live tapbacks come back on message reads, oldest first.
-        for r in target.reactions or []:
+        # Read the returned target: an attachment can resolve to a different message.
+        reacted_message = identity.get_imessage(sent_reaction.target_message_id)
+        for r in reacted_message.reactions or []:
             print(r.direction, r.reaction, r.custom_emoji)
 
         # Take your own tapback back. A failed removal leaves it in place.

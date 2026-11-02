@@ -1380,6 +1380,32 @@ mod tests {
     }
 
     #[test]
+    fn send_reaction_preserves_resolved_target_and_part() {
+        let server = MockServer::start();
+        let message_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let primary_id = Uuid::parse_str("50000000-0000-4000-8000-000000000005").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/imessage/reactions")
+                .json_body(json!({"message_id": message_id, "reaction": "like", "part_index": 0}));
+            then.status(201).json_body(json!({
+                "id": "11111111-1111-1111-1111-111111111111",
+                "conversation_id": "33333333-3333-3333-3333-333333333333",
+                "assignment_id": null, "target_message_id": primary_id,
+                "direction": "outbound", "reaction": "like", "remote_number": "+15550001111",
+                "part_index": 2, "created_at": "2026-07-22T00:00:00Z", "updated_at": "2026-07-22T00:00:00Z"
+            }));
+        });
+        let reaction = client(&server)
+            .imessages()
+            .send_reaction(&message_id, IMessageReactionType::Like, 0)
+            .unwrap();
+        mock.assert();
+        assert_eq!(reaction.target_message_id, primary_id);
+        assert_eq!(reaction.part_index, 2);
+    }
+
+    #[test]
     fn release_assignment_deletes_the_connection_by_id() {
         let server = MockServer::start();
         let assignment_id = Uuid::parse_str("bbbb2222-0000-0000-0000-000000000001").unwrap();

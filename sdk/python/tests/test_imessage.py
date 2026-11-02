@@ -437,6 +437,18 @@ class TestIMessageActions:
         assert reaction.reaction is IMessageReactionType.LIKE
         assert reaction.target_message_id == UUID(MSG_ID)
 
+    def test_send_attachment_reaction_preserves_resolved_target(self, client, transport):
+        primary_id = "50000000-0000-4000-8000-000000000005"
+        transport.post.return_value = {
+            **IMESSAGE_REACTION_DICT, "target_message_id": primary_id, "part_index": 2,
+        }
+        reaction = client._imessages.send_reaction(message_id=MSG_ID, reaction="like")
+        transport.post.assert_called_once_with(
+            "/reactions", json={"message_id": MSG_ID, "reaction": "like", "part_index": 0},
+        )
+        assert reaction.target_message_id == UUID(primary_id)
+        assert reaction.part_index == 2
+
     def test_send_group_reaction_preserves_request_and_parses_null_assignment(
         self, client, transport,
     ):

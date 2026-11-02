@@ -585,6 +585,7 @@ export function registerIMessageCommands(program: Command): void {
             assignmentId: reaction.assignmentId,
             reaction: reaction.reaction,
             targetMessageId: reaction.targetMessageId,
+            partIndex: reaction.partIndex,
             conversationId: reaction.conversationId,
             createdAt: reaction.createdAt,
           },

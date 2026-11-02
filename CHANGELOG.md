@@ -4,7 +4,17 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.24 - Voice AI external connections and OAuth (unreleased)
+## 0.7.25 - iMessage reaction targets (unreleased)
+
+### Fixed
+
+- `inkbox imessage react` now includes `partIndex` alongside `targetMessageId` in
+  its output, so callers can identify the resolved message part. Existing Python,
+  TypeScript, and Rust reaction results already preserve both fields.
+- Clarify that a reaction's returned target and part can differ from the request;
+  use the returned target when reading its live reactions.
+
+## 0.7.24 - Voice AI external connections and OAuth
 
 ### Added
 

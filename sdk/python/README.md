@@ -776,6 +776,9 @@ identity.release_imessage_assignment(connections[0].id)  # admin key only; they 
 # new tapback replaces your previous one on the same message part. Group read
 # receipts and typing indicators remain unsupported and return 409.
 sent_reaction = identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+# The resolved target and part can differ from the requested message and part.
+reacted_message = identity.get_imessage(sent_reaction.target_message_id)
+print(sent_reaction.part_index, reacted_message.reactions)
 
 # Take your own tapback back. Only the sender can; a failed removal leaves it in
 # place rather than clearing it locally, so the call can be retried.

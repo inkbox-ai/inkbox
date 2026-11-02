@@ -589,8 +589,9 @@ if (target) {
   if (targetConvo.assignmentStatus === "active") {
     const sentReaction = await identity.sendIMessageReaction({ messageId: target.id, reaction: "like" });
 
-    // Live tapbacks come back on message reads, oldest first.
-    for (const r of target.reactions ?? []) {
+    // Read the returned target: an attachment can resolve to a different message.
+    const reactedMessage = await identity.getIMessage(sentReaction.targetMessageId);
+    for (const r of reactedMessage.reactions ?? []) {
       console.log(r.direction, r.reaction, r.customEmoji);
     }
 
