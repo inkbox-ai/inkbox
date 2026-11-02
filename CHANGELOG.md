@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.26 - Identity packs (unreleased)
+
+### Added
+
+- Python, TypeScript, and Rust billing methods to list identity packs with cursor
+  pagination, quote and purchase a pack, and cancel or resume renewal. Responses
+  include capacity, paid-through dates, decimal prices, and payment action URLs.
+- `inkbox billing identity-packs list|quote|purchase|cancel|resume`. Purchases
+  require an explicit charge confirmation. Every mutation requires a request UUID,
+  preserved in command output and errors for retries with the same arguments.
+- Typed payment-required results. Complete any returned payment URL, then read
+  agreement status; an accepted request or payment redirect does not confirm capacity.
+
 ## 0.7.25 - iMessage reaction targets (unreleased)
 
 ### Fixed
