@@ -14,7 +14,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Clarify that a reaction's returned target and part can differ from the request;
   use the returned target when reading its live reactions.
 
-## 0.7.24 - Voice AI external connections and OAuth (unreleased)
+## 0.7.24 - Voice AI external connections and OAuth
 
 ### Added
 
