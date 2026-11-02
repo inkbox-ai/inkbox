@@ -81,6 +81,10 @@ describe("verifyWebhook", () => {
     expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders(sig), secret: TEST_KEY })).toBe(false);
   });
 
+  it("returns false for truncated signature without throwing", () => {
+    expect(verifyWebhook({ payload: TEST_BODY, headers: makeHeaders("sha256=abcd"), secret: TEST_KEY })).toBe(false);
+  });
+
   it("returns false when headers are missing", () => {
     expect(verifyWebhook({ payload: TEST_BODY, headers: {}, secret: TEST_KEY })).toBe(false);
   });
