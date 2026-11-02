@@ -496,7 +496,7 @@ impl IdentitiesResource {
 }
 
 impl IdentitiesResource {
-    /// Fresh WhatsApp availability without changing legacy identity summary construction.
+    /// Fresh WhatsApp sending availability, distinct from configured identity history.
     pub fn get_whatsapp_status(
         &self,
         handle: &str,

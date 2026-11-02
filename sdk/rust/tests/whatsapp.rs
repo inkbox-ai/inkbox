@@ -653,3 +653,32 @@ fn failed_send_preserves_explicit_key_and_api_metadata() {
     assert_eq!(error.idempotency_key(), None);
     request.assert_hits(1);
 }
+
+#[test]
+fn identity_lists_retain_configured_whatsapp_and_default_older_responses() {
+    for configured in [Some(true), Some(false), None] {
+        let server = MockServer::start();
+        let mut identity = json!({
+            "id": Uuid::nil(), "organization_id": "org_example",
+            "agent_handle": "example", "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z", "whatsapp_enabled": false
+        });
+        if let Some(value) = configured {
+            identity["whatsapp_configured"] = json!(value);
+        }
+        let list = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/identities/");
+            then.status(200).json_body(json!([identity]));
+        });
+        let client = Inkbox::builder("test-only")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let summaries = client.identities().list().unwrap();
+        assert_eq!(
+            serde_json::to_value(&summaries[0]).unwrap()["whatsapp_configured"],
+            json!(configured.unwrap_or(false))
+        );
+        list.assert();
+    }
+}

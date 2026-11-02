@@ -1350,7 +1350,12 @@ an automatically generated key. Retry the unchanged request with that key rather
 than starting a new logical send. Submission errors use `InkboxError::MessageSend`;
 match `error.original_error()` for the original API status, transport error, or
 decoding error. Retry-delay and support accessors preserve the original metadata.
-Local validation errors remain unchanged.
+Local validation errors remain unchanged. Exhaustive matches on `InkboxError` must
+handle the new `MessageSend` variant even when the application does not use WhatsApp.
+
+Identity summaries expose `whatsapp_configured` independently of current sending
+access. Older responses default it to `false`; manually constructed
+`AgentIdentitySummary` literals must include the field.
 
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
