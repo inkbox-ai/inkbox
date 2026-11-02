@@ -189,8 +189,6 @@ pub struct IdentityPacksResponse {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IdentityPackPaymentMode {
-    Checkout,
-    SavedCard,
     Quantity,
 }
 
@@ -350,6 +348,7 @@ impl BillingResource {
         )?)
     }
 
+    /// Preview an immediate prorated charge on the active paid plan's monthly cycle.
     pub fn quote_identity_pack(&self) -> Result<IdentityPackQuote> {
         Ok(serde_json::from_value(self.http.post(
             "/billing/identity-packs/quote",
@@ -358,29 +357,20 @@ impl BillingResource {
         )?)?)
     }
 
-    /// Reuse the quote and request UUID on retry; acceptance is not payment confirmation.
+    /// Buy a prorated pack on an active paid plan; reuse the quote and UUID on retries.
     pub fn purchase_identity_pack(
         &self,
         quote: &str,
         request_key: Uuid,
-        success_url: Option<&str>,
-        cancel_url: Option<&str>,
     ) -> Result<IdentityPackMutationResponse> {
-        let mut body = json!({"quote": quote, "request_key": request_key});
-        if let Some(url) = success_url {
-            body["success_url"] = json!(url);
-        }
-        if let Some(url) = cancel_url {
-            body["cancel_url"] = json!(url);
-        }
         Ok(serde_json::from_value(self.http.post(
             "/billing/identity-packs",
-            Some(&body),
+            Some(&json!({"quote": quote, "request_key": request_key})),
             NO_QUERY,
         )?)?)
     }
 
-    /// Stop renewal, retaining paid capacity. Reuse this action's UUID on retry.
+    /// Stop only pack renewal, retaining paid capacity; reuse this action's UUID on retry.
     pub fn cancel_identity_pack(
         &self,
         agreement_id: Uuid,
@@ -393,7 +383,7 @@ impl BillingResource {
         )?)?)
     }
 
-    /// Resume before expiry. Use a new UUID for this action, retaining it on retry.
+    /// Resume before expiry on an active paid plan; retain this action's UUID on retries.
     pub fn resume_identity_pack(
         &self,
         agreement_id: Uuid,

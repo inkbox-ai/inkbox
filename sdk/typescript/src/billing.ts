@@ -64,7 +64,7 @@ export interface IdentityPacksResponse {
 export interface IdentityPackQuote {
   quote: string; expires_at: number; code: string; name: string; monthly_amount: string; currency: string;
   identity_slots: number; amount_due_cents: number; invoice_total_cents: number; pack_amount_cents: number;
-  renewal_at: number | null; payment_mode: "checkout" | "saved_card" | "quantity"; payment_method_available: boolean;
+  renewal_at: number | null; payment_mode: "quantity"; payment_method_available: boolean;
 }
 export interface IdentityPackMutationResponse {
   agreement_id: string; status: IdentityPackStatus; payment_url: string | null;
@@ -114,22 +114,23 @@ export class BillingResource {
   identityPacks(options: { cursor?: string; limit?: number } = {}): Promise<IdentityPacksResponse> {
     return this.http.get("/billing/identity-packs", options);
   }
+  /** Preview an immediate prorated charge on the active paid plan's monthly cycle. */
   quoteIdentityPack(): Promise<IdentityPackQuote> {
     return this.http.post("/billing/identity-packs/quote", {});
   }
-  /** Reuse the quote and request UUID on retry; acceptance is not payment confirmation. */
+  /** Buy a prorated pack on an active paid plan; reuse the quote and UUID on retries. */
   purchaseIdentityPack(options: {
-    quote: string; requestKey: string; successUrl?: string; cancelUrl?: string;
+    quote: string; requestKey: string;
   }): Promise<IdentityPackMutationResponse> {
     return this.http.post("/billing/identity-packs", {
-      quote: options.quote, request_key: options.requestKey, success_url: options.successUrl, cancel_url: options.cancelUrl,
+      quote: options.quote, request_key: options.requestKey,
     });
   }
-  /** Stop renewal, retaining paid capacity. Reuse this action's UUID on retry. */
+  /** Stop only pack renewal, retaining paid capacity; reuse this action's UUID on retry. */
   cancelIdentityPack(agreementId: string, options: { requestKey: string }): Promise<IdentityPackMutationResponse> {
     return this.http.post(`/billing/identity-packs/${encodeURIComponent(agreementId)}/cancel`, { request_key: options.requestKey });
   }
-  /** Resume before expiry. Use a new UUID for this action, retaining it on retry. */
+  /** Resume before expiry on an active paid plan; retain this action's UUID on retries. */
   resumeIdentityPack(agreementId: string, options: { requestKey: string }): Promise<IdentityPackMutationResponse> {
     return this.http.post(`/billing/identity-packs/${encodeURIComponent(agreementId)}/resume`, { request_key: options.requestKey });
   }

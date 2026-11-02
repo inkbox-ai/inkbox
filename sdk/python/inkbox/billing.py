@@ -180,7 +180,7 @@ class IdentityPackQuote(TypedDict):
     invoice_total_cents: int
     pack_amount_cents: int
     renewal_at: int | None
-    payment_mode: Literal["checkout", "saved_card", "quantity"]
+    payment_mode: Literal["quantity"]
     payment_method_available: bool
 
 
@@ -254,29 +254,25 @@ class BillingResource:
         }))
 
     def quote_identity_pack(self) -> IdentityPackQuote:
-        """Preview the charge for one pack without purchasing it."""
+        """Preview an immediate prorated charge on the active paid plan's monthly cycle."""
         return cast(IdentityPackQuote, self._http.post("/billing/identity-packs/quote", json={}))
 
     def purchase_identity_pack(
         self, *, quote: str, request_key: UUID | str,
-        success_url: str | None = None, cancel_url: str | None = None,
     ) -> IdentityPackMutationResponse:
-        """Reuse the same quote and request UUID on retry; acceptance is not payment confirmation."""
-        body = {"quote": quote, "request_key": str(request_key)}
-        if success_url is not None:
-            body["success_url"] = success_url
-        if cancel_url is not None:
-            body["cancel_url"] = cancel_url
-        return cast(IdentityPackMutationResponse, self._http.post("/billing/identity-packs", json=body))
+        """Buy a prorated pack on an active paid plan; reuse the quote and UUID on retries."""
+        return cast(IdentityPackMutationResponse, self._http.post("/billing/identity-packs", json={
+            "quote": quote, "request_key": str(request_key),
+        }))
 
     def cancel_identity_pack(self, agreement_id: UUID | str, *, request_key: UUID | str) -> IdentityPackMutationResponse:
-        """Stop renewal, retaining paid capacity. Reuse this action's UUID on retry."""
+        """Stop only pack renewal, retaining paid capacity; reuse this action's UUID on retry."""
         return cast(IdentityPackMutationResponse, self._http.post(
             f"/billing/identity-packs/{UUID(str(agreement_id))}/cancel", json={"request_key": str(request_key)},
         ))
 
     def resume_identity_pack(self, agreement_id: UUID | str, *, request_key: UUID | str) -> IdentityPackMutationResponse:
-        """Resume renewal before expiry. Use a new UUID for this action, retaining it on retry."""
+        """Resume before expiry on an active paid plan; retain this action's UUID on retries."""
         return cast(IdentityPackMutationResponse, self._http.post(
             f"/billing/identity-packs/{UUID(str(agreement_id))}/resume", json={"request_key": str(request_key)},
         ))

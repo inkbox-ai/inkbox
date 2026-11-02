@@ -48,15 +48,17 @@ test("identity packs list pagination, quote, confirmed purchase and payment URL"
   await assert.rejects(run(...args), /--confirm/);
   await assert.rejects(run("purchase", "--quote", fixture.quote.quote, "--confirm"), /--request-key/);
   await assert.rejects(run("purchase", "--quote", fixture.quote.quote, "--request-key", "invalid", "--confirm"), /Expected a UUID/);
+  for (const flag of ["--success-url", "--cancel-url"]) {
+    await assert.rejects(run(...args, "--confirm", flag, "https://example.com/return"), /unknown option/);
+  }
   assert.equal(calls.length, 3);
   for (let i = 0; i < 2; i++) {
-    const result = await run(...args, "--confirm", "--success-url", "https://example.com/complete", "--cancel-url", "https://example.com/cancel");
+    const result = await run(...args, "--confirm");
     assert.deepEqual(JSON.parse(result.stdout), { ...fixture.mutation, request_key: requestKey });
   }
   assert.deepEqual(calls[3], {
     path: "/api/v1/billing/identity-packs", method: "POST", body: {
       quote: fixture.quote.quote, request_key: requestKey,
-      success_url: "https://example.com/complete", cancel_url: "https://example.com/cancel",
     },
   });
   assert.deepEqual(calls[3], calls[4]);
@@ -131,4 +133,28 @@ test("identity pack lost responses expose the original key for a deliberate retr
   assert.equal(JSON.parse((await run(...args)).stdout).request_key, requestKey);
   assert.equal(calls.length, 2);
   assert.deepEqual(calls[0], calls[1]);
+});
+
+test("identity packs retain history and paid-plan errors for new billing actions", async (t) => {
+  const payload = { ...fixture.list, eligible: false, eligibility_reason: fixture.paid_plan_required };
+  const { calls, run } = await mockApi(t, (call, response) => {
+    response.statusCode = call.method === "GET" ? 200 : 409;
+    response.end(JSON.stringify(call.method === "GET" ? payload : { detail: fixture.paid_plan_required }));
+  });
+  assert.deepEqual(JSON.parse((await run("list")).stdout), payload);
+  for (const args of [
+    ["quote"],
+    ["purchase", "--quote", fixture.quote.quote, "--request-key", requestKey, "--confirm"],
+    ["resume", agreementId, "--request-key", resumeKey],
+  ]) {
+    await assert.rejects(run(...args), error => {
+      const result = JSON.parse(error.stderr);
+      assert.equal(result.error.statusCode, 409);
+      assert.equal(result.error.detail, fixture.paid_plan_required);
+      return true;
+    });
+  }
+  assert.equal(calls.length, 4);
+  assert.match((await run("quote", "--help")).stdout, /existing monthly boundary/);
+  assert.match((await run("resume", "--help")).stdout, /active paid plan/);
 });

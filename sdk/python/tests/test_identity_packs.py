@@ -49,19 +49,19 @@ def test_identity_pack_pagination_quote_and_payment_action() -> None:
                 "limit": "1",
             }
             assert page["agreements"][0]["paid_through"] is None
-            assert page["capacity"]["total"] == 3
+            assert page["capacity"]["total"] == 10
             quote = client.billing.quote_identity_pack()
             assert quote == FIXTURE["quote"]
             assert quote["monthly_amount"] == "100.00"
-            assert quote["renewal_at"] is None
+            assert quote["amount_due_cents"] == 5000
+            assert quote["renewal_at"] == 2001209600
+            assert quote["payment_mode"] == "quantity"
             assert requests[2].url.path == "/api/v1/billing/identity-packs/quote"
             assert json.loads(requests[2].content) == {}
             for _ in range(2):
                 result = client.billing.purchase_identity_pack(
                     quote=quote["quote"],
                     request_key=REQUEST_KEY,
-                    success_url="https://example.com/complete",
-                    cancel_url="https://example.com/cancel",
                 )
                 assert result == FIXTURE["mutation"]
                 assert result["status"] == "requires_payment"
@@ -69,8 +69,6 @@ def test_identity_pack_pagination_quote_and_payment_action() -> None:
             assert json.loads(requests[3].content) == {
                 "quote": quote["quote"],
                 "request_key": str(REQUEST_KEY),
-                "success_url": "https://example.com/complete",
-                "cancel_url": "https://example.com/cancel",
             }
             client.billing.purchase_identity_pack(
                 quote=quote["quote"], request_key=str(REQUEST_KEY)
@@ -182,7 +180,7 @@ def test_identity_pack_unavailable_offer_and_last_page() -> None:
         "agreements": [],
         "next_cursor": None,
         "eligible": False,
-        "eligibility_reason": "Resume the ending agreement first.",
+        "eligibility_reason": FIXTURE["paid_plan_required"],
     }
     with patch(
         "inkbox._http.httpx.HTTPTransport",
@@ -192,3 +190,66 @@ def test_identity_pack_unavailable_offer_and_last_page() -> None:
     ):
         with Inkbox(api_key="synthetic-admin-key") as client:
             assert client.billing.identity_packs(cursor=AGREEMENT_ID) == payload
+
+
+@pytest.mark.parametrize("action", ["quote", "purchase", "resume"])
+def test_identity_pack_paid_plan_requirement_preserves_history_and_errors(
+    action: str,
+) -> None:
+    """Retain existing agreements and surface paid-plan requirements without retries."""
+    requests: list[httpx.Request] = []
+    payload = {
+        **FIXTURE["list"],
+        "eligible": False,
+        "eligibility_reason": FIXTURE["paid_plan_required"],
+    }
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Allow agreement reads and reject new billing actions."""
+        requests.append(request)
+        if request.method == "GET":
+            return httpx.Response(200, json=payload)
+        return httpx.Response(409, json={"detail": FIXTURE["paid_plan_required"]})
+
+    with patch(
+        "inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)
+    ):
+        with Inkbox(api_key="synthetic-admin-key") as client:
+            assert client.billing.identity_packs() == payload
+            with pytest.raises(InkboxAPIError) as error:
+                if action == "quote":
+                    client.billing.quote_identity_pack()
+                elif action == "purchase":
+                    client.billing.purchase_identity_pack(
+                        quote=FIXTURE["quote"]["quote"], request_key=REQUEST_KEY
+                    )
+                else:
+                    client.billing.resume_identity_pack(
+                        AGREEMENT_ID, request_key=RESUME_KEY
+                    )
+    assert error.value.status_code == 409
+    assert error.value.detail == FIXTURE["paid_plan_required"]
+    assert len(requests) == 2
+
+
+@pytest.mark.parametrize("parameter", ["success_url", "cancel_url"])
+def test_identity_pack_purchase_rejects_return_urls(parameter: str) -> None:
+    """Reject return URLs before sending a purchase request."""
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Record any unexpected request."""
+        requests.append(request)
+        return httpx.Response(202, json=FIXTURE["mutation"])
+
+    with patch(
+        "inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)
+    ):
+        with Inkbox(api_key="synthetic-admin-key") as client:
+            with pytest.raises(TypeError, match="unexpected keyword argument"):
+                client.billing.purchase_identity_pack(
+                    quote=FIXTURE["quote"]["quote"],
+                    request_key=REQUEST_KEY,
+                    **{parameter: "https://example.com/return"},
+                )
+    assert not requests

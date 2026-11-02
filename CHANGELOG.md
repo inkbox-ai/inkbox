@@ -11,11 +11,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python, TypeScript, and Rust billing methods to list identity packs with cursor
   pagination, quote and purchase a pack, and cancel or resume renewal. Responses
   include capacity, paid-through dates, decimal prices, and payment action URLs.
+- Quotes, purchases, and resumes require an active paid plan. First and subsequent
+  purchases charge the quoted proration immediately and follow the existing monthly
+  billing cycle, including on annual plans. Capacity activates after confirmed payment.
 - `inkbox billing identity-packs list|quote|purchase|cancel|resume`. Purchases
   require an explicit charge confirmation. Every mutation requires a request UUID,
   preserved in command output and errors for retries with the same arguments.
-- Typed payment-required results. Complete any returned payment URL, then read
-  agreement status; an accepted request or payment redirect does not confirm capacity.
+- Typed payment-required results. Complete any returned invoice payment action,
+  then read agreement status; accepting a request does not confirm capacity.
+- Cancellation stops only pack renewal and retains paid capacity through expiry;
+  existing agreements remain readable without an active paid plan.
 
 ## 0.7.25 - iMessage reaction targets (unreleased)
 

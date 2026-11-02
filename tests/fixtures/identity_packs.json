@@ -25,16 +25,16 @@
     }],
     "capacity": {
       "used": 2,
-      "baseline": 3,
+      "baseline": 10,
       "paid_slots": 0,
       "processing_slots": 0,
-      "total": 3,
+      "total": 10,
       "renewing_packs": 0,
       "paid_packs": 0
     },
-    "mail_storage_bytes_per_identity": 1073741824,
+    "mail_storage_bytes_per_identity": 2147483648,
     "billing_account_available": true,
-    "payment_method_available": false,
+    "payment_method_available": true,
     "eligible": true,
     "eligibility_reason": null,
     "next_cursor": "11111111-1111-4111-8111-111111111111"
@@ -47,12 +47,12 @@
     "monthly_amount": "100.00",
     "currency": "usd",
     "identity_slots": 100,
-    "amount_due_cents": 10000,
-    "invoice_total_cents": 10000,
-    "pack_amount_cents": 10000,
-    "renewal_at": null,
-    "payment_mode": "checkout",
-    "payment_method_available": false
+    "amount_due_cents": 5000,
+    "invoice_total_cents": 5000,
+    "pack_amount_cents": 5000,
+    "renewal_at": 2001209600,
+    "payment_mode": "quantity",
+    "payment_method_available": true
   },
   "mutation": {
     "agreement_id": "11111111-1111-4111-8111-111111111111",
@@ -62,7 +62,8 @@
   "conflict": {
     "error": "identity_pack_capacity_in_use",
     "message": "Current usage exceeds the remaining identity capacity.",
-    "used": 5,
-    "remaining_capacity": 3
-  }
+    "used": 12,
+    "remaining_capacity": 10
+  },
+  "paid_plan_required": "An active paid plan is required."
 }
