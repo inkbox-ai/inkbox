@@ -574,6 +574,10 @@ sent, by reaction id; only the sender can, and a failed removal leaves it in
 place rather than clearing it locally, so the call can be retried. Group read
 receipts and typing indicators remain unsupported.
 
+A reaction result's `target_message_id` and `part_index` identify the resolved
+message part and can differ from the request. Read that returned message ID to
+inspect the live reactions; remove a reaction using its reaction ID.
+
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.

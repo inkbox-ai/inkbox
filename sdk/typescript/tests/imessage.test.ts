@@ -464,6 +464,18 @@ describe("IMessagesResource", () => {
     expect(reaction.targetMessageId).toBe(MSG_ID);
   });
 
+  it("sendReaction preserves a resolved target and part distinct from the request", async () => {
+    const primaryId = "50000000-0000-4000-8000-000000000005";
+    vi.mocked(fetch).mockResolvedValue(ok({ ...REACTION_DICT, target_message_id: primaryId, part_index: 2 }));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+    const reaction = await resource.sendReaction({ messageId: MSG_ID, reaction: "like" });
+    expect(JSON.parse(lastCall().init.body as string)).toEqual({
+      message_id: MSG_ID, reaction: "like", part_index: 0,
+    });
+    expect(reaction.targetMessageId).toBe(primaryId);
+    expect(reaction.partIndex).toBe(2);
+  });
+
   it("sendReaction supports an inbound group target without changing the request", async () => {
     vi.mocked(fetch).mockResolvedValue(ok(GROUP_REACTION_DICT));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));

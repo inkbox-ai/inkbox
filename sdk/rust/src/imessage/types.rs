@@ -457,6 +457,7 @@ pub struct IMessageReaction {
     pub id: Uuid,
     pub conversation_id: Uuid,
     pub assignment_id: Option<Uuid>,
+    /// Resolved target; can differ from the request. Read this message for live reactions.
     pub target_message_id: Uuid,
     /// "inbound" | "outbound"
     pub direction: String,

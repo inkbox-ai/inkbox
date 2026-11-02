@@ -248,3 +248,35 @@ test("invalid thread flag combinations fail before any identity or message reque
   });
   assert.deepEqual(calls, []);
 });
+
+
+test("react prints the resolved target and part instead of assuming the requested target", async t => {
+  const primaryId = "50000000-0000-4000-8000-000000000005";
+  const bodies = [];
+  const server = createServer(async (request, response) => {
+    response.setHeader("content-type", "application/json");
+    if (request.url === "/api/v1/identities/support-bot") {
+      response.end(JSON.stringify({ id: identityId, organization_id: "org_example", agent_handle: "support-bot",
+        imessage_enabled: true, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }));
+    } else if (request.method === "POST" && request.url === "/api/v1/imessage/reactions") {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      bodies.push(JSON.parse(body));
+      response.writeHead(201).end(JSON.stringify({
+        id: "60000000-0000-4000-8000-000000000006", conversation_id: conversationId,
+        assignment_id: null, target_message_id: primaryId, part_index: 2,
+        direction: "outbound", reaction: "like", remote_number: "+15550001111",
+        created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+      }));
+    } else { response.writeHead(404).end(); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const result = await exec(process.execPath, [cli, "--base-url", `http://127.0.0.1:${server.address().port}`,
+    "--api-key", "test-only", "--json", "imessage", "react", messageId, "--identity", "support-bot", "--reaction", "like"],
+  { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 });
+  const reaction = JSON.parse(result.stdout);
+  assert.equal(reaction.targetMessageId, primaryId);
+  assert.equal(reaction.partIndex, 2);
+  assert.deepEqual(bodies, [{ message_id: messageId, reaction: "like", part_index: 0 }]);
+});

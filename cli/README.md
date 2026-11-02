@@ -543,6 +543,8 @@ inkbox imessage react <message-id> -i <handle>  # React to an inbound 1:1 or gro
   --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question, eyes
   --part-index <n>                           #   Part of a multi-part message (default: 0)
 
+# react output includes targetMessageId and partIndex for the resolved target.
+# These can differ from the requested message ID and --part-index.
 inkbox imessage unreact <reaction-id> -i <handle>  # Take back a tapback this identity sent
 
 inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # One-to-one only

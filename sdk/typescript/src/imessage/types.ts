@@ -277,6 +277,7 @@ export interface IMessageReaction {
   id: string;
   conversationId: string;
   assignmentId: string | null;
+  /** Resolved target; can differ from the requested attachment ID. Read this message for live reactions. */
   targetMessageId: string;
   /** "inbound" | "outbound" */
   direction: string;

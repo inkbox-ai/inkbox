@@ -448,7 +448,11 @@ class IMessageConversationSummary:
 
 @dataclass
 class IMessageReaction:
-    """A tapback reaction on an iMessage."""
+    """A tapback with its resolved target_message_id and part_index.
+
+    The resolved target and part can differ from the send request. Read the
+    returned target message to inspect its live reactions.
+    """
 
     id: UUID
     conversation_id: UUID
