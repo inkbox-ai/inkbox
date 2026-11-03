@@ -1161,6 +1161,9 @@ export class TunnelRuntime {
     const session = conn.session;
     if (session === null) throw new Error("h2 connection not open");
     const stream = session.request(headers, { endStream: opts.endStream });
+    stream.on("error", () => {
+      // Surfaces via close(), including errors deferred by request().
+    });
     const bus: StreamBus = {
       events: [],
       waiter: null,
@@ -1172,6 +1175,7 @@ export class TunnelRuntime {
     if (streamId === -1) {
       // Fall back to listening for `ready`.
       // In practice Node assigns the id synchronously; this is a guard.
+      stream.destroy();
       throw new Error("h2 stream id not assigned synchronously");
     }
     conn.streams.set(streamId, bus);
@@ -1204,9 +1208,6 @@ export class TunnelRuntime {
         bus.ended = true;
         this.wake(bus);
       }
-    });
-    stream.on("error", () => {
-      // Surfaces via close().
     });
     return { stream, streamId };
   }

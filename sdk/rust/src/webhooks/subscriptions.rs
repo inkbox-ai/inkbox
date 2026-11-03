@@ -155,7 +155,15 @@ struct ListResponse {
     subscriptions: Vec<WebhookSubscription>,
 }
 
-const EVENT_PREFIXES: &[&str] = &["message.", "text.", "imessage.", "call.", "a2a.", "slack."];
+const EVENT_PREFIXES: &[&str] = &[
+    "message.",
+    "text.",
+    "imessage.",
+    "whatsapp.",
+    "call.",
+    "a2a.",
+    "slack.",
+];
 
 /// Reject an empty list or one carrying duplicate values.
 fn assert_event_types_non_empty_distinct(event_types: &[String]) -> Result<()> {

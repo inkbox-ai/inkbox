@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.26 - Identity packs (unreleased)
+## 0.7.27 - Identity packs (unreleased)
 
 ### Added
 
@@ -22,7 +22,68 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Cancellation stops only pack renewal and retains paid capacity through expiry;
   existing agreements remain readable without an active paid plan.
 
-## 0.7.25 - iMessage reaction targets (unreleased)
+## 0.7.26 - WhatsApp conversations (unreleased)
+
+### Added
+
+- Python, TypeScript, Rust, and CLI support for approved dedicated one-to-one
+  WhatsApp: send and read messages, list conversations, upload owned attachments,
+  renew temporary media access, and mark only local history read.
+- Native quoted replies and chronological cursor-based thread reads. Whole-message
+  named/custom reactions have explicit logical-write keys and versioned receipts;
+  stale removal cannot remove a newer reaction. Queued and uncertain receipts remain
+  distinct from applied message reactions.
+- Sends accept one E.164 recipient string or an existing direct conversation.
+  Recipient arrays are rejected, including one-element arrays.
+- Creation-date filters and timezone-aware bounds across message/conversation lists.
+  CLI aliases include `--unread-only`, `unreact`, and a `conversation` history command.
+- Strict `plain_reply_fallback` / `plainReplyFallback` send option, default true; false
+  explicitly requires native quoting. All current WhatsApp targets support native
+  quotes; missing evidence or rejected/uncertain sends never cause a plain replacement.
+- Typed WhatsApp notification payloads, fresh identity channel-status reads, and
+  explicit opt-in WhatsApp contact correspondence. Existing correspondence defaults
+  remain unchanged.
+- WhatsApp sends use the existing logical-send key and lookup recovery contract.
+  Send acceptance, confirmed sending, delivery, and uncertain delivery stay distinct.
+- Effective WhatsApp limits expose the identity, configurable policy values, and
+  daily-only usage without a billing-cycle timestamp, monthly allowance, or
+  enabled-agent cap.
+
+### Changed
+
+- Rust WhatsApp submission errors use `InkboxError::MessageSend`, retaining the
+  original failure through `original_error()` and the error source. Code matching
+  API error variants should inspect `original_error()`. Downstream exhaustive
+  matches on `InkboxError` must handle the new `MessageSend` variant, even in
+  applications that do not use WhatsApp.
+- Rust exhaustive matches on correspondence channels/items or context text channels
+  must handle the new WhatsApp variant. Complete `CorrespondenceQuery` struct literals
+  need `whatsapp_limit: None` (or `..Default::default()`).
+- Rust `AgentIdentitySummary` struct literals must supply `whatsapp_configured`
+  (use `false` when not configured). Older JSON responses remain compatible: the
+  field defaults to `false` when omitted.
+
+### Fixed
+
+- Python, TypeScript, and Rust identity summaries retain `whatsapp_configured`
+  independently of sending access, defaulting to false for older responses.
+  Python and TypeScript also expose it through identity accessors.
+- WhatsApp conversation history uses the same table columns as message lists.
+- WhatsApp reaction examples retain a consistent actor for each receipt, and the Rust example explicitly selects its agent.
+- Python, TypeScript, and Rust WhatsApp sends retain their request key when a
+  successful response cannot be decoded. Rust also exposes the submitted key
+  after exhausted transport retries through `InkboxError::idempotency_key()`;
+  reuse it with the unchanged request to recover an uncertain send.
+- Rejected HTTP/2 tunnel streams are closed before returning an error, preventing
+  an unhandled stream error when a request races with connection shutdown.
+
+### Availability
+
+- WhatsApp requires approval and an existing dedicated iMessage number. It is not
+  a shared channel. Voice calls, remote read receipts, typing, and self-service
+  number provisioning are not supported.
+
+## 0.7.25 - iMessage reaction targets
 
 ### Fixed
 

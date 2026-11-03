@@ -13,6 +13,7 @@ pub use correspondence::{
     CorrespondenceMediaMetadata, CorrespondenceOrder, CorrespondenceTranscriptEntry,
     CorrespondenceTranscriptMarker, CorrespondenceTranscriptMode, EmailCorrespondenceItem,
     IMessageCorrespondenceItem, SlackCorrespondenceItem, SmsCorrespondenceItem,
+    WhatsAppCorrespondenceItem,
 };
 pub use resources::communication_policy::*;
 pub use resources::contact_access::ContactAccessResource;

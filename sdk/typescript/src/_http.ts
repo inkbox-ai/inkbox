@@ -566,13 +566,14 @@ export class HttpTransport {
       content: Uint8Array | Blob;
       contentType: string;
     },
+    opts?: { params?: Params },
   ): Promise<T> {
     const form = new FormData();
     const blob = file.content instanceof Blob
       ? file.content
       : new Blob([file.content as BlobPart], { type: file.contentType });
     form.append(file.fieldName, blob, file.filename);
-    return this.request<T>("POST", path, { formBody: form });
+    return this.request<T>("POST", path, { formBody: form, params: opts?.params });
   }
 
   async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {

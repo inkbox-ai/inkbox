@@ -83,7 +83,7 @@ fn legacy_slack_literals_remain_constructible() {
 }
 
 #[test]
-fn legacy_response_literals_remain_constructible() {
+fn response_literals_include_current_required_fields() {
     let id = Uuid::nil();
     let mailbox = IdentityMailbox {
         signature_html: None,
@@ -131,6 +131,7 @@ fn legacy_response_literals_remain_constructible() {
         created_at: String::new(),
         updated_at: String::new(),
         imessage_enabled: false,
+        whatsapp_configured: false,
         contact_sharing_enabled: true,
         imessage_filter_mode: FilterMode::Whitelist,
         mail_filter_mode: FilterMode::Whitelist,

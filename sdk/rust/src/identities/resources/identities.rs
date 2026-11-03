@@ -495,6 +495,25 @@ impl IdentitiesResource {
     }
 }
 
+impl IdentitiesResource {
+    /// Fresh WhatsApp sending availability, distinct from configured identity history.
+    pub fn get_whatsapp_status(
+        &self,
+        handle: &str,
+    ) -> Result<Option<crate::whatsapp::WhatsAppChannelStatus>> {
+        let data = self.http.get(
+            &format!("/{}/channel-status", path_segment(handle)),
+            crate::http::NO_QUERY,
+        )?;
+        data.get("whatsapp")
+            .filter(|v| !v.is_null())
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(Into::into)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use httpmock::prelude::*;
