@@ -14,6 +14,7 @@ import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
+import { WhatsAppResource } from "./whatsapp.js";
 import { MessageSendsResource } from "./message_sends.js";
 import { DraftsResource } from "./mail/resources/drafts.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
@@ -161,6 +162,7 @@ export interface InkboxOptions {
 export class Inkbox {
   readonly companion: CompanionResource;
   readonly messageSends: MessageSendsResource;
+  readonly whatsapp: WhatsAppResource;
   readonly _mailboxes: MailboxesResource;
   readonly _messages: MessagesResource;
   readonly _drafts: DraftsResource;
@@ -241,6 +243,7 @@ export class Inkbox {
 
     const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar, userAgent, options.onResponse);
     const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar, userAgent, options.onResponse);
+    const whatsappHttp = new HttpTransport(apiKey, `${apiRoot}/whatsapp`, ms, cookieJar, userAgent, options.onResponse);
     const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar, userAgent, options.onResponse);
     const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar, userAgent, options.onResponse);
     const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar, userAgent, options.onResponse);
@@ -277,6 +280,7 @@ export class Inkbox {
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
     this._smsOptIns         = new SmsOptInsResource(phoneHttp);
 
+    this.whatsapp = new WhatsAppResource(whatsappHttp);
     this._imessages            = new IMessagesResource(imessageHttp);
     this._imessageContactRules = new IMessageContactRulesResource(imessageHttp);
 

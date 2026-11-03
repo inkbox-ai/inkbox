@@ -2237,6 +2237,115 @@ impl std::fmt::Debug for AgentIdentity {
     }
 }
 
+impl AgentIdentity {
+    pub fn get_whatsapp_limits(&self) -> Result<crate::whatsapp::WhatsAppLimits> {
+        self.inkbox.whatsapp().get_limits(Some(&self.id()))
+    }
+    pub fn get_whatsapp_status(&self) -> Result<Option<crate::whatsapp::WhatsAppChannelStatus>> {
+        self.inkbox
+            .identities()
+            .get_whatsapp_status(&self.agent_handle())
+    }
+    pub fn send_whatsapp(
+        &self,
+        o: &crate::whatsapp::WhatsAppSendOptions,
+    ) -> Result<crate::whatsapp::WhatsAppMessage> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().send(&o)
+    }
+    pub fn get_whatsapp_message(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMessage> {
+        self.inkbox.whatsapp().get(id, Some(&self.id()))
+    }
+    pub fn list_whatsapp_messages(
+        &self,
+        o: &crate::whatsapp::WhatsAppListOptions,
+    ) -> Result<Vec<crate::whatsapp::WhatsAppMessage>> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().list(&o)
+    }
+    pub fn list_whatsapp_conversations(
+        &self,
+        o: &crate::whatsapp::WhatsAppListOptions,
+    ) -> Result<Vec<crate::whatsapp::WhatsAppConversationSummary>> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().list_conversations(&o)
+    }
+    pub fn get_whatsapp_conversation(
+        &self,
+        id: &Uuid,
+    ) -> Result<crate::whatsapp::WhatsAppConversation> {
+        self.inkbox
+            .whatsapp()
+            .get_conversation(id, Some(&self.id()))
+    }
+    pub fn get_whatsapp_thread(
+        &self,
+        id: &Uuid,
+        options: &crate::whatsapp::WhatsAppThreadOptions,
+    ) -> Result<crate::whatsapp::WhatsAppThread> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().get_thread(id, &options)
+    }
+    pub fn get_whatsapp_conversation_thread(
+        &self,
+        conversation: &Uuid,
+        thread: &Uuid,
+        options: &crate::whatsapp::WhatsAppThreadOptions,
+    ) -> Result<crate::whatsapp::WhatsAppThread> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox
+            .whatsapp()
+            .get_conversation_thread(conversation, thread, &options)
+    }
+    pub fn send_whatsapp_reaction(
+        &self,
+        options: &crate::whatsapp::WhatsAppReactionOptions,
+    ) -> Result<crate::whatsapp::WhatsAppReaction> {
+        let mut options = options.clone();
+        options.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().send_reaction(&options)
+    }
+    pub fn get_whatsapp_reaction(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppReaction> {
+        self.inkbox.whatsapp().get_reaction(id, Some(&self.id()))
+    }
+    pub fn remove_whatsapp_reaction(
+        &self,
+        id: &Uuid,
+        key: &str,
+    ) -> Result<crate::whatsapp::WhatsAppReaction> {
+        self.inkbox
+            .whatsapp()
+            .remove_reaction(id, key, Some(&self.id()))
+    }
+    pub fn upload_whatsapp_media(
+        &self,
+        content: Vec<u8>,
+        filename: &str,
+        content_type: Option<&str>,
+    ) -> Result<crate::whatsapp::WhatsAppMedia> {
+        self.inkbox
+            .whatsapp()
+            .upload_media(content, filename, content_type, Some(&self.id()))
+    }
+    pub fn get_whatsapp_media(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMedia> {
+        self.inkbox.whatsapp().get_media(id, Some(&self.id()))
+    }
+    pub fn mark_whatsapp_read(
+        &self,
+        id: &Uuid,
+        through: &Uuid,
+    ) -> Result<crate::whatsapp::WhatsAppMarkReadResult> {
+        self.inkbox
+            .whatsapp()
+            .mark_read(id, through, Some(&self.id()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use httpmock::prelude::*;

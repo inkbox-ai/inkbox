@@ -19,6 +19,7 @@ export interface ContactCorrespondenceOptions {
   emailLimit?: number;
   smsLimit?: number;
   imessageLimit?: number;
+  whatsappLimit?: number;
   callsLimit?: number;
   cursor?: string;
   order?: CorrespondenceOrder;
@@ -52,6 +53,7 @@ export class ContactCorrespondenceResource {
       email_limit: options.emailLimit,
       sms_limit: options.smsLimit,
       imessage_limit: options.imessageLimit,
+      whatsapp_limit: options.whatsappLimit,
       calls_limit: options.callsLimit,
       cursor: options.cursor,
       order: options.order,

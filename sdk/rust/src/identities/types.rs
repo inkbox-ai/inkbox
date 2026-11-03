@@ -435,6 +435,10 @@ pub struct AgentIdentitySummary {
     /// Defaults to `false` when the server omits the field.
     #[serde(default)]
     pub imessage_enabled: bool,
+    /// Whether WhatsApp has been configured, independently of current sending access.
+    /// Defaults to `false` when absent from older responses.
+    #[serde(default)]
+    pub whatsapp_configured: bool,
     /// Whether an attached dedicated iMessage line automatically shares this
     /// identity's name and optional avatar. Defaults to `true` when absent.
     #[serde(default = "default_contact_sharing_enabled")]

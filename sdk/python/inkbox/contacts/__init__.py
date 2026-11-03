@@ -50,6 +50,7 @@ from inkbox.contacts.types import (
     CorrespondenceTranscriptMode,
     EmailCorrespondenceItem,
     IMessageCorrespondenceItem,
+    WhatsAppCorrespondenceItem,
     SmsCorrespondenceItem,
     SlackCorrespondenceItem,
 )
@@ -100,6 +101,7 @@ __all__ = [
     "CorrespondenceTranscriptMode",
     "EmailCorrespondenceItem",
     "IMessageCorrespondenceItem",
+    "WhatsAppCorrespondenceItem",
     "SmsCorrespondenceItem",
     "SlackCorrespondenceItem",
 ]

@@ -30,6 +30,7 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox.companion import CompanionResource
+from inkbox.whatsapp import WhatsAppResource
 from inkbox.message_sends import MessageSendsResource
 from inkbox.notes.resources.notes import NotesResource
 from inkbox.billing import BillingResource
@@ -214,6 +215,10 @@ class Inkbox:
             cookie_jar=_cookie_jar,
             user_agent=_ua,
         )
+        self._whatsapp_http = HttpTransport(
+            api_key=api_key, base_url=f"{_api_root}/whatsapp", timeout=timeout,
+            cookie_jar=_cookie_jar, user_agent=_ua,
+        )
         self._imessage_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/imessage",
@@ -297,6 +302,7 @@ class Inkbox:
             self._api_http
         )
 
+        self.whatsapp = WhatsAppResource(self._whatsapp_http)
         self._imessages = IMessagesResource(self._imessage_http)
         self._imessage_contact_rules = IMessageContactRulesResource(self._imessage_http)
 
@@ -370,6 +376,7 @@ class Inkbox:
         """Close all underlying HTTP connection pools."""
         self._mail_http.close()
         self._phone_http.close()
+        self._whatsapp_http.close()
         self._imessage_http.close()
         self._ids_http.close()
         self._vault_http.close()

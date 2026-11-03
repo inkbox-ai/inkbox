@@ -290,3 +290,26 @@ thread. Unsettled targets or missing reply metadata still fail. A previously
 supported target may still fail after native delivery becomes unavailable; fallback
 does not resend rejected replies. Read queued message status and error fields,
 because delivery webhooks do not cover every failure before dispatch.
+
+## Approved dedicated WhatsApp
+
+For an approved agent with an existing dedicated personal iMessage number,
+WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
+do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
+point the user to Request Access in the console. Direct conversations, native quotes, and whole-message reactions are
+supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
+Send to one E.164 string or an existing direct-message conversation. Recipient
+arrays, including singleton arrays, and comma-separated lists are rejected.
+WhatsApp is one-to-one only; never fan out into separate sends. Upload at most one attachment
+(default policy 5 MiB, hard ceiling 20 MiB) first and reuse its owned media ID. Outbound text is at most 4,000 Unicode
+code points. Preserve a stable logical-send key and media ID after ambiguity;
+check message/lookup state rather than sending a duplicate. Attachment URLs expire:
+refresh metadata by media ID before downloading. Local mark-read sends no remote
+receipt. Only `whatsapp.received` is new incoming content; delivery notifications
+must not trigger replies. Quote only an authorized message in the selected conversation using
+reply_to_message_id / replyToMessageId. Never silently fall back to a plain send.
+Read quote chains with the thread helpers. React with named love/like/dislike/laugh/
+emphasize/question/eyes or exclusive custom emoji and an explicit stable key.
+Keep pending/uncertain receipts separate from live applied reactions. Remove only
+the selected receipt version. Reaction notifications are not new text-reply turns.
+Typing, voice calls, and remote read receipts are not supported.
