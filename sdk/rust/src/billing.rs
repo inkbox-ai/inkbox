@@ -123,6 +123,7 @@ pub struct BundleQuote {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum IdentityPackStatus {
     Pending,
     RequiresPayment,
@@ -133,6 +134,8 @@ pub enum IdentityPackStatus {
     Expired,
     Failed,
     Review,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

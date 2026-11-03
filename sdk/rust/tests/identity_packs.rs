@@ -299,3 +299,22 @@ fn identity_pack_paid_plan_requirement_preserves_history_and_errors() {
         rejected.assert_hits(1);
     }
 }
+
+#[test]
+fn future_statuses_preserve_pack_lists_and_mutation_receipts() {
+    let mut page = fixture()["list"].clone();
+    page["agreements"][0]["status"] = json!("future_status");
+    let parsed: inkbox::billing::IdentityPacksResponse = serde_json::from_value(page).unwrap();
+    assert_eq!(parsed.agreements[0].status, IdentityPackStatus::Unknown);
+    assert_eq!(parsed.agreements[0].monthly_amount, "100.00");
+
+    let mut receipt = fixture()["mutation"].clone();
+    receipt["status"] = json!("future_status");
+    let parsed: inkbox::billing::IdentityPackMutationResponse =
+        serde_json::from_value(receipt.clone()).unwrap();
+    assert_eq!(parsed.status, IdentityPackStatus::Unknown);
+    assert_eq!(
+        parsed.agreement_id.to_string(),
+        receipt["agreement_id"].as_str().unwrap()
+    );
+}

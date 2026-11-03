@@ -21,6 +21,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   then read agreement status; accepting a request does not confirm capacity.
 - Cancellation stops only pack renewal and retains paid capacity through expiry;
   existing agreements remain readable without an active paid plan.
+- Rust identity-pack statuses include an `Unknown` fallback for future values;
+  the enum is non-exhaustive, so matches must include a wildcard arm.
 
 ## 0.7.26 - WhatsApp conversations (unreleased)
 
