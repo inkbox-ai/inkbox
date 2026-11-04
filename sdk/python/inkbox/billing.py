@@ -1,4 +1,4 @@
-"""Organization-admin pricing and calling-country subscriptions."""
+"""Organization-admin pricing and add-on subscriptions."""
 
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 from uuid import UUID
@@ -115,6 +115,81 @@ class BundleQuote(TypedDict):
     period_end: str
 
 
+IdentityPackStatus = Literal[
+    "pending", "requires_payment", "active", "canceling", "suspended",
+    "canceled", "expired", "failed", "review",
+]
+
+
+class IdentityPackOffer(TypedDict):
+    code: str
+    name: str
+    monthly_amount: str
+    currency: str
+    identity_slots: int
+
+
+class IdentityPackAgreement(TypedDict):
+    id: str
+    code: str
+    name: str
+    monthly_amount: str
+    currency: str
+    status: IdentityPackStatus
+    paid_through: str | None
+    cancel_at_period_end: bool
+    change_pending: bool
+    renewal_processing: bool
+    payment_url: str | None
+    can_cancel: bool
+    can_resume: bool
+    created_at: str
+
+
+class IdentityPackCapacity(TypedDict):
+    used: int
+    baseline: int
+    paid_slots: int
+    processing_slots: int
+    total: int
+    renewing_packs: int
+    paid_packs: int
+
+
+class IdentityPacksResponse(TypedDict):
+    offer: IdentityPackOffer | None
+    agreements: list[IdentityPackAgreement]
+    capacity: IdentityPackCapacity
+    mail_storage_bytes_per_identity: int
+    billing_account_available: bool
+    payment_method_available: bool
+    eligible: bool
+    eligibility_reason: str | None
+    next_cursor: str | None
+
+
+class IdentityPackQuote(TypedDict):
+    quote: str
+    expires_at: int
+    code: str
+    name: str
+    monthly_amount: str
+    currency: str
+    identity_slots: int
+    amount_due_cents: int
+    invoice_total_cents: int
+    pack_amount_cents: int
+    renewal_at: int | None
+    payment_mode: Literal["quantity"]
+    payment_method_available: bool
+
+
+class IdentityPackMutationResponse(TypedDict):
+    agreement_id: str
+    status: IdentityPackStatus
+    payment_url: str | None
+
+
 class BillingResource:
     """Requires an organization-admin API key; identity-scoped keys cannot purchase."""
 
@@ -171,3 +246,33 @@ class BillingResource:
 
     def resume_line_bundle(self, agreement_id: UUID | str) -> LineBundlesResponse:
         return cast(LineBundlesResponse, self._http.post(f"/billing/line-bundles/{UUID(str(agreement_id))}/resume", json={}))
+
+    def identity_packs(self, *, cursor: UUID | str | None = None, limit: int | None = None) -> IdentityPacksResponse:
+        """Read one page of agreements and the organization's total identity capacity."""
+        return cast(IdentityPacksResponse, self._http.get("/billing/identity-packs", params={
+            "cursor": str(cursor) if cursor is not None else None, "limit": limit,
+        }))
+
+    def quote_identity_pack(self) -> IdentityPackQuote:
+        """Preview an immediate prorated charge on the active paid plan's monthly cycle."""
+        return cast(IdentityPackQuote, self._http.post("/billing/identity-packs/quote", json={}))
+
+    def purchase_identity_pack(
+        self, *, quote: str, request_key: UUID | str,
+    ) -> IdentityPackMutationResponse:
+        """Buy a prorated pack on an active paid plan; reuse the quote and UUID on retries."""
+        return cast(IdentityPackMutationResponse, self._http.post("/billing/identity-packs", json={
+            "quote": quote, "request_key": str(request_key),
+        }))
+
+    def cancel_identity_pack(self, agreement_id: UUID | str, *, request_key: UUID | str) -> IdentityPackMutationResponse:
+        """Stop only pack renewal, retaining paid capacity; reuse this action's UUID on retry."""
+        return cast(IdentityPackMutationResponse, self._http.post(
+            f"/billing/identity-packs/{UUID(str(agreement_id))}/cancel", json={"request_key": str(request_key)},
+        ))
+
+    def resume_identity_pack(self, agreement_id: UUID | str, *, request_key: UUID | str) -> IdentityPackMutationResponse:
+        """Resume before expiry on an active paid plan; retain this action's UUID on retries."""
+        return cast(IdentityPackMutationResponse, self._http.post(
+            f"/billing/identity-packs/{UUID(str(agreement_id))}/resume", json={"request_key": str(request_key)},
+        ))

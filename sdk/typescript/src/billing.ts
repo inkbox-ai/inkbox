@@ -42,6 +42,34 @@ export interface BundleQuote {
   voice_seconds: number; messages: number; period_end: string;
 }
 
+export type IdentityPackStatus = "pending" | "requires_payment" | "active" | "canceling" | "suspended"
+  | "canceled" | "expired" | "failed" | "review";
+export interface IdentityPackOffer {
+  code: string; name: string; monthly_amount: string; currency: string; identity_slots: number;
+}
+export interface IdentityPackAgreement {
+  id: string; code: string; name: string; monthly_amount: string; currency: string; status: IdentityPackStatus;
+  paid_through: string | null; cancel_at_period_end: boolean; change_pending: boolean; renewal_processing: boolean;
+  payment_url: string | null; can_cancel: boolean; can_resume: boolean; created_at: string;
+}
+export interface IdentityPackCapacity {
+  used: number; baseline: number; paid_slots: number; processing_slots: number; total: number;
+  renewing_packs: number; paid_packs: number;
+}
+export interface IdentityPacksResponse {
+  offer: IdentityPackOffer | null; agreements: IdentityPackAgreement[]; capacity: IdentityPackCapacity;
+  mail_storage_bytes_per_identity: number; billing_account_available: boolean; payment_method_available: boolean;
+  eligible: boolean; eligibility_reason: string | null; next_cursor: string | null;
+}
+export interface IdentityPackQuote {
+  quote: string; expires_at: number; code: string; name: string; monthly_amount: string; currency: string;
+  identity_slots: number; amount_due_cents: number; invoice_total_cents: number; pack_amount_cents: number;
+  renewal_at: number | null; payment_mode: "quantity"; payment_method_available: boolean;
+}
+export interface IdentityPackMutationResponse {
+  agreement_id: string; status: IdentityPackStatus; payment_url: string | null;
+}
+
 /** Organization-admin billing. Decimal amounts and response field names preserve the API representation. */
 export class BillingResource {
   constructor(private readonly http: HttpTransport) {}
@@ -81,5 +109,29 @@ export class BillingResource {
   }
   resumeLineBundle(agreementId: string): Promise<LineBundlesResponse> {
     return this.http.post(`/billing/line-bundles/${encodeURIComponent(agreementId)}/resume`, {});
+  }
+  /** Read one page of agreements and the organization's total identity capacity. */
+  identityPacks(options: { cursor?: string; limit?: number } = {}): Promise<IdentityPacksResponse> {
+    return this.http.get("/billing/identity-packs", options);
+  }
+  /** Preview an immediate prorated charge on the active paid plan's monthly cycle. */
+  quoteIdentityPack(): Promise<IdentityPackQuote> {
+    return this.http.post("/billing/identity-packs/quote", {});
+  }
+  /** Buy a prorated pack on an active paid plan; reuse the quote and UUID on retries. */
+  purchaseIdentityPack(options: {
+    quote: string; requestKey: string;
+  }): Promise<IdentityPackMutationResponse> {
+    return this.http.post("/billing/identity-packs", {
+      quote: options.quote, request_key: options.requestKey,
+    });
+  }
+  /** Stop only pack renewal, retaining paid capacity; reuse this action's UUID on retry. */
+  cancelIdentityPack(agreementId: string, options: { requestKey: string }): Promise<IdentityPackMutationResponse> {
+    return this.http.post(`/billing/identity-packs/${encodeURIComponent(agreementId)}/cancel`, { request_key: options.requestKey });
+  }
+  /** Resume before expiry on an active paid plan; retain this action's UUID on retries. */
+  resumeIdentityPack(agreementId: string, options: { requestKey: string }): Promise<IdentityPackMutationResponse> {
+    return this.http.post(`/billing/identity-packs/${encodeURIComponent(agreementId)}/resume`, { request_key: options.requestKey });
   }
 }
