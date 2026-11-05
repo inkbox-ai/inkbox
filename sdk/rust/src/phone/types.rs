@@ -236,8 +236,11 @@ pub struct CallPlacementOptions {
 }
 
 /// Optional controls for an Inkbox Voice AI outbound call.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct HostedCallPlacementOptions {
+    /// Seconds to wait before an outbound opening (0–60). Omit for 1.5 seconds;
+    /// zero requests an immediate opening.
+    pub outbound_greeting_wait_seconds: Option<f64>,
     /// Omit to inherit the identity's saved Voice AI authority.
     ///
     /// An explicit `ContactScoped` downscopes the call. An explicit `Yolo`

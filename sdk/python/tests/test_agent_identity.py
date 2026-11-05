@@ -591,3 +591,13 @@ class TestAgentIdentityUpdate:
 
         inkbox._ids_resource.get.assert_not_called()
         assert identity.imessage_number is None
+
+
+@pytest.mark.parametrize("origin", list(CallOrigin))
+@pytest.mark.parametrize("timeout", [0, 4.5])
+def test_identity_forwards_outbound_greeting_wait(origin, timeout):
+    identity, client = _identity_with_mailbox()
+    identity.place_call(to_number="+15551234567", origination=origin,
+                        mode=CallMode.HOSTED_AGENT, reason="Confirm an appointment.",
+                        outbound_greeting_wait_seconds=timeout)
+    assert client._calls.place.call_args.kwargs["outbound_greeting_wait_seconds"] == timeout

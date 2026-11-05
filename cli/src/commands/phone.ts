@@ -25,6 +25,7 @@ interface PlaceCallCommandOptions {
   voicemailDetection?: boolean;
   onVoicemail?: string;
   voicemailMessage?: string;
+  outboundGreetingWaitSeconds?: string;
 }
 
 interface PlaceCallOptions {
@@ -37,6 +38,7 @@ interface PlaceCallOptions {
   voicemailDetection?: VoicemailDetection;
   onVoicemail?: OnVoicemail;
   voicemailMessage?: string;
+  outboundGreetingWaitSeconds?: number;
 }
 
 export function buildPlaceCallOptions(
@@ -92,7 +94,19 @@ export function buildPlaceCallOptions(
     return { error: "--voicemail-message conflicts with --no-voicemail-detection." };
   }
 
+  if (cmdOpts.outboundGreetingWaitSeconds !== undefined && !cmdOpts.hosted) {
+    return { error: "--outbound-greeting-wait-seconds requires --hosted." };
+  }
+  const timeout = cmdOpts.outboundGreetingWaitSeconds === undefined
+    ? undefined : Number(cmdOpts.outboundGreetingWaitSeconds);
+  if (timeout !== undefined && (!cmdOpts.outboundGreetingWaitSeconds?.trim()
+      || !Number.isFinite(timeout) || timeout < 0 || timeout > 60)) {
+    return { error: "--outbound-greeting-wait-seconds must be a number from 0 to 60." };
+  }
   const callOptions: PlaceCallOptions = { toNumber: cmdOpts.to };
+  if (timeout !== undefined) {
+    callOptions.outboundGreetingWaitSeconds = timeout;
+  }
   if (cmdOpts.wsUrl) {
     callOptions.clientWebsocketUrl = cmdOpts.wsUrl;
   }
@@ -132,6 +146,10 @@ export function registerPhoneCommands(program: Command): void {
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .option("--hosted", "Let Inkbox Voice AI drive the call (requires --reason)")
     .option("--reason <text>", "Voice AI's task brief — what to accomplish")
+    .option(
+      "--outbound-greeting-wait-seconds <seconds>",
+      "Wait 0–60 seconds for the recipient before opening; default 1.5 (--hosted only)",
+    )
     .option(
       "--authority-mode <mode>",
       "Voice AI authority override: contact_scoped or yolo; omit to inherit the saved default",

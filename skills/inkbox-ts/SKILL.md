@@ -332,6 +332,7 @@ console.log(call.rateLimit.callsRemaining);
 const hosted = await identity.placeCall({
   toNumber: "+15551234567",
   mode: CallMode.HOSTED_AGENT,   // default CallMode.CLIENT_WEBSOCKET
+  outboundGreetingWaitSeconds: 5, // Optional: 0–60 seconds; default 1.5
   reason: "Confirm tomorrow's 3pm appointment; reschedule if needed.",
   // Optional: onVoicemail (OnVoicemail.LEAVE_MESSAGE | HANG_UP | IGNORE;
   // hosted calls default to leave_message) and voicemailMessage (what Voice

@@ -386,6 +386,7 @@ inkbox phone call -i <handle>                # Place an outbound call
                                              #     omit to inherit the saved Voice AI authority
   --on-voicemail <action>                    #   leave_message, hang_up, or ignore; omit for the
                                              #     default (leave_message with --hosted, else hang_up)
+  --outbound-greeting-wait-seconds <n>     #   Hosted opening wait: 0–60 seconds (default 1.5)
   --voicemail-message <text>                 #   What Voice AI says on the voicemail
                                              #     (requires --on-voicemail leave_message)
   --no-voicemail-detection                   #   Deprecated; same as --on-voicemail ignore

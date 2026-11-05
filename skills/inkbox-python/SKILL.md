@@ -331,6 +331,7 @@ print(call.rate_limit.calls_remaining)
 call = identity.place_call(
     to_number="+15551234567",
     mode="hosted_agent",     # CallMode.HOSTED_AGENT; default "client_websocket"
+    outbound_greeting_wait_seconds=5,  # Optional: 0–60 seconds; default 1.5
     reason="Confirm tomorrow's 3pm appointment; reschedule if needed.",
     # Optional: on_voicemail (OnVoicemail.LEAVE_MESSAGE | HANG_UP | IGNORE;
     # hosted calls default to leave_message) and voicemail_message (what Voice
