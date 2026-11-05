@@ -1064,17 +1064,18 @@ mod tests {
     fn hosted_opening_wait_roundtrips_zero_and_fractional_values() {
         for timeout in [0.0, 4.5, 60.0] {
             let server = MockServer::start();
-            let mock =
-                server.mock(|when, then| {
-                    when.method(POST).path("/api/v1/phone/place-call").json_body(json!({
-                    "to_number": "+15550002222", "origination": "dedicated_number",
-                    "mode": "hosted_agent", "reason": "Confirm an appointment",
-                    "from_number": "+15550001111", "outbound_greeting_wait_seconds": timeout
-                }));
-                    let mut body = placed_json("dedicated_number", json!("+15550001111"));
-                    body["outbound_greeting_wait_seconds"] = json!(timeout);
-                    then.status(200).json_body(body);
-                });
+            let mock = server.mock(|when, then| {
+                when.method(POST)
+                    .path("/api/v1/phone/place-call")
+                    .json_body(json!({
+                        "to_number": "+15550002222", "origination": "dedicated_number",
+                        "mode": "hosted_agent", "reason": "Confirm an appointment",
+                        "from_number": "+15550001111", "outbound_greeting_wait_seconds": timeout
+                    }));
+                let mut body = placed_json("dedicated_number", json!("+15550001111"));
+                body["outbound_greeting_wait_seconds"] = json!(timeout);
+                then.status(200).json_body(body);
+            });
             let placed = client(&server)
                 .calls()
                 .place_hosted_with_options(
