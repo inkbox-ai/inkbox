@@ -155,7 +155,7 @@ class CallsResource:
         voicemail_detection: VoicemailDetection | str | None = None,
         on_voicemail: OnVoicemail | str | None = None,
         voicemail_message: str | None = None,
-        outbound_greeting_timeout_seconds: float | None = None,
+        outbound_greeting_wait_seconds: float | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
@@ -197,7 +197,7 @@ class CallsResource:
                 1000 characters). Valid only with
                 ``on_voicemail=leave_message`` (server 422 otherwise). When
                 omitted the agent composes a short message from ``reason``.
-            outbound_greeting_timeout_seconds: Seconds to wait for an outbound
+            outbound_greeting_wait_seconds: Seconds to wait for an outbound
                 recipient before opening (0–60). Omit for 1.5 seconds; zero
                 requests an immediate opening. Only valid with hosted-agent mode.
             reason: Voice AI's task brief for the call — what to
@@ -242,10 +242,10 @@ class CallsResource:
             body["agent_identity_id"] = str(agent_identity_id)
         if client_websocket_url is not None:
             body["client_websocket_url"] = client_websocket_url
-        if outbound_greeting_timeout_seconds is not None:
-            if not math.isfinite(outbound_greeting_timeout_seconds):
-                raise ValueError("outbound_greeting_timeout_seconds must be finite")
-            body["outbound_greeting_timeout_seconds"] = outbound_greeting_timeout_seconds
+        if outbound_greeting_wait_seconds is not None:
+            if not math.isfinite(outbound_greeting_wait_seconds):
+                raise ValueError("outbound_greeting_wait_seconds must be finite")
+            body["outbound_greeting_wait_seconds"] = outbound_greeting_wait_seconds
         if reason is not None:
             body["reason"] = reason
         data = self._http.post("/place-call", json=body)

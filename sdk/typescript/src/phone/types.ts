@@ -344,7 +344,7 @@ export interface PhoneCall {
   /** Resolved Voice AI authority. Missing legacy values parse as `contact_scoped`. */
   hostedAgentAuthorityMode: HostedAgentAuthorityMode;
   /** Explicit outbound opening wait; null means the default applies. */
-  outboundGreetingTimeoutSeconds: number | null;
+  outboundGreetingWaitSeconds: number | null;
   /** Whether voicemail detection ran. Defaults to `enabled`. */
   voicemailDetection: VoicemailDetection;
   /**
@@ -688,7 +688,7 @@ export interface RawPhoneCall {
   reason?: string | null;
   // Optional/nullable for compatibility; parser defaults to contact_scoped.
   hosted_agent_authority_mode?: HostedAgentAuthorityMode | string | null;
-  outbound_greeting_timeout_seconds?: number | null;
+  outbound_greeting_wait_seconds?: number | null;
   // Optional/nullable for compatibility; parser defaults to enabled.
   voicemail_detection?: VoicemailDetection | string | null;
   // Optional/nullable for compatibility; parser defaults to hang_up.
@@ -976,7 +976,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     // Coerce a null/missing mode to client_websocket for back-compat.
     mode: r.mode ?? CallMode.CLIENT_WEBSOCKET,
     reason: r.reason ?? null,
-    outboundGreetingTimeoutSeconds: r.outbound_greeting_timeout_seconds ?? null,
+    outboundGreetingWaitSeconds: r.outbound_greeting_wait_seconds ?? null,
     hostedAgentAuthorityMode:
       (r.hosted_agent_authority_mode as HostedAgentAuthorityMode | null | undefined)
       ?? HostedAgentAuthorityMode.CONTACT_SCOPED,

@@ -556,7 +556,7 @@ console.log(call.status, call.rateLimit.callsRemaining);
 const hostedCall = await identity.placeCall({
   toNumber: "+15551234567",
   mode: CallMode.HOSTED_AGENT,
-  outboundGreetingTimeoutSeconds: 5, // Optional: 0–60 seconds; default 1.5
+  outboundGreetingWaitSeconds: 5, // Optional: 0–60 seconds; default 1.5
   reason: "Coordinate the appointment and send confirmations.",
   onVoicemail: OnVoicemail.LEAVE_MESSAGE,
   voicemailMessage: "Hi, this is Ava calling about your appointment. Please call us back.",

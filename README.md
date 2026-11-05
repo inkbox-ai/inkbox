@@ -720,9 +720,9 @@ because delivery webhooks do not cover every failure before dispatch.
 
 ### Outbound Voice AI opening wait
 
-Set `outbound_greeting_timeout_seconds` (Python/Rust),
-`outboundGreetingTimeoutSeconds` (TypeScript), or
-`--outbound-greeting-timeout-seconds` (CLI) when placing a hosted call.
+Set `outbound_greeting_wait_seconds` (Python/Rust),
+`outboundGreetingWaitSeconds` (TypeScript), or
+`--outbound-greeting-wait-seconds` (CLI) when placing a hosted call.
 Use 0–60 seconds; omission preserves the 1.5-second default. Zero requests an
 immediate opening. This setting does not change incoming-call greetings.
 

@@ -9,9 +9,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Set an outbound Voice AI opening wait per call with
-  `outbound_greeting_timeout_seconds` in Python and Rust,
-  `outboundGreetingTimeoutSeconds` in TypeScript, or
-  `--outbound-greeting-timeout-seconds` in the CLI. Values from 0 to 60 seconds
+  `outbound_greeting_wait_seconds` in Python and Rust,
+  `outboundGreetingWaitSeconds` in TypeScript, or
+  `--outbound-greeting-wait-seconds` in the CLI. Values from 0 to 60 seconds
   are accepted. Omission preserves the 1.5-second default.
 - Call records preserve the explicit timeout override; missing or null values
   remain unset when reading older responses.

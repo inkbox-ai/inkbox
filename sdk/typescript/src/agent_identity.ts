@@ -686,7 +686,7 @@ export class AgentIdentity {
    *   otherwise).
    * @param options.voicemailMessage - What Voice AI says on the voicemail
    *   (max 1000 characters); requires `onVoicemail=leave_message`.
-   * @param options.outboundGreetingTimeoutSeconds - Outbound opening wait in seconds
+   * @param options.outboundGreetingWaitSeconds - Outbound opening wait in seconds
    *   (0–60); omit for 1.5 seconds, or use zero for an immediate opening. Hosted calls only.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
@@ -700,7 +700,7 @@ export class AgentIdentity {
     voicemailDetection?: VoicemailDetection;
     onVoicemail?: OnVoicemail;
     voicemailMessage?: string;
-    outboundGreetingTimeoutSeconds?: number;
+    outboundGreetingWaitSeconds?: number;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
@@ -717,7 +717,7 @@ export class AgentIdentity {
         voicemailDetection: options.voicemailDetection,
         onVoicemail:         options.onVoicemail,
         voicemailMessage:    options.voicemailMessage,
-        outboundGreetingTimeoutSeconds: options.outboundGreetingTimeoutSeconds,
+        outboundGreetingWaitSeconds: options.outboundGreetingWaitSeconds,
         reason:              options.reason,
       });
     }
@@ -732,7 +732,7 @@ export class AgentIdentity {
       voicemailDetection: options.voicemailDetection,
       onVoicemail:         options.onVoicemail,
       voicemailMessage:    options.voicemailMessage,
-      outboundGreetingTimeoutSeconds: options.outboundGreetingTimeoutSeconds,
+      outboundGreetingWaitSeconds: options.outboundGreetingWaitSeconds,
       reason:              options.reason,
     });
   }

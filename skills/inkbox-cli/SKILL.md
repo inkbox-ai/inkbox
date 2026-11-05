@@ -314,7 +314,7 @@ voicemail answers; omit it for the default (`leave_message` with `--hosted`,
 and requires `--on-voicemail leave_message`. `--no-voicemail-detection` is
 deprecated (same as `--on-voicemail ignore`).
 
-For outbound Voice AI calls, `--outbound-greeting-timeout-seconds 5` waits up to
+For outbound Voice AI calls, `--outbound-greeting-wait-seconds 5` waits up to
 five seconds for the recipient before the agent opens. Accepts 0–60 seconds;
 omit for 1.5 seconds. Zero requests an immediate opening. Requires `--hosted`.
 

@@ -821,7 +821,7 @@ test("phone call forwards --on-voicemail and --voicemail-message and prints the 
       "--reason", "Confirm the appointment",
       "--on-voicemail", "leave_message",
       "--voicemail-message", "Please call us back.",
-      "--outbound-greeting-timeout-seconds", "4.5",
+      "--outbound-greeting-wait-seconds", "4.5",
     ]);
 
     assert.ifError(result.error);
@@ -843,7 +843,7 @@ test("phone call forwards --on-voicemail and --voicemail-message and prints the 
           origination: "dedicated_number",
           on_voicemail: "leave_message",
           voicemail_message: "Please call us back.",
-          outbound_greeting_timeout_seconds: 4.5,
+          outbound_greeting_wait_seconds: 4.5,
         },
       },
     ]);
@@ -1101,22 +1101,22 @@ test("calls JSON preserves canonical connections without dropping legacy history
 });
 
 
-test("outbound greeting timeout preserves zero and fractional seconds", () => {
+test("outbound greeting wait preserves zero and fractional seconds", () => {
   for (const value of ["0", "4.5", "60"]) {
     const result = buildPlaceCallOptions({ identity: "support-bot", to: "+15551234567", hosted: true,
-      reason: "Confirm an appointment.", outboundGreetingTimeoutSeconds: value });
-    assert.equal(result.callOptions.outboundGreetingTimeoutSeconds, Number(value));
+      reason: "Confirm an appointment.", outboundGreetingWaitSeconds: value });
+    assert.equal(result.callOptions.outboundGreetingWaitSeconds, Number(value));
   }
   const omitted = buildPlaceCallOptions({ identity: "support-bot", to: "+15551234567", hosted: true,
     reason: "Confirm an appointment." });
-  assert.equal(Object.hasOwn(omitted.callOptions, "outboundGreetingTimeoutSeconds"), false);
+  assert.equal(Object.hasOwn(omitted.callOptions, "outboundGreetingWaitSeconds"), false);
 });
 
-test("outbound greeting timeout rejects invalid values and non-hosted calls", () => {
+test("outbound greeting wait rejects invalid values and non-hosted calls", () => {
   for (const value of ["-1", "61", "NaN", "Infinity", "", " ", "hello"]) {
     assert.match(buildPlaceCallOptions({ identity: "support-bot", to: "+15551234567", hosted: true,
-      reason: "Confirm an appointment.", outboundGreetingTimeoutSeconds: value }).error, /0 to 60/);
+      reason: "Confirm an appointment.", outboundGreetingWaitSeconds: value }).error, /0 to 60/);
   }
   assert.match(buildPlaceCallOptions({ identity: "support-bot", to: "+15551234567",
-    outboundGreetingTimeoutSeconds: "0" }).error, /requires --hosted/);
+    outboundGreetingWaitSeconds: "0" }).error, /requires --hosted/);
 });

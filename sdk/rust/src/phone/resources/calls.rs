@@ -274,13 +274,13 @@ impl CallsResource {
         body.insert("origination".into(), origination.as_str().into());
         body.insert("mode".into(), "hosted_agent".into());
         body.insert("reason".into(), reason.into());
-        if let Some(timeout) = options.outbound_greeting_timeout_seconds {
+        if let Some(timeout) = options.outbound_greeting_wait_seconds {
             if !timeout.is_finite() {
                 return Err(InkboxError::InvalidArgument(
-                    "outbound_greeting_timeout_seconds must be finite".into(),
+                    "outbound_greeting_wait_seconds must be finite".into(),
                 ));
             }
-            body.insert("outbound_greeting_timeout_seconds".into(), timeout.into());
+            body.insert("outbound_greeting_wait_seconds".into(), timeout.into());
         }
         if let Some(authority_mode) = options.authority_mode {
             body.insert(
@@ -326,7 +326,7 @@ impl CallsResource {
             agent_identity_id,
             reason,
             &HostedCallPlacementOptions {
-                outbound_greeting_timeout_seconds: None,
+                outbound_greeting_wait_seconds: None,
                 authority_mode: Some(authority_mode),
                 voicemail_detection: None,
                 on_voicemail: None,
@@ -979,7 +979,7 @@ mod tests {
                 None,
                 "Leave the appointment details in a voicemail",
                 &HostedCallPlacementOptions {
-                    outbound_greeting_timeout_seconds: None,
+                    outbound_greeting_wait_seconds: None,
                     authority_mode: Some(HostedAgentAuthorityMode::Yolo),
                     voicemail_detection: Some(VoicemailDetection::Disabled),
                     on_voicemail: None,
@@ -1023,7 +1023,7 @@ mod tests {
                 None,
                 "Confirm the appointment",
                 &HostedCallPlacementOptions {
-                    outbound_greeting_timeout_seconds: None,
+                    outbound_greeting_wait_seconds: None,
                     authority_mode: None,
                     voicemail_detection: None,
                     on_voicemail: Some(OnVoicemail::LeaveMessage),
@@ -1037,7 +1037,7 @@ mod tests {
     }
 
     #[test]
-    fn hosted_opening_timeout_rejects_nonfinite_without_a_request() {
+    fn hosted_opening_wait_rejects_nonfinite_without_a_request() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST);
@@ -1051,7 +1051,7 @@ mod tests {
                 None,
                 "Confirm an appointment",
                 &HostedCallPlacementOptions {
-                    outbound_greeting_timeout_seconds: Some(timeout),
+                    outbound_greeting_wait_seconds: Some(timeout),
                     ..Default::default()
                 },
             );
@@ -1061,7 +1061,7 @@ mod tests {
     }
 
     #[test]
-    fn hosted_opening_timeout_roundtrips_zero_and_fractional_values() {
+    fn hosted_opening_wait_roundtrips_zero_and_fractional_values() {
         for timeout in [0.0, 4.5, 60.0] {
             let server = MockServer::start();
             let mock =
@@ -1069,10 +1069,10 @@ mod tests {
                     when.method(POST).path("/api/v1/phone/place-call").json_body(json!({
                     "to_number": "+15550002222", "origination": "dedicated_number",
                     "mode": "hosted_agent", "reason": "Confirm an appointment",
-                    "from_number": "+15550001111", "outbound_greeting_timeout_seconds": timeout
+                    "from_number": "+15550001111", "outbound_greeting_wait_seconds": timeout
                 }));
                     let mut body = placed_json("dedicated_number", json!("+15550001111"));
-                    body["outbound_greeting_timeout_seconds"] = json!(timeout);
+                    body["outbound_greeting_wait_seconds"] = json!(timeout);
                     then.status(200).json_body(body);
                 });
             let placed = client(&server)
@@ -1084,13 +1084,13 @@ mod tests {
                     None,
                     "Confirm an appointment",
                     &HostedCallPlacementOptions {
-                        outbound_greeting_timeout_seconds: Some(timeout),
+                        outbound_greeting_wait_seconds: Some(timeout),
                         ..Default::default()
                     },
                 )
                 .unwrap();
             mock.assert();
-            assert_eq!(placed.call.outbound_greeting_timeout_seconds, Some(timeout));
+            assert_eq!(placed.call.outbound_greeting_wait_seconds, Some(timeout));
         }
     }
 
