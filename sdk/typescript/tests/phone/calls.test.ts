@@ -654,22 +654,22 @@ it("keeps external tool provenance, unknown outcomes, and unavailable payloads",
 
 
 describe("outbound greeting wait", () => {
-  it.each([0, 4.5, 60])("preserves %s seconds in request and response", async (timeout) => {
+  it.each([0, 4.5, 60])("preserves %s seconds in request only", async (timeout) => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({ ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
       outbound_greeting_wait_seconds: timeout });
     const result = await new CallsResource(http).place({ toNumber: "+15551234567",
       mode: CallMode.HOSTED_AGENT, reason: "Confirm an appointment.", outboundGreetingWaitSeconds: timeout });
     expect(vi.mocked(http.post).mock.calls[0][1]).toHaveProperty("outbound_greeting_wait_seconds", timeout);
-    expect(result.outboundGreetingWaitSeconds).toBe(timeout);
+    expect(result).not.toHaveProperty("outboundGreetingWaitSeconds");
   });
-  it.each([undefined, null])("reads legacy or null override as null: %s", async (timeout) => {
+  it.each([undefined, null])("does not expose a response override: %s", async (timeout) => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({ ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
       outbound_greeting_wait_seconds: timeout });
     const result = await new CallsResource(http).place({ toNumber: "+15551234567" });
     expect(vi.mocked(http.post).mock.calls[0][1]).not.toHaveProperty("outbound_greeting_wait_seconds");
-    expect(result.outboundGreetingWaitSeconds).toBeNull();
+    expect(result).not.toHaveProperty("outboundGreetingWaitSeconds");
   });
 });
 

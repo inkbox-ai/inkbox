@@ -1091,7 +1091,10 @@ mod tests {
                 )
                 .unwrap();
             mock.assert();
-            assert_eq!(placed.call.outbound_greeting_wait_seconds, Some(timeout));
+            assert!(serde_json::to_value(&placed.call)
+                .unwrap()
+                .get("outbound_greeting_wait_seconds")
+                .is_none());
         }
     }
 

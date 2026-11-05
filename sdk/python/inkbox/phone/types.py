@@ -336,8 +336,6 @@ class PhoneCall:
     hosted_agent_authority_mode: HostedAgentAuthorityMode = (
         HostedAgentAuthorityMode.CONTACT_SCOPED
     )
-    # Explicit outbound opening wait; None means the default applies.
-    outbound_greeting_wait_seconds: float | None = None
     # Whether voicemail detection ran. Missing/null legacy values preserve the
     # server default.
     voicemail_detection: VoicemailDetection = VoicemailDetection.ENABLED
@@ -377,7 +375,6 @@ class PhoneCall:
             # Coerce a null/missing mode to client_websocket for back-compat.
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
-            outbound_greeting_wait_seconds=d.get("outbound_greeting_wait_seconds"),
             hosted_agent_authority_mode=HostedAgentAuthorityMode(
                 d.get("hosted_agent_authority_mode") or "contact_scoped"
             ),

@@ -682,17 +682,17 @@ def test_external_tool_history_keeps_source_unknown_and_missing_payloads():
 
 
 @pytest.mark.parametrize("timeout", [0, 4.5, 60])
-def test_outbound_greeting_wait_roundtrip(client, transport, timeout):
+def test_outbound_greeting_wait_request(client, transport, timeout):
     transport.post.return_value = {**PHONE_CALL_DICT, "outbound_greeting_wait_seconds": timeout}
     result = client._calls.place(to_number="+15551234567", mode=CallMode.HOSTED_AGENT,
                                  reason="Confirm an appointment.", outbound_greeting_wait_seconds=timeout)
     assert transport.post.call_args.kwargs["json"]["outbound_greeting_wait_seconds"] == timeout
-    assert result.outbound_greeting_wait_seconds == timeout
+    assert not hasattr(result, "outbound_greeting_wait_seconds")
 
 
 @pytest.mark.parametrize("fields", [{}, {"outbound_greeting_wait_seconds": None}])
 def test_outbound_greeting_wait_legacy_response(fields):
-    assert PhoneCall._from_dict({**PHONE_CALL_DICT, **fields}).outbound_greeting_wait_seconds is None
+    assert not hasattr(PhoneCall._from_dict({**PHONE_CALL_DICT, **fields}), "outbound_greeting_wait_seconds")
 
 
 @pytest.mark.parametrize("timeout", [float("nan"), float("inf"), -float("inf")])

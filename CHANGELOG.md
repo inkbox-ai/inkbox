@@ -13,8 +13,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `outboundGreetingWaitSeconds` in TypeScript, or
   `--outbound-greeting-wait-seconds` in the CLI. Values from 0 to 60 seconds
   are accepted. Omission preserves the 1.5-second default.
-- Call records preserve the explicit timeout override; missing or null values
-  remain unset when reading older responses.
 
 ### Changed
 

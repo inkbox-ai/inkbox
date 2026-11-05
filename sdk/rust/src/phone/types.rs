@@ -582,9 +582,6 @@ pub struct PhoneCall {
     /// behavior for compatibility with older responses.
     #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
     pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
-    /// Explicit outbound opening wait; None means the default applies.
-    #[serde(default)]
-    pub outbound_greeting_wait_seconds: Option<f64>,
     /// Whether voicemail detection ran. Missing/null legacy values retain the
     /// server default.
     #[serde(
@@ -1242,16 +1239,6 @@ mod tests {
         let forwarding: PhoneCallForwarding =
             serde_json::from_value(fixture["forwarding"].clone()).unwrap();
         assert_eq!(forwarding.status, CallForwardingStatus::Forwarded);
-    }
-
-    #[test]
-    fn opening_wait_absent_or_null_remains_unset() {
-        let mut value = call_json();
-        let call: PhoneCall = serde_json::from_value(value.clone()).unwrap();
-        assert_eq!(call.outbound_greeting_wait_seconds, None);
-        value["outbound_greeting_wait_seconds"] = serde_json::Value::Null;
-        let call: PhoneCall = serde_json::from_value(value).unwrap();
-        assert_eq!(call.outbound_greeting_wait_seconds, None);
     }
 
     #[test]
