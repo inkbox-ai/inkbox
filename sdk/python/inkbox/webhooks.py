@@ -973,8 +973,8 @@ class WhatsAppWebhookMessage(TypedDict):
     conversation_id: str
     direction: str
     local_number: str
-    remote_number: str
-    sender_number: str
+    remote_number: str | None
+    sender_number: str | None
     participants: list[str]
     content: str | None
     media: list[WhatsAppWebhookMedia]
@@ -995,6 +995,10 @@ class WhatsAppWebhookMessage(TypedDict):
     thread_id: NotRequired[str | None]
     thread_root_message_id: NotRequired[str | None]
     reactions: NotRequired[list["WhatsAppWebhookReaction"]]
+
+    is_group: NotRequired[bool]
+    group_name: NotRequired[str | None]
+    unresolved_participant_count: NotRequired[int]
 
 
 class WhatsAppWebhookReaction(TypedDict):

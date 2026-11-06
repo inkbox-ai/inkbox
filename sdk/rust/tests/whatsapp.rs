@@ -176,8 +176,14 @@ fn fresh_status_missing_on_older_api_is_none_and_webhooks_are_typed() {
         .url
         .is_none());
     assert_eq!(
-        payload.data.message.as_ref().unwrap().sender_number,
-        "+15555550101"
+        payload
+            .data
+            .message
+            .as_ref()
+            .unwrap()
+            .sender_number
+            .as_deref(),
+        Some("+15555550101")
     );
 }
 
@@ -681,4 +687,77 @@ fn identity_lists_retain_configured_whatsapp_and_default_older_responses() {
         );
         list.assert();
     }
+}
+
+#[test]
+fn group_metadata_and_quoted_animation_preserve_stable_ids() {
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let message: inkbox::WhatsAppMessage = serde_json::from_value(f["message"].clone()).unwrap();
+    let conversation: inkbox::WhatsAppConversation =
+        serde_json::from_value(f["conversation"].clone()).unwrap();
+    assert!(message.is_group && conversation.is_group);
+    assert_eq!(conversation.group_name.as_deref(), Some("Project garden"));
+    assert!(message.remote_number.is_none() && message.recipients.is_empty());
+    assert_eq!(
+        message.sender_number.as_deref(),
+        Some(message.local_number.as_str())
+    );
+    assert_eq!(message.unresolved_participant_count, 0);
+    let blocked: inkbox::WhatsAppMessage =
+        serde_json::from_value(f["blocked_inbound_message"].clone()).unwrap();
+    assert_eq!(blocked.direction, inkbox::WhatsAppDirection::Inbound);
+    assert!(blocked.is_blocked && blocked.sender_number.is_none());
+    assert_eq!(blocked.unresolved_participant_count, 1);
+    let direct: inkbox::WhatsAppMessage =
+        serde_json::from_value(fixture()["message"].clone()).unwrap();
+    assert!(!direct.is_group && direct.group_name.is_none());
+    assert_eq!(direct.unresolved_participant_count, 0);
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(f["message"].clone()).unwrap();
+    assert!(webhook.is_group);
+    assert_eq!(
+        webhook.sender_number.as_deref(),
+        Some(message.local_number.as_str())
+    );
+    let server = MockServer::start();
+    let send = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/messages")
+            .header("Idempotency-Key", "group-quote")
+            .json_body(f["send"].clone());
+        then.status(201).json_body(json!({"message": f["message"]}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let options = WhatsAppSendOptions {
+        conversation_id: Some(conversation.id),
+        reply_to_message_id: Some(message.id),
+        media_ids: Some(vec![Uuid::parse_str(
+            f["send"]["media_ids"][0].as_str().unwrap(),
+        )
+        .unwrap()]),
+        gif_playback: Some(true),
+        text: Some("Here is the animation".into()),
+        idempotency_key: Some("group-quote".into()),
+        ..Default::default()
+    };
+    assert!(client.whatsapp().send(&options).unwrap().is_group);
+    send.assert();
+    let unexpected = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/whatsapp/messages");
+        then.status(500);
+    });
+    let no_media = WhatsAppSendOptions {
+        media_ids: None,
+        ..options
+    };
+    assert!(matches!(
+        client.whatsapp().send(&no_media),
+        Err(inkbox::InkboxError::InvalidArgument(_))
+    ));
+    unexpected.assert_hits(0);
+    send.assert_hits(1);
 }

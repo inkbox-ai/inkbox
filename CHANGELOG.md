@@ -4,6 +4,31 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.29 - Existing WhatsApp groups (unreleased)
+
+### Added
+
+- Read group names and group metadata in Python, TypeScript, Rust, CLI, and webhook
+  messages. Use stable conversation IDs for group text, media, reactions, and
+  quoted replies after receiving an allowed message from another participant.
+  All participants must have known phone numbers permitted by contact rules.
+  Group creation is not supported.
+- Play uploaded MP4 attachments as animations with `gif_playback`, `gifPlayback`,
+  or the CLI's `--gif-playback` flag.
+
+### Source-breaking
+
+- WhatsApp message and conversation remote numbers, and message sender numbers,
+  can be null for groups. TypeScript consumers must handle `string | null`;
+  Rust fields now use `Option<String>`.
+- Hand-built TypeScript message and conversation objects must include `isGroup`,
+  `groupName`, and `unresolvedParticipantCount`. Decoding older direct responses
+  still defaults these fields to false, null, and zero.
+- Rust message, conversation, and webhook struct literals must include the new
+  group metadata fields. `WhatsAppSendOptions` literals must include the new
+  `gif_playback` option or use `..Default::default()`.
+
+
 ## 0.7.28 - Per-call Voice AI opening wait (unreleased)
 
 ### Added

@@ -116,8 +116,8 @@ export interface WhatsAppMessage {
   conversationId: string;
   direction: WhatsAppDirection;
   localNumber: string;
-  remoteNumber: string;
-  senderNumber: string;
+  remoteNumber: string | null;
+  senderNumber: string | null;
   participants: string[];
   content: string | null;
   media: WhatsAppMedia[];
@@ -140,6 +140,9 @@ export interface WhatsAppMessage {
   threadId: string | null;
   threadRootMessageId: string | null;
   reactions: WhatsAppReaction[];
+  isGroup: boolean;
+  groupName: string | null;
+  unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppMessage {
   id: string;
@@ -147,8 +150,8 @@ export interface RawWhatsAppMessage {
   conversation_id: string;
   direction: WhatsAppDirection;
   local_number: string;
-  remote_number: string;
-  sender_number: string;
+  remote_number: string | null;
+  sender_number: string | null;
   participants: string[];
   content: string | null;
   media: RawWhatsAppMedia[];
@@ -171,9 +174,15 @@ export interface RawWhatsAppMessage {
   thread_id?: string | null;
   thread_root_message_id?: string | null;
   reactions?: RawWhatsAppReaction[];
+  is_group?: boolean;
+  group_name?: string | null;
+  unresolved_participant_count?: number;
 }
 export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   return {
+    isGroup: r.is_group ?? false,
+    groupName: r.group_name ?? null,
+    unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     conversationId: r.conversation_id,
@@ -211,24 +220,33 @@ export interface WhatsAppConversation {
   id: string;
   agentIdentityId: string;
   localNumber: string;
-  remoteNumber: string;
+  remoteNumber: string | null;
   participants: string[];
   createdAt: Date;
   updatedAt: Date;
+  isGroup: boolean;
+  groupName: string | null;
+  unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppConversation {
   id: string;
   agent_identity_id: string;
   local_number: string;
-  remote_number: string;
+  remote_number: string | null;
   participants: string[];
   created_at: string;
   updated_at: string;
+  is_group?: boolean;
+  group_name?: string | null;
+  unresolved_participant_count?: number;
 }
 export function parseWhatsAppConversation(
   r: RawWhatsAppConversation,
 ): WhatsAppConversation {
   return {
+    isGroup: r.is_group ?? false,
+    groupName: r.group_name ?? null,
+    unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     localNumber: r.local_number,
@@ -309,6 +327,8 @@ export interface WhatsAppSendOptions {
   replyToMessageId?: string;
   /** Defaults true; false requires native quoting. Missing evidence or uncertain sends never trigger a plain replacement. */
   plainReplyFallback?: boolean;
+  /** Play an uploaded MP4 attachment as an animation. */
+  gifPlayback?: boolean;
   text?: string;
   mediaIds?: string[];
   agentIdentityId?: string;
@@ -353,6 +373,10 @@ export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
   /** Queue one message. Reuse its key and owned media IDs after uncertainty. */
   async send(o: WhatsAppSendOptions): Promise<WhatsAppMessage> {
+    if (o.gifPlayback !== undefined && typeof o.gifPlayback !== "boolean")
+      throw new Error("gifPlayback must be a boolean");
+    if (o.gifPlayback && !o.mediaIds?.length)
+      throw new Error("gifPlayback requires one MP4 media attachment");
     if (o.plainReplyFallback !== undefined && typeof o.plainReplyFallback !== "boolean")
       throw new Error("plainReplyFallback must be a boolean");
     if ((o.to == null) === (o.conversationId == null))
@@ -375,6 +399,7 @@ export class WhatsAppResource {
       ...(o.replyToMessageId != null && o.plainReplyFallback === false ? { plain_reply_fallback: false } : {}),
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
+      ...(o.gifPlayback === true ? { gif_playback: true } : {}),
     };
     const key = messageKey(o.idempotencyKey);
     const data = await postMessage<{ message: RawWhatsAppMessage }>(

@@ -1448,7 +1448,7 @@ Optional `threadTs` in reply context selects a reply thread; it does not limit s
 
 Available by approval on the same number as an existing dedicated personal
 iMessage line; not a shared channel. Read fresh WhatsApp channel status and
-request access in the console when unavailable. One-to-one messages support text
+request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
@@ -1462,14 +1462,34 @@ reactions are supported. Typing, remote read receipts, and WhatsApp calls are no
 
 ### WhatsApp history filters
 
-`inkbox whatsapp list` and `conversations` list direct conversations. Use
+`inkbox whatsapp list` and `conversations` list direct and group conversations; listing a group does not guarantee send eligibility. Use
 `--start-datetime` / `--end-datetime` for creation-date
 bounds, and `--tz` for zone-less dates. `--unread-only` is an alias of `--unread`
 on message lists. `inkbox whatsapp conversation <conversation-id>` reads messages
-in an existing direct conversation; `get-conversation` still returns
+in an existing direct or group conversation; `get-conversation` still returns
 metadata. `unreact` and `remove-reaction` are equivalent and require the original
 reaction ID and a stable removal idempotency key.
 
 For quoted sends, `--no-plain-reply-fallback` explicitly requires a native quote.
 All currently supported WhatsApp targets support native quotes; missing evidence
 or rejected/uncertain sends never trigger a plain replacement.
+
+Use `--conversation-id` for a group; names are display metadata, not destinations.
+The agent must be added in WhatsApp and receive a message from another participant
+before it can send content or reactions. Group creation is not supported. Use
+`upload-media animation.mp4 --identity my-agent --content-type video/mp4` first,
+then `send --conversation-id <id> --identity my-agent --media-id <id> --gif-playback`
+to play the MP4 as an animation.
+
+All group participants must have known phone numbers (`unresolved_participant_count`
+must be zero). Receiving checks every participant against inbound contact rules;
+blocked incoming messages do not trigger `whatsapp.received`. Sending content or
+reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+if any participant is unresolved or not allowed for outbound traffic. An outbound-only
+block does not block incoming messages or erase an earlier qualifying incoming
+message. A new allowed incoming message is needed only when none already qualifies.
+
+A `409 whatsapp_group_reply_required` means the current WhatsApp connection has no
+qualifying incoming group message, including after a connection replacement.
+Wait for an allowed message from another participant. Do not retry with a new
+idempotency key or fall back to a direct message.

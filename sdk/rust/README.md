@@ -1339,7 +1339,7 @@ let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
 
 Available by approval on the same number as an existing dedicated personal
 iMessage line; not a shared channel. Read fresh WhatsApp channel status and
-request access in the console when unavailable. One-to-one messages support text
+request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
@@ -1362,3 +1362,25 @@ The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-what
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
 reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+
+Group names are display metadata; use the conversation ID to send. Groups must be
+joined in WhatsApp and receive a message from another participant before the agent
+can send text, attachments, reactions, or quoted replies. Group creation is not
+supported. Group responses may have null remote or sender phone numbers. See the
+[existing groups guide](https://github.com/inkbox-ai/inkbox#existing-groups) for fields and animated MP4 playback.
+
+When uploading an MP4 for animated playback, explicitly pass `Some("video/mp4")` as the content-type argument.
+The upload default is `application/octet-stream`, which does not select MP4 playback.
+
+All group participants must have known phone numbers (`unresolved_participant_count`
+must be zero). Receiving checks every participant against inbound contact rules;
+blocked incoming messages do not trigger `whatsapp.received`. Sending content or
+reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+if any participant is unresolved or not allowed for outbound traffic. An outbound-only
+block does not block incoming messages or erase an earlier qualifying incoming
+message. A new allowed incoming message is needed only when none already qualifies.
+
+A `409 whatsapp_group_reply_required` means the current WhatsApp connection has no
+qualifying incoming group message, including after a connection replacement.
+Wait for an allowed message from another participant. Do not retry with a new
+idempotency key or fall back to a direct message.

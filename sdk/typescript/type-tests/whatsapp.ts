@@ -22,3 +22,11 @@ void [reactionTarget, reactionActor, reactionEvent];
 
 // @ts-expect-error WhatsApp accepts one recipient string, not a recipient array.
 identity.sendWhatsApp({to:["+15555550101"],text:"Hello"});
+
+const groupReply: Promise<WhatsAppMessage> = identity.sendWhatsApp({conversationId:"conversation-id",replyToMessageId:"message-id",mediaIds:["owned-media-id"],gifPlayback:true});
+declare const groupMessage: WhatsAppMessage;
+const groupName: string | null = groupMessage.groupName;
+const groupRemote: string | null = groupMessage.remoteNumber;
+const groupSender: string | null = groupMessage.senderNumber;
+const incomingGroup: boolean | undefined = webhook.data.message?.is_group;
+void [groupReply, groupName, groupRemote, groupSender, incomingGroup];
