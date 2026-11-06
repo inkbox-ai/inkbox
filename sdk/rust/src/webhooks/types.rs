@@ -1773,6 +1773,8 @@ pub struct WhatsAppWebhookMessage {
     #[serde(default)]
     pub agent_mentioned: bool,
     #[serde(default)]
+    pub mentions: Vec<crate::whatsapp::WhatsAppMention>,
+    #[serde(default)]
     pub is_group: bool,
     #[serde(default)]
     pub group_name: Option<String>,

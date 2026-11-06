@@ -780,3 +780,21 @@ fn native_agent_mention_is_typed_and_defaults_false() {
     payload["agent_mentioned"] = serde_json::json!("true");
     assert!(serde_json::from_value::<inkbox::whatsapp::WhatsAppMessage>(payload).is_err());
 }
+
+#[test]
+fn structured_mentions_preserve_unknown_phone_numbers() {
+    let group: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let mut payload = group["message"].clone();
+    let legacy: inkbox::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    assert!(legacy.mentions.is_empty());
+    payload["mentions"] = json!([{"text":"@123456789","phone_number":null,"is_agent":false},
+        {"text":"@15550000002","phone_number":"+15550000002","is_agent":true}]);
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    assert_eq!(parsed.mentions[0].text.as_deref(), Some("@123456789"));
+    assert!(parsed.mentions[0].phone_number.is_none() && !parsed.mentions[0].is_agent);
+    assert!(parsed.mentions[1].is_agent);
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(payload).unwrap();
+    assert_eq!(webhook.mentions.len(), 2);
+}

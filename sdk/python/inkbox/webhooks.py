@@ -967,6 +967,12 @@ class WhatsAppWebhookRecipient(TypedDict):
     failed_at: str | None
 
 
+class WhatsAppWebhookMention(TypedDict):
+    text: str | None
+    phone_number: str | None
+    is_agent: bool
+
+
 class WhatsAppWebhookMessage(TypedDict):
     id: str
     agent_identity_id: str
@@ -996,6 +1002,7 @@ class WhatsAppWebhookMessage(TypedDict):
     thread_root_message_id: NotRequired[str | None]
     reactions: NotRequired[list["WhatsAppWebhookReaction"]]
 
+    mentions: NotRequired[list[WhatsAppWebhookMention]]
     agent_mentioned: NotRequired[bool]
     is_group: NotRequired[bool]
     group_name: NotRequired[str | None]

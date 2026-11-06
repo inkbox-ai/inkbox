@@ -54,3 +54,13 @@ def test_animation_requires_media_and_false_does_not_change_wire():
 def test_native_agent_mention_requires_boolean_evidence(value, expected):
     assert WhatsAppMessage._from_dict({**GROUP["message"], "agent_mentioned": value}).agent_mentioned is expected
     assert WhatsAppMessage._from_dict(GROUP["message"]).agent_mentioned is False
+
+
+def test_structured_mentions_preserve_unresolved_identity_without_guessing():
+    mentions = [{"text": "@123456789", "phone_number": None, "is_agent": False},
+                {"text": "@15550000002", "phone_number": "+15550000002", "is_agent": True}]
+    parsed = WhatsAppMessage._from_dict({**GROUP["message"], "mentions": mentions})
+    assert parsed.mentions[0].text == "@123456789" and parsed.mentions[0].phone_number is None
+    assert not parsed.mentions[0].is_agent and parsed.mentions[1].is_agent
+    assert parsed.mentions[1].phone_number == "+15550000002"
+    assert WhatsAppMessage._from_dict(GROUP["message"]).mentions == []

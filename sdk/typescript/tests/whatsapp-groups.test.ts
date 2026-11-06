@@ -44,3 +44,12 @@ it("preserves verified native mentions and defaults legacy messages to unmention
   expect(parseWhatsAppMessage({ ...group.message, agent_mentioned: true }).agentMentioned).toBe(true);
   expect(parseWhatsAppMessage(group.message).agentMentioned).toBe(false);
 });
+it("preserves structured mentions without inventing unresolved phone numbers", () => {
+  const mentions = [{ text: "@123456789", phone_number: null, is_agent: false },
+    { text: "@15550000002", phone_number: "+15550000002", is_agent: true }];
+  expect(parseWhatsAppMessage({ ...group.message, mentions }).mentions).toEqual([
+    { text: "@123456789", phoneNumber: null, isAgent: false },
+    { text: "@15550000002", phoneNumber: "+15550000002", isAgent: true },
+  ]);
+  expect(parseWhatsAppMessage(group.message).mentions).toEqual([]);
+});

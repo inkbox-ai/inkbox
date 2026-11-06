@@ -146,6 +146,12 @@ pub struct WhatsAppRecipient {
     pub failed_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppMention {
+    pub text: Option<String>,
+    pub phone_number: Option<String>,
+    pub is_agent: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppMessage {
     pub id: Uuid,
     pub agent_identity_id: Uuid,
@@ -182,6 +188,8 @@ pub struct WhatsAppMessage {
     pub reactions: Vec<WhatsAppReaction>,
     #[serde(default)]
     pub agent_mentioned: bool,
+    #[serde(default)]
+    pub mentions: Vec<WhatsAppMention>,
     #[serde(default)]
     pub is_group: bool,
     #[serde(default)]

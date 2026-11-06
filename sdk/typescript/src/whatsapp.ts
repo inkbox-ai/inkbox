@@ -110,6 +110,16 @@ export function parseWhatsAppRecipient(
     failedAt: r.failed_at ? new Date(r.failed_at) : null,
   };
 }
+export interface WhatsAppMention {
+  text: string | null;
+  phoneNumber: string | null;
+  isAgent: boolean;
+}
+export interface RawWhatsAppMention {
+  text: string | null;
+  phone_number: string | null;
+  is_agent: boolean;
+}
 export interface WhatsAppMessage {
   id: string;
   agentIdentityId: string;
@@ -140,6 +150,7 @@ export interface WhatsAppMessage {
   threadId: string | null;
   threadRootMessageId: string | null;
   reactions: WhatsAppReaction[];
+  mentions: WhatsAppMention[];
   agentMentioned: boolean;
   isGroup: boolean;
   groupName: string | null;
@@ -175,6 +186,7 @@ export interface RawWhatsAppMessage {
   thread_id?: string | null;
   thread_root_message_id?: string | null;
   reactions?: RawWhatsAppReaction[];
+  mentions?: RawWhatsAppMention[];
   agent_mentioned?: boolean;
   is_group?: boolean;
   group_name?: string | null;
@@ -182,6 +194,7 @@ export interface RawWhatsAppMessage {
 }
 export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   return {
+    mentions: (r.mentions ?? []).map((item) => ({ text: item.text, phoneNumber: item.phone_number, isAgent: item.is_agent === true })),
     agentMentioned: r.agent_mentioned === true,
     isGroup: r.is_group ?? false,
     groupName: r.group_name ?? null,
