@@ -4,9 +4,17 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.29 - Existing WhatsApp groups (unreleased)
+## 0.7.29 - WhatsApp groups, Companion, and onboarding (unreleased)
 
 ### Added
+
+- Read an agent's WhatsApp message link and QR code with `get_onboarding` in
+  Python and Rust, `getOnboarding` in TypeScript, or
+  `inkbox whatsapp onboarding --identity <handle>`. Identity helpers are also
+  available. Opening the link or scanning the QR drafts a message; the person
+  still taps Send. Availability and missing numbers are returned explicitly.
+- Use the existing Companion configuration and paginated initialization helpers
+  with WhatsApp groups; preserve direct versus sponsored sender admission.
 
 - WhatsApp messages expose verified native `agent_mentioned` metadata, defaulting to false for older messages. Structured `mentions` identify visible tokens and known phone numbers without guessing unresolved identities.
 

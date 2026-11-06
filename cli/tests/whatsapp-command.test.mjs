@@ -12,6 +12,7 @@ const f = JSON.parse(
     "utf8",
   ),
 );
+const onboarding = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-onboarding.json", import.meta.url), "utf8"));
 const v2 = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-v2.json", import.meta.url), "utf8"));
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
@@ -74,6 +75,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       [`/api/v1/whatsapp/messages/${v2.message.id}/thread`]: v2.thread,
       [`/api/v1/whatsapp/conversations/${v2.thread.conversation_id}/threads/${v2.thread.thread_id}`]: v2.thread,
       "/api/v1/whatsapp/limits": f.limits,
+      "/api/v1/whatsapp/onboarding": onboarding,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
       "/api/v1/whatsapp/mark-read": {
@@ -152,6 +154,15 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
+  const draft = await run("onboarding");
+  assert.equal(draft.messageLink, onboarding.message_link);
+  assert.equal(draft.messageQrPngDataUrl, onboarding.message_qr_png_data_url);
+  assert.equal(draft.messageText, "Hello!");
+  assert.equal(draft.ready, true);
+  assert.equal(calls.at(-1).path, "/api/v1/whatsapp/onboarding");
+  assert.equal(calls.at(-1).method, "GET");
+  assert.equal(calls.at(-1).body, null);
+  assert.deepEqual(calls.at(-1).query, { agent_identity_id: f.identity_id });
   const limits = await run("limits");
   assert.deepEqual(Object.keys(limits).sort(), ["agentIdentityId", "limits", "usage"]);
   assert.equal(limits.limits["whatsapp.future_limit"], 7);

@@ -2332,6 +2332,11 @@ results. Preserve the query and filters when following a cursor.
 
 ## Dedicated WhatsApp
 
+From version 0.7.29, `await identity.getWhatsAppOnboarding()`
+returns a message link and PNG QR code for contacting the agent. Check `ready`
+before presenting the draft; the person still taps Send in WhatsApp. This read
+does not enable WhatsApp or send a message.
+
 `identity.sendWhatsApp({to: "+15555550101", text: "Hello", idempotencyKey: "stable-key"})`
 
 Available by approval on the same number as an existing dedicated personal

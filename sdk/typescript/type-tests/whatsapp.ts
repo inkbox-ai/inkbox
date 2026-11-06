@@ -30,3 +30,8 @@ const groupRemote: string | null = groupMessage.remoteNumber;
 const groupSender: string | null = groupMessage.senderNumber;
 const incomingGroup: boolean | undefined = webhook.data.message?.is_group;
 void [groupReply, groupName, groupRemote, groupSender, incomingGroup];
+
+import type { WhatsAppOnboarding } from "../dist/index.js";
+const onboarding: Promise<WhatsAppOnboarding> = client.whatsapp.getOnboarding();
+const ownOnboarding: Promise<WhatsAppOnboarding> = identity.getWhatsAppOnboarding();
+void [onboarding, ownOnboarding];
