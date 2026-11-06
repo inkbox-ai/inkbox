@@ -140,6 +140,7 @@ export interface WhatsAppMessage {
   threadId: string | null;
   threadRootMessageId: string | null;
   reactions: WhatsAppReaction[];
+  agentMentioned: boolean;
   isGroup: boolean;
   groupName: string | null;
   unresolvedParticipantCount: number;
@@ -174,12 +175,14 @@ export interface RawWhatsAppMessage {
   thread_id?: string | null;
   thread_root_message_id?: string | null;
   reactions?: RawWhatsAppReaction[];
+  agent_mentioned?: boolean;
   is_group?: boolean;
   group_name?: string | null;
   unresolved_participant_count?: number;
 }
 export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   return {
+    agentMentioned: r.agent_mentioned === true,
     isGroup: r.is_group ?? false,
     groupName: r.group_name ?? null,
     unresolvedParticipantCount: r.unresolved_participant_count ?? 0,

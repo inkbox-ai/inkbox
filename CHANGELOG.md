@@ -8,6 +8,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
+- WhatsApp messages expose verified native `agent_mentioned` metadata, defaulting to false for older messages.
+
 - Read group names and group metadata in Python, TypeScript, Rust, CLI, and webhook
   messages. Use stable conversation IDs for group text, media, reactions, and
   quoted replies after receiving an allowed message from another participant.

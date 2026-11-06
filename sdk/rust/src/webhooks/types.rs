@@ -1771,6 +1771,8 @@ pub struct WhatsAppWebhookMessage {
     #[serde(default)]
     pub reactions: Vec<crate::whatsapp::WhatsAppReaction>,
     #[serde(default)]
+    pub agent_mentioned: bool,
+    #[serde(default)]
     pub is_group: bool,
     #[serde(default)]
     pub group_name: Option<String>,

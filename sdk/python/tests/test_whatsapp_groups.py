@@ -48,3 +48,9 @@ def test_animation_requires_media_and_false_does_not_change_wire():
     http.post.return_value = {"message": GROUP["message"]}
     api.send(conversation_id=GROUP["conversation"]["id"], text="hello", gif_playback=False)
     assert "gif_playback" not in http.post.call_args.kwargs["json"]
+
+
+@pytest.mark.parametrize("value, expected", [(True, True), (False, False), (None, False), ("true", False), (1, False)])
+def test_native_agent_mention_requires_boolean_evidence(value, expected):
+    assert WhatsAppMessage._from_dict({**GROUP["message"], "agent_mentioned": value}).agent_mentioned is expected
+    assert WhatsAppMessage._from_dict(GROUP["message"]).agent_mentioned is False

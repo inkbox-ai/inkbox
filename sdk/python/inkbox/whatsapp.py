@@ -177,6 +177,7 @@ class WhatsAppMessage:
     thread_root_message_id: UUID | None = None
     reactions: list[WhatsAppReaction] = field(default_factory=list)
 
+    agent_mentioned: bool = field(default=False, kw_only=True)
     is_group: bool = field(default=False, kw_only=True)
     group_name: str | None = field(default=None, kw_only=True)
     unresolved_participant_count: int = field(default=0, kw_only=True)
@@ -184,6 +185,7 @@ class WhatsAppMessage:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMessage:
         return cls(
+            agent_mentioned=d.get("agent_mentioned") is True,
             is_group=d.get("is_group", False),
             group_name=d.get("group_name"),
             unresolved_participant_count=d.get("unresolved_participant_count", 0),

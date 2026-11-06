@@ -39,3 +39,8 @@ it("requires media for animations and preserves false/default send payloads", as
   await api().send({ conversationId: group.conversation.id, text: "hello", gifPlayback: false });
   expect(JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)![1]!.body))).toEqual({ conversation_id: group.conversation.id, text: "hello" });
 });
+
+it("preserves verified native mentions and defaults legacy messages to unmentioned", () => {
+  expect(parseWhatsAppMessage({ ...group.message, agent_mentioned: true }).agentMentioned).toBe(true);
+  expect(parseWhatsAppMessage(group.message).agentMentioned).toBe(false);
+});

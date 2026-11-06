@@ -181,6 +181,8 @@ pub struct WhatsAppMessage {
     #[serde(default)]
     pub reactions: Vec<WhatsAppReaction>,
     #[serde(default)]
+    pub agent_mentioned: bool,
+    #[serde(default)]
     pub is_group: bool,
     #[serde(default)]
     pub group_name: Option<String>,
