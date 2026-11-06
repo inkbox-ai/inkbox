@@ -764,14 +764,18 @@ fn group_metadata_and_quoted_animation_preserve_stable_ids() {
 
 #[test]
 fn native_agent_mention_is_typed_and_defaults_false() {
-    let group: serde_json::Value = serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let group: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
     let mut payload = group["message"].clone();
-    let legacy: inkbox::whatsapp::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    let legacy: inkbox::whatsapp::WhatsAppMessage =
+        serde_json::from_value(payload.clone()).unwrap();
     assert!(!legacy.agent_mentioned);
     payload["agent_mentioned"] = serde_json::json!(true);
-    let message: inkbox::whatsapp::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    let message: inkbox::whatsapp::WhatsAppMessage =
+        serde_json::from_value(payload.clone()).unwrap();
     assert!(message.agent_mentioned);
-    let webhook: inkbox::webhooks::WhatsAppWebhookMessage = serde_json::from_value(payload.clone()).unwrap();
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(payload.clone()).unwrap();
     assert!(webhook.agent_mentioned);
     payload["agent_mentioned"] = serde_json::json!("true");
     assert!(serde_json::from_value::<inkbox::whatsapp::WhatsAppMessage>(payload).is_err());
