@@ -887,3 +887,26 @@ fn identity_onboarding_reads_its_own_fresh_details() {
     identity_get.assert();
     onboarding.assert();
 }
+
+#[test]
+fn whatsapp_null_sender_access_decodes_outbound_rest_and_webhooks() {
+    let mut message = fixture()["message"].clone();
+    message["direction"] = json!("outbound");
+    message["sender_access"] = Value::Null;
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message.clone()).unwrap();
+    assert!(parsed.sender_access.is_none());
+    for event in [
+        "whatsapp.sent",
+        "whatsapp.delivered",
+        "whatsapp.delivery_failed",
+    ] {
+        let mut payload = fixture()["webhook"].clone();
+        payload["event_type"] = json!(event);
+        payload["data"]["message"] = message.clone();
+        let parsed: WhatsAppWebhookPayload = serde_json::from_value(payload).unwrap();
+        assert!(parsed.data.message.unwrap().sender_access.is_none());
+    }
+    message["sender_access"] = json!("unrecognized");
+    assert!(serde_json::from_value::<inkbox::WhatsAppMessage>(message.clone()).is_err());
+    assert!(serde_json::from_value::<inkbox::webhooks::WhatsAppWebhookMessage>(message).is_err());
+}

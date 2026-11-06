@@ -895,4 +895,4 @@ export type WhatsAppWebhookRecipient = import("../whatsapp.js").RawWhatsAppRecip
 export type WhatsAppWebhookMedia = import("../whatsapp.js").RawWhatsAppMedia;
 export type WhatsAppWebhookReaction = import("../whatsapp.js").RawWhatsAppReaction;
 export interface WhatsAppWebhookData { message?: WhatsAppWebhookMessage | null; reaction?: WhatsAppWebhookReaction | null; contacts: WebhookContact[]; agent_identities: WebhookAgentIdentity[]; context?: WebhookContext; }
-export interface WhatsAppWebhookPayload { id:string;event_type:WhatsAppWebhookEventType;timestamp:string;data:WhatsAppWebhookData; }
+export interface WhatsAppWebhookPayload { companion?: CompanionMetadata; id:string;event_type:WhatsAppWebhookEventType;timestamp:string;data:WhatsAppWebhookData; }

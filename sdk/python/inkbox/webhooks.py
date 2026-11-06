@@ -1036,6 +1036,7 @@ class WhatsAppWebhookData(TypedDict):
 
 
 class WhatsAppWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata]
     id: str
     event_type: WhatsAppWebhookEventType
     timestamp: str

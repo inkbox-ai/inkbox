@@ -398,3 +398,13 @@ def test_identity_onboarding_reads_fresh_details_with_own_identity():
         }
         assert AgentIdentity(data, client).get_whatsapp_onboarding().ready is False
         client.whatsapp._http.get.assert_called_once_with("/onboarding", params={"agent_identity_id": OWNER})
+
+
+def test_whatsapp_webhook_companion_metadata_is_optional_and_typed():
+    from typing import get_type_hints, get_args, NotRequired
+    from inkbox.companion import CompanionMetadata
+    from inkbox.webhooks import WhatsAppWebhookPayload
+
+    annotation = get_type_hints(WhatsAppWebhookPayload, include_extras=True)["companion"]
+    assert annotation == NotRequired[CompanionMetadata]
+    assert get_args(annotation) == (CompanionMetadata,)

@@ -198,11 +198,7 @@ pub struct WhatsAppMessage {
     pub reactions: Vec<WhatsAppReaction>,
     #[serde(default)]
     pub agent_mentioned: bool,
-    #[serde(
-        default,
-        deserialize_with = "crate::sender_access::deserialize_optional",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sender_access: Option<crate::SenderAccess>,
     #[serde(default)]
     pub mentions: Vec<WhatsAppMention>,

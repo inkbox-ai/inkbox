@@ -35,3 +35,5 @@ import type { WhatsAppOnboarding } from "../dist/index.js";
 const onboarding: Promise<WhatsAppOnboarding> = client.whatsapp.getOnboarding();
 const ownOnboarding: Promise<WhatsAppOnboarding> = identity.getWhatsAppOnboarding();
 void [onboarding, ownOnboarding];
+const companionPhase: "ordinary" | "initialization" | "live" | undefined = webhook.companion?.phase;
+void companionPhase;
