@@ -1,3 +1,4 @@
+import type { SenderAccess } from "./sender_access.js";
 /** Approved WhatsApp conversations, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
 import { messageKey, postMessage } from "./message_sends.js";
@@ -150,6 +151,7 @@ export interface WhatsAppMessage {
   threadId: string | null;
   threadRootMessageId: string | null;
   reactions: WhatsAppReaction[];
+  senderAccess?: SenderAccess | null;
   mentions: WhatsAppMention[];
   agentMentioned: boolean;
   isGroup: boolean;
@@ -186,6 +188,7 @@ export interface RawWhatsAppMessage {
   thread_id?: string | null;
   thread_root_message_id?: string | null;
   reactions?: RawWhatsAppReaction[];
+  sender_access?: SenderAccess | null;
   mentions?: RawWhatsAppMention[];
   agent_mentioned?: boolean;
   is_group?: boolean;
@@ -195,6 +198,7 @@ export interface RawWhatsAppMessage {
 export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   return {
     mentions: (r.mentions ?? []).map((item) => ({ text: item.text, phoneNumber: item.phone_number, isAgent: item.is_agent === true })),
+    ...(r.sender_access === undefined ? {} : { senderAccess: r.sender_access }),
     agentMentioned: r.agent_mentioned === true,
     isGroup: r.is_group ?? false,
     groupName: r.group_name ?? null,

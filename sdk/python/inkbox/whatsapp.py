@@ -11,6 +11,7 @@ from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
 from inkbox._message_requests import post_message, send_key
+from inkbox.sender_access import SenderAccess
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -188,6 +189,7 @@ class WhatsAppMessage:
     thread_root_message_id: UUID | None = None
     reactions: list[WhatsAppReaction] = field(default_factory=list)
 
+    sender_access: SenderAccess | None = field(default=None, kw_only=True)
     mentions: list[WhatsAppMention] = field(default_factory=list, kw_only=True)
     agent_mentioned: bool = field(default=False, kw_only=True)
     is_group: bool = field(default=False, kw_only=True)
@@ -198,6 +200,7 @@ class WhatsAppMessage:
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMessage:
         return cls(
             mentions=[WhatsAppMention._from_dict(item) for item in d.get("mentions", [])],
+            sender_access=d.get("sender_access"),
             agent_mentioned=d.get("agent_mentioned") is True,
             is_group=d.get("is_group", False),
             group_name=d.get("group_name"),

@@ -798,3 +798,19 @@ fn structured_mentions_preserve_unknown_phone_numbers() {
         serde_json::from_value(payload).unwrap();
     assert_eq!(webhook.mentions.len(), 2);
 }
+
+#[test]
+fn whatsapp_sender_access_preserves_receipt_admission() {
+    let mut message = fixture()["message"].clone();
+    for access in ["direct", "sponsored"] {
+        message["sender_access"] = json!(access);
+        let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message.clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(parsed.sender_access).unwrap(),
+            json!(access)
+        );
+    }
+    message.as_object_mut().unwrap().remove("sender_access");
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message).unwrap();
+    assert!(parsed.sender_access.is_none());
+}

@@ -53,3 +53,9 @@ it("preserves structured mentions without inventing unresolved phone numbers", (
   ]);
   expect(parseWhatsAppMessage(group.message).mentions).toEqual([]);
 });
+
+
+it.each(["direct", "sponsored", null] as const)("preserves WhatsApp sender admission %s", (access) => {
+  expect(parseWhatsAppMessage({ ...group.message, sender_access: access }).senderAccess).toBe(access);
+  expect(parseWhatsAppMessage(direct.message).senderAccess).toBeUndefined();
+});

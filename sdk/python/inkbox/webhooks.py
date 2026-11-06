@@ -1002,6 +1002,7 @@ class WhatsAppWebhookMessage(TypedDict):
     thread_root_message_id: NotRequired[str | None]
     reactions: NotRequired[list["WhatsAppWebhookReaction"]]
 
+    sender_access: NotRequired[SenderAccess | None]
     mentions: NotRequired[list[WhatsAppWebhookMention]]
     agent_mentioned: NotRequired[bool]
     is_group: NotRequired[bool]

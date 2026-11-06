@@ -64,3 +64,10 @@ def test_structured_mentions_preserve_unresolved_identity_without_guessing():
     assert not parsed.mentions[0].is_agent and parsed.mentions[1].is_agent
     assert parsed.mentions[1].phone_number == "+15550000002"
     assert WhatsAppMessage._from_dict(GROUP["message"]).mentions == []
+
+
+@pytest.mark.parametrize("access", ["direct", "sponsored", None])
+def test_whatsapp_sender_access_preserves_receipt_admission(access):
+    message = WhatsAppMessage._from_dict({**GROUP["message"], "sender_access": access})
+    assert message.sender_access == access
+    assert WhatsAppMessage._from_dict(DIRECT["message"]).sender_access is None

@@ -43,7 +43,7 @@ def test_activation_uuid_case_variants(requested_id, page):
     assert [entry.id for entry in result.items] == [entry["id"] for entry in FIXTURE["pages"][0]["items"]]
 
 
-@pytest.mark.parametrize("channel", ["mail", "phone", "imessage"])
+@pytest.mark.parametrize("channel", ["mail", "phone", "imessage", "whatsapp"])
 def test_uuid_normalization_across_pages_duplicates_and_revalidation(channel):
     pages = copy.deepcopy(FIXTURE["pages"])
     for page in pages:
@@ -145,7 +145,7 @@ def test_paged_state():
         assert dict(requests[-1].url.params) == {"channel": "mail", "limit": "200", "offset": "10000"}
 
 
-@pytest.mark.parametrize("channel", ["mail", "phone", "imessage"])
+@pytest.mark.parametrize("channel", ["mail", "phone", "imessage", "whatsapp"])
 def test_complete_hydration_dedup_scope_notices_and_attachments(channel):
     pages = copy.deepcopy(FIXTURE["pages"])
     for page in pages:

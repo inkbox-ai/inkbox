@@ -30,7 +30,7 @@ it.each([activation, activation.toUpperCase()])("accepts UUID case variants for 
   }
 });
 
-it.each(["mail", "phone", "imessage"])("normalizes %s UUIDs across pages, duplicates and revalidation", async (channel) => {
+it.each(["mail", "phone", "imessage", "whatsapp"])("normalizes %s UUIDs across pages, duplicates and revalidation", async (channel) => {
   const pages = structuredClone(fixture.pages);
   for (const page of pages) {
     page.channel = page.reply_context.channel = channel;
@@ -109,7 +109,7 @@ it("preserves bounded state pagination", async () => {
   expect(Object.fromEntries(url.searchParams)).toEqual({ channel: "mail", limit: "200", offset: "10000" });
 });
 
-it.each(["mail", "phone", "imessage"])("hydrates %s once with canonical scope, duplicate removal, notices and attachment refs", async (channel) => {
+it.each(["mail", "phone", "imessage", "whatsapp"])("hydrates %s once with canonical scope, duplicate removal, notices and attachment refs", async (channel) => {
   const pages = structuredClone(fixture.pages);
   for (const page of pages) {
     page.channel = page.reply_context.channel = channel;
