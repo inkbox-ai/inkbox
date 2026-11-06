@@ -22,3 +22,8 @@ void [reactionTarget, reactionActor, reactionEvent];
 
 // @ts-expect-error WhatsApp accepts one recipient string, not a recipient array.
 identity.sendWhatsApp({to:["+15555550101"],text:"Hello"});
+
+import type { WhatsAppOnboarding } from "../dist/index.js";
+const onboarding: Promise<WhatsAppOnboarding> = client.whatsapp.getOnboarding();
+const ownOnboarding: Promise<WhatsAppOnboarding> = identity.getWhatsAppOnboarding();
+void [onboarding, ownOnboarding];

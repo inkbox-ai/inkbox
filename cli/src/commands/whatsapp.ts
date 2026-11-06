@@ -101,6 +101,17 @@ export function registerWhatsAppCommands(program: Command): void {
   );
 
   identityCommand(
+    "onboarding",
+    "Get the agent's WhatsApp message link and QR code without sending a message",
+  ).action(
+    withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this);
+      const identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.getWhatsAppOnboarding(), { json: !!global.json });
+    }),
+  );
+
+  identityCommand(
     "limits",
     "Read effective server policy limits and independent usage",
   ).action(

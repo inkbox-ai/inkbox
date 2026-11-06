@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
+/// A message draft link and QR code; opening either does not send a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppOnboarding {
+    pub agent_identity_id: Uuid,
+    pub number: Option<String>,
+    pub message_text: String,
+    pub message_link: Option<String>,
+    pub message_qr_png_data_url: Option<String>,
+    pub ready: bool,
+}
 /// Effective server limits and independent usage. Unknown public policy keys remain available.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppLimits {
@@ -508,6 +518,12 @@ impl WhatsAppResource {
             ),
             &owner(identity),
         )?)?)
+    }
+    /// Read a link and QR for messaging the agent, without sending or enabling WhatsApp.
+    pub fn get_onboarding(&self, identity: Option<&Uuid>) -> Result<WhatsAppOnboarding> {
+        Ok(serde_json::from_value(
+            self.http.get("/onboarding", &owner(identity))?,
+        )?)
     }
     pub fn get_limits(&self, identity: Option<&Uuid>) -> Result<WhatsAppLimits> {
         Ok(serde_json::from_value(

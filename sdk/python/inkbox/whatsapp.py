@@ -283,6 +283,29 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
 
 
 @dataclass
+class WhatsAppOnboarding:
+    """A message draft link and QR code; opening either does not send a message."""
+
+    agent_identity_id: UUID
+    number: str | None
+    message_text: str
+    message_link: str | None
+    message_qr_png_data_url: str | None
+    ready: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppOnboarding:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            number=d["number"],
+            message_text=d["message_text"],
+            message_link=d["message_link"],
+            message_qr_png_data_url=d["message_qr_png_data_url"],
+            ready=d["ready"],
+        )
+
+
+@dataclass
 class WhatsAppLimits:
     agent_identity_id: UUID
     limits: dict[str, int]
@@ -543,6 +566,12 @@ class WhatsAppResource:
         )
         return WhatsAppMarkReadResult(
             UUID(data["conversation_id"]), data["updated_count"]
+        )
+
+    def get_onboarding(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppOnboarding:
+        """Read a link and QR for messaging the agent, without sending or enabling WhatsApp."""
+        return WhatsAppOnboarding._from_dict(
+            self._http.get("/onboarding", params=_owner(agent_identity_id))
         )
 
     def get_limits(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppLimits:

@@ -1323,6 +1323,11 @@ Preserve the query and filters when following a cursor.
 
 ## Dedicated WhatsApp
 
+From version 0.7.30, `identity.get_whatsapp_onboarding()?`
+returns a message link and PNG QR code for contacting the agent. Check `ready`
+before presenting the draft; the person still taps Send in WhatsApp. This read
+does not enable WhatsApp or send a message.
+
 ```rust,no_run
 # fn example() -> inkbox::Result<()> {
 let client = inkbox::Inkbox::builder("your-api-key").build()?;

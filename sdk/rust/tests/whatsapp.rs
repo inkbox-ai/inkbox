@@ -682,3 +682,76 @@ fn identity_lists_retain_configured_whatsapp_and_default_older_responses() {
         list.assert();
     }
 }
+
+#[test]
+fn onboarding_preserves_ownership_and_availability_without_sending() {
+    let base: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    let owner = Uuid::parse_str(base["agent_identity_id"].as_str().unwrap()).unwrap();
+    for state in ["ready", "unavailable", "disabled"] {
+        for identity in [None, Some(&owner)] {
+            let server = MockServer::start();
+            let mut raw = base.clone();
+            raw["ready"] = json!(state == "ready");
+            if state == "disabled" {
+                raw["number"] = Value::Null;
+                raw["message_link"] = Value::Null;
+                raw["message_qr_png_data_url"] = Value::Null;
+            }
+            let get = server.mock(|when, then| {
+                let when = when.method(GET).path("/api/v1/whatsapp/onboarding");
+                if let Some(id) = identity {
+                    when.query_param("agent_identity_id", id.to_string());
+                } else {
+                    when.matches(|request| match &request.query_params {
+                        None => true,
+                        Some(query) => query.is_empty(),
+                    });
+                }
+                then.status(200).json_body(raw.clone());
+            });
+            let client = Inkbox::builder("test-only")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let result: inkbox::WhatsAppOnboarding =
+                client.whatsapp().get_onboarding(identity).unwrap();
+            assert_eq!(serde_json::to_value(result).unwrap(), raw);
+            get.assert();
+        }
+    }
+}
+
+#[test]
+fn identity_onboarding_reads_its_own_fresh_details() {
+    let raw: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    let owner = raw["agent_identity_id"].as_str().unwrap();
+    let server = MockServer::start();
+    let identity_get = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/identities/my-agent");
+        then.status(200).json_body(json!({"id":owner,"organization_id":"org_example","agent_handle":"my-agent","created_at":"2026-10-01T12:00:00Z","updated_at":"2026-10-01T12:00:00Z"}));
+    });
+    let onboarding = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/onboarding")
+            .query_param("agent_identity_id", owner);
+        then.status(200).json_body(raw.clone());
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let result = client
+        .get_identity("my-agent")
+        .unwrap()
+        .get_whatsapp_onboarding()
+        .unwrap();
+    assert_eq!(serde_json::to_value(result).unwrap(), raw);
+    identity_get.assert();
+    onboarding.assert();
+}

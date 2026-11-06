@@ -732,6 +732,14 @@ MIT
 
 ## Dedicated WhatsApp
 
+From version 0.7.30, `identity.get_whatsapp_onboarding()` (Python),
+`await identity.getWhatsAppOnboarding()` (TypeScript),
+`identity.get_whatsapp_onboarding()?` (Rust), or
+`inkbox whatsapp onboarding --identity my-agent`
+returns a message link and PNG QR code for contacting the agent. Check `ready`
+before presenting the draft; the person still taps Send in WhatsApp. This read
+does not enable WhatsApp or send a message.
+
 WhatsApp is available by approval for agents that already have a dedicated
 personal iMessage number. The approved WhatsApp channel uses that same number;
 it is not a shared-number channel. Check fresh channel status instead of assuming

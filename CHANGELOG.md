@@ -4,6 +4,16 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.30 - WhatsApp message links and QR codes (unreleased)
+
+### Added
+
+- Read an agent's WhatsApp message link and QR code with `get_onboarding` in
+  Python and Rust, `getOnboarding` in TypeScript, or
+  `inkbox whatsapp onboarding --identity <handle>`. Identity helpers are also
+  available. Opening the link or scanning the QR drafts a message; the person
+  still taps Send. Availability and missing numbers are returned explicitly.
+
 ## 0.7.28 - Per-call Voice AI opening wait (unreleased)
 
 ### Added

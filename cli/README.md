@@ -1444,6 +1444,11 @@ Optional `threadTs` in reply context selects a reply thread; it does not limit s
 
 ## Dedicated WhatsApp
 
+From version 0.7.30, `inkbox whatsapp onboarding --identity my-agent`
+returns a message link and PNG QR code for contacting the agent. Check `ready`
+before presenting the draft; the person still taps Send in WhatsApp. This read
+does not enable WhatsApp or send a message.
+
 `inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello --idempotency-key stable-key`
 
 Available by approval on the same number as an existing dedicated personal

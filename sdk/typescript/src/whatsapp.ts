@@ -332,6 +332,33 @@ export type WhatsAppConversationListOptions = Omit<
 >;
 const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
+/** A message draft link and QR code; opening either does not send a message. */
+export interface WhatsAppOnboarding {
+  agentIdentityId: string;
+  number: string | null;
+  messageText: string;
+  messageLink: string | null;
+  messageQrPngDataUrl: string | null;
+  ready: boolean;
+}
+export interface RawWhatsAppOnboarding {
+  agent_identity_id: string;
+  number: string | null;
+  message_text: string;
+  message_link: string | null;
+  message_qr_png_data_url: string | null;
+  ready: boolean;
+}
+export function parseWhatsAppOnboarding(row: RawWhatsAppOnboarding): WhatsAppOnboarding {
+  return {
+    agentIdentityId: row.agent_identity_id,
+    number: row.number,
+    messageText: row.message_text,
+    messageLink: row.message_link,
+    messageQrPngDataUrl: row.message_qr_png_data_url,
+    ready: row.ready,
+  };
+}
 export interface WhatsAppLimits {
   agentIdentityId: string;
   limits: Record<string, number>;
@@ -528,6 +555,12 @@ export class WhatsAppResource {
         },
         { params: owner(o.agentIdentityId) },
       ),
+    );
+  }
+  /** Read a link and QR for messaging the agent, without sending or enabling WhatsApp. */
+  async getOnboarding(o: { agentIdentityId?: string } = {}): Promise<WhatsAppOnboarding> {
+    return parseWhatsAppOnboarding(
+      await this.http.get<RawWhatsAppOnboarding>("/onboarding", owner(o.agentIdentityId)),
     );
   }
   /** Effective server limits and independent usage; protocol maxima are not entitlements. */

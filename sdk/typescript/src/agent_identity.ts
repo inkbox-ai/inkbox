@@ -126,6 +126,10 @@ export class AgentIdentity {
   get whatsappNumber(): string | null {
     return this._data.whatsappNumber ?? null;
   }
+  /** Read this agent's WhatsApp message link and QR code. */
+  getWhatsAppOnboarding() {
+    return this._inkbox.whatsapp.getOnboarding({ agentIdentityId: this.id });
+  }
   getWhatsAppLimits() {
     return this._inkbox.whatsapp.getLimits({ agentIdentityId: this.id });
   }
