@@ -41,3 +41,32 @@ impl DateRangeFilter {
         }
     }
 }
+
+/// Match conversations by any participant, or by a saved contact's active identifiers.
+///
+/// The variants make the selectors mutually exclusive. Existing list methods
+/// remain unfiltered; pass this selector to the corresponding `*_matching` method.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConversationParticipantFilter {
+    /// One to 100 email addresses or E.164 phone numbers, matched with OR semantics.
+    Participants(Vec<String>),
+    /// Resolve the accessible active email addresses and phone numbers of a contact.
+    ContactId(uuid::Uuid),
+}
+
+impl ConversationParticipantFilter {
+    pub(crate) fn apply(&self, params: &mut Vec<(&'static str, String)>) -> crate::Result<()> {
+        match self {
+            Self::Participants(values) => {
+                if values.is_empty() || values.len() > 100 {
+                    return Err(crate::InkboxError::InvalidArgument(
+                        "participants must contain between 1 and 100 addresses".into(),
+                    ));
+                }
+                params.extend(values.iter().cloned().map(|value| ("participants", value)));
+            }
+            Self::ContactId(value) => params.push(("contact_id", value.to_string())),
+        }
+        Ok(())
+    }
+}

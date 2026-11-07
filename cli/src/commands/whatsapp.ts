@@ -240,6 +240,8 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--tz <zone>", "IANA timezone for zone-less dates (default UTC)")
     .option("--limit <n>", "Maximum results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--participants <addresses...>", "Match any email address or E.164 phone number")
+    .option("--contact-id <id>", "Match a saved contact; mutually exclusive with --participants")
     .action(
       withErrorHandler(async function (this: Command, opts) {
         const listOptions = buildWhatsAppListOptions(opts);
@@ -248,6 +250,8 @@ export function registerWhatsAppCommands(program: Command): void {
         output(
           await identity.listWhatsAppConversations({
             ...listOptions,
+            participants: opts.participants,
+            contactId: opts.contactId,
             limit: Number(opts.limit),
             offset: Number(opts.offset),
           }),

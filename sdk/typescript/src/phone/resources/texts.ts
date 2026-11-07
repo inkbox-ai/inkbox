@@ -1,3 +1,4 @@
+import { conversationFilterParams } from "../../_conversationFilters.js";
 /**
  * inkbox-phone/resources/texts.ts
  *
@@ -222,9 +223,12 @@ export class TextsResource {
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
+      participants?: string[];
+      contactId?: string;
     },
   ): Promise<TextConversationSummary[]> {
-    const params: Record<string, string | number | boolean> = {
+    const params: Record<string, string | string[] | number | boolean> = {
+      ...conversationFilterParams(options),
       limit: options?.limit ?? 50,
       offset: options?.offset ?? 0,
     };

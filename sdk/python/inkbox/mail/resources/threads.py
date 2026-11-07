@@ -7,6 +7,8 @@ listing, per-thread update, and delete.
 
 from __future__ import annotations
 
+from inkbox._conversation_filters import conversation_filter_params
+
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
@@ -30,12 +32,17 @@ class ThreadsResource:
         *,
         folder: ThreadFolder | str | None = None,
         page_size: int = _DEFAULT_PAGE_SIZE,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> Iterator[Thread]:
         """Iterator over threads in a mailbox, most recent activity first.
 
         Pagination is handled automatically — just iterate.
 
         Args:
+            participants: Match any email address (1–100 values).
+            contact_id: Match all accessible active emails of this contact;
+                mutually exclusive with participants.
             email_address: Full email address of the mailbox.
             folder: Optional folder filter (``inbox`` | ``spam`` |
                 ``blocked`` | ``archive``). When omitted, the server returns
@@ -49,7 +56,8 @@ class ThreadsResource:
             folder_value = folder.value
         else:
             folder_value = folder
-        return self._paginate(email_address, folder=folder_value, page_size=page_size)
+        return self._paginate(email_address, folder=folder_value, page_size=page_size,
+                              selectors=conversation_filter_params(participants, contact_id))
 
     def _paginate(
         self,
@@ -57,10 +65,11 @@ class ThreadsResource:
         *,
         folder: str | None,
         page_size: int,
+        selectors: dict[str, str | list[str]],
     ) -> Iterator[Thread]:
         cursor: str | None = None
         while True:
-            params: dict[str, Any] = {"limit": page_size, "cursor": cursor}
+            params: dict[str, Any] = {"limit": page_size, "cursor": cursor, **selectors}
             if folder is not None:
                 params["folder"] = folder
             page = self._http.get(

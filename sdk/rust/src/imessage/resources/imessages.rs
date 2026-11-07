@@ -659,6 +659,29 @@ impl IMessagesResource {
         filter: &DateRangeFilter,
         include_groups: bool,
     ) -> Result<Vec<IMessageConversationSummary>> {
+        self.list_conversations_matching(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            filter,
+            include_groups,
+            None,
+        )
+    }
+
+    /// List conversations matching any participant or a saved contact.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_conversations_matching(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+        participants: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<IMessageConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
         if let Some(id) = agent_identity_id {
@@ -671,6 +694,9 @@ impl IMessagesResource {
             params.push(("include_groups", "true".to_string()));
         }
         filter.apply(&mut params);
+        if let Some(selector) = participants {
+            selector.apply(&mut params)?;
+        }
         let data = self.http.get("/conversations", &params)?;
         Ok(serde_json::from_value(data)?)
     }

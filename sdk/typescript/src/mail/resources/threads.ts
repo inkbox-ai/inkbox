@@ -1,3 +1,4 @@
+import { conversationFilterParams } from "../../_conversationFilters.js";
 /**
  * inkbox-mail/resources/threads.ts
  *
@@ -39,13 +40,15 @@ export class ThreadsResource {
    */
   async *list(
     emailAddress: string,
-    options?: { folder?: ThreadFolder; pageSize?: number },
+    options?: { folder?: ThreadFolder; pageSize?: number; participants?: string[]; contactId?: string },
   ): AsyncGenerator<Thread> {
+    const selectors = conversationFilterParams(options);
     const limit = options?.pageSize ?? DEFAULT_PAGE_SIZE;
     let cursor: string | undefined;
 
     while (true) {
-      const params: Record<string, string | number | undefined> = {
+      const params: Record<string, string | string[] | number | undefined> = {
+        ...selectors,
         limit,
         cursor,
       };
