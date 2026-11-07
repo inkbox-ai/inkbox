@@ -12,6 +12,7 @@ const f = JSON.parse(
     "utf8",
   ),
 );
+const onboarding = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-onboarding.json", import.meta.url), "utf8"));
 const v2 = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-v2.json", import.meta.url), "utf8"));
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
@@ -74,6 +75,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       [`/api/v1/whatsapp/messages/${v2.message.id}/thread`]: v2.thread,
       [`/api/v1/whatsapp/conversations/${v2.thread.conversation_id}/threads/${v2.thread.thread_id}`]: v2.thread,
       "/api/v1/whatsapp/limits": f.limits,
+      "/api/v1/whatsapp/onboarding": onboarding,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
       "/api/v1/whatsapp/mark-read": {
@@ -152,6 +154,15 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
+  const draft = await run("onboarding");
+  assert.equal(draft.messageLink, onboarding.message_link);
+  assert.equal(draft.messageQrPngDataUrl, onboarding.message_qr_png_data_url);
+  assert.equal(draft.messageText, "Hello!");
+  assert.equal(draft.ready, true);
+  assert.equal(calls.at(-1).path, "/api/v1/whatsapp/onboarding");
+  assert.equal(calls.at(-1).method, "GET");
+  assert.equal(calls.at(-1).body, null);
+  assert.deepEqual(calls.at(-1).query, { agent_identity_id: f.identity_id });
   const limits = await run("limits");
   assert.deepEqual(Object.keys(limits).sort(), ["agentIdentityId", "limits", "usage"]);
   assert.equal(limits.limits["whatsapp.future_limit"], 7);
@@ -208,7 +219,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   const plain = await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
     `http://127.0.0.1:${server.address().port}`, "whatsapp", "conversation", f.conversation.id,
     "--identity", "agent"], { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 });
-  assert.match(plain.stdout.split("\n")[0], /^id\s+conversationId\s+direction\s+remoteNumber\s+content\s+status\s+deliveryState$/);
+  assert.match(plain.stdout.split("\n")[0], /^id\s+conversationId\s+direction\s+groupName\s+remoteNumber\s+senderNumber\s+content\s+status\s+deliveryState$/);
   const beforeEmptyQuote = calls.length;
   for (const selector of [["--conversation-id", f.conversation.id], ["--to", "+15555550101"]]) {
     await assert.rejects(() => run("send", ...selector, "--reply-to-message-id", "", "--text", "Do not silently send plain"));
@@ -244,13 +255,44 @@ test("native reply requirement is explicit and irrelevant without a quote", () =
   assert.equal(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "Hello", plainReplyFallback: false}).plainReplyFallback, undefined);
 });
 
-test("bundled WhatsApp skills teach the scalar direct-message contract", () => {
+test("bundled WhatsApp skills teach direct recipients and inbound-only groups", () => {
   for (const name of ["inkbox-cli", "inkbox-python", "inkbox-ts", "inkbox-all"]) {
     const document = readFileSync(new URL(`../../skills/${name}/SKILL.md`, import.meta.url), "utf8");
     const section = document.split("## Approved dedicated WhatsApp\n")[1]?.split("\n## ")[0];
     assert.ok(section, `missing WhatsApp section in ${name}`);
-    assert.match(section, /one E\.164 string or an existing direct-message conversation/);
+    assert.match(section, /one E\.164 string or an existing conversation ID/);
     assert.match(section, /arrays, including singleton arrays, and comma-separated lists are rejected/);
+    assert.match(section, /receive a message from another participant before sending content/);
+    assert.match(section, /Do not create groups/);
     assert.doesNotMatch(section, /1–8 unique|create\/select a group|Group uncertainty|Group sends require/);
   }
+});
+
+test("quoted group animation options use conversation IDs, not display names", () => {
+  assert.deepEqual(buildWhatsAppSendOptions({conversationId: f.conversation.id, replyToMessageId: f.message.id,
+    mediaId: f.media.id, gifPlayback: true, idempotencyKey: "group-animation"}), {
+    conversationId: f.conversation.id, replyToMessageId: f.message.id,
+    mediaIds: [f.media.id], gifPlayback: true, idempotencyKey: "group-animation",
+  });
+  assert.throws(() => buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "hello", gifPlayback: true}), /requires --media-id/);
+});
+
+test("group names appear in conversation tables and nullable metadata survives JSON", async (t) => {
+  const group = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-groups.json", import.meta.url), "utf8"));
+  const server = createServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url.startsWith("/api/v1/identities/agent")) res.end(JSON.stringify({id:f.identity_id,organization_id:"org_example",agent_handle:"agent",created_at:f.message.created_at,updated_at:f.message.updated_at}));
+    else if (req.url.startsWith("/api/v1/whatsapp/conversations")) res.end(JSON.stringify([group.summary]));
+    else if (req.url.startsWith("/api/v1/whatsapp/messages")) res.end(JSON.stringify([{...group.blocked_inbound_message,sender_number:"+15555550101",unresolved_participant_count:0,is_blocked:false}]));
+    else { res.statusCode = 404; res.end("{}"); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const run = async (json, command = "conversations") => (await exec(process.execPath,[cli,"--api-key","test-only","--base-url",`http://127.0.0.1:${server.address().port}`,...(json ? ["--json"] : []),"whatsapp",command,"--identity","agent"],{env:{...process.env,NODE_USE_ENV_PROXY:"0"},timeout:10000})).stdout;
+  assert.match(await run(false), /Project garden/);
+  const messages = await run(false, "list");
+  assert.match(messages, /senderNumber/);
+  assert.match(messages, /\+15555550101/);
+  const row = JSON.parse(await run(true))[0];
+  assert.equal(row.isGroup, true); assert.equal(row.groupName, "Project garden"); assert.equal(row.remoteNumber, null);
 });

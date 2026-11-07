@@ -1744,8 +1744,8 @@ pub struct WhatsAppWebhookMessage {
     pub conversation_id: String,
     pub direction: crate::whatsapp::WhatsAppDirection,
     pub local_number: String,
-    pub remote_number: String,
-    pub sender_number: String,
+    pub remote_number: Option<String>,
+    pub sender_number: Option<String>,
     pub participants: Vec<String>,
     pub content: Option<String>,
     pub media: Vec<WhatsAppWebhookMedia>,
@@ -1770,6 +1770,18 @@ pub struct WhatsAppWebhookMessage {
     pub thread_root_message_id: Option<uuid::Uuid>,
     #[serde(default)]
     pub reactions: Vec<crate::whatsapp::WhatsAppReaction>,
+    #[serde(default)]
+    pub agent_mentioned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_access: Option<crate::SenderAccess>,
+    #[serde(default)]
+    pub mentions: Vec<crate::whatsapp::WhatsAppMention>,
+    #[serde(default)]
+    pub is_group: bool,
+    #[serde(default)]
+    pub group_name: Option<String>,
+    #[serde(default)]
+    pub unresolved_participant_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

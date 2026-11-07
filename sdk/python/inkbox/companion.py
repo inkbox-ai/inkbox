@@ -13,7 +13,7 @@ from inkbox._http import HttpTransport
 from inkbox.sender_access import SenderAccess
 from inkbox.response_metadata import ResponseNotice, _parse_notices
 
-CompanionChannel = Literal["mail", "phone", "imessage", "slack"]
+CompanionChannel = Literal["mail", "phone", "imessage", "whatsapp", "slack"]
 DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024
 _UNSET = object()
 
@@ -155,7 +155,7 @@ def _path(handle: str) -> str:
 def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
     try:
         ids = {key: str(UUID(data[key])) for key in ("scope_id", "activation_id", "conversation_id")}
-        if ids["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage", "slack"):
+        if ids["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage", "whatsapp", "slack"):
             raise ValueError()
         reply = dict(data["reply_context"])
         reply["conversation_id"] = str(UUID(reply["conversation_id"]))
@@ -242,7 +242,7 @@ class CompanionResource:
         _positive(limit, "limit", 200)
         if type(offset) is not int or not 0 <= offset <= 10000:
             raise ValueError("offset must be an integer between 0 and 10000")
-        if channel is not None and channel not in ("mail", "phone", "imessage", "slack"):
+        if channel is not None and channel not in ("mail", "phone", "imessage", "whatsapp", "slack"):
             raise ValueError("Invalid Companion channel")
         data = self._http.get(f"{_path(handle)}/conversations", params={"channel": channel, "limit": limit, "offset": offset})
         return CompanionConversationPage([

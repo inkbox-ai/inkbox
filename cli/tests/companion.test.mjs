@@ -91,9 +91,10 @@ test("state/history JSON retain pagination and notices preserve output semantics
     requests.push(req.url);
     respond(res, req.url.includes("conversations") ? { items: [], total: 8 } : fixture.pages[0]);
   }, async (url) => {
-    const state = await run(url, ["identity", "companion", "state", "example-agent", "--channel", "phone", "--limit", "200", "--offset", "4"]);
+    const state = await run(url, ["identity", "companion", "state", "example-agent", "--channel", "whatsapp", "--limit", "200", "--offset", "4"]);
     assert.ifError(state.error);
     assert.deepEqual(JSON.parse(state.stdout), { items: [], total: 8 });
+    assert.match(requests[0], /channel=whatsapp/);
     assert.match(requests[0], /limit=200/);
     assert.match(requests[0], /offset=4/);
     const args = ["identity", "companion", "history", "example-agent", activation, "--cursor", "opaque-value", "--limit", "1"];

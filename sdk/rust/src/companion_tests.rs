@@ -115,7 +115,7 @@ fn companion_paged_state_preserves_wire_shape() {
 
 #[test]
 fn companion_complete_hydration_normalizes_uuid_case_deduplicates_and_revalidates() {
-    for channel in ["mail", "phone", "imessage"] {
+    for channel in ["mail", "phone", "imessage", "whatsapp"] {
         let server = MockServer::start();
         let mut fixture = fixture();
         for page in fixture["pages"].as_array_mut().unwrap() {

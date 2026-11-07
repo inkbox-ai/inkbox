@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
+/// A message draft link and QR code; opening either does not send a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppOnboarding {
+    pub agent_identity_id: Uuid,
+    pub number: Option<String>,
+    pub message_text: String,
+    pub message_link: Option<String>,
+    pub message_qr_png_data_url: Option<String>,
+    pub ready: bool,
+}
 /// Effective server limits and independent usage. Unknown public policy keys remain available.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppLimits {
@@ -146,14 +156,20 @@ pub struct WhatsAppRecipient {
     pub failed_at: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppMention {
+    pub text: Option<String>,
+    pub phone_number: Option<String>,
+    pub is_agent: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppMessage {
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub conversation_id: Uuid,
     pub direction: WhatsAppDirection,
     pub local_number: String,
-    pub remote_number: String,
-    pub sender_number: String,
+    pub remote_number: Option<String>,
+    pub sender_number: Option<String>,
     pub participants: Vec<String>,
     pub content: Option<String>,
     pub media: Vec<WhatsAppMedia>,
@@ -180,16 +196,34 @@ pub struct WhatsAppMessage {
     pub thread_root_message_id: Option<Uuid>,
     #[serde(default)]
     pub reactions: Vec<WhatsAppReaction>,
+    #[serde(default)]
+    pub agent_mentioned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_access: Option<crate::SenderAccess>,
+    #[serde(default)]
+    pub mentions: Vec<WhatsAppMention>,
+    #[serde(default)]
+    pub is_group: bool,
+    #[serde(default)]
+    pub group_name: Option<String>,
+    #[serde(default)]
+    pub unresolved_participant_count: u64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConversation {
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub local_number: String,
-    pub remote_number: String,
+    pub remote_number: Option<String>,
     pub participants: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub is_group: bool,
+    #[serde(default)]
+    pub group_name: Option<String>,
+    #[serde(default)]
+    pub unresolved_participant_count: u64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConversationSummary {
@@ -225,6 +259,9 @@ pub struct WhatsAppSendOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Defaults to true. False requires native quoting; unavailable evidence or uncertain sends never trigger a plain replacement.
     pub plain_reply_fallback: Option<bool>,
+    /// Play an uploaded MP4 attachment as an animation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gif_playback: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -262,6 +299,11 @@ impl WhatsAppResource {
     /// Submission failures retain the key in [`InkboxError::idempotency_key`],
     /// and the original failure in [`InkboxError::original_error`].
     pub fn send(&self, o: &WhatsAppSendOptions) -> Result<WhatsAppMessage> {
+        if o.gif_playback == Some(true) && o.media_ids.as_ref().map_or(true, |v| v.is_empty()) {
+            return Err(InkboxError::InvalidArgument(
+                "gif_playback requires one MP4 media attachment".into(),
+            ));
+        }
         if o.to.is_some() == o.conversation_id.is_some() {
             return Err(InkboxError::InvalidArgument(
                 "Specify exactly one of to or conversation_id".into(),
@@ -295,6 +337,11 @@ impl WhatsAppResource {
             ));
         }
         let mut body = serde_json::to_value(o)?;
+        if o.gif_playback != Some(true) {
+            body.as_object_mut()
+                .expect("send options serialize to an object")
+                .remove("gif_playback");
+        }
         if o.reply_to_message_id.is_none() || o.plain_reply_fallback != Some(false) {
             body.as_object_mut()
                 .expect("send options serialize to an object")
@@ -508,6 +555,12 @@ impl WhatsAppResource {
             ),
             &owner(identity),
         )?)?)
+    }
+    /// Read a link and QR for messaging the agent, without sending or enabling WhatsApp.
+    pub fn get_onboarding(&self, identity: Option<&Uuid>) -> Result<WhatsAppOnboarding> {
+        Ok(serde_json::from_value(
+            self.http.get("/onboarding", &owner(identity))?,
+        )?)
     }
     pub fn get_limits(&self, identity: Option<&Uuid>) -> Result<WhatsAppLimits> {
         Ok(serde_json::from_value(

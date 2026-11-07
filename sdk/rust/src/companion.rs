@@ -18,6 +18,7 @@ pub enum CompanionChannel {
     Mail,
     Phone,
     Imessage,
+    Whatsapp,
     Slack,
 }
 
@@ -34,6 +35,8 @@ pub struct CompanionChannelReadiness {
     pub imessage: CompanionReadiness,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slack: Option<CompanionReadiness>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whatsapp: Option<CompanionReadiness>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -278,6 +281,7 @@ impl CompanionResource {
                 CompanionChannel::Mail => "mail",
                 CompanionChannel::Phone => "phone",
                 CompanionChannel::Imessage => "imessage",
+                CompanionChannel::Whatsapp => "whatsapp",
                 CompanionChannel::Slack => "slack",
             };
             query.push(("channel", name.into()));

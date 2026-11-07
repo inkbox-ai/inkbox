@@ -2,11 +2,13 @@
 inkbox — Python SDK for the Inkbox APIs.
 """
 
-from inkbox.webhooks import WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
+from inkbox.webhooks import WhatsAppWebhookMention, WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
 from inkbox.whatsapp import (
+    WhatsAppOnboarding,
     WhatsAppLimits,
     WhatsAppDirection,
     WhatsAppResource,
+    WhatsAppMention,
     WhatsAppMessage,
     WhatsAppConversation,
     WhatsAppConversationSummary,
@@ -542,14 +544,17 @@ __all__ = [
     "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",
     "WhatsAppWebhookData",
+    "WhatsAppWebhookMention",
     "WhatsAppWebhookMessage",
     "WhatsAppWebhookMedia",
     "WhatsAppWebhookRecipient",
     "WhatsAppWebhookEventType",
 
+    "WhatsAppOnboarding",
     "WhatsAppLimits",
     "WhatsAppDirection",
     "WhatsAppResource",
+    "WhatsAppMention",
     "WhatsAppMessage",
     "WhatsAppConversation",
     "WhatsAppConversationSummary",
