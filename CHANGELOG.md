@@ -4,6 +4,16 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.29 - Hosted-agent management (unreleased)
+
+### Added
+
+- Python, TypeScript, and Rust methods to read and update identity hosting,
+  inspect event handoffs, and retry eligible deliveries.
+- Read-only computer usage history, conversations, and session run listings.
+- `inkbox identity hosting get|configure|remove|deliveries|retry` commands for
+  managing hosted agents, model-key selection, instructions, and event triggers.
+
 ## 0.7.28 - Per-call Voice AI opening wait (unreleased)
 
 ### Added

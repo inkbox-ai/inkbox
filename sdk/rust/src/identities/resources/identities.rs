@@ -26,6 +26,55 @@ pub struct IdentitiesResource {
 }
 
 impl IdentitiesResource {
+    pub fn list_hosting_deliveries(
+        &self,
+        handle: &str,
+        before: Option<&str>,
+    ) -> Result<crate::identities::HostingDeliveries> {
+        let query = before
+            .map(|v| vec![("before", v.to_owned())])
+            .unwrap_or_default();
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/{}/hosting/deliveries", path_segment(handle)),
+            &query,
+        )?)?)
+    }
+
+    pub fn retry_hosting_delivery(&self, handle: &str, delivery_id: &str) -> Result<bool> {
+        #[derive(serde::Deserialize)]
+        struct Receipt {
+            queued: bool,
+        }
+        let receipt: Receipt = serde_json::from_value(self.http.post(
+            &format!(
+                "/{}/hosting/deliveries/{}/retry",
+                path_segment(handle),
+                path_segment(delivery_id)
+            ),
+            Some(&serde_json::json!({})),
+            crate::http::NO_QUERY,
+        )?)?;
+        Ok(receipt.queued)
+    }
+
+    pub fn get_hosting(&self, handle: &str) -> Result<crate::identities::HostingConfiguration> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/{}/hosting", path_segment(handle)),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    pub fn update_hosting(
+        &self,
+        handle: &str,
+        options: &crate::identities::HostingUpdate,
+    ) -> Result<crate::identities::HostingConfiguration> {
+        Ok(serde_json::from_value(self.http.put(
+            &format!("/{}/hosting", path_segment(handle)),
+            options,
+        )?)?)
+    }
+
     pub fn get_with_options(
         &self,
         agent_handle: &str,

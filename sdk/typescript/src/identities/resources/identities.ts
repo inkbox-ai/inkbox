@@ -29,7 +29,27 @@ import {
   vaultSecretIdsToWire,
 } from "../types.js";
 
+import { parseHosting, parseHostingDelivery, hostingUpdateBody, type HostingDelivery, type HostingConfiguration, type HostingUpdate } from "../hosting.js";
+
 export class IdentitiesResource {
+  async listHostingDeliveries(handle: string, before?: string): Promise<HostingDelivery[]> {
+    const data = await this.http.get<{items: Parameters<typeof parseHostingDelivery>[0][]}>(`/${encodeURIComponent(handle)}/hosting/deliveries`, {before});
+    return data.items.map(parseHostingDelivery);
+  }
+
+  async retryHostingDelivery(handle: string, deliveryId: string): Promise<boolean> {
+    const data = await this.http.post<{queued: boolean}>(`/${encodeURIComponent(handle)}/hosting/deliveries/${encodeURIComponent(deliveryId)}/retry`, {});
+    return data.queued;
+  }
+
+  async getHosting(handle: string): Promise<HostingConfiguration> {
+    return parseHosting(await this.http.get(`/${encodeURIComponent(handle)}/hosting`));
+  }
+
+  async updateHosting(handle: string, options: HostingUpdate): Promise<HostingConfiguration> {
+    return parseHosting(await this.http.put(`/${encodeURIComponent(handle)}/hosting`, hostingUpdateBody(options)));
+  }
+
   async getWhatsAppStatus(handle:string):Promise<WhatsAppChannelStatus|null> {
     const data = await this.http.get<{whatsapp?:RawWhatsAppChannelStatus|null}>(`/${encodeURIComponent(handle)}/channel-status`);
     return data.whatsapp == null ? null : parseWhatsAppChannelStatus(data.whatsapp);

@@ -22,6 +22,7 @@ use crate::agent_signup::types::{
 use crate::api_keys::resources::api_keys::ApiKeysResource;
 use crate::billing::BillingResource;
 use crate::companion::CompanionResource;
+use crate::computers::ComputersResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
 use crate::error::{parse_agent_support, InkboxError, Result};
@@ -179,6 +180,7 @@ pub struct Inkbox {
     vault: VaultResource,
     contacts: ContactsResource,
     companion: CompanionResource,
+    computers: ComputersResource,
     notes: NotesResource,
     billing: BillingResource,
 
@@ -318,6 +320,7 @@ impl Inkbox {
             vault,
             contacts: ContactsResource::new(contacts_http.clone()),
             companion: CompanionResource::new(api_http.clone()),
+            computers: ComputersResource::new(api_http.clone()),
             message_sends: MessageSendsResource::new(
                 api_http.clone(),
                 mk(&format!("{api_root}/mail")),
@@ -385,6 +388,10 @@ impl Inkbox {
     pub fn mailboxes(&self) -> &MailboxesResource {
         &self.mailboxes
     }
+    pub fn computers(&self) -> &ComputersResource {
+        &self.computers
+    }
+
     pub fn companion(&self) -> &CompanionResource {
         &self.companion
     }

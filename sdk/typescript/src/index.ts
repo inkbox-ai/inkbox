@@ -560,3 +560,8 @@ export type { IdentityPackStatus, IdentityPackOffer, IdentityPackAgreement, Iden
 
 export * from "./whatsapp.js";
 export type {WhatsAppWebhookEventType,WhatsAppWebhookReaction,WhatsAppWebhookMessage,WhatsAppWebhookRecipient,WhatsAppWebhookMedia,WhatsAppWebhookData,WhatsAppWebhookPayload} from "./webhooks/types.js";
+
+export type { HostingConfiguration, HostingUpdate, HostingDelivery } from "./identities/hosting.js";
+
+export { ComputersResource } from "./computers.js";
+export type { ComputerMetricSummary, ComputerUsageHistory, ComputerConversation, ComputerConversationList, ComputerConversationHistory, ComputerSessionRun } from "./computers.js";

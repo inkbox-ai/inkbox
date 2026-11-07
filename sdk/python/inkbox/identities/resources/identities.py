@@ -15,6 +15,7 @@ from uuid import UUID
 
 from inkbox.whatsapp import WhatsAppChannelStatus
 from inkbox.exceptions import InkboxAPIError
+from inkbox.identities.hosting import HostingConfiguration, HostingUpdate, HostingDelivery
 from inkbox.identities.exceptions import map_identity_conflict_error
 from inkbox.identities.types import (
     _UNSET,
@@ -33,6 +34,24 @@ if TYPE_CHECKING:
 
 
 class IdentitiesResource:
+    def get_hosting(self, agent_handle: str) -> HostingConfiguration:
+        """Read hosting status, applied configuration and selected triggers."""
+        return HostingConfiguration.from_dict(self._http.get(f"/{quote(agent_handle, safe='')}/hosting"))
+
+    def update_hosting(self, agent_handle: str, options: HostingUpdate) -> HostingConfiguration:
+        """Enable, edit or remove hosting using the last read generation."""
+        return HostingConfiguration.from_dict(self._http.put(f"/{quote(agent_handle, safe='')}/hosting", json=dict(options)))
+
+    def list_hosting_deliveries(self, agent_handle: str, *, before: str | None = None) -> list[HostingDelivery]:
+        """Read up to 100 handoffs; accepted does not mean the agent has replied."""
+        data = self._http.get(f"/{quote(agent_handle, safe='')}/hosting/deliveries", params={"before": before})
+        return [HostingDelivery.from_dict(item) for item in data["items"]]
+
+    def retry_hosting_delivery(self, agent_handle: str, delivery_id: str) -> bool:
+        """Retry an eligible handoff while preserving its original event identity."""
+        data = self._http.post(f"/{quote(agent_handle, safe='')}/hosting/deliveries/{quote(delivery_id, safe='')}/retry", json={})
+        return bool(data["queued"])
+
     def get_whatsapp_status(self, agent_handle: str) -> WhatsAppChannelStatus | None:
         """Read fresh WhatsApp availability; None means the API omitted the channel."""
         data = self._http.get(f"/{quote(agent_handle, safe='')}/channel-status")
