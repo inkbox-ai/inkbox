@@ -110,3 +110,50 @@ fn contact_selector_and_empty_participants_are_unambiguous() {
         .is_err());
     query.assert_hits(1);
 }
+
+#[test]
+fn whatsapp_selectors_preserve_scope_pagination_and_repeated_values() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-test-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let identity = Uuid::parse_str("aaaaaaaa-1111-4111-8111-111111111111").unwrap();
+    let options = inkbox::whatsapp::WhatsAppListOptions {
+        agent_identity_id: Some(identity),
+        limit: Some(12),
+        offset: Some(7),
+        ..Default::default()
+    };
+    for selector in [
+        ConversationParticipantFilter::Participants(vec![
+            "+14155550123".into(),
+            "+14155550124".into(),
+        ]),
+        ConversationParticipantFilter::ContactId(identity),
+    ] {
+        let request = server.mock(|when, then| {
+            let when = when
+                .method(GET)
+                .path("/api/v1/whatsapp/conversations")
+                .query_param("agent_identity_id", identity.to_string())
+                .query_param("limit", "12")
+                .query_param("offset", "7");
+            match &selector {
+                ConversationParticipantFilter::Participants(values) => {
+                    when.query_param("participants", &values[0])
+                        .query_param("participants", &values[1]);
+                }
+                ConversationParticipantFilter::ContactId(id) => {
+                    when.query_param("contact_id", id.to_string());
+                }
+            }
+            then.status(200).json_body(json!([]));
+        });
+        client
+            .whatsapp()
+            .list_conversations_matching(&options, Some(&selector))
+            .unwrap();
+        request.assert();
+    }
+}

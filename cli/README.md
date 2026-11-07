@@ -1509,6 +1509,7 @@ methods without a selector retain their behavior.
 ```bash
 inkbox text conversations --identity support-bot --participants +14155550123 +14155550124 --include-groups
 inkbox imessage conversations --identity support-bot --contact-id aaaaaaaa-1111-4111-8111-111111111111 --include-groups
+inkbox whatsapp conversations --identity support-bot --participants +14155550123
 ```
 
 Use `--participants` or `--contact-id`, not both. Existing group-listing rules

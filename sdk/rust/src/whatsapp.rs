@@ -407,7 +407,18 @@ impl WhatsAppResource {
         &self,
         o: &WhatsAppListOptions,
     ) -> Result<Vec<WhatsAppConversationSummary>> {
+        self.list_conversations_matching(o, None)
+    }
+    /// List direct and group conversations matching any participant or a saved contact.
+    pub fn list_conversations_matching(
+        &self,
+        o: &WhatsAppListOptions,
+        selector: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<WhatsAppConversationSummary>> {
         let mut p = owner(o.agent_identity_id.as_ref());
+        if let Some(selector) = selector {
+            selector.apply(&mut p)?;
+        }
         p.push(("limit", o.limit.unwrap_or(50).to_string()));
         p.push(("offset", o.offset.unwrap_or(0).to_string()));
         for (name, value) in [

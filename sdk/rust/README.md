@@ -1400,6 +1400,7 @@ methods without a selector retain their behavior.
 Use `ConversationParticipantFilter::Participants` or
 `ConversationParticipantFilter::ContactId` with `threads().list_matching`,
 `texts().list_conversations_matching`, `imessages().list_conversations_matching`,
+`whatsapp().list_conversations_matching`,
 or the identity-level `list_text_conversations_matching` /
-`list_imessage_conversations_matching` methods. Existing method signatures remain
+`list_imessage_conversations_matching` / `list_whatsapp_conversations_matching` methods. Existing method signatures remain
 compatible.

@@ -1,3 +1,4 @@
+import { WhatsAppResource } from "../src/whatsapp.js";
 import { describe, expect, it, vi } from "vitest";
 import type { HttpTransport } from "../src/_http.js";
 import { ThreadsResource } from "../src/mail/resources/threads.js";
@@ -9,7 +10,7 @@ const contactId = "aaaaaaaa-1111-4111-8111-111111111111";
 
 describe("conversation selectors", () => {
   for (const selector of [{ participants }, { contactId }]) {
-    for (const channel of ["email", "sms", "imessage"]) {
+    for (const channel of ["email", "sms", "imessage", "whatsapp"]) {
       it(`forwards ${Object.keys(selector)[0]} for ${channel}`, async () => {
         const get = vi.fn().mockResolvedValue(channel === "email" ? { items: [], has_more: false } : []);
         const http = { get } as unknown as HttpTransport;
@@ -17,6 +18,8 @@ describe("conversation selectors", () => {
           for await (const _item of new ThreadsResource(http).list("agent@example.com", selector)) { /* empty page */ }
         } else if (channel === "sms") {
           await new TextsResource(http).listConversations("number-id", selector);
+        } else if (channel === "whatsapp") {
+          await new WhatsAppResource(http).listConversations(selector);
         } else {
           await new IMessagesResource(http).listConversations(selector);
         }
@@ -37,4 +40,12 @@ describe("conversation selectors", () => {
     await expect(resource.listConversations("number", { participants, contactId })).rejects.toThrow();
     expect(get).not.toHaveBeenCalled();
   });
+});
+
+it("WhatsApp rejects conflicting selectors without issuing a request", async () => {
+  const get = vi.fn();
+  const resource = new WhatsAppResource({ get } as unknown as HttpTransport);
+  await expect(resource.listConversations({ participants: [], contactId })).rejects.toThrow();
+  await expect(resource.listConversations({ participants: [] })).rejects.toThrow();
+  expect(get).not.toHaveBeenCalled();
 });

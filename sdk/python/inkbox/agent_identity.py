@@ -221,10 +221,12 @@ class AgentIdentity:
     def list_whatsapp_conversations(
         self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None,
         start_datetime: str | None = None, end_datetime: str | None = None, tz: str | None = None,
+        participants: list[str] | None = None, contact_id: UUID | str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         return self._inkbox.whatsapp.list_conversations(
             agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked,
             start_datetime=start_datetime, end_datetime=end_datetime, tz=tz,
+            participants=participants, contact_id=contact_id,
         )
 
     def get_whatsapp_conversation(

@@ -2344,7 +2344,7 @@ contact, including nonprimary addresses. The selectors are mutually exclusive.
 Filtering precedes pagination and never grants additional access. Existing
 methods without a selector retain their behavior.
 
-Use optional `participants` or `contact_id` on email thread lists and SMS/iMessage conversation lists.
+Use optional `participants` or `contact_id` on email thread lists and SMS, iMessage, and WhatsApp conversation lists.
 
 ```python
 identity.list_text_conversations(participants=["+14155550123"], include_groups=True)

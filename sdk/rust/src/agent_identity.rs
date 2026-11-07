@@ -2323,6 +2323,18 @@ impl AgentIdentity {
         o.agent_identity_id = Some(self.id());
         self.inkbox.whatsapp().list_conversations(&o)
     }
+    /// List this identity's WhatsApp conversations matching a participant selector.
+    pub fn list_whatsapp_conversations_matching(
+        &self,
+        o: &crate::whatsapp::WhatsAppListOptions,
+        selector: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<crate::whatsapp::WhatsAppConversationSummary>> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox
+            .whatsapp()
+            .list_conversations_matching(&o, selector)
+    }
     pub fn get_whatsapp_conversation(
         &self,
         id: &Uuid,

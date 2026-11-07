@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
-for (const channel of ["text", "imessage"]) {
+for (const channel of ["text", "imessage", "whatsapp"]) {
   test(`${channel} conversations forwards repeated participants and contacts`, async (t) => {
     const calls = [];
     const server = createServer((request, response) => {
@@ -24,9 +24,9 @@ for (const channel of ["text", "imessage"]) {
     const run = (...args) => exec(process.execPath, [cli, "--base-url", `http://127.0.0.1:${server.address().port}`,
       "--api-key", "synthetic-test-key", "--json", channel, "conversations", "--identity", "support-bot", ...args],
       { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 });
-    await run("--participants", "guest@example.com", "+14155550123", "--include-groups");
+    await run("--participants", "guest@example.com", "+14155550123", ...(channel === "whatsapp" ? [] : ["--include-groups"]));
     assert.deepEqual(calls.at(-1).searchParams.getAll("participants"), ["guest@example.com", "+14155550123"]);
-    assert.equal(calls.at(-1).searchParams.get("include_groups"), "true");
+    assert.equal(calls.at(-1).searchParams.get("include_groups"), channel === "whatsapp" ? null : "true");
     await run("--contact-id", "aaaaaaaa-1111-4111-8111-111111111111");
     assert.equal(calls.at(-1).searchParams.get("contact_id"), "aaaaaaaa-1111-4111-8111-111111111111");
     const before = calls.filter(url => url.pathname.endsWith("/conversations")).length;

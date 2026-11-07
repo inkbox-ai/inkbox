@@ -1,3 +1,4 @@
+import { conversationFilterParams } from "./_conversationFilters.js";
 import type { SenderAccess } from "./sender_access.js";
 /** Approved WhatsApp conversations, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
@@ -369,7 +370,7 @@ export interface WhatsAppListOptions {
 export type WhatsAppConversationListOptions = Omit<
   WhatsAppListOptions,
   "conversationId" | "threadId" | "isRead"
->;
+> & { participants?: string[]; contactId?: string };
 const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
 /** A message draft link and QR code; opening either does not send a message. */
@@ -500,6 +501,7 @@ export class WhatsAppResource {
       "/conversations",
       {
         ...owner(o.agentIdentityId),
+        ...conversationFilterParams(o),
         limit: o.limit ?? 50,
         offset: o.offset ?? 0,
         ...(o.startDatetime != null ? { start_datetime: o.startDatetime } : {}),
