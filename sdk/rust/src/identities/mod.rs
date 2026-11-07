@@ -12,9 +12,11 @@
 
 pub mod directional;
 pub mod exceptions;
+pub mod hosting;
 pub mod resources;
 pub mod types;
 pub use directional::*;
+pub use hosting::{HostingConfiguration, HostingDeliveries, HostingDelivery, HostingUpdate};
 
 // Re-export the public types.
 pub use types::{

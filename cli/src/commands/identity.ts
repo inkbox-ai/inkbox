@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { registerHostingCommands } from "./hosting.js";
 import { registerCompanionCommands } from "./companion.js";
 import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
 import { parsePolicyPagination } from "../pagination.js";
@@ -1084,6 +1085,7 @@ export function registerIdentityCommands(program: Command): void {
 
   registerIdentityMailRuleCommands(identity);
   registerCompanionCommands(identity);
+  registerHostingCommands(identity);
   registerIdentityPhoneRuleCommands(identity);
   registerIdentitySigningKeyCommands(identity);
 }
