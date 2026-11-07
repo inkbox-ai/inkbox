@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import httpx
 import pytest
@@ -360,3 +361,50 @@ def test_post_accept_decode_failure_retains_request_key_without_resend(key, malf
     resource.send(conversation_id=CONV, text="One logical message", idempotency_key=retained)
     assert http.post.call_count == 2
     assert http.post.call_args == original
+
+
+@pytest.mark.parametrize("identity_id", [None, OWNER, UUID(OWNER)])
+@pytest.mark.parametrize("state", ["ready", "unavailable", "disabled"])
+def test_onboarding_is_an_owned_read_and_preserves_availability(identity_id, state):
+    from dataclasses import asdict
+    from inkbox import WhatsAppOnboarding
+
+    raw = json.loads((Path(__file__).parents[3] / "tests/fixtures/whatsapp-onboarding.json").read_text())
+    raw["agent_identity_id"] = OWNER
+    raw["ready"] = state == "ready"
+    if state == "disabled":
+        raw.update(number=None, message_link=None, message_qr_png_data_url=None)
+    http = MagicMock()
+    http.get.return_value = raw
+    result = WhatsAppResource(http).get_onboarding(agent_identity_id=identity_id)
+    assert isinstance(result, WhatsAppOnboarding)
+    assert asdict(result) == {**raw, "agent_identity_id": UUID(OWNER)}
+    http.get.assert_called_once_with(
+        "/onboarding", params={} if identity_id is None else {"agent_identity_id": OWNER}
+    )
+    http.post.assert_not_called()
+
+
+def test_identity_onboarding_reads_fresh_details_with_own_identity():
+    data = _AgentIdentityData._from_dict({
+        "id": OWNER, "organization_id": "org_example", "agent_handle": "agent",
+        "created_at": F["message"]["created_at"], "updated_at": F["message"]["updated_at"],
+    })
+    with Inkbox(api_key="test-only") as client:
+        client.whatsapp._http = MagicMock()
+        client.whatsapp._http.get.return_value = {
+            "agent_identity_id": OWNER, "number": None, "message_text": "Hello!",
+            "message_link": None, "message_qr_png_data_url": None, "ready": False,
+        }
+        assert AgentIdentity(data, client).get_whatsapp_onboarding().ready is False
+        client.whatsapp._http.get.assert_called_once_with("/onboarding", params={"agent_identity_id": OWNER})
+
+
+def test_whatsapp_webhook_companion_metadata_is_optional_and_typed():
+    from typing import get_type_hints, get_args, NotRequired
+    from inkbox.companion import CompanionMetadata
+    from inkbox.webhooks import WhatsAppWebhookPayload
+
+    annotation = get_type_hints(WhatsAppWebhookPayload, include_extras=True)["companion"]
+    assert annotation == NotRequired[CompanionMetadata]
+    assert get_args(annotation) == (CompanionMetadata,)

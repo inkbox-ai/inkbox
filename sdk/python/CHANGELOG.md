@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.29 - Existing WhatsApp groups (unreleased)
+
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0729---whatsapp-groups-companion-and-onboarding-unreleased) for this release.
+
 ## Unreleased
 
 ## 0.7.14 - Slack contact rules (unreleased)

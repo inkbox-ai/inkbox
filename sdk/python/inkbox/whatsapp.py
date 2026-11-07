@@ -11,6 +11,7 @@ from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
 from inkbox._message_requests import post_message, send_key
+from inkbox.sender_access import SenderAccess
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -146,14 +147,25 @@ class WhatsAppReaction:
 
 
 @dataclass
+class WhatsAppMention:
+    text: str | None
+    phone_number: str | None
+    is_agent: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMention:
+        return cls(text=d.get("text"), phone_number=d.get("phone_number"), is_agent=d.get("is_agent") is True)
+
+
+@dataclass
 class WhatsAppMessage:
     id: UUID
     agent_identity_id: UUID
     conversation_id: UUID
     direction: WhatsAppDirection
     local_number: str
-    remote_number: str
-    sender_number: str
+    remote_number: str | None
+    sender_number: str | None
     participants: list[str]
     content: str | None
     media: list[WhatsAppMedia]
@@ -177,9 +189,22 @@ class WhatsAppMessage:
     thread_root_message_id: UUID | None = None
     reactions: list[WhatsAppReaction] = field(default_factory=list)
 
+    sender_access: SenderAccess | None = field(default=None, kw_only=True)
+    mentions: list[WhatsAppMention] = field(default_factory=list, kw_only=True)
+    agent_mentioned: bool = field(default=False, kw_only=True)
+    is_group: bool = field(default=False, kw_only=True)
+    group_name: str | None = field(default=None, kw_only=True)
+    unresolved_participant_count: int = field(default=0, kw_only=True)
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMessage:
         return cls(
+            mentions=[WhatsAppMention._from_dict(item) for item in d.get("mentions", [])],
+            sender_access=d.get("sender_access"),
+            agent_mentioned=d.get("agent_mentioned") is True,
+            is_group=d.get("is_group", False),
+            group_name=d.get("group_name"),
+            unresolved_participant_count=d.get("unresolved_participant_count", 0),
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),
             conversation_id=UUID(d["conversation_id"]),
@@ -219,10 +244,14 @@ class WhatsAppConversation:
     id: UUID
     agent_identity_id: UUID
     local_number: str
-    remote_number: str
+    remote_number: str | None
     participants: list[str]
     created_at: datetime
     updated_at: datetime
+
+    is_group: bool = field(default=False, kw_only=True)
+    group_name: str | None = field(default=None, kw_only=True)
+    unresolved_participant_count: int = field(default=0, kw_only=True)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConversation:
@@ -234,6 +263,9 @@ class WhatsAppConversation:
             d["participants"],
             datetime.fromisoformat(d["created_at"]),
             datetime.fromisoformat(d["updated_at"]),
+            is_group=d.get("is_group", False),
+            group_name=d.get("group_name"),
+            unresolved_participant_count=d.get("unresolved_participant_count", 0),
         )
 
 
@@ -283,6 +315,29 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
 
 
 @dataclass
+class WhatsAppOnboarding:
+    """A message draft link and QR code; opening either does not send a message."""
+
+    agent_identity_id: UUID
+    number: str | None
+    message_text: str
+    message_link: str | None
+    message_qr_png_data_url: str | None
+    ready: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppOnboarding:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            number=d["number"],
+            message_text=d["message_text"],
+            message_link=d["message_link"],
+            message_qr_png_data_url=d["message_qr_png_data_url"],
+            ready=d["ready"],
+        )
+
+
+@dataclass
 class WhatsAppLimits:
     agent_identity_id: UUID
     limits: dict[str, int]
@@ -294,7 +349,7 @@ class WhatsAppLimits:
 
 
 class WhatsAppResource:
-    """Direct WhatsApp on an approved dedicated number.
+    """Direct and existing-group WhatsApp on an approved dedicated number.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
     and owned media IDs after an uncertain outcome; never re-upload to retry it.
@@ -310,18 +365,23 @@ class WhatsAppResource:
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
+        gif_playback: bool = False,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
     ) -> WhatsAppMessage:
-        """Queue a direct message or native quoted reply, without assuming delivery.
+        """Queue a direct or eligible group message or native quoted reply, without assuming delivery.
 
         Preserve the logical key after uncertainty rather than starting another operation.
         plain_reply_fallback defaults to True; False explicitly requires a native
         quote. Current supported targets use native quotes; missing evidence or
         rejected/uncertain sends never trigger a plain replacement.
         """
+        if not isinstance(gif_playback, bool):
+            raise ValueError("gif_playback must be a boolean")
+        if gif_playback and not media_ids:
+            raise ValueError("gif_playback requires one MP4 media attachment")
         if not isinstance(plain_reply_fallback, bool):
             raise ValueError("plain_reply_fallback must be a boolean")
         if (to is None) == (conversation_id is None):
@@ -351,6 +411,8 @@ class WhatsAppResource:
             body["text"] = text
         if media_ids is not None:
             body["media_ids"] = [str(value) for value in media_ids]
+        if gif_playback:
+            body["gif_playback"] = True
         key = send_key(idempotency_key)
         data = post_message(
             self._http,
@@ -543,6 +605,12 @@ class WhatsAppResource:
         )
         return WhatsAppMarkReadResult(
             UUID(data["conversation_id"]), data["updated_count"]
+        )
+
+    def get_onboarding(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppOnboarding:
+        """Read a link and QR for messaging the agent, without sending or enabling WhatsApp."""
+        return WhatsAppOnboarding._from_dict(
+            self._http.get("/onboarding", params=_owner(agent_identity_id))
         )
 
     def get_limits(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppLimits:

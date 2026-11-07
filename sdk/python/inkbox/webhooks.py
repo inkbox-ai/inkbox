@@ -967,14 +967,20 @@ class WhatsAppWebhookRecipient(TypedDict):
     failed_at: str | None
 
 
+class WhatsAppWebhookMention(TypedDict):
+    text: str | None
+    phone_number: str | None
+    is_agent: bool
+
+
 class WhatsAppWebhookMessage(TypedDict):
     id: str
     agent_identity_id: str
     conversation_id: str
     direction: str
     local_number: str
-    remote_number: str
-    sender_number: str
+    remote_number: str | None
+    sender_number: str | None
     participants: list[str]
     content: str | None
     media: list[WhatsAppWebhookMedia]
@@ -995,6 +1001,13 @@ class WhatsAppWebhookMessage(TypedDict):
     thread_id: NotRequired[str | None]
     thread_root_message_id: NotRequired[str | None]
     reactions: NotRequired[list["WhatsAppWebhookReaction"]]
+
+    sender_access: NotRequired[SenderAccess | None]
+    mentions: NotRequired[list[WhatsAppWebhookMention]]
+    agent_mentioned: NotRequired[bool]
+    is_group: NotRequired[bool]
+    group_name: NotRequired[str | None]
+    unresolved_participant_count: NotRequired[int]
 
 
 class WhatsAppWebhookReaction(TypedDict):
@@ -1023,6 +1036,7 @@ class WhatsAppWebhookData(TypedDict):
 
 
 class WhatsAppWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata]
     id: str
     event_type: WhatsAppWebhookEventType
     timestamp: str

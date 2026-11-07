@@ -2,14 +2,14 @@ import type { SenderAccess } from "./sender_access.js";
 import { HttpTransport } from "./_http.js";
 import { collectResponseNotices, parseResponseNotices, type ResponseNotice } from "./response_metadata.js";
 
-export type CompanionChannel = "mail" | "phone" | "imessage" | "slack";
+export type CompanionChannel = "mail" | "phone" | "imessage" | "whatsapp" | "slack";
 export const DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024;
 
 export interface CompanionReadiness { ready: boolean; reasons: string[] }
 export interface CompanionConfig {
   enabled: boolean;
   configRevision: number;
-  readiness: Record<Exclude<CompanionChannel, "slack">, CompanionReadiness> & { slack?: CompanionReadiness };
+  readiness: Record<Exclude<CompanionChannel, "slack" | "whatsapp">, CompanionReadiness> & { slack?: CompanionReadiness; whatsapp?: CompanionReadiness };
   notices?: ResponseNotice[];
 }
 export interface CompanionUpdateOptions { enabled?: boolean }
@@ -117,7 +117,7 @@ function uuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 }
 function channel(value: unknown): value is CompanionChannel {
-  return value === "mail" || value === "phone" || value === "imessage" || value === "slack";
+  return value === "mail" || value === "phone" || value === "imessage" || value === "whatsapp" || value === "slack";
 }
 function object(value: unknown): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value);

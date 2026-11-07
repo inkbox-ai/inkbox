@@ -1,3 +1,4 @@
+import type { SenderAccess } from "./sender_access.js";
 /** Approved WhatsApp conversations, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
 import { messageKey, postMessage } from "./message_sends.js";
@@ -110,14 +111,24 @@ export function parseWhatsAppRecipient(
     failedAt: r.failed_at ? new Date(r.failed_at) : null,
   };
 }
+export interface WhatsAppMention {
+  text: string | null;
+  phoneNumber: string | null;
+  isAgent: boolean;
+}
+export interface RawWhatsAppMention {
+  text: string | null;
+  phone_number: string | null;
+  is_agent: boolean;
+}
 export interface WhatsAppMessage {
   id: string;
   agentIdentityId: string;
   conversationId: string;
   direction: WhatsAppDirection;
   localNumber: string;
-  remoteNumber: string;
-  senderNumber: string;
+  remoteNumber: string | null;
+  senderNumber: string | null;
   participants: string[];
   content: string | null;
   media: WhatsAppMedia[];
@@ -140,6 +151,12 @@ export interface WhatsAppMessage {
   threadId: string | null;
   threadRootMessageId: string | null;
   reactions: WhatsAppReaction[];
+  senderAccess?: SenderAccess | null;
+  mentions: WhatsAppMention[];
+  agentMentioned: boolean;
+  isGroup: boolean;
+  groupName: string | null;
+  unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppMessage {
   id: string;
@@ -147,8 +164,8 @@ export interface RawWhatsAppMessage {
   conversation_id: string;
   direction: WhatsAppDirection;
   local_number: string;
-  remote_number: string;
-  sender_number: string;
+  remote_number: string | null;
+  sender_number: string | null;
   participants: string[];
   content: string | null;
   media: RawWhatsAppMedia[];
@@ -171,9 +188,21 @@ export interface RawWhatsAppMessage {
   thread_id?: string | null;
   thread_root_message_id?: string | null;
   reactions?: RawWhatsAppReaction[];
+  sender_access?: SenderAccess | null;
+  mentions?: RawWhatsAppMention[];
+  agent_mentioned?: boolean;
+  is_group?: boolean;
+  group_name?: string | null;
+  unresolved_participant_count?: number;
 }
 export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   return {
+    mentions: (r.mentions ?? []).map((item) => ({ text: item.text, phoneNumber: item.phone_number, isAgent: item.is_agent === true })),
+    ...(r.sender_access === undefined ? {} : { senderAccess: r.sender_access }),
+    agentMentioned: r.agent_mentioned === true,
+    isGroup: r.is_group ?? false,
+    groupName: r.group_name ?? null,
+    unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     conversationId: r.conversation_id,
@@ -211,24 +240,33 @@ export interface WhatsAppConversation {
   id: string;
   agentIdentityId: string;
   localNumber: string;
-  remoteNumber: string;
+  remoteNumber: string | null;
   participants: string[];
   createdAt: Date;
   updatedAt: Date;
+  isGroup: boolean;
+  groupName: string | null;
+  unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppConversation {
   id: string;
   agent_identity_id: string;
   local_number: string;
-  remote_number: string;
+  remote_number: string | null;
   participants: string[];
   created_at: string;
   updated_at: string;
+  is_group?: boolean;
+  group_name?: string | null;
+  unresolved_participant_count?: number;
 }
 export function parseWhatsAppConversation(
   r: RawWhatsAppConversation,
 ): WhatsAppConversation {
   return {
+    isGroup: r.is_group ?? false,
+    groupName: r.group_name ?? null,
+    unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     localNumber: r.local_number,
@@ -309,6 +347,8 @@ export interface WhatsAppSendOptions {
   replyToMessageId?: string;
   /** Defaults true; false requires native quoting. Missing evidence or uncertain sends never trigger a plain replacement. */
   plainReplyFallback?: boolean;
+  /** Play an uploaded MP4 attachment as an animation. */
+  gifPlayback?: boolean;
   text?: string;
   mediaIds?: string[];
   agentIdentityId?: string;
@@ -332,6 +372,33 @@ export type WhatsAppConversationListOptions = Omit<
 >;
 const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
+/** A message draft link and QR code; opening either does not send a message. */
+export interface WhatsAppOnboarding {
+  agentIdentityId: string;
+  number: string | null;
+  messageText: string;
+  messageLink: string | null;
+  messageQrPngDataUrl: string | null;
+  ready: boolean;
+}
+export interface RawWhatsAppOnboarding {
+  agent_identity_id: string;
+  number: string | null;
+  message_text: string;
+  message_link: string | null;
+  message_qr_png_data_url: string | null;
+  ready: boolean;
+}
+export function parseWhatsAppOnboarding(row: RawWhatsAppOnboarding): WhatsAppOnboarding {
+  return {
+    agentIdentityId: row.agent_identity_id,
+    number: row.number,
+    messageText: row.message_text,
+    messageLink: row.message_link,
+    messageQrPngDataUrl: row.message_qr_png_data_url,
+    ready: row.ready,
+  };
+}
 export interface WhatsAppLimits {
   agentIdentityId: string;
   limits: Record<string, number>;
@@ -353,6 +420,10 @@ export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
   /** Queue one message. Reuse its key and owned media IDs after uncertainty. */
   async send(o: WhatsAppSendOptions): Promise<WhatsAppMessage> {
+    if (o.gifPlayback !== undefined && typeof o.gifPlayback !== "boolean")
+      throw new Error("gifPlayback must be a boolean");
+    if (o.gifPlayback && !o.mediaIds?.length)
+      throw new Error("gifPlayback requires one MP4 media attachment");
     if (o.plainReplyFallback !== undefined && typeof o.plainReplyFallback !== "boolean")
       throw new Error("plainReplyFallback must be a boolean");
     if ((o.to == null) === (o.conversationId == null))
@@ -375,6 +446,7 @@ export class WhatsAppResource {
       ...(o.replyToMessageId != null && o.plainReplyFallback === false ? { plain_reply_fallback: false } : {}),
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
+      ...(o.gifPlayback === true ? { gif_playback: true } : {}),
     };
     const key = messageKey(o.idempotencyKey);
     const data = await postMessage<{ message: RawWhatsAppMessage }>(
@@ -528,6 +600,12 @@ export class WhatsAppResource {
         },
         { params: owner(o.agentIdentityId) },
       ),
+    );
+  }
+  /** Read a link and QR for messaging the agent, without sending or enabling WhatsApp. */
+  async getOnboarding(o: { agentIdentityId?: string } = {}): Promise<WhatsAppOnboarding> {
+    return parseWhatsAppOnboarding(
+      await this.http.get<RawWhatsAppOnboarding>("/onboarding", owner(o.agentIdentityId)),
     );
   }
   /** Effective server limits and independent usage; protocol maxima are not entitlements. */

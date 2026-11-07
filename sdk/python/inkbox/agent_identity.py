@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 from inkbox.phone.hosted_mcp import HostedMcpConnection, HostedMcpCreate
 
-from inkbox.whatsapp import (WhatsAppLimits, WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus, WhatsAppReaction, WhatsAppThread)
+from inkbox.whatsapp import (WhatsAppOnboarding, WhatsAppLimits, WhatsAppMessage, WhatsAppConversation, WhatsAppConversationSummary, WhatsAppMedia, WhatsAppMarkReadResult, WhatsAppChannelStatus, WhatsAppReaction, WhatsAppThread)
 from inkbox.credentials import Credentials
 from inkbox.a2a.client import A2AClient
 from inkbox.a2a.resource import skills_wire
@@ -139,6 +139,10 @@ class AgentIdentity:
     def whatsapp_number(self) -> str | None:
         return self._data.whatsapp_number
 
+    def get_whatsapp_onboarding(self) -> WhatsAppOnboarding:
+        """Read this agent's WhatsApp message link and QR code."""
+        return self._inkbox.whatsapp.get_onboarding(agent_identity_id=self.id)
+
     def get_whatsapp_limits(self) -> WhatsAppLimits:
         return self._inkbox.whatsapp.get_limits(agent_identity_id=self.id)
 
@@ -152,6 +156,7 @@ class AgentIdentity:
         conversation_id: UUID | str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
+        gif_playback: bool = False,
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         idempotency_key: str | None = None,
@@ -161,6 +166,7 @@ class AgentIdentity:
             conversation_id=conversation_id,
             reply_to_message_id=reply_to_message_id,
             plain_reply_fallback=plain_reply_fallback,
+            gif_playback=gif_playback,
             text=text,
             media_ids=media_ids,
             idempotency_key=idempotency_key,

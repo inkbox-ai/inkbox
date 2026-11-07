@@ -176,8 +176,14 @@ fn fresh_status_missing_on_older_api_is_none_and_webhooks_are_typed() {
         .url
         .is_none());
     assert_eq!(
-        payload.data.message.as_ref().unwrap().sender_number,
-        "+15555550101"
+        payload
+            .data
+            .message
+            .as_ref()
+            .unwrap()
+            .sender_number
+            .as_deref(),
+        Some("+15555550101")
     );
 }
 
@@ -681,4 +687,226 @@ fn identity_lists_retain_configured_whatsapp_and_default_older_responses() {
         );
         list.assert();
     }
+}
+
+#[test]
+fn group_metadata_and_quoted_animation_preserve_stable_ids() {
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let message: inkbox::WhatsAppMessage = serde_json::from_value(f["message"].clone()).unwrap();
+    let conversation: inkbox::WhatsAppConversation =
+        serde_json::from_value(f["conversation"].clone()).unwrap();
+    assert!(message.is_group && conversation.is_group);
+    assert_eq!(conversation.group_name.as_deref(), Some("Project garden"));
+    assert!(message.remote_number.is_none() && message.recipients.is_empty());
+    assert_eq!(
+        message.sender_number.as_deref(),
+        Some(message.local_number.as_str())
+    );
+    assert_eq!(message.unresolved_participant_count, 0);
+    let blocked: inkbox::WhatsAppMessage =
+        serde_json::from_value(f["blocked_inbound_message"].clone()).unwrap();
+    assert_eq!(blocked.direction, inkbox::WhatsAppDirection::Inbound);
+    assert!(blocked.is_blocked && blocked.sender_number.is_none());
+    assert_eq!(blocked.unresolved_participant_count, 1);
+    let direct: inkbox::WhatsAppMessage =
+        serde_json::from_value(fixture()["message"].clone()).unwrap();
+    assert!(!direct.is_group && direct.group_name.is_none());
+    assert_eq!(direct.unresolved_participant_count, 0);
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(f["message"].clone()).unwrap();
+    assert!(webhook.is_group);
+    assert_eq!(
+        webhook.sender_number.as_deref(),
+        Some(message.local_number.as_str())
+    );
+    let server = MockServer::start();
+    let send = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/messages")
+            .header("Idempotency-Key", "group-quote")
+            .json_body(f["send"].clone());
+        then.status(201).json_body(json!({"message": f["message"]}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let options = WhatsAppSendOptions {
+        conversation_id: Some(conversation.id),
+        reply_to_message_id: Some(message.id),
+        media_ids: Some(vec![Uuid::parse_str(
+            f["send"]["media_ids"][0].as_str().unwrap(),
+        )
+        .unwrap()]),
+        gif_playback: Some(true),
+        text: Some("Here is the animation".into()),
+        idempotency_key: Some("group-quote".into()),
+        ..Default::default()
+    };
+    assert!(client.whatsapp().send(&options).unwrap().is_group);
+    send.assert();
+    let unexpected = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/whatsapp/messages");
+        then.status(500);
+    });
+    let no_media = WhatsAppSendOptions {
+        media_ids: None,
+        ..options
+    };
+    assert!(matches!(
+        client.whatsapp().send(&no_media),
+        Err(inkbox::InkboxError::InvalidArgument(_))
+    ));
+    unexpected.assert_hits(0);
+    send.assert_hits(1);
+}
+
+#[test]
+fn native_agent_mention_is_typed_and_defaults_false() {
+    let group: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let mut payload = group["message"].clone();
+    let legacy: inkbox::whatsapp::WhatsAppMessage =
+        serde_json::from_value(payload.clone()).unwrap();
+    assert!(!legacy.agent_mentioned);
+    payload["agent_mentioned"] = serde_json::json!(true);
+    let message: inkbox::whatsapp::WhatsAppMessage =
+        serde_json::from_value(payload.clone()).unwrap();
+    assert!(message.agent_mentioned);
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(payload.clone()).unwrap();
+    assert!(webhook.agent_mentioned);
+    payload["agent_mentioned"] = serde_json::json!("true");
+    assert!(serde_json::from_value::<inkbox::whatsapp::WhatsAppMessage>(payload).is_err());
+}
+
+#[test]
+fn structured_mentions_preserve_unknown_phone_numbers() {
+    let group: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-groups.json")).unwrap();
+    let mut payload = group["message"].clone();
+    let legacy: inkbox::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    assert!(legacy.mentions.is_empty());
+    payload["mentions"] = json!([{"text":"@123456789","phone_number":null,"is_agent":false},
+        {"text":"@15550000002","phone_number":"+15550000002","is_agent":true}]);
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(payload.clone()).unwrap();
+    assert_eq!(parsed.mentions[0].text.as_deref(), Some("@123456789"));
+    assert!(parsed.mentions[0].phone_number.is_none() && !parsed.mentions[0].is_agent);
+    assert!(parsed.mentions[1].is_agent);
+    let webhook: inkbox::webhooks::WhatsAppWebhookMessage =
+        serde_json::from_value(payload).unwrap();
+    assert_eq!(webhook.mentions.len(), 2);
+}
+
+#[test]
+fn whatsapp_sender_access_preserves_receipt_admission() {
+    let mut message = fixture()["message"].clone();
+    for access in ["direct", "sponsored"] {
+        message["sender_access"] = json!(access);
+        let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message.clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(parsed.sender_access).unwrap(),
+            json!(access)
+        );
+    }
+    message.as_object_mut().unwrap().remove("sender_access");
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message).unwrap();
+    assert!(parsed.sender_access.is_none());
+}
+
+#[test]
+fn onboarding_preserves_ownership_and_availability_without_sending() {
+    let base: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    let owner = Uuid::parse_str(base["agent_identity_id"].as_str().unwrap()).unwrap();
+    for state in ["ready", "unavailable", "disabled"] {
+        for identity in [None, Some(&owner)] {
+            let server = MockServer::start();
+            let mut raw = base.clone();
+            raw["ready"] = json!(state == "ready");
+            if state == "disabled" {
+                raw["number"] = Value::Null;
+                raw["message_link"] = Value::Null;
+                raw["message_qr_png_data_url"] = Value::Null;
+            }
+            let get = server.mock(|when, then| {
+                let when = when.method(GET).path("/api/v1/whatsapp/onboarding");
+                if let Some(id) = identity {
+                    when.query_param("agent_identity_id", id.to_string());
+                } else {
+                    when.matches(|request| match &request.query_params {
+                        None => true,
+                        Some(query) => query.is_empty(),
+                    });
+                }
+                then.status(200).json_body(raw.clone());
+            });
+            let client = Inkbox::builder("test-only")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let result: inkbox::WhatsAppOnboarding =
+                client.whatsapp().get_onboarding(identity).unwrap();
+            assert_eq!(serde_json::to_value(result).unwrap(), raw);
+            get.assert();
+        }
+    }
+}
+
+#[test]
+fn identity_onboarding_reads_its_own_fresh_details() {
+    let raw: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    let owner = raw["agent_identity_id"].as_str().unwrap();
+    let server = MockServer::start();
+    let identity_get = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/identities/my-agent");
+        then.status(200).json_body(json!({"id":owner,"organization_id":"org_example","agent_handle":"my-agent","created_at":"2026-10-01T12:00:00Z","updated_at":"2026-10-01T12:00:00Z"}));
+    });
+    let onboarding = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/onboarding")
+            .query_param("agent_identity_id", owner);
+        then.status(200).json_body(raw.clone());
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let result = client
+        .get_identity("my-agent")
+        .unwrap()
+        .get_whatsapp_onboarding()
+        .unwrap();
+    assert_eq!(serde_json::to_value(result).unwrap(), raw);
+    identity_get.assert();
+    onboarding.assert();
+}
+
+#[test]
+fn whatsapp_null_sender_access_decodes_outbound_rest_and_webhooks() {
+    let mut message = fixture()["message"].clone();
+    message["direction"] = json!("outbound");
+    message["sender_access"] = Value::Null;
+    let parsed: inkbox::WhatsAppMessage = serde_json::from_value(message.clone()).unwrap();
+    assert!(parsed.sender_access.is_none());
+    for event in [
+        "whatsapp.sent",
+        "whatsapp.delivered",
+        "whatsapp.delivery_failed",
+    ] {
+        let mut payload = fixture()["webhook"].clone();
+        payload["event_type"] = json!(event);
+        payload["data"]["message"] = message.clone();
+        let parsed: WhatsAppWebhookPayload = serde_json::from_value(payload).unwrap();
+        assert!(parsed.data.message.unwrap().sender_access.is_none());
+    }
+    message["sender_access"] = json!("unrecognized");
+    assert!(serde_json::from_value::<inkbox::WhatsAppMessage>(message.clone()).is_err());
+    assert!(serde_json::from_value::<inkbox::webhooks::WhatsAppWebhookMessage>(message).is_err());
 }

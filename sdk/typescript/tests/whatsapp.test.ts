@@ -277,3 +277,25 @@ it.each([
   expect(last().body).toEqual(original.body);
   expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe(retained);
 });
+
+const onboarding = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp-onboarding.json", import.meta.url), "utf8"));
+it.each(["ready", "unavailable", "disabled"])("onboarding preserves %s state and optional identity without sending", async (state) => {
+  const raw = { ...onboarding, ready: state === "ready", ...(state === "disabled" ? { number: null, message_link: null, message_qr_png_data_url: null } : {}) };
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok(raw))));
+  for (const agentIdentityId of [undefined, owner]) {
+    const result = await resource().getOnboarding({ agentIdentityId });
+    expect(result).toEqual({ agentIdentityId: raw.agent_identity_id, number: raw.number, messageText: raw.message_text,
+      messageLink: raw.message_link, messageQrPngDataUrl: raw.message_qr_png_data_url, ready: raw.ready });
+    expect(last().url.pathname).toBe("/api/v1/whatsapp/onboarding");
+    expect(Object.fromEntries(last().url.searchParams)).toEqual(agentIdentityId ? { agent_identity_id: owner } : {});
+    expect(last().init.method).toBe("GET");
+    expect(last().body).toBeUndefined();
+  }
+});
+it("identity onboarding uses fresh details for its own identity", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok({ id: owner, organization_id: "org_example", agent_handle: "agent",
+    created_at: f.message.created_at, updated_at: f.message.updated_at })).mockResolvedValueOnce(ok(onboarding)));
+  const identity = await new Inkbox({ apiKey: "test-only" }).getIdentity("agent");
+  expect((await identity.getWhatsAppOnboarding()).messageLink).toBe(onboarding.message_link);
+  expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+});

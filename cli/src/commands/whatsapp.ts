@@ -11,6 +11,7 @@ export function buildWhatsAppSendOptions(options: {
   conversationId?: string;
   replyToMessageId?: string;
   plainReplyFallback?: boolean;
+  gifPlayback?: boolean;
   text?: string;
   mediaId?: string;
   idempotencyKey?: string;
@@ -21,6 +22,7 @@ export function buildWhatsAppSendOptions(options: {
     throw new Error("Provide one E.164 recipient.");
   if (options.replyToMessageId !== undefined && !options.replyToMessageId) throw new Error("--reply-to-message-id requires a non-empty message ID.");
   if (options.replyToMessageId !== undefined && !options.conversationId) throw new Error("--reply-to-message-id requires --conversation-id.");
+  if (options.gifPlayback && !options.mediaId) throw new Error("--gif-playback requires --media-id with an MP4 attachment.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
   return {
@@ -32,6 +34,7 @@ export function buildWhatsAppSendOptions(options: {
     ...(options.replyToMessageId !== undefined && options.plainReplyFallback === false ? { plainReplyFallback: false } : {}),
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
+    ...(options.gifPlayback ? { gifPlayback: true } : {}),
     ...(options.idempotencyKey !== undefined
       ? { idempotencyKey: options.idempotencyKey }
       : {}),
@@ -51,13 +54,13 @@ export function buildWhatsAppListOptions(options: {
 }
 
 const WHATSAPP_MESSAGE_COLUMNS = [
-  "id", "conversationId", "direction", "remoteNumber", "content", "status", "deliveryState",
+  "id", "conversationId", "direction", "groupName", "remoteNumber", "senderNumber", "content", "status", "deliveryState",
 ];
 
 export function registerWhatsAppCommands(program: Command): void {
   const whatsapp = program
     .command("whatsapp")
-    .description("Approved WhatsApp conversations, quoted replies, and reactions");
+    .description("WhatsApp direct and inbound group conversations, quoted replies, and reactions");
   const identityCommand = (name: string, description: string) =>
     whatsapp
       .command(name)
@@ -71,9 +74,10 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--to <number>", "One E.164 recipient")
     .option("--reply-to-message-id <id>", "Quote a message in --conversation-id")
     .option("--no-plain-reply-fallback", "Require a native quoted reply; never resend an uncertain quote as plain")
-    .option("--conversation-id <id>", "Existing conversation ID")
+    .option("--conversation-id <id>", "Existing direct or inbound group conversation ID")
     .option("--text <text>", "Message text (at most 4000 characters)")
     .option("--media-id <id>", "Owned attachment ID from upload-media")
+    .option("--gif-playback", "Play an MP4 media attachment as an animation")
     .option(
       "--idempotency-key <key>",
       "Stable key for this logical send; reuse after uncertainty",
@@ -97,6 +101,17 @@ export function registerWhatsAppCommands(program: Command): void {
         opts.identity,
       );
       output(status, { json: !!global.json });
+    }),
+  );
+
+  identityCommand(
+    "onboarding",
+    "Get the agent's WhatsApp message link and QR code without sending a message",
+  ).action(
+    withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this);
+      const identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.getWhatsAppOnboarding(), { json: !!global.json });
     }),
   );
 
@@ -240,6 +255,7 @@ export function registerWhatsAppCommands(program: Command): void {
             json: !!global.json,
             columns: [
               "id",
+              "groupName",
               "remoteNumber",
               "participants",
               "latestText",

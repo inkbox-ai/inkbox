@@ -1702,11 +1702,13 @@ require a native reply instead.
 For an approved agent with an existing dedicated personal iMessage number,
 WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
 do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
-point the user to Request Access in the console. Direct conversations, native quotes, and whole-message reactions are
+point the user to Request Access in the console. Direct conversations, existing groups, native quotes, and whole-message reactions are
 supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
-Send to one E.164 string or an existing direct-message conversation. Recipient
+Send to one E.164 string or an existing conversation ID. Recipient
 arrays, including singleton arrays, and comma-separated lists are rejected.
-WhatsApp is one-to-one only; never fan out into separate sends. Upload at most one attachment
+For groups, use the conversation ID, never its display name. The agent must be added
+in WhatsApp and receive a message from another participant before sending content
+or reactions. Do not create groups or fan out into separate sends. Upload at most one attachment
 (default policy 5 MiB, hard ceiling 20 MiB) first and reuse its owned media ID. Outbound text is at most 4,000 Unicode
 code points. Preserve a stable logical-send key and media ID after ambiguity;
 check message/lookup state rather than sending a duplicate. Attachment URLs expire:
@@ -1719,3 +1721,24 @@ emphasize/question/eyes or exclusive custom emoji and an explicit stable key.
 Keep pending/uncertain receipts separate from live applied reactions. Remove only
 the selected receipt version. Reaction notifications are not new text-reply turns.
 Typing, voice calls, and remote read receipts are not supported.
+
+All group participants must have known phone numbers (`unresolved_participant_count`
+/ `unresolvedParticipantCount` must be zero). Incoming content checks inbound
+contact rules for every participant; blocked content produces no `whatsapp.received`.
+Content and reaction sends check outbound rules and return `whatsapp_contact_not_allowed`
+if any participant is unresolved or not allowed for outbound traffic. An outbound-only
+block does not block incoming content or erase earlier qualifying incoming messages.
+A new allowed incoming message is needed only if none already qualifies. Do not
+repeatedly retry this error or suggest weakening contact rules; check the current
+participant metadata and the relevant direction's permissions.
+
+A `409 whatsapp_group_reply_required` means the current WhatsApp connection has no
+qualifying incoming group message, including after a connection replacement.
+Wait for an allowed message from another participant. Do not retry with a new
+idempotency key or fall back to a direct message.
+
+Group `remote_number` / `remoteNumber` is null. `group_name` / `groupName` is display
+metadata; an unknown sender number can occur in blocked incoming history.
+For animations, upload MP4 with content type `video/mp4`, then set `gif_playback`
+(Python/Rust), `gifPlayback` (TypeScript), or `--gif-playback` (CLI). Group sends
+remain subject to message, conversation, and unanswered-message limits.

@@ -732,6 +732,14 @@ MIT
 
 ## Dedicated WhatsApp
 
+From version 0.7.29, `identity.get_whatsapp_onboarding()` (Python),
+`await identity.getWhatsAppOnboarding()` (TypeScript),
+`identity.get_whatsapp_onboarding()?` (Rust), or
+`inkbox whatsapp onboarding --identity my-agent`
+returns a message link and PNG QR code for contacting the agent. Check `ready`
+before presenting the draft; the person still taps Send in WhatsApp. This read
+does not enable WhatsApp or send a message.
+
 WhatsApp is available by approval for agents that already have a dedicated
 personal iMessage number. The approved WhatsApp channel uses that same number;
 it is not a shared-number channel. Check fresh channel status instead of assuming
@@ -778,10 +786,47 @@ inkbox whatsapp conversations --identity my-agent
 inkbox whatsapp list --identity my-agent --conversation-id <conversation-id>
 ```
 
-Use either one E.164 recipient string (`to`) or an existing direct `conversation_id` /
+Use either one E.164 recipient string (`to`) or an existing `conversation_id` /
 `conversationId`, never both. Recipient arrays are not supported. WhatsApp supports
-one-to-one conversations only. Outbound text is at most 4,000 Unicode code points.
+direct conversations and existing groups. Outbound text is at most 4,000 Unicode code points.
 Each message can contain text, one owned attachment, or both.
+
+### Existing groups
+
+Add the agent to a group in WhatsApp, then send a message from another participant.
+The agent cannot create groups or initiate group conversations. Text, attachments,
+reactions, and quoted replies require an allowed incoming message.
+All group participants must have known phone numbers (`unresolved_participant_count`
+must be zero). Receiving checks every participant against inbound contact rules;
+blocked incoming messages do not trigger `whatsapp.received`. Sending content or
+reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+if any participant is unresolved or not allowed for outbound traffic. An outbound-only
+block does not block incoming messages or erase an earlier qualifying incoming
+message. A new allowed incoming message is needed only when none already qualifies.
+
+A `409 whatsapp_group_reply_required` means the current WhatsApp connection has no
+qualifying incoming group message, including after a connection replacement.
+Wait for an allowed message from another participant. Do not retry with a new
+idempotency key or fall back to a direct message.
+
+Use the returned conversation ID to address the group, not its display name.
+Names can change or be shared by multiple groups.
+
+Messages and conversations expose `is_group`, `group_name`, and
+`unresolved_participant_count` (TypeScript: `isGroup`, `groupName`, and
+`unresolvedParticipantCount`). A group's `remote_number` / `remoteNumber` is null;
+`sender_number` / `senderNumber` may also be null when a participant's phone number
+is unavailable in a blocked incoming message. `participants` contains only known
+remote phone numbers.
+
+Existing attachment, reaction, quote, and thread methods also work in eligible
+groups. Upload an MP4 with `content_type="video/mp4"` (Python),
+`contentType: "video/mp4"` (TypeScript), or `Some("video/mp4")` as the upload
+content-type argument (Rust). Then set `gif_playback=True` (Python), `gifPlayback: true`
+(TypeScript), or `gif_playback: Some(true)` (Rust) for animated playback. In the
+CLI, upload with `inkbox whatsapp upload-media animation.mp4 --identity my-agent
+--content-type video/mp4`, then send with `--media-id <id> --gif-playback`. A raw GIF file is a document attachment;
+the SDK does not convert files.
 
 ### Attachments and recovery
 
@@ -893,3 +938,8 @@ cap. Current defaults allow 1,000 outbound messages per identity in a rolling
 between new contacts, three openings of at most 159 characters before the first
 reply, and 15 consecutive unanswered messages. Before the first direct reply,
 links, phone numbers, email addresses, and media are not allowed. Read the effective limits rather than assuming these defaults apply to every identity.
+
+Group sends also count toward the identity message quota, the rolling 24-hour
+conversation limit, and the consecutive-unanswered-message limit. Groups require
+an allowed incoming message before the first send; the direct-conversation
+opening allowance does not apply.

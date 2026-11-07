@@ -2238,6 +2238,10 @@ impl std::fmt::Debug for AgentIdentity {
 }
 
 impl AgentIdentity {
+    /// Read this agent's WhatsApp message link and QR code.
+    pub fn get_whatsapp_onboarding(&self) -> Result<crate::whatsapp::WhatsAppOnboarding> {
+        self.inkbox.whatsapp().get_onboarding(Some(&self.id()))
+    }
     pub fn get_whatsapp_limits(&self) -> Result<crate::whatsapp::WhatsAppLimits> {
         self.inkbox.whatsapp().get_limits(Some(&self.id()))
     }
