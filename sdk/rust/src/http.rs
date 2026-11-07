@@ -128,6 +128,38 @@ impl HttpTransport {
         })
     }
 
+    pub(crate) fn event_stream(
+        &self,
+        path: &str,
+        after: Option<&str>,
+    ) -> Result<reqwest::blocking::Response> {
+        let url = self.url(path);
+        let mut request = self
+            .client
+            .get(&url)
+            .header("Accept", "text/event-stream")
+            .timeout(Duration::from_secs(1800))
+            .query(&after.map(|v| vec![("after", v)]).unwrap_or_default());
+        if let Some(cookie) = self.cookie_jar.header_for_url(&url) {
+            request = request.header("Cookie", cookie);
+        }
+        let response = request.send()?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let headers = response.headers().clone();
+            let bytes = response.bytes().map(|b| b.to_vec());
+            raise_for_status(RawResponse(BufferedResponse {
+                status,
+                headers,
+                bytes,
+            }))?;
+            return Err(InkboxError::InvalidArgument(
+                "Invalid event response".into(),
+            ));
+        }
+        Ok(response)
+    }
+
     pub fn get(&self, path: &str, params: Query) -> Result<Value> {
         self.get_with_timeout(path, params, None)
     }
@@ -245,6 +277,22 @@ impl HttpTransport {
         }
         let resp = raise_for_status(self.send(rb, &self.url(path))?)?;
         resp.json_or_null()
+    }
+
+    pub(crate) fn command_json(
+        &self,
+        method: &str,
+        path: &str,
+        body: &Value,
+        headers: Headers,
+    ) -> Result<Value> {
+        let method = reqwest::Method::from_bytes(method.as_bytes())
+            .map_err(|_| InkboxError::InvalidArgument("Invalid method".into()))?;
+        let mut request = self.client.request(method, self.url(path)).json(body);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        raise_for_status(self.send(request, &self.url(path))?)?.json_or_null()
     }
 
     pub fn put<B: Serialize>(&self, path: &str, body: &B) -> Result<Value> {

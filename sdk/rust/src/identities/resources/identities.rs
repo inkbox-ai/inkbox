@@ -26,6 +26,9 @@ pub struct IdentitiesResource {
 }
 
 impl IdentitiesResource {
+    pub fn workspace(&self, handle: &str) -> crate::hosted_workspace::HostedWorkspace {
+        crate::hosted_workspace::HostedWorkspace::new(self.http.clone(), handle)
+    }
     pub fn list_hosting_deliveries(
         &self,
         handle: &str,

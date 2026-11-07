@@ -1,3 +1,4 @@
+import { registerWorkspaceCommands } from "./workspace.js";
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
 import type { HostingUpdate } from "@inkbox/sdk";
@@ -7,6 +8,7 @@ import { withErrorHandler } from "../errors.js";
 
 export function registerHostingCommands(identity: Command): void {
   const hosting = identity.command("hosting").description("Manage an identity's hosted agent");
+  registerWorkspaceCommands(hosting);
   hosting.command("get <handle>").action(withErrorHandler(async function (this: Command, handle: string) {
     const opts = getGlobalOpts(this);
     output(await createClient(opts).identities.getHosting(handle), { json: !!opts.json });
@@ -29,6 +31,9 @@ export function registerHostingCommands(identity: Command): void {
     .requiredOption("--expected-generation <number>", "Current generation; 0 for initial setup")
     .addOption(new Option("--harness <name>", "Agent harness").choices(["codex", "hermes"]))
     .addOption(new Option("--size <size>", "Computer size").choices(["small", "medium", "large"]))
+    .option("--reset-instructions", "Restore default hosted-agent instructions")
+    .option("--always-on", "Disable idle shutdown")
+    .option("--idle-stop", "Enable idle shutdown")
     .option("--instructions-file <path>", "Read hosted-agent instructions from a UTF-8 file")
     .option("--events <events>", "Comma-separated trigger events; an empty string disables event triggers")
     .option("--default-events", "Restore default trigger events")
@@ -38,15 +43,19 @@ export function registerHostingCommands(identity: Command): void {
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
       expectedGeneration: string; harness?: "codex" | "hermes"; size?: "small" | "medium" | "large";
       instructionsFile?: string; events?: string; defaultEvents?: boolean; modelKey?: string;
-      credits?: boolean; idleSeconds?: string;
+      credits?: boolean; idleSeconds?: string; resetInstructions?: boolean; alwaysOn?: boolean; idleStop?: boolean;
     }) {
       const expectedGeneration = generation(opts.expectedGeneration);
       if (opts.events !== undefined && opts.defaultEvents) throw new Error("Choose events or default events, not both");
       if (opts.modelKey && opts.credits) throw new Error("Choose a model key or credits, not both");
       const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size };
+      if (opts.alwaysOn && opts.idleStop) throw new Error("Choose always-on or idle-stop");
+      if (opts.resetInstructions && opts.instructionsFile) throw new Error("Choose reset or custom instructions");
+      if (opts.alwaysOn || opts.idleStop) update.idleStopEnabled = !opts.alwaysOn;
+      if (opts.resetInstructions) update.resetInstructions = true;
       if (opts.instructionsFile) {
         update.instructions = await readFile(opts.instructionsFile, "utf8");
-        if (update.instructions.length > 32768) throw new Error("Instructions exceed 32768 characters");
+        if (Buffer.byteLength(update.instructions, "utf8") > 32768) throw new Error("Instructions exceed 32768 UTF-8 bytes");
       }
       if (opts.events !== undefined) update.triggerEvents = opts.events.split(",").map(v => v.trim()).filter(Boolean);
       if (opts.defaultEvents) update.followDefaults = true;

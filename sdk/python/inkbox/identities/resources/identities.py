@@ -34,6 +34,11 @@ if TYPE_CHECKING:
 
 
 class IdentitiesResource:
+    def workspace(self, agent_handle: str):
+        """Access retained conversations and hosted workspace controls."""
+        from inkbox.hosted_workspace import HostedWorkspace
+        return HostedWorkspace(self._http, agent_handle)
+
     def get_hosting(self, agent_handle: str) -> HostingConfiguration:
         """Read hosting status, applied configuration and selected triggers."""
         return HostingConfiguration.from_dict(self._http.get(f"/{quote(agent_handle, safe='')}/hosting"))

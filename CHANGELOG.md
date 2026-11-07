@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.31
+
+### Added
+
+- Identity workspace methods in Python, TypeScript, and Rust for retained chat, event streams, typed approvals and questions, files, lifecycle, environment, terminals, and native schedules.
+- CLI chat and workspace commands with explicit idempotency keys, event following, and versioned edits.
+- Hosted idle-stop configuration and default instruction reset.
+
+
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.

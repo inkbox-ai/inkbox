@@ -1,3 +1,4 @@
+import { HostedWorkspace } from "../../hosted-workspace.js";
 /**
  * inkbox-identities/resources/identities.ts
  *
@@ -32,6 +33,7 @@ import {
 import { parseHosting, parseHostingDelivery, hostingUpdateBody, type HostingDelivery, type HostingConfiguration, type HostingUpdate } from "../hosting.js";
 
 export class IdentitiesResource {
+  workspace(handle:string):HostedWorkspace {return new HostedWorkspace(this.http,handle);}
   async listHostingDeliveries(handle: string, before?: string): Promise<HostingDelivery[]> {
     const data = await this.http.get<{items: Parameters<typeof parseHostingDelivery>[0][]}>(`/${encodeURIComponent(handle)}/hosting/deliveries`, {before});
     return data.items.map(parseHostingDelivery);

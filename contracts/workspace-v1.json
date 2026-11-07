@@ -1,0 +1,750 @@
+[
+  {
+    "name": "running",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": []
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "stopped",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "stopped",
+        "desired_state": "stopped",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "unavailable",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": true,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": []
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "start"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "starting",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "starting",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "initializing",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": true,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": []
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "agent_unavailable",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "unavailable",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": true,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": []
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "credits_exhausted",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 50000000,
+          "reserved_microusd": 0,
+          "available_microusd": 0,
+          "activated": true,
+          "eligible": true,
+          "exhausted": true
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": [
+          {
+            "code": "included_credits_exhausted",
+            "message": "Update model access or agent settings before continuing.",
+            "scope": "organization",
+            "retryable": false,
+            "actions": [
+              "refresh_status"
+            ]
+          }
+        ]
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "credits_unavailable",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 0,
+          "settled_microusd": 0,
+          "reserved_microusd": 0,
+          "available_microusd": 0,
+          "activated": false,
+          "eligible": false,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": [
+          {
+            "code": "included_credits_unavailable",
+            "message": "Update model access or agent settings before continuing.",
+            "scope": "organization",
+            "retryable": false,
+            "actions": [
+              "refresh_status"
+            ]
+          }
+        ]
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "key_revoked",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "organization_key",
+          "binding_id": "00000000-0000-4000-8000-000000000003",
+          "key_revoked": true
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": [
+          {
+            "code": "model_key_missing",
+            "message": "Update model access or agent settings before continuing.",
+            "scope": "organization",
+            "retryable": false,
+            "actions": [
+              "refresh_status"
+            ]
+          }
+        ]
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "configuration_pending",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 2,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": []
+      },
+      "configuration": {
+        "environment_version": 2,
+        "applied_environment_version": 1,
+        "pending": true
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "guest_update_required",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": {
+        "state": "running",
+        "desired_state": "running",
+        "created_at": "2026-01-01T00:00:00Z",
+        "tier": "standard",
+        "vcpus": 2,
+        "memory_bytes": 4294967296,
+        "disk_bytes": 12884901888,
+        "software": {
+          "name": "Agent",
+          "version": "1"
+        },
+        "operation": null
+      },
+      "agent": {
+        "state": "ready",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": false,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": {
+        "applied": {
+          "source": "inkbox_credits",
+          "binding_id": null,
+          "key_revoked": null
+        },
+        "pending": false,
+        "credits": {
+          "currency": "USD",
+          "one_time": true,
+          "grant_microusd": 50000000,
+          "settled_microusd": 17600000,
+          "reserved_microusd": 0,
+          "available_microusd": 32400000,
+          "activated": true,
+          "eligible": true,
+          "exhausted": false
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "blockers": [
+          {
+            "code": "guest_update_required",
+            "message": "Update model access or agent settings before continuing.",
+            "scope": "organization",
+            "retryable": false,
+            "actions": [
+              "refresh_status"
+            ]
+          }
+        ]
+      },
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": false,
+        "cancel_turn": false,
+        "approvals": false,
+        "questions": false,
+        "attachments": false,
+        "tool_activity": false
+      },
+      "allowed_actions": [
+        "stop"
+      ],
+      "links": [],
+      "unavailable_sections": []
+    }
+  },
+  {
+    "name": "partial_backend_failure",
+    "workspace": {
+      "identity_id": "00000000-0000-4000-8000-000000000001",
+      "machine_id": "00000000-0000-4000-8000-000000000002",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "computer": null,
+      "agent": {
+        "state": "unavailable",
+        "observed_at": "2026-01-01T00:00:00Z",
+        "stale": true,
+        "generation": 1,
+        "applied_generation": 1
+      },
+      "automation": {
+        "idle_stop_enabled": true,
+        "idle_timeout_seconds": 600,
+        "schedules_may_start": true,
+        "selected_events_may_start": true
+      },
+      "funding": null,
+      "configuration": {
+        "environment_version": 1,
+        "applied_environment_version": 1,
+        "pending": false
+      },
+      "capabilities": {
+        "send_message": true,
+        "cancel_turn": true,
+        "approvals": true,
+        "questions": true,
+        "attachments": true,
+        "tool_activity": true
+      },
+      "allowed_actions": [],
+      "links": [],
+      "unavailable_sections": [
+        "computer",
+        "funding"
+      ]
+    }
+  }
+]

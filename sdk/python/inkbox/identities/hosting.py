@@ -13,6 +13,8 @@ class HostingUpdate(TypedDict):
     follow_defaults: NotRequired[bool]
     credential_binding_id: NotRequired[str | None]
     idle_timeout_seconds: NotRequired[int]
+    idle_stop_enabled: NotRequired[bool]
+    reset_instructions: NotRequired[bool]
 
 
 @dataclass
@@ -30,6 +32,7 @@ class HostingConfiguration:
     follow_defaults: bool = True
     credential_binding_id: str | None = None
     idle_timeout_seconds: int = 600
+    idle_stop_enabled: bool = True
     last_error: str | None = None
     updated_at: str | None = None
 

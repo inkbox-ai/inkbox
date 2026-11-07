@@ -8,6 +8,8 @@ export interface HostingUpdate {
   followDefaults?: boolean;
   credentialBindingId?: string | null;
   idleTimeoutSeconds?: number;
+  idleStopEnabled?: boolean;
+  resetInstructions?: boolean;
 }
 
 export interface HostingConfiguration {
@@ -24,6 +26,7 @@ export interface HostingConfiguration {
   followDefaults: boolean;
   credentialBindingId: string | null;
   idleTimeoutSeconds: number;
+  idleStopEnabled: boolean;
   lastError: string | null;
   updatedAt: string | null;
 }
@@ -42,6 +45,7 @@ interface RawHostingConfiguration {
   follow_defaults?: boolean;
   credential_binding_id?: string | null;
   idle_timeout_seconds?: number;
+  idle_stop_enabled?: boolean;
   last_error?: string | null;
   updated_at?: string | null;
 }
@@ -53,13 +57,14 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
     generation: data.generation, appliedGeneration: data.applied_generation,
     instructions: data.instructions ?? "", triggerEvents: data.trigger_events ?? [],
     followDefaults: data.follow_defaults ?? true, credentialBindingId: data.credential_binding_id ?? null,
-    idleTimeoutSeconds: data.idle_timeout_seconds ?? 600, lastError: data.last_error ?? null,
+    idleStopEnabled: data.idle_stop_enabled ?? true, idleTimeoutSeconds: data.idle_timeout_seconds ?? 600, lastError: data.last_error ?? null,
     updatedAt: data.updated_at ?? null,
   };
 }
 
 export function hostingUpdateBody(options: HostingUpdate): Record<string, unknown> {
   return {
+    idle_stop_enabled: options.idleStopEnabled, reset_instructions: options.resetInstructions,
     expected_generation: options.expectedGeneration, enabled: options.enabled,
     harness: options.harness, tier: options.tier, instructions: options.instructions,
     trigger_events: options.triggerEvents, follow_defaults: options.followDefaults,

@@ -17,6 +17,8 @@ pub struct HostingConfiguration {
     pub follow_defaults: bool,
     pub credential_binding_id: Option<String>,
     pub idle_timeout_seconds: u32,
+    #[serde(default = "default_idle_stop")]
+    pub idle_stop_enabled: bool,
     pub last_error: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -43,6 +45,10 @@ pub struct HostingUpdate {
     pub credential_binding_id: Unset<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idle_timeout_seconds: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub idle_stop_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reset_instructions: Option<bool>,
 }
 
 fn serialize_binding<S: serde::Serializer>(
@@ -69,4 +75,8 @@ pub struct HostingDelivery {
 #[derive(Clone, Debug, Deserialize)]
 pub struct HostingDeliveries {
     pub items: Vec<HostingDelivery>,
+}
+
+fn default_idle_stop() -> bool {
+    true
 }

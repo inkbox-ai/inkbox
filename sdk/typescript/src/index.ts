@@ -565,3 +565,5 @@ export type { HostingConfiguration, HostingUpdate, HostingDelivery } from "./ide
 
 export { ComputersResource } from "./computers.js";
 export type { ComputerMetricSummary, ComputerUsageHistory, ComputerConversation, ComputerConversationList, ComputerConversationHistory, ComputerSessionRun } from "./computers.js";
+
+export * from "./hosted-workspace.js";

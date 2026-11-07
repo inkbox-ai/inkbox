@@ -109,3 +109,5 @@ pub mod billing;
 
 pub mod whatsapp;
 pub use whatsapp::*;
+
+pub mod hosted_workspace;
