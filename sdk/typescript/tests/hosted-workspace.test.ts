@@ -10,6 +10,17 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it("surfaces stream resets without replay", async () => {
+    const fetch = vi.fn(async () => new Response(
+      'event: stream.reset\ndata: {"code":"event_cursor_expired","status":410}\n\n',
+    ));
+    vi.stubGlobal("fetch", fetch);
+    const stream = new HttpTransport("synthetic-key", "https://example.test").streamEvents("/events");
+    await expect(stream.next()).rejects.toMatchObject({
+      statusCode: 410, detail: { code: "event_cursor_expired" },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("streams the shared typed events and forwards the cursor", async () => {
     const fetch = vi.fn(
       async () =>

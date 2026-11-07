@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.32
+
+### Changed
+
+- Surface chat stream resets as structured API errors in Python, TypeScript, and Rust without automatically replaying requests.
+- Extend hosted workspace contract fixtures with retryable capacity blockers and a shared workspace response schema.
+
 ## 0.7.31
 
 ### Added

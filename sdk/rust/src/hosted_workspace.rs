@@ -532,6 +532,7 @@ impl Iterator for ChatEventStream {
             return None;
         }
         let mut data = Vec::new();
+        let mut event_type = Vec::new();
         loop {
             let mut line = Vec::new();
             match self
@@ -563,8 +564,28 @@ impl Iterator for ChatEventStream {
             }
             if line.is_empty() {
                 if !data.is_empty() {
+                    if event_type == b"stream.reset" {
+                        self.done = true;
+                        return Some(
+                            serde_json::from_slice::<Value>(&data)
+                                .map_err(Into::into)
+                                .and_then(|payload| {
+                                    Err(crate::InkboxError::Api {
+                                        status_code: payload["status"]
+                                            .as_u64()
+                                            .and_then(|v| u16::try_from(v).ok())
+                                            .unwrap_or(410),
+                                        detail: crate::error::ApiErrorDetail::Structured(payload),
+                                        agent_support: None,
+                                    })
+                                }),
+                        );
+                    }
                     return Some(serde_json::from_slice(&data).map_err(Into::into));
                 }
+                event_type.clear();
+            } else if let Some(part) = line.strip_prefix(b"event:") {
+                event_type = part.strip_prefix(b" ").unwrap_or(part).to_vec();
             } else if let Some(part) = line.strip_prefix(b"data:") {
                 if !data.is_empty() {
                     data.push(b'\n');

@@ -285,6 +285,7 @@ class HttpTransport:
             _observe_response(response, self._notice_collector, self._response_observer)
             buffer = b""
             data = []
+            event_type = b""
             size = 0
             for chunk in response.iter_bytes():
                 buffer += chunk
@@ -295,8 +296,13 @@ class HttpTransport:
                     line = line.rstrip(b"\r")
                     if not line:
                         if data:
-                            yield json.loads(b"\n".join(data))
-                        data, size = [], 0
+                            payload = json.loads(b"\n".join(data))
+                            if event_type == b"stream.reset":
+                                raise InkboxAPIError(payload.get("status", 410), payload)
+                            yield payload
+                        data, size, event_type = [], 0, b""
+                    elif line.startswith(b"event:"):
+                        event_type = line[6:].strip()
                     elif line.startswith(b"data:"):
                         part = line[5:].removeprefix(b" ")
                         data.append(part)

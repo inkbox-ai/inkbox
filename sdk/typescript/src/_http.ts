@@ -547,7 +547,7 @@ export class HttpTransport {
     if(!response.ok){const error=await readErrorEnvelope(response);raiseForErrorResponse(response.status,error.detail,response.headers,error.agentSupport);}
     if(!response.body)throw new Error("Event stream unavailable");
     const reader=response.body.getReader(),decoder=new TextDecoder();
-    let buffer="",data:string[]=[],size=0;
+    let buffer="",data:string[]=[],size=0,eventType="";
     try {
       while(true){
         const {done,value}=await reader.read();if(done)return;
@@ -556,7 +556,15 @@ export class HttpTransport {
         let newline:number;
         while((newline=buffer.indexOf("\n"))>=0){
           const line=buffer.slice(0,newline).replace(/\r$/,"");buffer=buffer.slice(newline+1);
-          if(!line){if(data.length)yield JSON.parse(data.join("\n")) as T;data=[];size=0;}
+          if(!line){
+            if(data.length){
+              const payload=JSON.parse(data.join("\n"));
+              if(eventType==="stream.reset")raiseForErrorResponse(payload.status ?? 410,payload);
+              yield payload as T;
+            }
+            data=[];size=0;eventType="";
+          }
+          else if(line.startsWith("event:"))eventType=line.slice(6).trim();
           else if(line.startsWith("data:")){const part=line.slice(5).replace(/^ /,"");data.push(part);size+=part.length;}
         }
       }

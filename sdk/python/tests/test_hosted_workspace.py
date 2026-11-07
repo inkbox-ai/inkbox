@@ -6,6 +6,7 @@ import httpx
 import pytest
 from inkbox._http import HttpTransport
 from inkbox.hosted_workspace import HostedWorkspace
+from inkbox.exceptions import InkboxAPIError
 
 FIXTURES = Path(__file__).resolve().parents[3] / "contracts"
 
@@ -72,3 +73,18 @@ def test_stream_rejects_oversized_frame():
         )
         with pytest.raises(ValueError, match="limit"):
             list(transport.iter_sse("/events"))
+
+
+def test_stream_reset_is_an_actionable_error_without_replay():
+    with HttpTransport("synthetic-key", "https://example.test") as transport:
+        transport._client.close()
+        transport._client = httpx.Client(
+            base_url="https://example.test",
+            transport=httpx.MockTransport(lambda _: httpx.Response(
+                200, content='event: stream.reset\ndata: {"code":"event_cursor_expired","status":410}\n\n'
+            )),
+        )
+        with pytest.raises(InkboxAPIError) as error:
+            list(transport.iter_sse("/events"))
+        assert error.value.status_code == 410
+        assert error.value.detail["code"] == "event_cursor_expired"

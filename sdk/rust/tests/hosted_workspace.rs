@@ -5,6 +5,35 @@ use inkbox::{
 };
 use serde_json::{json, Value};
 #[test]
+fn stream_reset_is_an_actionable_error_without_replay() {
+    let server = MockServer::start();
+    let reset = server.mock(|when, then| {
+        when.method(GET);
+        then.status(200).body(
+            "event: stream.reset\ndata: {\"code\":\"event_cursor_expired\",\"status\":410}\n\n",
+        );
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let workspace = client.identities().workspace("example-agent");
+    let mut stream = workspace.stream_events("conversation", None).unwrap();
+    match stream.next().unwrap().unwrap_err() {
+        inkbox::InkboxError::Api {
+            status_code,
+            detail,
+            ..
+        } => {
+            assert_eq!(status_code, 410);
+            assert_eq!(detail.as_object().unwrap()["code"], "event_cursor_expired");
+        }
+        error => panic!("Unexpected error: {error}"),
+    }
+    assert!(stream.next().is_none());
+    reset.assert_hits(1);
+}
+#[test]
 fn shared_events_have_typed_payloads_and_stream_without_replay() {
     let data: Vec<ChatEvent> =
         serde_json::from_str(include_str!("../../../contracts/events-v1.json")).unwrap();
