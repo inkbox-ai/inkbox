@@ -20,6 +20,8 @@ pub struct ChatCapabilities {
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatConversation {
+    pub created_at: Option<String>,
+    pub last_active_at: Option<String>,
     pub id: String,
     pub identity_id: Option<String>,
     pub title: String,
@@ -479,6 +481,7 @@ pub struct ChatChoice {
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatInteraction {
+    pub decision: Option<String>,
     pub id: String,
     pub kind: String,
     pub version: u64,

@@ -17,6 +17,8 @@ class ChatCapabilities(TypedDict):
 
 
 class ChatConversation(TypedDict):
+    created_at: NotRequired[str | None]
+    last_active_at: NotRequired[str | None]
     id: str
     identity_id: NotRequired[str | None]
     title: str
@@ -72,6 +74,7 @@ class ChatQuestionField(TypedDict):
 
 
 class ChatInteraction(ChatResource):
+    decision: NotRequired[Literal["approve_once", "deny"] | None]
     kind: Literal["approval", "question"]
     version: int
     status: Literal["pending", "submitted", "resolved", "expired", "cancelled"]

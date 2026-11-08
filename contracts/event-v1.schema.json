@@ -413,6 +413,22 @@
           ],
           "default": null,
           "title": "Fields"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "enum": [
+                "approve_once",
+                "deny"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision"
         }
       },
       "required": [

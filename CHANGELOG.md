@@ -4,6 +4,7 @@
 
 ### Added
 
+- Hosted chat conversation creation/activity timestamps and retained approval decisions across Python, TypeScript, and Rust.
 - Optional per-turn model selection in hosted chat across Python, TypeScript, Rust and the CLI (`chat send --model`), preserving existing default requests.
 
 ## 0.7.33

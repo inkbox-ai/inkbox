@@ -90,7 +90,8 @@
         "approve_once",
         "deny"
       ],
-      "expires_at": "2026-01-01T00:05:00Z"
+      "expires_at": "2026-01-01T00:05:00Z",
+      "decision": "approve_once"
     },
     "cursor": "cursor-5"
   },

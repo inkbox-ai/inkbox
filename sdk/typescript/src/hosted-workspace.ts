@@ -9,6 +9,8 @@ export interface ChatCapabilities {
   tool_activity: boolean;
 }
 export interface ChatConversation {
+  created_at?: string | null;
+  last_active_at?: string | null;
   id: string;
   identity_id?: string | null;
   title: string;
@@ -76,6 +78,7 @@ export interface ChatQuestionField {
   allow_free_text?: boolean;
 }
 export interface ChatInteraction extends ChatResource {
+  decision?: "approve_once" | "deny" | null;
   kind: "approval" | "question";
   version: number;
   status: "pending" | "submitted" | "resolved" | "expired" | "cancelled";
