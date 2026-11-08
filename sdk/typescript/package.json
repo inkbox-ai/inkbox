@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/sdk",
-  "version": "0.7.32",
+  "version": "0.7.33",
   "description": "TypeScript SDK for the Inkbox API",
   "license": "MIT",
   "type": "module",

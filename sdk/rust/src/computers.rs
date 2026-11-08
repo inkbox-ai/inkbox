@@ -8,6 +8,40 @@ use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ComputerHarness {
+    Codex,
+    Hermes,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct ComputerSoftware {
+    pub harness_version: Option<String>,
+    pub harness_release: Option<String>,
+    pub os: Option<String>,
+    pub os_version: Option<String>,
+    pub model_gateway: Option<String>,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct ComputerTemplate {
+    pub id: String,
+    pub total_disk_bytes: u64,
+    pub requested_free_bytes: u64,
+    pub harness: Option<ComputerHarness>,
+    pub software: ComputerSoftware,
+    pub capabilities: Vec<String>,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct HostedTemplateDefaults {
+    pub codex: Option<ComputerTemplate>,
+    pub hermes: Option<ComputerTemplate>,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct ComputerTemplates {
+    pub items: Vec<ComputerTemplate>,
+    pub hosted_defaults: HostedTemplateDefaults,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct MetricSummary {
     pub unit: String,
     pub average: Option<f64>,
@@ -73,6 +107,12 @@ pub struct ComputersResource {
 impl ComputersResource {
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+    /// Read current hosted defaults without reserving capacity.
+    pub fn templates(&self) -> Result<ComputerTemplates> {
+        Ok(serde_json::from_value(
+            self.http.get("/computers/templates", NO_QUERY)?,
+        )?)
     }
     pub fn usage_history(&self, machine: &str, window: &str) -> Result<UsageHistory> {
         Ok(serde_json::from_value(self.http.get(

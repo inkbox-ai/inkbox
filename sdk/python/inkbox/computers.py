@@ -4,6 +4,33 @@ from urllib.parse import quote
 from inkbox._http import HttpTransport
 
 
+class ComputerSoftware(TypedDict):
+    harness_version: str | None
+    harness_release: str | None
+    os: str | None
+    os_version: str | None
+    model_gateway: str | None
+
+
+class ComputerTemplate(TypedDict):
+    id: str
+    total_disk_bytes: int
+    requested_free_bytes: int
+    harness: Literal["codex", "hermes"] | None
+    software: ComputerSoftware
+    capabilities: list[str]
+
+
+class HostedTemplateDefaults(TypedDict):
+    codex: ComputerTemplate | None
+    hermes: ComputerTemplate | None
+
+
+class ComputerTemplates(TypedDict):
+    items: list[ComputerTemplate]
+    hosted_defaults: HostedTemplateDefaults
+
+
 class MetricSummary(TypedDict):
     unit: str
     average: float | None
@@ -63,6 +90,10 @@ class SessionRun(TypedDict):
 class ComputersResource:
     def __init__(self, http: HttpTransport):
         self._http = http
+
+    def templates(self) -> ComputerTemplates:
+        """Read templates and current hosted defaults without reserving capacity."""
+        return cast(ComputerTemplates, self._http.get("/computers/templates"))
 
     def usage_history(self, machine_id: str, *, window: Literal['1h', '24h', '7d', '30d'] = '24h') -> UsageHistory:
         return cast(UsageHistory, self._http.get(f"/computers/machines/{quote(machine_id, safe='')}/usage/history", params={'window': window}))

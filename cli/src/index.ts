@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { registerComputersCommands } from "./commands/computers.js";
 import { Command } from "commander";
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { CLI_VERSION } from "./client.js";
@@ -53,6 +54,7 @@ const program = new Command()
   .option("--json", "Output as JSON", false)
   .option("--with-response-metadata", "Include response notices in a JSON result envelope (requires --json)", false);
 
+registerComputersCommands(program);
 registerWhoamiCommand(program);
 registerSignupCommands(program);
 registerIdentityCommands(program);

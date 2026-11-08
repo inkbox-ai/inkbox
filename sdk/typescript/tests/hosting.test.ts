@@ -39,3 +39,17 @@ it("reads computer history and conversation cursors without lifecycle writes", a
   expect(http.get).toHaveBeenLastCalledWith("/computers/sessions/session%2Fa/runs");
   expect(http.post).not.toHaveBeenCalled();
 });
+
+
+it("preserves selected template defaults, legacy metadata, and unavailable harnesses", async () => {
+  const {readFileSync} = await import("node:fs");
+  const {ComputersResource} = await import("../src/computers.js");
+  const wire = JSON.parse(readFileSync(new URL("../../../contracts/computer-templates.json", import.meta.url), "utf8"));
+  const http = {get: vi.fn().mockResolvedValue(wire)};
+  const result = await new ComputersResource(http as unknown as HttpTransport).templates();
+  expect(http.get).toHaveBeenCalledExactlyOnceWith("/computers/templates");
+  expect(result.hosted_defaults.codex?.id).toBe("codex-current");
+  expect(result.hosted_defaults.codex?.total_disk_bytes).toBe(12000000000);
+  expect(result.hosted_defaults.hermes).toBeNull();
+  expect(result.items[0].software.os).toBeNull();
+});

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.33
+
+### Added
+
+- Typed computer template discovery in Python, TypeScript, and Rust, including current hosted defaults, disk sizes, and software metadata.
+- `inkbox computers templates` to inspect available templates and hosted defaults.
+
 ## 0.7.32
 
 ### Changed

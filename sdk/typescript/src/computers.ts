@@ -1,5 +1,25 @@
 import type { HttpTransport } from "./_http.js";
 
+export interface ComputerSoftware {
+  harness_version: string | null;
+  harness_release: string | null;
+  os: string | null;
+  os_version: string | null;
+  model_gateway: string | null;
+}
+export interface ComputerTemplate {
+  id: string;
+  total_disk_bytes: number;
+  requested_free_bytes: number;
+  harness: "codex" | "hermes" | null;
+  software: ComputerSoftware;
+  capabilities: string[];
+}
+export interface ComputerTemplates {
+  items: ComputerTemplate[];
+  hosted_defaults: {codex: ComputerTemplate | null; hermes: ComputerTemplate | null};
+}
+
 export interface ComputerMetricSummary {unit: string; average: number | null; maximum: number | null; samples: number; last_sample_at: string | null}
 export interface ComputerUsageHistory {
   machine_id: string; source: string; from: string; to: string; resolution_seconds: number;
@@ -17,6 +37,10 @@ export interface ComputerSessionRun {id: string; state: string; terminal: boolea
 /** Read-only observations; these methods never start a computer. */
 export class ComputersResource {
   constructor(private readonly http: HttpTransport) {}
+  /** Current hosted defaults, without reserving capacity. */
+  templates(): Promise<ComputerTemplates> {
+    return this.http.get("/computers/templates");
+  }
   usageHistory(machineId: string, window: "1h" | "24h" | "7d" | "30d" = "24h"): Promise<ComputerUsageHistory> {
     return this.http.get(`/computers/machines/${encodeURIComponent(machineId)}/usage/history`, {window});
   }

@@ -45,3 +45,19 @@ def test_computer_reads_preserve_missing_data_and_do_not_mutate():
     assert resource.session_runs('session/a')[0]['terminal']
     http.get.assert_called_with('/computers/sessions/session%2Fa/runs')
     http.post.assert_not_called()
+
+
+def test_templates_preserve_selected_defaults_and_unavailable_harness():
+    import json
+    from pathlib import Path
+    from inkbox.computers import ComputersResource
+    wire = json.loads((Path(__file__).resolve().parents[3] / "contracts/computer-templates.json").read_text())
+    http = Mock()
+    http.get.return_value = wire
+    result = ComputersResource(http).templates()
+    http.get.assert_called_once_with("/computers/templates")
+    assert result["hosted_defaults"]["codex"]["id"] == "codex-current"
+    assert result["hosted_defaults"]["hermes"] is None
+    assert result["items"][0]["software"]["os"] is None
+    assert result["hosted_defaults"]["codex"]["total_disk_bytes"] == 12000000000
+    http.post.assert_not_called()

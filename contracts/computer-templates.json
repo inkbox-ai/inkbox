@@ -1,0 +1,67 @@
+{
+  "items": [
+    {
+      "id": "legacy",
+      "total_disk_bytes": 12000000000,
+      "requested_free_bytes": 6000000000,
+      "harness": null,
+      "software": {
+        "harness_version": null,
+        "harness_release": null,
+        "os": null,
+        "os_version": null,
+        "model_gateway": null
+      },
+      "capabilities": [
+        "exec",
+        "files",
+        "pty",
+        "runs",
+        "schedules"
+      ]
+    },
+    {
+      "id": "codex-current",
+      "total_disk_bytes": 12000000000,
+      "requested_free_bytes": 6000000000,
+      "harness": "codex",
+      "software": {
+        "harness_version": "1.0.0",
+        "harness_release": "1.0.0",
+        "os": "Ubuntu",
+        "os_version": "24.04",
+        "model_gateway": "1"
+      },
+      "capabilities": [
+        "exec",
+        "files",
+        "pty",
+        "runs",
+        "schedules"
+      ]
+    }
+  ],
+  "hosted_defaults": {
+    "codex": {
+      "id": "codex-current",
+      "total_disk_bytes": 12000000000,
+      "requested_free_bytes": 6000000000,
+      "harness": "codex",
+      "software": {
+        "harness_version": "1.0.0",
+        "harness_release": "1.0.0",
+        "os": "Ubuntu",
+        "os_version": "24.04",
+        "model_gateway": "1"
+      },
+      "capabilities": [
+        "exec",
+        "files",
+        "pty",
+        "runs",
+        "schedules"
+      ]
+    },
+    "hermes": null
+  }
+}
