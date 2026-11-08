@@ -1498,3 +1498,19 @@ A `409 whatsapp_group_reply_required` means the current WhatsApp connection has 
 qualifying incoming group message, including after a connection replacement.
 Wait for an allowed message from another participant. Do not retry with a new
 idempotency key or fall back to a direct message.
+## Conversation participant filters
+
+Conversation filtering matches **any** supplied email address or E.164 phone
+number (one to 100 values), or all accessible active identifiers of a saved
+contact, including nonprimary addresses. The selectors are mutually exclusive.
+Filtering precedes pagination and never grants additional access. Existing
+methods without a selector retain their behavior.
+
+```bash
+inkbox text conversations --identity support-bot --participants +14155550123 +14155550124 --include-groups
+inkbox imessage conversations --identity support-bot --contact-id aaaaaaaa-1111-4111-8111-111111111111 --include-groups
+inkbox whatsapp conversations --identity support-bot --participants +14155550123
+```
+
+Use `--participants` or `--contact-id`, not both. Existing group-listing rules
+still apply.

@@ -977,6 +977,8 @@ export class AgentIdentity {
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
+      participants?: string[];
+      contactId?: string;
     },
   ): Promise<TextConversationSummary[]> {
     this._requirePhone();
@@ -1187,6 +1189,8 @@ export class AgentIdentity {
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
+      participants?: string[];
+      contactId?: string;
     },
   ): Promise<IMessageConversationSummary[]> {
     this._requireIMessage();

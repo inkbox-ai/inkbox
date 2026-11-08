@@ -4,6 +4,15 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.30 - Conversation participant filters (unreleased)
+
+### Added
+
+- Filter email, SMS, iMessage, and WhatsApp conversations by any participant or
+  the active identifiers of a saved contact across Python, TypeScript, and Rust.
+  Text, iMessage, and WhatsApp CLI conversation commands expose `--participants`
+  and `--contact-id`. WhatsApp filters include direct and group conversations.
+
 ## 0.7.29 - WhatsApp groups, Companion, and onboarding (unreleased)
 
 ### Added

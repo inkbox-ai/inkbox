@@ -207,6 +207,8 @@ export function registerTextCommands(program: Command): void {
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--include-groups", "Include group conversations")
+    .option("--participants <addresses...>", "Match any email address or E.164 phone number")
+    .option("--contact-id <id>", "Match a saved contact; mutually exclusive with --participants")
     .option("--start-datetime <date>", "Only conversations with created_at >= this date/instant")
     .option("--end-datetime <date>", "Only conversations with created_at <= this date (bare date is whole-day inclusive)")
     .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
@@ -218,6 +220,8 @@ export function registerTextCommands(program: Command): void {
           limit: string;
           offset: string;
           includeGroups?: boolean;
+          participants?: string[];
+          contactId?: string;
           startDatetime?: string;
           endDatetime?: string;
           tz?: string;
@@ -233,6 +237,8 @@ export function registerTextCommands(program: Command): void {
           startDatetime: cmdOpts.startDatetime,
           endDatetime: cmdOpts.endDatetime,
           tz: cmdOpts.tz,
+          participants: cmdOpts.participants,
+          contactId: cmdOpts.contactId,
         });
         const rows = opts.json
           ? convos
