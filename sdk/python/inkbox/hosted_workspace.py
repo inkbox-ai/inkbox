@@ -7,6 +7,7 @@ from inkbox.imessage.types import _validate_idempotency_key
 
 
 class ChatCapabilities(TypedDict):
+    permission_mode_selection: NotRequired[bool]
     model_selection: NotRequired[bool]
     send_message: bool
     cancel_turn: bool
@@ -17,6 +18,7 @@ class ChatCapabilities(TypedDict):
 
 
 class ChatConversation(TypedDict):
+    permission_mode: NotRequired[Literal["ask", "yolo"]]
     created_at: NotRequired[str | None]
     last_active_at: NotRequired[str | None]
     id: str
@@ -185,6 +187,18 @@ class HostedWorkspace:
         return self._http.patch(
             self._conversation(conversation_id),
             json={"title": title},
+            headers=self._key(idempotency_key),
+        )
+
+    def set_permission_mode(
+        self, conversation_id: str, mode: Literal["ask", "yolo"], *, idempotency_key: str
+    ) -> ChatConversation:
+        """Set the tool permission policy for future turns in this chat."""
+        if mode not in ("ask", "yolo"):
+            raise ValueError("mode must be ask or yolo")
+        return self._http.patch(
+            self._conversation(conversation_id),
+            json={"permission_mode": mode},
             headers=self._key(idempotency_key),
         )
 

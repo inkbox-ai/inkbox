@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.35
+
+### Added
+- Per-chat tool permission modes: Ask by default, or YOLO to automatically approve tool permissions for future turns. Questions still require an answer.
+- `set_permission_mode` (Python/Rust), `setPermissionMode` (TypeScript), and `identity hosting chat permissions` (CLI).
+
 ## 0.7.34
 
 ### Added

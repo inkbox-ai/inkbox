@@ -67,3 +67,14 @@ test("conflicting hosting options and invalid generations fail before a request"
     assert.equal(requests.length, 0);
   });
 });
+
+test("chat permissions persists the selected mode and rejects unknown modes", async () => {
+  await withApi(async (run, requests) => {
+    const result = await run(["chat", "permissions", "example", "conversation", "--mode", "yolo", "--idempotency-key", "mode-once"]);
+    assert.ifError(result.error);
+    assert.deepEqual(requests, [{method: "PATCH", path: "/api/v1/identities/example/hosting/chat/conversations/conversation", body: {permission_mode: "yolo"}}]);
+    const invalid = await run(["chat", "permissions", "example", "conversation", "--mode", "always", "--idempotency-key", "mode-twice"]);
+    assert.ok(invalid.error);
+    assert.equal(requests.length, 1);
+  });
+});

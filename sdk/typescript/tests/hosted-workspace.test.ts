@@ -85,3 +85,13 @@ describe("hosted workspace contract", () => {
     );
   });
 });
+
+it("saves permission mode on the chat with an idempotency key", async () => {
+  const patch = vi.fn().mockResolvedValue({ permission_mode: "yolo" });
+  const workspace = new HostedWorkspace({ patch } as unknown as HttpTransport, "example-agent");
+  await workspace.setPermissionMode("conversation", "yolo", "mode-once");
+  expect(patch).toHaveBeenCalledWith(
+    "/example-agent/hosting/chat/conversations/conversation",
+    { permission_mode: "yolo" }, { headers: { "Idempotency-Key": "mode-once" } },
+  );
+});

@@ -1,5 +1,6 @@
 import { HttpTransport, validateIdempotencyKey } from "./_http.js";
 export interface ChatCapabilities {
+  permission_mode_selection?: boolean;
   model_selection?: boolean;
   send_message: boolean;
   cancel_turn: boolean;
@@ -9,6 +10,7 @@ export interface ChatCapabilities {
   tool_activity: boolean;
 }
 export interface ChatConversation {
+  permission_mode?: "ask" | "yolo";
   created_at?: string | null;
   last_active_at?: string | null;
   id: string;
@@ -236,6 +238,14 @@ export class HostedWorkspace {
     return this.http.patch(
       `${this.base}/chat/conversations/${enc(conversation)}`,
       { title },
+      this.key(key),
+    );
+  }
+  setPermissionMode(conversation: string, mode: "ask" | "yolo", key: string): Promise<ChatConversation> {
+    if (mode !== "ask" && mode !== "yolo") throw new Error("mode must be ask or yolo");
+    return this.http.patch(
+      `${this.base}/chat/conversations/${enc(conversation)}`,
+      { permission_mode: mode },
       this.key(key),
     );
   }

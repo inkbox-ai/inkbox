@@ -138,3 +138,27 @@ fn selected_model_is_sent_without_changing_default_requests() {
     selected.assert_hits(1);
     default.assert_hits(1);
 }
+
+#[test]
+fn permission_mode_is_saved_on_the_conversation() {
+    use inkbox::hosted_workspace::ChatPermissionMode;
+    let server = MockServer::start();
+    let update = server.mock(|when, then| {
+        when.method(httpmock::Method::PATCH)
+            .path("/api/v1/identities/example-agent/hosting/chat/conversations/conversation")
+            .header("Idempotency-Key", "mode-once")
+            .json_body(json!({"permission_mode":"yolo"}));
+        then.status(200).json_body(json!({"id":"conversation","title":"Inbox review","origin":"chat","permission_mode":"yolo","history_completeness":"complete","capabilities":{"send_message":true,"cancel_turn":true,"approvals":true,"questions":true,"attachments":true,"tool_activity":true}}));
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let result = client
+        .identities()
+        .workspace("example-agent")
+        .set_permission_mode("conversation", ChatPermissionMode::Yolo, "mode-once")
+        .unwrap();
+    assert_eq!(result.permission_mode, ChatPermissionMode::Yolo);
+    update.assert_hits(1);
+}

@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import type { ChatAnswer, ScheduleFields, ScheduleTiming } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -60,6 +60,16 @@ export function registerWorkspaceCommands(hosting: Command): void {
       o: { title: string; idempotencyKey: string },
     ) {
       show(this, await resource(this, handle).renameConversation(conversation, o.title, o.idempotencyKey));
+    }));
+  chat.command("permissions <handle> <conversation>")
+    .description("Set tool permissions for future messages in a chat")
+    .addOption(new Option("--mode <mode>", "Ask for tool permissions or approve automatically").choices(["ask", "yolo"]).makeOptionMandatory())
+    .requiredOption("--idempotency-key <key>")
+    .action(withErrorHandler(async function (
+      this: Command, handle: string, conversation: string,
+      o: { mode: "ask" | "yolo"; idempotencyKey: string },
+    ) {
+      show(this, await resource(this, handle).setPermissionMode(conversation, o.mode, o.idempotencyKey));
     }));
   chat.command("get <handle> <conversation>").action(
     withErrorHandler(async function (this: Command, h: string, c: string) {

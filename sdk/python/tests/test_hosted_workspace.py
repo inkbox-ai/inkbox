@@ -111,3 +111,16 @@ def test_turn_model_is_forwarded_only_when_selected(model):
     if model is not None:
         expected["model"] = model
     assert http.post.call_args.kwargs["json"] == expected
+
+
+def test_permission_mode_uses_chat_patch_and_validates_mode():
+    http = MagicMock()
+    workspace = HostedWorkspace(http, "example-agent")
+    workspace.set_permission_mode("conversation", "yolo", idempotency_key="mode-once")
+    http.patch.assert_called_once_with(
+        "/example-agent/hosting/chat/conversations/conversation",
+        json={"permission_mode": "yolo"}, headers={"Idempotency-Key": "mode-once"},
+    )
+    with pytest.raises(ValueError, match="mode must"):
+        workspace.set_permission_mode("conversation", "invalid", idempotency_key="mode-twice")
+    assert http.patch.call_count == 1

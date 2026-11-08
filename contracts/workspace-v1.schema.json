@@ -157,6 +157,11 @@
           "type": "boolean",
           "default": false,
           "title": "Model Selection"
+        },
+        "permission_mode_selection": {
+          "default": false,
+          "title": "Permission Mode Selection",
+          "type": "boolean"
         }
       },
       "required": [

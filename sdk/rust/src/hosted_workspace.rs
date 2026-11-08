@@ -7,8 +7,17 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatPermissionMode {
+    #[default]
+    Ask,
+    Yolo,
+}
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatCapabilities {
+    #[serde(default)]
+    pub permission_mode_selection: bool,
     #[serde(default)]
     pub model_selection: bool,
     pub send_message: bool,
@@ -20,6 +29,8 @@ pub struct ChatCapabilities {
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatConversation {
+    #[serde(default)]
+    pub permission_mode: ChatPermissionMode,
     pub created_at: Option<String>,
     pub last_active_at: Option<String>,
     pub id: String,
@@ -143,6 +154,23 @@ impl HostedWorkspace {
                 path_segment(conversation)
             ),
             &json!({"title":title}),
+            Some(key),
+        )?)?)
+    }
+    pub fn set_permission_mode(
+        &self,
+        conversation: &str,
+        mode: ChatPermissionMode,
+        key: &str,
+    ) -> Result<ChatConversation> {
+        Ok(serde_json::from_value(self.command(
+            "PATCH",
+            &format!(
+                "{}/chat/conversations/{}",
+                self.base,
+                path_segment(conversation)
+            ),
+            &json!({"permission_mode":mode}),
             Some(key),
         )?)?)
     }
