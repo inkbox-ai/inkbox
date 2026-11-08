@@ -36,6 +36,14 @@ test("hosting configuration preserves empty triggers and explicit model credits"
   });
 });
 
+test("chat rename patches the selected conversation", async () => {
+  await withApi(async (run, requests) => {
+    const result = await run(["chat", "rename", "example", "conversation", "--title", "Inbox review", "--idempotency-key", "rename-once"]);
+    assert.ifError(result.error);
+    assert.deepEqual(requests, [{method: "PATCH", path: "/api/v1/identities/example/hosting/chat/conversations/conversation", body: {title: "Inbox review"}}]);
+  });
+});
+
 test("removing hosting sends the generation and preserves omitted configuration", async () => {
   await withApi(async (run, requests) => {
     const result = await run(["remove", "example", "--expected-generation", "2"]);

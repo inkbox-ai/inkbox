@@ -179,6 +179,15 @@ class HostedWorkspace:
     def snapshot(self, conversation_id: str) -> ChatSnapshot:
         return self._http.get(self._conversation(conversation_id))
 
+    def rename_conversation(
+        self, conversation_id: str, title: str, *, idempotency_key: str
+    ) -> ChatConversation:
+        return self._http.patch(
+            self._conversation(conversation_id),
+            json={"title": title},
+            headers=self._key(idempotency_key),
+        )
+
     def messages(
         self,
         conversation_id: str,

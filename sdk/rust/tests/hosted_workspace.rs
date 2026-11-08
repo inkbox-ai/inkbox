@@ -5,6 +5,28 @@ use inkbox::{
 };
 use serde_json::{json, Value};
 #[test]
+fn rename_preserves_title_and_idempotency_key() {
+    let server = MockServer::start();
+    let renamed = server.mock(|when, then| {
+        when.method(httpmock::Method::PATCH)
+            .path("/api/v1/identities/example-agent/hosting/chat/conversations/conversation")
+            .header("Idempotency-Key", "rename-once")
+            .json_body(json!({"title":"Inbox review"}));
+        then.status(200).json_body(json!({"id":"conversation","title":"Inbox review","origin":"chat","history_completeness":"complete","capabilities":{"send_message":true,"cancel_turn":true,"approvals":true,"questions":true,"attachments":true,"tool_activity":true}}));
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let result = client
+        .identities()
+        .workspace("example-agent")
+        .rename_conversation("conversation", "Inbox review", "rename-once")
+        .unwrap();
+    assert_eq!(result.title, "Inbox review");
+    renamed.assert_hits(1);
+}
+#[test]
 fn stream_reset_is_an_actionable_error_without_replay() {
     let server = MockServer::start();
     let reset = server.mock(|when, then| {

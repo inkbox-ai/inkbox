@@ -10,6 +10,15 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it("renames with the supplied idempotency key", async () => {
+    const patch = vi.fn().mockResolvedValue({ title: "Inbox review" });
+    const workspace = new HostedWorkspace({ patch } as unknown as HttpTransport, "example-agent");
+    await workspace.renameConversation("conversation", "Inbox review", "rename-once");
+    expect(patch).toHaveBeenCalledWith(
+      "/example-agent/hosting/chat/conversations/conversation",
+      { title: "Inbox review" }, { headers: { "Idempotency-Key": "rename-once" } },
+    );
+  });
   it("forwards a selected model while preserving default request bodies", async () => {
     const post = vi.fn().mockResolvedValue({});
     const workspace = new HostedWorkspace({ post } as unknown as HttpTransport, "example-agent");

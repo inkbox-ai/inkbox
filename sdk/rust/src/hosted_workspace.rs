@@ -129,6 +129,23 @@ impl HostedWorkspace {
             Some(key),
         )?)?)
     }
+    pub fn rename_conversation(
+        &self,
+        conversation: &str,
+        title: &str,
+        key: &str,
+    ) -> Result<ChatConversation> {
+        Ok(serde_json::from_value(self.command(
+            "PATCH",
+            &format!(
+                "{}/chat/conversations/{}",
+                self.base,
+                path_segment(conversation)
+            ),
+            &json!({"title":title}),
+            Some(key),
+        )?)?)
+    }
     pub fn snapshot(&self, conversation: &str) -> Result<Value> {
         let query = Vec::new();
         self.http.get(

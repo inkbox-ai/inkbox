@@ -11,6 +11,17 @@ from inkbox.exceptions import InkboxAPIError
 FIXTURES = Path(__file__).resolve().parents[3] / "contracts"
 
 
+def test_rename_forwards_title_and_idempotency_key():
+    http = MagicMock()
+    HostedWorkspace(http, "example-agent").rename_conversation(
+        "conversation", "Inbox review", idempotency_key="rename-once"
+    )
+    http.patch.assert_called_once_with(
+        "/example-agent/hosting/chat/conversations/conversation",
+        json={"title": "Inbox review"}, headers={"Idempotency-Key": "rename-once"},
+    )
+
+
 def test_versioned_response_and_cursor_are_forwarded_without_replay():
     http = MagicMock()
     workspace = HostedWorkspace(http, "example-agent")

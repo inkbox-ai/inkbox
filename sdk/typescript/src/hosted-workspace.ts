@@ -232,6 +232,13 @@ export class HostedWorkspace {
       {},
     );
   }
+  renameConversation(conversation: string, title: string, key: string): Promise<ChatConversation> {
+    return this.http.patch(
+      `${this.base}/chat/conversations/${enc(conversation)}`,
+      { title },
+      this.key(key),
+    );
+  }
   messages(
     conversation: string,
     after?: string,

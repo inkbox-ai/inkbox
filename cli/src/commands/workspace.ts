@@ -52,6 +52,15 @@ export function registerWorkspaceCommands(hosting: Command): void {
         );
       }),
     );
+  chat.command("rename <handle> <conversation>")
+    .requiredOption("--title <text>", "Conversation title")
+    .requiredOption("--idempotency-key <key>")
+    .action(withErrorHandler(async function (
+      this: Command, handle: string, conversation: string,
+      o: { title: string; idempotencyKey: string },
+    ) {
+      show(this, await resource(this, handle).renameConversation(conversation, o.title, o.idempotencyKey));
+    }));
   chat.command("get <handle> <conversation>").action(
     withErrorHandler(async function (this: Command, h: string, c: string) {
       show(this, await resource(this, h).snapshot(c));
