@@ -1,5 +1,6 @@
 import { HttpTransport, validateIdempotencyKey } from "./_http.js";
 export interface ChatCapabilities {
+  model_selection?: boolean;
   send_message: boolean;
   cancel_turn: boolean;
   approvals: boolean;
@@ -253,10 +254,11 @@ export class HostedWorkspace {
     conversation: string,
     content: ChatContent[],
     key: string,
+    model?: string,
   ): Promise<ChatTurn> {
     return this.http.post(
       `${this.base}/chat/conversations/${enc(conversation)}/turns`,
-      { content },
+      { content, ...(model === undefined ? {} : { model }) },
       this.key(key),
     );
   }

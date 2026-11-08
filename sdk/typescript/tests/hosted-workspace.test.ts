@@ -10,6 +10,15 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it("forwards a selected model while preserving default request bodies", async () => {
+    const post = vi.fn().mockResolvedValue({});
+    const workspace = new HostedWorkspace({ post } as unknown as HttpTransport, "example-agent");
+    const content = [{ type: "text" as const, text: "Hello" }];
+    await workspace.send("conversation", content, "turn-default");
+    expect(post.mock.calls[0][1]).toEqual({ content });
+    await workspace.send("conversation", content, "turn-selected", "gpt-6.1-sol");
+    expect(post.mock.calls[1][1]).toEqual({ content, model: "gpt-6.1-sol" });
+  });
   it("surfaces stream resets without replay", async () => {
     const fetch = vi.fn(async () => new Response(
       'event: stream.reset\ndata: {"code":"event_cursor_expired","status":410}\n\n',

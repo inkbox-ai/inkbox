@@ -152,6 +152,11 @@
         "tool_activity": {
           "title": "Tool Activity",
           "type": "boolean"
+        },
+        "model_selection": {
+          "type": "boolean",
+          "default": false,
+          "title": "Model Selection"
         }
       },
       "required": [

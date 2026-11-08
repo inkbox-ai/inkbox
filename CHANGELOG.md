@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.34
+
+### Added
+
+- Optional per-turn model selection in hosted chat across Python, TypeScript, Rust and the CLI (`chat send --model`), preserving existing default requests.
+
 ## 0.7.33
 
 ### Added

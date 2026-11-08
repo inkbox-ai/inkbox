@@ -88,3 +88,15 @@ def test_stream_reset_is_an_actionable_error_without_replay():
             list(transport.iter_sse("/events"))
         assert error.value.status_code == 410
         assert error.value.detail["code"] == "event_cursor_expired"
+
+
+@pytest.mark.parametrize("model", [None, "gpt-6.1-sol"])
+def test_turn_model_is_forwarded_only_when_selected(model):
+    http = MagicMock()
+    workspace = HostedWorkspace(http, "example-agent")
+    content = [{"type": "text", "text": "Hello"}]
+    workspace.send("conversation", content, idempotency_key="turn-once", model=model)
+    expected = {"content": content}
+    if model is not None:
+        expected["model"] = model
+    assert http.post.call_args.kwargs["json"] == expected

@@ -85,3 +85,34 @@ fn shared_events_have_typed_payloads_and_stream_without_replay() {
         .unwrap();
     answer.assert_hits(1);
 }
+
+#[test]
+fn selected_model_is_sent_without_changing_default_requests() {
+    use inkbox::hosted_workspace::ChatContent;
+    let server = MockServer::start();
+    let response = json!({"id":"turn","conversation_id":"conversation","status":"queued","terminal":false,"blocker":null});
+    let selected = server.mock(|when, then| {
+        when.method(POST)
+            .json_body(json!({"content":[{"type":"text","text":"Hello"}],"model":"gpt-6.1-sol"}));
+        then.status(202).json_body(response.clone());
+    });
+    let default = server.mock(|when, then| {
+        when.method(POST)
+            .json_body(json!({"content":[{"type":"text","text":"Hello"}]}));
+        then.status(202).json_body(response.clone());
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let workspace = client.identities().workspace("example-agent");
+    let content = [ChatContent::Text {
+        text: "Hello".into(),
+    }];
+    workspace.send("conversation", &content, "default").unwrap();
+    workspace
+        .send_with_model("conversation", &content, "selected", Some("gpt-6.1-sol"))
+        .unwrap();
+    selected.assert_hits(1);
+    default.assert_hits(1);
+}

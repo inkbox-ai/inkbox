@@ -9,6 +9,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatCapabilities {
+    #[serde(default)]
+    pub model_selection: bool,
     pub send_message: bool,
     pub cancel_turn: bool,
     pub approvals: bool,
@@ -181,6 +183,19 @@ impl HostedWorkspace {
         )?)?)
     }
     pub fn send(&self, conversation: &str, content: &[ChatContent], key: &str) -> Result<ChatTurn> {
+        self.send_with_model(conversation, content, key, None)
+    }
+    pub fn send_with_model(
+        &self,
+        conversation: &str,
+        content: &[ChatContent],
+        key: &str,
+        model: Option<&str>,
+    ) -> Result<ChatTurn> {
+        let mut body = json!({"content":content});
+        if let Some(model) = model {
+            body["model"] = json!(model);
+        }
         Ok(serde_json::from_value(self.command(
             "POST",
             &format!(
@@ -188,7 +203,7 @@ impl HostedWorkspace {
                 self.base,
                 path_segment(conversation)
             ),
-            &json!({"content":content}),
+            &body,
             Some(key),
         )?)?)
     }

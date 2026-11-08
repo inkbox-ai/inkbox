@@ -7,6 +7,7 @@ from inkbox.imessage.types import _validate_idempotency_key
 
 
 class ChatCapabilities(TypedDict):
+    model_selection: NotRequired[bool]
     send_message: bool
     cancel_turn: bool
     approvals: bool
@@ -208,10 +209,11 @@ class HostedWorkspace:
         content: list[ChatText | ChatFileReference],
         *,
         idempotency_key: str,
+        model: str | None = None,
     ) -> ChatTurn:
         return self._http.post(
             self._conversation(conversation_id) + "/turns",
-            json={"content": content},
+            json={"content": content, **({"model": model} if model is not None else {})},
             headers=self._key(idempotency_key),
         )
 

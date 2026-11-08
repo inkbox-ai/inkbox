@@ -97,6 +97,7 @@ export function registerWorkspaceCommands(hosting: Command): void {
   chat
     .command("send <handle> <conversation>")
     .requiredOption("--message <text>")
+    .option("--model <model>", "Model for this turn (default: gpt-5.4)")
     .option("--file-id <id...>", "Uploaded file references")
     .requiredOption("--idempotency-key <key>")
     .action(
@@ -104,7 +105,7 @@ export function registerWorkspaceCommands(hosting: Command): void {
         this: Command,
         h: string,
         c: string,
-        o: { message: string; fileId?: string[]; idempotencyKey: string },
+        o: { message: string; fileId?: string[]; idempotencyKey: string; model?: string },
       ) {
         show(
           this,
@@ -118,6 +119,7 @@ export function registerWorkspaceCommands(hosting: Command): void {
               })),
             ],
             o.idempotencyKey,
+            o.model,
           ),
         );
       }),
