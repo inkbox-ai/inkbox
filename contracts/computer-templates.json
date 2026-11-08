@@ -16,8 +16,7 @@
         "exec",
         "files",
         "pty",
-        "runs",
-        "schedules"
+        "memory_sleep"
       ]
     },
     {
@@ -36,6 +35,7 @@
         "exec",
         "files",
         "pty",
+        "memory_sleep",
         "runs",
         "schedules"
       ]
@@ -58,6 +58,7 @@
         "exec",
         "files",
         "pty",
+        "memory_sleep",
         "runs",
         "schedules"
       ]
