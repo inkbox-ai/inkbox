@@ -77,6 +77,7 @@ class ChatQuestionField(TypedDict):
 
 
 class ChatInteraction(ChatResource):
+    auto_approve: NotRequired[bool]
     decision: NotRequired[Literal["approve_once", "deny"] | None]
     kind: Literal["approval", "question"]
     version: int

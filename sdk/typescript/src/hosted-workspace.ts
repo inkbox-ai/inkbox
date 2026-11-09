@@ -81,6 +81,7 @@ export interface ChatQuestionField {
   allow_free_text?: boolean;
 }
 export interface ChatInteraction extends ChatResource {
+  auto_approve?: boolean;
   decision?: "approve_once" | "deny" | null;
   kind: "approval" | "question";
   version: number;

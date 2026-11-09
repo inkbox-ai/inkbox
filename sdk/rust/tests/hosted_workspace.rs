@@ -258,3 +258,15 @@ fn stream_headers_update_cookies_and_metadata_before_consumption_even_on_errors(
         subsequent.assert_hits(1);
     }
 }
+
+#[test]
+fn automatic_approval_metadata_is_optional_for_older_events() {
+    let base = json!({"id":"request","kind":"approval","version":1,"status":"pending","expires_at":"2026-01-01T00:00:00Z","title":"Read file"});
+    let old: inkbox::hosted_workspace::ChatInteraction =
+        serde_json::from_value(base.clone()).unwrap();
+    assert!(!old.auto_approve);
+    let mut automatic = base;
+    automatic["auto_approve"] = json!(true);
+    let new: inkbox::hosted_workspace::ChatInteraction = serde_json::from_value(automatic).unwrap();
+    assert!(new.auto_approve);
+}

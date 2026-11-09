@@ -527,6 +527,8 @@ pub struct ChatChoice {
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatInteraction {
+    #[serde(default)]
+    pub auto_approve: bool,
     pub decision: Option<String>,
     pub id: String,
     pub kind: String,

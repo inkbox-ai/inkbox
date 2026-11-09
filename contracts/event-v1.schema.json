@@ -414,6 +414,11 @@
           "default": null,
           "title": "Fields"
         },
+        "auto_approve": {
+          "default": false,
+          "title": "Auto Approve",
+          "type": "boolean"
+        },
         "decision": {
           "anyOf": [
             {
