@@ -1,7 +1,7 @@
 import { registerWorkspaceCommands } from "./workspace.js";
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
-import type { HostingUpdate } from "@inkbox/sdk";
+import type { HostingModel, HostingUpdate } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -30,28 +30,28 @@ export function registerHostingCommands(identity: Command): void {
     .description("Enable or update hosting using the generation returned by get")
     .requiredOption("--expected-generation <number>", "Current generation; 0 for initial setup")
     .addOption(new Option("--harness <name>", "Agent harness").choices(["codex", "hermes"]))
+    .addOption(new Option("--default-model <model>", "Default model for turns and scheduled work").choices(["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"]))
     .addOption(new Option("--size <size>", "Computer size").choices(["small", "medium", "large"]))
     .option("--reset-instructions", "Restore default hosted-agent instructions")
-    .option("--always-on", "Disable idle shutdown")
     .option("--idle-stop", "Enable idle shutdown")
     .option("--instructions-file <path>", "Read hosted-agent instructions from a UTF-8 file")
     .option("--events <events>", "Comma-separated trigger events; an empty string disables event triggers")
     .option("--default-events", "Restore default trigger events")
     .option("--model-key <id>", "Use a saved organization model-key ID")
     .option("--credits", "Use the organization's remaining model credits")
-    .option("--idle-seconds <seconds>", "Stop after this many idle seconds (60–86400)")
+    .option("--idle-seconds <seconds>", "Stop after 300, 600, or 1800 idle seconds")
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
       expectedGeneration: string; harness?: "codex" | "hermes"; size?: "small" | "medium" | "large";
+      defaultModel?: HostingModel;
       instructionsFile?: string; events?: string; defaultEvents?: boolean; modelKey?: string;
-      credits?: boolean; idleSeconds?: string; resetInstructions?: boolean; alwaysOn?: boolean; idleStop?: boolean;
+      credits?: boolean; idleSeconds?: string; resetInstructions?: boolean; idleStop?: boolean;
     }) {
       const expectedGeneration = generation(opts.expectedGeneration);
       if (opts.events !== undefined && opts.defaultEvents) throw new Error("Choose events or default events, not both");
       if (opts.modelKey && opts.credits) throw new Error("Choose a model key or credits, not both");
-      const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size };
-      if (opts.alwaysOn && opts.idleStop) throw new Error("Choose always-on or idle-stop");
+      const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size, defaultModel: opts.defaultModel };
       if (opts.resetInstructions && opts.instructionsFile) throw new Error("Choose reset or custom instructions");
-      if (opts.alwaysOn || opts.idleStop) update.idleStopEnabled = !opts.alwaysOn;
+      if (opts.idleStop) update.idleStopEnabled = true;
       if (opts.resetInstructions) update.resetInstructions = true;
       if (opts.instructionsFile) {
         update.instructions = await readFile(opts.instructionsFile, "utf8");
@@ -63,7 +63,7 @@ export function registerHostingCommands(identity: Command): void {
       if (opts.credits) update.credentialBindingId = null;
       if (opts.idleSeconds !== undefined) {
         const seconds = Number(opts.idleSeconds);
-        if (!Number.isInteger(seconds) || seconds < 60 || seconds > 86400) throw new Error("Idle seconds must be between 60 and 86400");
+        if (seconds !== 300 && seconds !== 600 && seconds !== 1800) throw new Error("Idle seconds must be 300, 600, or 1800");
         update.idleTimeoutSeconds = seconds;
       }
       const global = getGlobalOpts(this);

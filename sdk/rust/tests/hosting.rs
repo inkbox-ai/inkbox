@@ -2,6 +2,24 @@ use inkbox::identities::{HostingUpdate, Unset};
 use serde_json::json;
 
 #[test]
+fn persistent_default_model_survives_requests_and_responses() {
+    let update = HostingUpdate {
+        expected_generation: 1,
+        default_model: Some("gpt-6-luna".into()),
+        ..Default::default()
+    };
+    assert_eq!(
+        serde_json::to_value(update).unwrap(),
+        json!({"expected_generation":1,"default_model":"gpt-6-luna"})
+    );
+    let response: inkbox::identities::HostingConfiguration = serde_json::from_value(json!({
+        "mode":"inkbox","identity_id":"identity","state":"ready","generation":2,"applied_generation":2,
+        "default_model":"gpt-6-luna","instructions":"","trigger_events":[],"follow_defaults":true,"idle_timeout_seconds":600
+    })).unwrap();
+    assert_eq!(response.default_model, "gpt-6-luna");
+}
+
+#[test]
 fn updates_preserve_empty_selection_and_distinguish_credits_from_omission() {
     let mut update = HostingUpdate {
         expected_generation: 2,

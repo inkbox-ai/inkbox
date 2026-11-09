@@ -1,7 +1,11 @@
+export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra";
+
 export interface HostingUpdate {
   expectedGeneration: number;
   enabled?: boolean;
   harness?: "codex" | "hermes";
+  /** Default for turns and scheduled work that do not override the model. */
+  defaultModel?: HostingModel;
   tier?: "small" | "medium" | "large";
   instructions?: string;
   triggerEvents?: string[];
@@ -19,6 +23,7 @@ export interface HostingConfiguration {
   identityId: string;
   machineId: string | null;
   harness: string | null;
+  defaultModel: HostingModel;
   tier: string | null;
   state: string;
   generation: number;
@@ -38,6 +43,7 @@ interface RawHostingConfiguration {
   identity_id: string;
   machine_id?: string | null;
   harness?: string | null;
+  default_model?: HostingModel;
   tier?: string | null;
   state: string;
   generation: number;
@@ -56,6 +62,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
   return {
     mode: data.mode, identityId: data.identity_id, machineId: data.machine_id ?? null,
     harness: data.harness ?? null, tier: data.tier ?? null, state: data.state,
+    defaultModel: data.default_model ?? "gpt-6.1-terra",
     generation: data.generation, appliedGeneration: data.applied_generation,
     instructions: data.instructions ?? "", triggerEvents: data.trigger_events ?? [],
     followDefaults: data.follow_defaults ?? true, credentialBindingId: data.credential_binding_id ?? null,
@@ -69,6 +76,7 @@ export function hostingUpdateBody(options: HostingUpdate): Record<string, unknow
     idle_stop_enabled: options.idleStopEnabled, reset_instructions: options.resetInstructions,
     expected_generation: options.expectedGeneration, enabled: options.enabled,
     harness: options.harness, tier: options.tier, instructions: options.instructions,
+    default_model: options.defaultModel,
     trigger_events: options.triggerEvents, follow_defaults: options.followDefaults,
     credential_binding_id: options.credentialBindingId, idle_timeout_seconds: options.idleTimeoutSeconds,
   };

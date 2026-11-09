@@ -152,6 +152,27 @@ export interface WorkspacePage<T> {
   items: T[];
   next_cursor: string | null;
 }
+export interface ScheduleOutputReference {
+  conversation_id: string;
+  message_id: string;
+  availability: "available" | "unavailable";
+}
+export interface ScheduleOccurrence {
+  id: string;
+  intended_due_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  output_references?: ScheduleOutputReference[];
+  state: string;
+  reason: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+export interface ScheduleHistory {
+  items: ScheduleOccurrence[];
+  conversation_id: string | null;
+  history_completeness: "partial" | "unavailable";
+}
 export type ScheduleTiming =
   | { kind: "once"; at: string; timezone?: string }
   | { kind: "interval"; seconds: number; timezone?: string }
@@ -437,7 +458,7 @@ export class HostedWorkspace {
       {},
     );
   }
-  scheduleHistory(schedule: string): Promise<WorkspacePage<ObjectValue>> {
+  scheduleHistory(schedule: string): Promise<ScheduleHistory> {
     return this.http.get(
       `${this.base}/workspace/schedules/${enc(schedule)}/occurrences`,
       {},

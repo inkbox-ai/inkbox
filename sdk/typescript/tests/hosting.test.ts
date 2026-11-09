@@ -14,6 +14,15 @@ it("encodes handles and preserves empty triggers, explicit credits and omitted c
   expect(JSON.parse(JSON.stringify(http.put.mock.calls[1][1]))).toEqual({expected_generation:2,enabled:false});
 });
 
+it("saves and reads the persistent hosting default model", async () => {
+  const wire = {mode:"inkbox",identity_id:"identity",state:"ready",generation:2,applied_generation:2,default_model:"gpt-6-luna"};
+  const http = {get:vi.fn().mockResolvedValue(wire),put:vi.fn().mockResolvedValue(wire)};
+  const resource = new IdentitiesResource(http as unknown as HttpTransport);
+  expect((await resource.getHosting("agent")).defaultModel).toBe("gpt-6-luna");
+  expect((await resource.updateHosting("agent", {expectedGeneration:1,defaultModel:"gpt-6-luna"})).defaultModel).toBe("gpt-6-luna");
+  expect(JSON.parse(JSON.stringify(http.put.mock.calls[0][1]))).toEqual({expected_generation:1,default_model:"gpt-6-luna"});
+});
+
 
 it("paginates delivery status and retries the same escaped delivery ID", async () => {
   const item = {id: "event", event: "message.received", state: "expired", attempts: 3,

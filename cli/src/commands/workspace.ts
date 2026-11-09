@@ -116,7 +116,7 @@ export function registerWorkspaceCommands(hosting: Command): void {
   chat
     .command("send <handle> <conversation>")
     .requiredOption("--message <text>")
-    .option("--model <model>", "Model for this turn (default: gpt-5.4)")
+    .option("--model <model>", "Model for this turn (default: the agent's configured model)")
     .option("--file-id <id...>", "Uploaded file references")
     .requiredOption("--idempotency-key <key>")
     .action(

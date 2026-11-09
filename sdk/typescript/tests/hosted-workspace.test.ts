@@ -10,6 +10,18 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it("returns schedule history metadata without inventing pagination", async () => {
+    const payload = {items:[{id:"occurrence",intended_due_at:"2026-01-01T00:00:00Z",state:"succeeded",reason:null}],conversation_id:"conversation",history_completeness:"partial"};
+    const get = vi.fn().mockResolvedValue(payload);
+    const workspace = new HostedWorkspace({get} as unknown as HttpTransport, "example-agent");
+    const result = await workspace.scheduleHistory("schedule/id");
+    expect(result).toEqual(payload);
+    expect(result.conversation_id).toBe("conversation");
+    expect(result.history_completeness).toBe("partial");
+    expect(result.items[0].intended_due_at).toBe(payload.items[0].intended_due_at);
+    expect(result).not.toHaveProperty("next_cursor");
+    expect(get).toHaveBeenCalledWith("/example-agent/hosting/workspace/schedules/schedule%2Fid/occurrences", {});
+  });
   it("renames with the supplied idempotency key", async () => {
     const patch = vi.fn().mockResolvedValue({ title: "Inbox review" });
     const workspace = new HostedWorkspace({ patch } as unknown as HttpTransport, "example-agent");

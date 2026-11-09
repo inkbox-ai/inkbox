@@ -30,6 +30,17 @@ def test_delivery_pagination_and_retry_keep_the_original_id():
     http.post.assert_called_once_with('/%40example/hosting/deliveries/id%2Fpath/retry', json={})
 
 
+def test_persistent_default_model_survives_requests_and_responses():
+    from inkbox.identities.hosting import HostingUpdate
+    http = Mock()
+    http.get.return_value = http.put.return_value = {'mode': 'inkbox', 'identity_id': 'identity', 'default_model': 'gpt-6-luna'}
+    resource = IdentitiesResource(http)
+    assert resource.get_hosting('agent').default_model == 'gpt-6-luna'
+    update: HostingUpdate = {'expected_generation': 1, 'default_model': 'gpt-6-luna'}
+    assert resource.update_hosting('agent', update).default_model == 'gpt-6-luna'
+    http.put.assert_called_once_with('/agent/hosting', json=update)
+
+
 def test_computer_reads_preserve_missing_data_and_do_not_mutate():
     from inkbox.computers import ComputersResource
     http = Mock()

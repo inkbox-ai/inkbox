@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
-const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2};
+const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2, default_model: "gpt-6-luna"};
 
 async function withApi(action) {
   const requests = [];
@@ -60,11 +60,30 @@ test("conflicting hosting options and invalid generations fail before a request"
       ["--expected-generation", "-1"],
       ["--expected-generation", "9007199254740992"],
       ["--expected-generation", "1", "--idle-seconds", "59"],
+      ["--expected-generation", "1", "--idle-seconds", "60"],
+      ["--expected-generation", "1", "--idle-seconds", "301"],
+      ["--expected-generation", "1", "--idle-seconds", "86400"],
+      ["--expected-generation", "1", "--always-on"],
+      ["--expected-generation", "1", "--default-model", "gpt-5.4"],
     ]) {
       const result = await run(["configure", "example", ...args]);
       assert.ok(result.error);
     }
     assert.equal(requests.length, 0);
+  });
+});
+
+test("hosting accepts only supported idle choices and preserves the default model", async () => {
+  await withApi(async (run, requests) => {
+    for (const seconds of [300, 600, 1800]) {
+      const result = await run(["configure", "example", "--expected-generation", "1", "--idle-seconds", String(seconds), "--idle-stop", "--default-model", "gpt-6-luna"]);
+      assert.ifError(result.error);
+      assert.deepEqual(requests.at(-1).body, {expected_generation:1,idle_timeout_seconds:seconds,idle_stop_enabled:true,default_model:"gpt-6-luna"});
+      assert.equal(JSON.parse(result.stdout).defaultModel, "gpt-6-luna");
+    }
+    const result = await run(["get", "example"]);
+    assert.ifError(result.error);
+    assert.equal(JSON.parse(result.stdout).defaultModel, "gpt-6-luna");
   });
 });
 

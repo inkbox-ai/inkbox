@@ -8,6 +8,8 @@ pub struct HostingConfiguration {
     pub identity_id: String,
     pub machine_id: Option<String>,
     pub harness: Option<String>,
+    #[serde(default = "default_model")]
+    pub default_model: String,
     pub tier: Option<String>,
     pub state: String,
     pub generation: u64,
@@ -30,6 +32,9 @@ pub struct HostingUpdate {
     pub enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub harness: Option<String>,
+    /// Default model for turns and scheduled work without a per-turn override.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,4 +86,8 @@ pub struct HostingDeliveries {
 
 fn default_idle_stop() -> bool {
     true
+}
+
+fn default_model() -> String {
+    "gpt-6.1-terra".into()
 }
