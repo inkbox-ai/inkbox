@@ -17,6 +17,12 @@ function object(value: string): Record<string, unknown> {
     throw new Error("Expected a JSON object");
   return parsed as Record<string, unknown>;
 }
+function pageSize(value: string) {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n < 1 || n > 100)
+    throw new Error("Expected a page size between 1 and 100");
+  return n;
+}
 function version(value: string) {
   const n = Number(value);
   if (!Number.isSafeInteger(n) || n < 0)
@@ -28,9 +34,11 @@ export function registerWorkspaceCommands(hosting: Command): void {
   const chat = hosting
     .command("chat")
     .description("Retained chat, approvals and questions");
-  chat.command("list <handle>").action(
-    withErrorHandler(async function (this: Command, handle: string) {
-      show(this, await resource(this, handle).conversations());
+  chat.command("list <handle>")
+    .option("--after <cursor>", "Continue from next_cursor")
+    .option("--limit <count>", "Page size (1–100)", pageSize, 50).action(
+    withErrorHandler(async function (this: Command, handle: string, o: { after?: string; limit: number }) {
+      show(this, await resource(this, handle).conversations(o.after, o.limit));
     }),
   );
   chat
@@ -248,7 +256,6 @@ export function registerWorkspaceCommands(hosting: Command): void {
     ["get", "status"],
     ["environment", "environment"],
     ["usage", "usage"],
-    ["terminals", "terminals"],
     ["schedules", "schedules"],
   ] as const) {
     workspace.command(`${name} <handle>`).action(
@@ -257,6 +264,12 @@ export function registerWorkspaceCommands(hosting: Command): void {
       }),
     );
   }
+  workspace.command("terminals <handle>")
+    .option("--after <cursor>", "Continue from next_cursor")
+    .option("--limit <count>", "Page size (1–100)", pageSize, 50)
+    .action(withErrorHandler(async function (this: Command, h: string, o: { after?: string; limit: number }) {
+      show(this, await resource(this, h).terminals(o.after, o.limit));
+    }));
   for (const action of ["start", "stop"] as const) {
     workspace
       .command(`${action} <handle>`)

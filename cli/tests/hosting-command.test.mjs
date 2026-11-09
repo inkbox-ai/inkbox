@@ -97,3 +97,19 @@ test("chat permissions persists the selected mode and rejects unknown modes", as
     assert.equal(requests.length, 1);
   });
 });
+
+for (const [args, endpoint] of [[['chat', 'list'], 'chat/conversations'], [['workspace', 'terminals'], 'workspace/terminals']]) {
+  test(`${args.join(' ')} forwards cursor and page size`, async () => {
+    await withApi(async (run, requests) => {
+      assert.ifError((await run([...args, 'example', '--after', 'next-page', '--limit', '20'])).error);
+      const url = new URL(requests[0].path, 'https://example.test');
+      assert.equal(url.pathname, `/api/v1/identities/example/hosting/${endpoint}`);
+      assert.equal(url.searchParams.get('after'), 'next-page');
+      assert.equal(url.searchParams.get('limit'), '20');
+      for (const limit of ['0', '101', '1.5']) {
+        assert.ok((await run([...args, 'example', '--limit', limit])).error);
+      }
+      assert.equal(requests.length, 1);
+    });
+  });
+}
