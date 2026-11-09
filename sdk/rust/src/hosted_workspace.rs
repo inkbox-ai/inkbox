@@ -494,6 +494,7 @@ impl HostedWorkspace {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChatMessage {
+    pub phase: Option<String>,
     pub id: String,
     pub role: String,
     #[serde(default)]

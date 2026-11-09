@@ -55,6 +55,7 @@ class ChatResource(TypedDict):
 
 
 class ChatMessage(ChatResource):
+    phase: NotRequired[Literal["commentary", "final_answer"] | None]
     role: Literal["user", "assistant"]
     content: NotRequired[list[dict[str, Any]]]
     completed: NotRequired[bool]

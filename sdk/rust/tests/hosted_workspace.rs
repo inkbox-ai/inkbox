@@ -191,3 +191,14 @@ fn authoritative_operation_and_history_fixtures() {
     operation.assert_hits(1);
     history.assert_hits(1);
 }
+
+#[test]
+fn message_phase_is_preserved_by_typed_payloads() {
+    let events: Vec<inkbox::hosted_workspace::ChatEvent> =
+        serde_json::from_str(include_str!("../../../contracts/events-v1.json")).unwrap();
+    let inkbox::hosted_workspace::ChatPayload::Message(message) = events[0].payload().unwrap()
+    else {
+        panic!("expected message");
+    };
+    assert_eq!(message.phase.as_deref(), Some("commentary"));
+}

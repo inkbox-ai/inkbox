@@ -62,6 +62,7 @@ export interface ChatResource {
     | null;
 }
 export interface ChatMessage extends ChatResource {
+  phase?: "commentary" | "final_answer" | null;
   role: "user" | "assistant";
   content?: ({ type: "text"; text: string } | HostedFile)[];
   completed?: boolean;

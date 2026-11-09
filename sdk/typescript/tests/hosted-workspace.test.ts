@@ -71,6 +71,7 @@ describe("hosted workspace contract", () => {
     for await (const event of workspace.streamEvents("conversation", "resume"))
       received.push(event);
     expect(received).toEqual(events);
+    if (received[0].type === "message.created") expect(received[0].data.phase).toBe("commentary");
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(String(fetch.mock.calls[0][0])).toContain("after=resume");
     const request = received.find((e) => e.type === "interaction.created");

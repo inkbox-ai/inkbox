@@ -505,6 +505,22 @@
           "default": null,
           "title": "Resource Type"
         },
+        "phase": {
+          "anyOf": [
+            {
+              "enum": [
+                "commentary",
+                "final_answer"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
         "role": {
           "enum": [
             "user",
