@@ -202,3 +202,59 @@ fn message_phase_is_preserved_by_typed_payloads() {
     };
     assert_eq!(message.phase.as_deref(), Some("commentary"));
 }
+
+#[test]
+fn stream_headers_update_cookies_and_metadata_before_consumption_even_on_errors() {
+    use std::sync::{Arc, Mutex};
+    for status in [200, 403] {
+        let server = MockServer::start();
+        let mut stream = server.mock(|when, then| {
+            when.method(GET).path(
+                "/api/v1/identities/example-agent/hosting/chat/conversations/conversation/events",
+            );
+            then.status(status)
+                .header("Set-Cookie", "stream_session=example; Path=/")
+                .header(
+                    "Inkbox-Notices",
+                    r#"[{"code":"test_notice","level":"info","message":"Example notice"}]"#,
+                )
+                .body(if status == 200 {
+                    ": heartbeat\n\n"
+                } else {
+                    r#"{"detail":"Denied"}"#
+                });
+        });
+        let subsequent = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/identities/example-agent/hosting/chat/conversations/conversation/events")
+                .query_param("after", "next").header("Cookie", "stream_session=example");
+            then.status(200).body(": done\n\n");
+        });
+        let observations = Arc::new(Mutex::new(Vec::new()));
+        let observed = observations.clone();
+        let client = Inkbox::builder("synthetic-key")
+            .base_url(server.base_url())
+            .response_observer(move |metadata| observed.lock().unwrap().push(metadata.clone()))
+            .build()
+            .unwrap();
+        let scoped = client
+            .with_response_metadata(|scoped| {
+                let opened = scoped
+                    .identities()
+                    .workspace("example-agent")
+                    .stream_events("conversation", None);
+                assert_eq!(opened.is_ok(), status == 200);
+                // Headers are observed without needing to iterate the body.
+                assert_eq!(observations.lock().unwrap().len(), 1);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(scoped.notices.unwrap()[0].code, "test_notice");
+        stream.delete();
+        let _ = client
+            .identities()
+            .workspace("example-agent")
+            .stream_events("conversation", Some("next"))
+            .unwrap();
+        subsequent.assert_hits(1);
+    }
+}

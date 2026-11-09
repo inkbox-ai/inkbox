@@ -144,6 +144,22 @@ impl HttpTransport {
             request = request.header("Cookie", cookie);
         }
         let response = request.send()?;
+        let set_cookies: Vec<&str> = response
+            .headers()
+            .get_all(reqwest::header::SET_COOKIE)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .collect();
+        self.cookie_jar
+            .store_from_headers(&url, set_cookies.into_iter());
+        let notices = response
+            .headers()
+            .get("Inkbox-Notices")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| serde_json::from_str::<Value>(value).ok())
+            .and_then(|value| crate::response_metadata::notices(&value));
+        self.response_context
+            .observe(crate::ResponseMetadata { notices });
         if !response.status().is_success() {
             let status = response.status();
             let headers = response.headers().clone();
