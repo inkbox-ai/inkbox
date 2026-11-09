@@ -136,3 +136,11 @@ def test_authoritative_operation_history_and_file_request_fixtures():
     assert workspace.schedule_history('schedule') == wire['schedule_history']
     workspace.send('conversation', wire['file_turn']['content'], idempotency_key='once')
     assert http.post.call_args.kwargs['json'] == wire['file_turn']
+
+
+def test_conversations_forward_optional_origin_and_cursor():
+    http = MagicMock()
+    workspace = HostedWorkspace(http, "example-agent")
+    workspace.conversations(after="cursor", limit=2, origin="chat")
+    http.get.assert_called_once_with("/example-agent/hosting/chat/conversations",
+        params={"after": "cursor", "limit": 2, "origin": "chat"})

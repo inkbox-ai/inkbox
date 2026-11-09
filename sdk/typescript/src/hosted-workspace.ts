@@ -241,8 +241,9 @@ export class HostedWorkspace {
   conversations(
     after?: string,
     limit = 50,
+    origin?: ChatConversation["origin"],
   ): Promise<WorkspacePage<ChatConversation>> {
-    return this.http.get(`${this.base}/chat/conversations`, { after, limit });
+    return this.http.get(`${this.base}/chat/conversations`, { after, limit, ...(origin ? { origin } : {}) });
   }
   createConversation(title: string, key: string): Promise<ChatConversation> {
     return this.http.post(

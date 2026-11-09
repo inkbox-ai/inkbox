@@ -124,9 +124,21 @@ impl HostedWorkspace {
         self.http.get(&format!("{}/workspace", self.base), &query)
     }
     pub fn conversations(&self, after: Option<&str>, limit: u32) -> Result<Value> {
+        self.conversations_filtered(after, limit, None)
+    }
+    /// Filter conversation origins before pagination; use `chat` for website chats.
+    pub fn conversations_filtered(
+        &self,
+        after: Option<&str>,
+        limit: u32,
+        origin: Option<&str>,
+    ) -> Result<Value> {
         let mut query = Vec::new();
         if let Some(value) = after {
             query.push(("after", value.to_owned()));
+        }
+        if let Some(origin) = origin {
+            query.push(("origin", origin.to_owned()));
         }
         query.push(("limit", limit.to_string()));
         self.http

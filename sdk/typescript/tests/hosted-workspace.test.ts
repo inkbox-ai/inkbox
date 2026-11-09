@@ -122,3 +122,10 @@ it("consumes authoritative operation, history, file-turn and validation fixtures
   await expect(workspace.send("conversation", wire.file_turn.content, "once")).rejects.toMatchObject({statusCode:400,detail:wire.cadence_error.detail});
   expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual(wire.file_turn);
 });
+
+it("forwards conversation origin before pagination", async () => {
+  const get = vi.fn().mockResolvedValue({ items: [], next_cursor: null });
+  const workspace = new HostedWorkspace({ get } as unknown as HttpTransport, "example-agent");
+  await workspace.conversations("cursor", 2, "chat");
+  expect(get).toHaveBeenCalledWith("/example-agent/hosting/chat/conversations", { after: "cursor", limit: 2, origin: "chat" });
+});

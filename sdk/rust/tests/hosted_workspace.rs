@@ -270,3 +270,27 @@ fn automatic_approval_metadata_is_optional_for_older_events() {
     let new: inkbox::hosted_workspace::ChatInteraction = serde_json::from_value(automatic).unwrap();
     assert!(new.auto_approve);
 }
+
+#[test]
+fn conversation_origin_filter_preserves_cursor() {
+    let server = MockServer::start();
+    let filtered = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/identities/example-agent/hosting/chat/conversations")
+            .query_param("origin", "chat")
+            .query_param("limit", "2")
+            .query_param("after", "cursor");
+        then.status(200)
+            .json_body(json!({"items":[],"next_cursor":null}));
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    client
+        .identities()
+        .workspace("example-agent")
+        .conversations_filtered(Some("cursor"), 2, Some("chat"))
+        .unwrap();
+    filtered.assert_hits(1);
+}

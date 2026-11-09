@@ -162,10 +162,11 @@ class HostedWorkspace:
         return self._http.get(self._base + "/workspace")
 
     def conversations(
-        self, *, after: str | None = None, limit: int = 50
+        self, *, after: str | None = None, limit: int = 50,
+        origin: Literal["chat", "communication", "schedule"] | None = None
     ) -> dict[str, Any]:
         return self._http.get(
-            self._base + "/chat/conversations", params={"after": after, "limit": limit}
+            self._base + "/chat/conversations", params={"after": after, "limit": limit, **({"origin": origin} if origin is not None else {})}
         )
 
     def create_conversation(
