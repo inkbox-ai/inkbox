@@ -113,3 +113,13 @@ for (const [args, endpoint] of [[['chat', 'list'], 'chat/conversations'], [['wor
     });
   });
 }
+
+
+test("chat list forwards origin and rejects unknown origins", async () => {
+  await withApi(async (run, requests) => {
+    assert.ifError((await run(['chat', 'list', 'example', '--origin', 'chat'])).error);
+    assert.equal(new URL(requests[0].path, 'https://example.test').searchParams.get('origin'), 'chat');
+    assert.ok((await run(['chat', 'list', 'example', '--origin', 'invalid'])).error);
+    assert.equal(requests.length, 1);
+  });
+});

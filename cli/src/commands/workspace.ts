@@ -36,9 +36,11 @@ export function registerWorkspaceCommands(hosting: Command): void {
     .description("Retained chat, approvals and questions");
   chat.command("list <handle>")
     .option("--after <cursor>", "Continue from next_cursor")
+    .option("--origin <origin>", "Filter chat, communication, or schedule conversations")
     .option("--limit <count>", "Page size (1–100)", pageSize, 50).action(
-    withErrorHandler(async function (this: Command, handle: string, o: { after?: string; limit: number }) {
-      show(this, await resource(this, handle).conversations(o.after, o.limit));
+    withErrorHandler(async function (this: Command, handle: string, o: { after?: string; limit: number; origin?: "chat" | "communication" | "schedule" }) {
+      if (o.origin && !["chat", "communication", "schedule"].includes(o.origin)) throw new Error("Expected origin chat, communication, or schedule");
+      show(this, await resource(this, handle).conversations(o.after, o.limit, o.origin));
     }),
   );
   chat
