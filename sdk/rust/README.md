@@ -1389,3 +1389,18 @@ A `409 whatsapp_group_reply_required` means the current WhatsApp connection has 
 qualifying incoming group message, including after a connection replacement.
 Wait for an allowed message from another participant. Do not retry with a new
 idempotency key or fall back to a direct message.
+## Conversation participant filters
+
+Conversation filtering matches **any** supplied email address or E.164 phone
+number (one to 100 values), or all accessible active identifiers of a saved
+contact, including nonprimary addresses. The selectors are mutually exclusive.
+Filtering precedes pagination and never grants additional access. Existing
+methods without a selector retain their behavior.
+
+Use `ConversationParticipantFilter::Participants` or
+`ConversationParticipantFilter::ContactId` with `threads().list_matching`,
+`texts().list_conversations_matching`, `imessages().list_conversations_matching`,
+`whatsapp().list_conversations_matching`,
+or the identity-level `list_text_conversations_matching` /
+`list_imessage_conversations_matching` / `list_whatsapp_conversations_matching` methods. Existing method signatures remain
+compatible.

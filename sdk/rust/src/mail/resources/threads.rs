@@ -37,6 +37,17 @@ impl ThreadsResource {
         folder: Option<ThreadFolder>,
         page_size: Option<i64>,
     ) -> Result<Vec<Thread>> {
+        self.list_matching(email_address, folder, page_size, None)
+    }
+
+    /// List threads matching any participant or the active emails of a contact.
+    pub fn list_matching(
+        &self,
+        email_address: &str,
+        folder: Option<ThreadFolder>,
+        page_size: Option<i64>,
+        participants: Option<&crate::ConversationParticipantFilter>,
+    ) -> Result<Vec<Thread>> {
         let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
         let folder_value = folder.map(|f| f.as_str().to_string());
 
@@ -46,6 +57,9 @@ impl ThreadsResource {
             // `limit` always sent; `cursor` only once we have one; `folder`
             // only when a filter was supplied.
             let mut params: Vec<(&str, String)> = vec![("limit", page_size.to_string())];
+            if let Some(selector) = participants {
+                selector.apply(&mut params)?;
+            }
             if let Some(c) = &cursor {
                 params.push(("cursor", c.clone()));
             }

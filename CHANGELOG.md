@@ -41,7 +41,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.30 - Hosted-agent management (unreleased)
+## 0.7.30 - Hosted-agent management and conversation participant filters (unreleased)
 
 ### Added
 
@@ -50,6 +50,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Read-only computer usage history, conversations, and session run listings.
 - `inkbox identity hosting get|configure|remove|deliveries|retry` commands for
   managing hosted agents, model-key selection, instructions, and event triggers.
+- Filter email, SMS, iMessage, and WhatsApp conversations by any participant or
+  the active identifiers of a saved contact across Python, TypeScript, and Rust.
+  Text, iMessage, and WhatsApp CLI conversation commands expose `--participants`
+  and `--contact-id`. WhatsApp filters include direct and group conversations.
 
 ## 0.7.29 - WhatsApp groups, Companion, and onboarding (unreleased)
 

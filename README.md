@@ -943,3 +943,19 @@ Group sends also count toward the identity message quota, the rolling 24-hour
 conversation limit, and the consecutive-unanswered-message limit. Groups require
 an allowed incoming message before the first send; the direct-conversation
 opening allowance does not apply.
+
+## Conversation participant filters
+
+From version 0.7.30, email thread lists and SMS, iMessage, and WhatsApp conversation
+lists accept optional participant or contact filters. Supply one to 100 email
+addresses or E.164 phone numbers to match any participant, or a saved contact ID
+to match its active identifiers. Use one selector, not both. Filtering happens
+before pagination and does not grant additional access.
+
+```python
+identity.list_whatsapp_conversations(participants=["+14155550123"])
+identity.list_imessage_conversations(contact_id=contact_id, include_groups=True)
+```
+
+WhatsApp filters include direct and group conversations. Existing group-listing
+options continue to apply to SMS and iMessage.

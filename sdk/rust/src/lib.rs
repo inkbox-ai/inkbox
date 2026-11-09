@@ -77,7 +77,7 @@ pub use contact_rules::{
 };
 pub use credentials::Credentials;
 pub use error::{ApiErrorDetail, InkboxError, Result};
-pub use filters::DateRangeFilter;
+pub use filters::{ConversationParticipantFilter, DateRangeFilter};
 pub use response_metadata::{APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver};
 
 pub mod organization_domains;

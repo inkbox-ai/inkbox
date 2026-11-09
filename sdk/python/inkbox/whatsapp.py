@@ -10,6 +10,8 @@ import unicodedata
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
+from ._conversation_filters import conversation_filter_params
+
 from inkbox._message_requests import post_message, send_key
 from inkbox.sender_access import SenderAccess
 
@@ -483,9 +485,12 @@ class WhatsAppResource:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         params: dict[str, Any] = {
             **_owner(agent_identity_id),
+            **conversation_filter_params(participants, contact_id),
             "limit": limit,
             "offset": offset,
         }

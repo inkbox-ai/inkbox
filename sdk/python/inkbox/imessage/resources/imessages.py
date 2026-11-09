@@ -12,6 +12,8 @@ line. This resource also lists and claims dedicated lines.
 
 from __future__ import annotations
 
+from inkbox._conversation_filters import conversation_filter_params
+
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -346,10 +348,15 @@ class IMessagesResource:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> list[IMessageConversationSummary]:
         """List iMessage conversations with latest-message preview.
 
         Args:
+            participants: Match any email address or E.164 phone number (1–100).
+            contact_id: Match all accessible active identifiers of this contact;
+                mutually exclusive with participants.
             agent_identity_id: Narrow to one agent identity. Ignored
                 for identity-scoped keys (always their own identity).
             limit: Max results to return (1–200).
@@ -367,7 +374,7 @@ class IMessagesResource:
             tz: IANA timezone name (str) governing zone-less values;
                 ``None`` means UTC.
         """
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset, **conversation_filter_params(participants, contact_id)}
         if agent_identity_id is not None:
             params["agent_identity_id"] = str(agent_identity_id)
         if is_blocked is not None:

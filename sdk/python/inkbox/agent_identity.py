@@ -10,6 +10,8 @@ or phone number ID explicitly.
 """
 
 from __future__ import annotations
+
+from inkbox._conversation_filters import conversation_filter_params
 from inkbox.contact_rules import ContactRuleDirection, _UNSET as _RULE_UNSET, _direction_fields, _rule_update
 
 from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyPage
@@ -219,10 +221,12 @@ class AgentIdentity:
     def list_whatsapp_conversations(
         self, *, limit: int = 50, offset: int = 0, is_blocked: bool | None = None,
         start_datetime: str | None = None, end_datetime: str | None = None, tz: str | None = None,
+        participants: list[str] | None = None, contact_id: UUID | str | None = None,
     ) -> list[WhatsAppConversationSummary]:
         return self._inkbox.whatsapp.list_conversations(
             agent_identity_id=self.id, limit=limit, offset=offset, is_blocked=is_blocked,
             start_datetime=start_datetime, end_datetime=end_datetime, tz=tz,
+            participants=participants, contact_id=contact_id,
         )
 
     def get_whatsapp_conversation(
@@ -1342,6 +1346,8 @@ class AgentIdentity:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> list[TextConversationSummary]:
         """List text conversations.
 
@@ -1351,6 +1357,9 @@ class AgentIdentity:
         narrow to conversations made up of blocked rows.
 
         Args:
+            participants: Match any email address or E.164 phone number (1–100).
+            contact_id: Match the contact’s accessible active identifiers;
+                mutually exclusive with participants.
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
             is_blocked: Tri-state filter — ``True`` for only blocked,
@@ -1373,6 +1382,7 @@ class AgentIdentity:
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
+            **conversation_filter_params(participants, contact_id),
         )
 
     def get_text_conversation(
@@ -1599,10 +1609,15 @@ class AgentIdentity:
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
+        participants: list[str] | None = None,
+        contact_id: UUID | str | None = None,
     ) -> list[IMessageConversationSummary]:
         """List this identity's iMessage conversations.
 
         Args:
+            participants: Match any email address or E.164 phone number (1–100).
+            contact_id: Match the contact’s accessible active identifiers;
+                mutually exclusive with participants.
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
             is_blocked: Tri-state filter applied to the underlying
@@ -1625,6 +1640,7 @@ class AgentIdentity:
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
+            **conversation_filter_params(participants, contact_id),
         )
 
     def get_imessage_conversation(
