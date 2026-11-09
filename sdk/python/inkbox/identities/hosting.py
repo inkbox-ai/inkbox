@@ -12,8 +12,8 @@ class HostingUpdate(TypedDict):
     trigger_events: NotRequired[list[str]]
     follow_defaults: NotRequired[bool]
     credential_binding_id: NotRequired[str | None]
-    idle_timeout_seconds: NotRequired[int]
-    idle_stop_enabled: NotRequired[bool]
+    idle_timeout_seconds: NotRequired[Literal[300, 600, 1800]]
+    idle_stop_enabled: NotRequired[Literal[True]]
     reset_instructions: NotRequired[bool]
 
 

@@ -44,8 +44,10 @@ pub struct HostingUpdate {
     )]
     pub credential_binding_id: Unset<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Accepted values: 300, 600, or 1800 seconds. New agents default to 600.
     pub idle_timeout_seconds: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Automatic idle shutdown is required; the API accepts only `Some(true)` or omission.
     pub idle_stop_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reset_instructions: Option<bool>,

@@ -7,8 +7,10 @@ export interface HostingUpdate {
   triggerEvents?: string[];
   followDefaults?: boolean;
   credentialBindingId?: string | null;
-  idleTimeoutSeconds?: number;
-  idleStopEnabled?: boolean;
+  /** Inactivity timeout; new agents default to 600 seconds. */
+  idleTimeoutSeconds?: 300 | 600 | 1800;
+  /** Automatic idle shutdown is required. */
+  idleStopEnabled?: true;
   resetInstructions?: boolean;
 }
 
