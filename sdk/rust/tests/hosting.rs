@@ -64,3 +64,23 @@ fn templates_preserve_selected_defaults_and_nullable_metadata() {
     assert!(result.items[0].software.os.is_none());
     request.assert_hits(1);
 }
+
+#[test]
+fn authoritative_server_hosting_fixture() {
+    let wire: serde_json::Value =
+        serde_json::from_str(include_str!("../../../contracts/hosted-workspace-v1.json")).unwrap();
+    let response: inkbox::identities::HostingConfiguration =
+        serde_json::from_value(wire["hosting"].clone()).unwrap();
+    assert_eq!(response.default_model, wire["hosting"]["default_model"]);
+    let update = HostingUpdate {
+        expected_generation: 1,
+        default_model: Some("gpt-6-luna".into()),
+        trigger_events: Some(vec![]),
+        credential_binding_id: Unset::Value(None),
+        ..Default::default()
+    };
+    assert_eq!(
+        serde_json::to_value(update).unwrap(),
+        wire["hosting_update"]
+    );
+}

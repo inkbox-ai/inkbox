@@ -62,3 +62,14 @@ it("preserves selected template defaults, legacy metadata, and unavailable harne
   expect(result.hosted_defaults.hermes).toBeNull();
   expect(result.items[0].software.os).toBeNull();
 });
+
+it("consumes the authoritative server hosting fixture", async () => {
+  const {readFileSync} = await import("node:fs");
+  const wire = JSON.parse(readFileSync(new URL("../../../contracts/hosted-workspace-v1.json", import.meta.url), "utf8"));
+  const http = {put: vi.fn().mockResolvedValue(wire.hosting)};
+  const result = await new IdentitiesResource(http as unknown as HttpTransport).updateHosting("example", {
+    expectedGeneration: 1, defaultModel: "gpt-6-luna", credentialBindingId: null, triggerEvents: [],
+  });
+  expect(JSON.parse(JSON.stringify(http.put.mock.calls[0][1]))).toEqual(wire.hosting_update);
+  expect(result.defaultModel).toBe(wire.hosting.default_model);
+});

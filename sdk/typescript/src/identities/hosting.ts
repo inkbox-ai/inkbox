@@ -1,5 +1,10 @@
 export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra";
 
+/** Generation-checked partial command: omitted settings stay unchanged.
+ * enabled defaults to true (activate/retry); false removes hosting.
+ * Null only clears credentialBindingId. Empty triggerEvents disables triggers;
+ * followDefaults/resetInstructions restore the respective defaults.
+ */
 export interface HostingUpdate {
   expectedGeneration: number;
   enabled?: boolean;

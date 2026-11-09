@@ -25,6 +25,10 @@ pub struct HostingConfiguration {
     pub updated_at: Option<String>,
 }
 
+/// Generation-checked partial command. Omitted settings are preserved;
+/// enabled defaults to activate/retry, false removes hosting. Only the credential
+/// binding accepts explicit null. Empty events disable triggers; the reset
+/// shortcuts restore event/instruction defaults.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct HostingUpdate {
     pub expected_generation: u64,

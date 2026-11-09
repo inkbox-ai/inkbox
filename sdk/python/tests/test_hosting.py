@@ -72,3 +72,14 @@ def test_templates_preserve_selected_defaults_and_unavailable_harness():
     assert result["items"][0]["software"]["os"] is None
     assert result["hosted_defaults"]["codex"]["total_disk_bytes"] == 12000000000
     http.post.assert_not_called()
+
+
+def test_authoritative_server_hosting_fixture():
+    import json
+    from pathlib import Path
+    wire = json.loads((Path(__file__).resolve().parents[3] / 'contracts/hosted-workspace-v1.json').read_text())
+    http = Mock()
+    http.put.return_value = wire['hosting']
+    result = IdentitiesResource(http).update_hosting('example', wire['hosting_update'])
+    assert result.default_model == wire['hosting']['default_model']
+    http.put.assert_called_once_with('/example/hosting', json=wire['hosting_update'])

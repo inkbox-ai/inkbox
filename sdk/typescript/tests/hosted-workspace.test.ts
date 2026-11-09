@@ -107,3 +107,17 @@ it("saves permission mode on the chat with an idempotency key", async () => {
     { permission_mode: "yolo" }, { headers: { "Idempotency-Key": "mode-once" } },
   );
 });
+
+it("consumes authoritative operation, history, file-turn and validation fixtures", async () => {
+  const wire = JSON.parse(readFileSync(new URL("../../../contracts/hosted-workspace-v1.json", import.meta.url), "utf8"));
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const workspace = new HostedWorkspace(new HttpTransport("synthetic-key", "https://example.test"), "example");
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify(wire.operation)));
+  expect(await workspace.operation("operation")).toEqual(wire.operation);
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify(wire.schedule_history)));
+  expect(await workspace.scheduleHistory("schedule")).toEqual(wire.schedule_history);
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify(wire.cadence_error), {status:400}));
+  await expect(workspace.send("conversation", wire.file_turn.content, "once")).rejects.toMatchObject({statusCode:400,detail:wire.cadence_error.detail});
+  expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual(wire.file_turn);
+});

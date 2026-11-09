@@ -124,3 +124,15 @@ def test_permission_mode_uses_chat_patch_and_validates_mode():
     with pytest.raises(ValueError, match="mode must"):
         workspace.set_permission_mode("conversation", "invalid", idempotency_key="mode-twice")
     assert http.patch.call_count == 1
+
+
+def test_authoritative_operation_history_and_file_request_fixtures():
+    wire = json.loads((Path(__file__).resolve().parents[3] / 'contracts/hosted-workspace-v1.json').read_text())
+    http = MagicMock()
+    workspace = HostedWorkspace(http, 'example')
+    http.get.return_value = wire['operation']
+    assert workspace.operation('operation') == wire['operation']
+    http.get.return_value = wire['schedule_history']
+    assert workspace.schedule_history('schedule') == wire['schedule_history']
+    workspace.send('conversation', wire['file_turn']['content'], idempotency_key='once')
+    assert http.post.call_args.kwargs['json'] == wire['file_turn']

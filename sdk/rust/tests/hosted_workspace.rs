@@ -162,3 +162,32 @@ fn permission_mode_is_saved_on_the_conversation() {
     assert_eq!(result.permission_mode, ChatPermissionMode::Yolo);
     update.assert_hits(1);
 }
+
+#[test]
+fn authoritative_operation_and_history_fixtures() {
+    let wire: Value =
+        serde_json::from_str(include_str!("../../../contracts/hosted-workspace-v1.json")).unwrap();
+    let server = MockServer::start();
+    let operation = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/identities/example/hosting/workspace/operations/operation");
+        then.status(200).json_body(wire["operation"].clone());
+    });
+    let history = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/identities/example/hosting/workspace/schedules/schedule/occurrences");
+        then.status(200).json_body(wire["schedule_history"].clone());
+    });
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let workspace = client.identities().workspace("example");
+    assert_eq!(workspace.operation("operation").unwrap(), wire["operation"]);
+    assert_eq!(
+        workspace.schedule_history("schedule").unwrap(),
+        wire["schedule_history"]
+    );
+    operation.assert_hits(1);
+    history.assert_hits(1);
+}

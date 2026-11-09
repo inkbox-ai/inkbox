@@ -4,6 +4,13 @@ from typing import Any, Literal, TypedDict, NotRequired
 
 
 class HostingUpdate(TypedDict):
+    """Partial command: omit to preserve; enabled defaults to activate/retry.
+
+    Only credential_binding_id accepts None (included credits). Empty events
+    disable triggers; follow_defaults/reset_instructions reset their settings.
+    enabled=False removes hosting.
+    """
+
     expected_generation: int
     enabled: NotRequired[bool]
     harness: NotRequired[Literal['codex', 'hermes']]
