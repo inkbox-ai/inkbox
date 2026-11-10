@@ -31,7 +31,7 @@ export function registerHostingCommands(identity: Command): void {
     .requiredOption("--expected-generation <number>", "Current generation; 0 for initial setup")
     .addOption(new Option("--harness <name>", "Agent harness").choices(["codex", "hermes"]))
     .addOption(new Option("--default-model <model>", "Default model for turns and scheduled work").choices(["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"]))
-    .addOption(new Option("--size <size>", "Computer size").choices(["small", "medium", "large"]))
+    .addOption(new Option("--size <size>", "Fixed computer size: 1 vCPU and 4 GiB RAM").choices(["medium"]))
     .option("--reset-instructions", "Restore default hosted-agent instructions")
     .option("--idle-stop", "Enable idle shutdown")
     .option("--instructions-file <path>", "Read hosted-agent instructions from a UTF-8 file")
@@ -39,9 +39,9 @@ export function registerHostingCommands(identity: Command): void {
     .option("--default-events", "Restore default trigger events")
     .option("--model-key <id>", "Use a saved organization model-key ID")
     .option("--credits", "Use the organization's remaining model credits")
-    .option("--idle-seconds <seconds>", "Stop after 300, 600, or 1800 idle seconds")
+    .option("--idle-seconds <seconds>", "Stop after 60 or 300 idle seconds")
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
-      expectedGeneration: string; harness?: "codex" | "hermes"; size?: "small" | "medium" | "large";
+      expectedGeneration: string; harness?: "codex" | "hermes"; size?: "medium";
       defaultModel?: HostingModel;
       instructionsFile?: string; events?: string; defaultEvents?: boolean; modelKey?: string;
       credits?: boolean; idleSeconds?: string; resetInstructions?: boolean; idleStop?: boolean;
@@ -63,7 +63,7 @@ export function registerHostingCommands(identity: Command): void {
       if (opts.credits) update.credentialBindingId = null;
       if (opts.idleSeconds !== undefined) {
         const seconds = Number(opts.idleSeconds);
-        if (seconds !== 300 && seconds !== 600 && seconds !== 1800) throw new Error("Idle seconds must be 300, 600, or 1800");
+        if (seconds !== 60 && seconds !== 300) throw new Error("Idle seconds must be 60 or 300");
         update.idleTimeoutSeconds = seconds;
       }
       const global = getGlobalOpts(this);

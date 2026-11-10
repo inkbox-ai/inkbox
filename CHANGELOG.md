@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.36
+
+### Changed
+- Hosted agents use one fixed size: 1 vCPU and 4 GiB RAM (`medium`). Other hosted sizes are no longer accepted.
+- Hosted idle shutdown accepts 60 or 300 seconds, with a 60-second default. The previous 600- and 1800-second choices are no longer accepted.
+
+
 ## 0.7.35
 
 ### Added

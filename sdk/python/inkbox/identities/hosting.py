@@ -15,12 +15,12 @@ class HostingUpdate(TypedDict):
     enabled: NotRequired[bool]
     harness: NotRequired[Literal['codex', 'hermes']]
     default_model: NotRequired[Literal['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra']]
-    tier: NotRequired[Literal['small', 'medium', 'large']]
+    tier: NotRequired[Literal['medium']]
     instructions: NotRequired[str]
     trigger_events: NotRequired[list[str]]
     follow_defaults: NotRequired[bool]
     credential_binding_id: NotRequired[str | None]
-    idle_timeout_seconds: NotRequired[Literal[300, 600, 1800]]
+    idle_timeout_seconds: NotRequired[Literal[60, 300]]
     idle_stop_enabled: NotRequired[Literal[True]]
     reset_instructions: NotRequired[bool]
 
@@ -40,7 +40,7 @@ class HostingConfiguration:
     trigger_events: list[str] = field(default_factory=list)
     follow_defaults: bool = True
     credential_binding_id: str | None = None
-    idle_timeout_seconds: int = 600
+    idle_timeout_seconds: int = 60
     idle_stop_enabled: bool = True
     last_error: str | None = None
     updated_at: str | None = None

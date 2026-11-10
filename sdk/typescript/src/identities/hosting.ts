@@ -11,13 +11,13 @@ export interface HostingUpdate {
   harness?: "codex" | "hermes";
   /** Default for turns and scheduled work that do not override the model. */
   defaultModel?: HostingModel;
-  tier?: "small" | "medium" | "large";
+  tier?: "medium";
   instructions?: string;
   triggerEvents?: string[];
   followDefaults?: boolean;
   credentialBindingId?: string | null;
-  /** Inactivity timeout; new agents default to 600 seconds. */
-  idleTimeoutSeconds?: 300 | 600 | 1800;
+  /** Inactivity timeout; new agents default to 60 seconds. */
+  idleTimeoutSeconds?: 60 | 300;
   /** Automatic idle shutdown is required. */
   idleStopEnabled?: true;
   resetInstructions?: boolean;
@@ -71,7 +71,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
     generation: data.generation, appliedGeneration: data.applied_generation,
     instructions: data.instructions ?? "", triggerEvents: data.trigger_events ?? [],
     followDefaults: data.follow_defaults ?? true, credentialBindingId: data.credential_binding_id ?? null,
-    idleStopEnabled: data.idle_stop_enabled ?? true, idleTimeoutSeconds: data.idle_timeout_seconds ?? 600, lastError: data.last_error ?? null,
+    idleStopEnabled: data.idle_stop_enabled ?? true, idleTimeoutSeconds: data.idle_timeout_seconds ?? 60, lastError: data.last_error ?? null,
     updatedAt: data.updated_at ?? null,
   };
 }
