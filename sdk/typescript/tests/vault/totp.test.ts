@@ -173,6 +173,22 @@ describe("parseTotpUri", () => {
     expect(() => parseTotpUri(uri)).toThrow("HOTP is not supported");
   });
 
+  it("parses uppercase and mixed-case TOTP in URI scheme authority", () => {
+    const upperUri = "otpauth://TOTP/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP";
+    const upperConfig = parseTotpUri(upperUri);
+    expect(upperConfig.secret).toBe("JBSWY3DPEHPK3PXP");
+    expect(upperConfig.issuer).toBe("GitHub");
+
+    const mixedUri = "otpauth://Totp/user@example.com?secret=JBSWY3DPEHPK3PXP";
+    const mixedConfig = parseTotpUri(mixedUri);
+    expect(mixedConfig.secret).toBe("JBSWY3DPEHPK3PXP");
+  });
+
+  it("rejects uppercase HOTP with expected unsupported message", () => {
+    const uri = "otpauth://HOTP/?secret=JBSWY3DPEHPK3PXP&counter=0";
+    expect(() => parseTotpUri(uri)).toThrow("HOTP is not supported");
+  });
+
   it("rejects invalid scheme", () => {
     const uri = "https://example.com/totp?secret=JBSWY3DPEHPK3PXP";
     expect(() => parseTotpUri(uri)).toThrow("Invalid scheme");
