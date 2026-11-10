@@ -63,7 +63,10 @@ test("conflicting hosting options and invalid generations fail before a request"
       ["--expected-generation", "-1"],
       ["--expected-generation", "9007199254740992"],
       ["--expected-generation", "1", "--idle-seconds", "59"],
-      ["--expected-generation", "1", "--idle-seconds", "60"],
+      ["--expected-generation", "1", "--idle-seconds", "600"],
+      ["--expected-generation", "1", "--idle-seconds", "1800"],
+      ["--expected-generation", "1", "--size", "small"],
+      ["--expected-generation", "1", "--size", "large"],
       ["--expected-generation", "1", "--idle-seconds", "301"],
       ["--expected-generation", "1", "--idle-seconds", "86400"],
       ["--expected-generation", "1", "--always-on"],
@@ -78,7 +81,7 @@ test("conflicting hosting options and invalid generations fail before a request"
 
 test("hosting accepts only supported idle choices and preserves the default model", async () => {
   await withApi(async (run, requests) => {
-    for (const seconds of [300, 600, 1800]) {
+    for (const seconds of [60, 300]) {
       const result = await run(["configure", "example", "--expected-generation", "1", "--idle-seconds", String(seconds), "--idle-stop", "--default-model", "gpt-6-luna"]);
       assert.ifError(result.error);
       assert.deepEqual(requests.at(-1).body, {expected_generation:1,idle_timeout_seconds:seconds,idle_stop_enabled:true,default_model:"gpt-6-luna"});

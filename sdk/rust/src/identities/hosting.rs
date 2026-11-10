@@ -40,6 +40,7 @@ pub struct HostingUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The only supported hosted size is `medium`: 1 vCPU and 4 GiB RAM.
     pub tier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
@@ -53,7 +54,7 @@ pub struct HostingUpdate {
     )]
     pub credential_binding_id: Unset<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Accepted values: 300, 600, or 1800 seconds. New agents default to 600.
+    /// Accepted values: 60 or 300 seconds. New agents default to 60.
     pub idle_timeout_seconds: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Automatic idle shutdown is required; the API accepts only `Some(true)` or omission.

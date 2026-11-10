@@ -2,12 +2,17 @@
 import type { HostingModel, HostingUpdate, ScheduleHistory, HostedWorkspace } from "../dist/index.js";
 
 const model: HostingModel = "gpt-6.1-terra";
-const update: HostingUpdate = {expectedGeneration: 1, defaultModel: model, idleTimeoutSeconds: 600};
+const update: HostingUpdate = {expectedGeneration: 1, defaultModel: model, tier: "medium", idleTimeoutSeconds: 60};
 void update;
+const fiveMinutes: HostingUpdate = {expectedGeneration: 1, idleTimeoutSeconds: 300};
+void fiveMinutes;
 // @ts-expect-error Hosted agents require automatic idle shutdown.
 const alwaysOn: HostingUpdate = {expectedGeneration: 1, idleStopEnabled: false};
 // @ts-expect-error Arbitrary idle intervals are not supported.
-const arbitraryInterval: HostingUpdate = {expectedGeneration: 1, idleTimeoutSeconds: 60};
+const arbitraryInterval: HostingUpdate = {expectedGeneration: 1, idleTimeoutSeconds: 600};
+// @ts-expect-error Hosted agents have one fixed size.
+const unsupportedSize: HostingUpdate = {expectedGeneration: 1, tier: "small"};
+void unsupportedSize;
 void alwaysOn;
 void arbitraryInterval;
 
