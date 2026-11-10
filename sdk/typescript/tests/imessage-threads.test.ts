@@ -76,6 +76,28 @@ describe("iMessage threads", () => {
     expect(rows[0].replyToMessageId).toBe(message);
     await expect(resource.list({ threadId: thread })).rejects.toThrow("requires conversationId");
   });
+  it("URL-encodes opaque thread IDs and conversation IDs with special characters", async () => {
+    const { fetch, resource } = setup(page);
+    const opaqueThreadId = "thread/sub+root==";
+    const phoneConversationId = "+15550100101";
+    await resource.getConversationThread(phoneConversationId, opaqueThreadId);
+    const url = new URL(fetch.mock.calls[0][0]);
+    expect(url.pathname).toBe(
+      `/api/v1/imessage/conversations/${encodeURIComponent(phoneConversationId)}/threads/${encodeURIComponent(opaqueThreadId)}`,
+    );
+  });
+  it("URL-encodes message IDs with special characters in getThread and get", async () => {
+    const { fetch, resource } = setup(page);
+    const complexMsgId = "msg/123+part==";
+    await resource.getThread(complexMsgId);
+    const threadUrl = new URL(fetch.mock.calls[0][0]);
+    expect(threadUrl.pathname).toBe(`/api/v1/imessage/messages/${encodeURIComponent(complexMsgId)}/thread`);
+
+    const { fetch: fetchGet, resource: resourceGet } = setup(row);
+    await resourceGet.get(complexMsgId);
+    const getUrl = new URL(fetchGet.mock.calls[0][0]);
+    expect(getUrl.pathname).toBe(`/api/v1/imessage/messages/${encodeURIComponent(complexMsgId)}`);
+  });
 });
 
 it("identity helpers scope every threaded operation", async () => {
