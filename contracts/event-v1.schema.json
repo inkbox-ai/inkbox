@@ -77,7 +77,7 @@
           "type": "string"
         },
         "size_bytes": {
-          "maximum": 262144,
+          "maximum": 5000000,
           "minimum": 0,
           "title": "Size Bytes",
           "type": "integer"

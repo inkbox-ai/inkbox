@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import http from "node:http";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -157,4 +160,38 @@ test("schedule list exposes its cursor in both output modes and retrieves paused
   }, req => new URL(req.url, "https://example.test").searchParams.get("after") === cursor
     ? {items: [{id: "job51", enabled: false}], next_cursor: null}
     : {items: Array.from({length: 50}, (_, i) => ({id: `job${i + 1}`, enabled: false})), next_cursor: cursor});
+});
+
+
+test("chat upload accepts the 5 MB contract boundary and rejects one byte over before HTTP", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "inkbox-upload-"));
+  const path = join(directory, "attachment.bin");
+  try {
+    await withApi(async (run, requests) => {
+      for (const size of [300_000, 5_000_000]) {
+        const data = Buffer.alloc(size, 0xa5);
+        await writeFile(path, data);
+        const result = await run(["chat", "upload", "example", path, "--name", "attachment.bin", "--idempotency-key", `upload-${size}`]);
+        assert.ifError(result.error);
+        const request = requests.at(-1);
+        assert.equal(request.method, "POST");
+        assert.equal(request.path, "/api/v1/identities/example/hosting/chat/files");
+        assert.deepEqual(Buffer.from(request.body.data_base64, "base64"), data);
+      }
+      await writeFile(path, Buffer.alloc(5_000_001));
+      const result = await run(["chat", "upload", "example", path, "--name", "attachment.bin", "--idempotency-key", "too-large"]);
+      assert.ok(result.error);
+      assert.match(result.stderr, /5 MB \(5,000,000 bytes\)/);
+      assert.equal(requests.length, 2);
+    });
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test("published chat file schema advertises the decoded 5 MB limit", async () => {
+  const schema = JSON.parse(await readFile(new URL("../../contracts/event-v1.schema.json", import.meta.url), "utf8"));
+  assert.deepEqual(schema.$defs.ArtifactData.properties.size_bytes, {
+    maximum: 5_000_000, minimum: 0, title: "Size Bytes", type: "integer",
+  });
 });

@@ -223,8 +223,8 @@ export function registerWorkspaceCommands(hosting: Command): void {
         o: { name: string; mediaType: string; idempotencyKey: string },
       ) {
         const data = await readFile(path);
-        if (data.length > 262144)
-          throw new Error("Files must be at most 256 KiB");
+        if (data.length > 5_000_000)
+          throw new Error("Files must be at most 5 MB (5,000,000 bytes)");
         show(
           this,
           await resource(this, h).uploadFile(
