@@ -129,3 +129,13 @@ it("forwards conversation origin before pagination", async () => {
   await workspace.conversations("cursor", 2, "chat");
   expect(get).toHaveBeenCalledWith("/example-agent/hosting/chat/conversations", { after: "cursor", limit: 2, origin: "chat" });
 });
+
+it.each(["offline_pause", "offline_delete", "resume_pending", "legacy_receipt", "offline_page", "synchronized_page"])("preserves schedule control contract: %s", async (name) => {
+  const wire = JSON.parse(readFileSync(new URL("../../../contracts/schedule-control-v1.json", import.meta.url), "utf8"))[name];
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(wire))));
+  const workspace = new HostedWorkspace(new HttpTransport("synthetic-key", "https://example.test"), "example-agent");
+  const result = name.endsWith("page") ? await workspace.schedules()
+    : name === "offline_delete" ? await workspace.deleteSchedule(wire.schedule_id, 1, "delete-once")
+    : await workspace.updateSchedule(wire.schedule_id, 1, {enabled: name === "resume_pending"}, "update-once");
+  expect(result).toEqual(wire);
+});

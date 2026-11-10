@@ -189,7 +189,12 @@ export interface ScheduleFields {
   catch_up?: boolean;
   reauthorize?: boolean;
 }
-export interface ScheduleReceipt {
+/** Effective controller state is independent of native synchronization. */
+export interface ScheduleControlStatus {
+  controller_effective_state?: "enabled" | "paused" | "deleted";
+  native_sync_status?: "deferred" | "pending" | "synchronized";
+}
+export interface ScheduleReceipt extends ScheduleControlStatus {
   command_id: string;
   state: "applied";
   registration_status: string;
@@ -414,7 +419,7 @@ export class HostedWorkspace {
       this.key(key),
     );
   }
-  schedules(after?: string, limit = 50): Promise<WorkspacePage<ObjectValue>> {
+  schedules(after?: string, limit = 50): Promise<WorkspacePage<ObjectValue & ScheduleControlStatus>> {
     return this.http.get(`${this.base}/workspace/schedules`, { after, limit });
   }
   createSchedule(

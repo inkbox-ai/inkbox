@@ -294,3 +294,43 @@ fn conversation_origin_filter_preserves_cursor() {
         .unwrap();
     filtered.assert_hits(1);
 }
+
+#[test]
+fn schedule_control_wire_compatibility() {
+    let fixtures: Value =
+        serde_json::from_str(include_str!("../../../contracts/schedule-control-v1.json")).unwrap();
+    for name in [
+        "offline_pause",
+        "offline_delete",
+        "resume_pending",
+        "legacy_receipt",
+        "offline_page",
+        "synchronized_page",
+    ] {
+        let wire = &fixtures[name];
+        let server = MockServer::start();
+        let response = server.mock(|_when, then| {
+            then.status(200).json_body(wire.clone());
+        });
+        let client = Inkbox::builder("synthetic-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let workspace = client.identities().workspace("example-agent");
+        let result = if name.ends_with("page") {
+            workspace.schedules(None, 50)
+        } else if name == "offline_delete" {
+            workspace.delete_schedule(wire["schedule_id"].as_str().unwrap(), 1, "delete-once")
+        } else {
+            workspace.update_schedule(
+                wire["schedule_id"].as_str().unwrap(),
+                1,
+                &json!({"enabled":name == "resume_pending"}),
+                "update-once",
+            )
+        }
+        .unwrap();
+        assert_eq!(&result, wire, "{name}");
+        response.assert_hits(1);
+    }
+}

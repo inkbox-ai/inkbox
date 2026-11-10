@@ -144,3 +144,22 @@ def test_conversations_forward_optional_origin_and_cursor():
     workspace.conversations(after="cursor", limit=2, origin="chat")
     http.get.assert_called_once_with("/example-agent/hosting/chat/conversations",
         params={"after": "cursor", "limit": 2, "origin": "chat"})
+
+
+@pytest.mark.parametrize("case", ["offline_pause", "offline_delete", "resume_pending", "legacy_receipt", "offline_page", "synchronized_page"])
+def test_schedule_control_wire_compatibility(case):
+    wire = json.loads((FIXTURES / "schedule-control-v1.json").read_text())[case]
+    with HttpTransport("synthetic-key", "https://example.test") as transport:
+        transport._client.close()
+        transport._client = httpx.Client(
+            base_url="https://example.test",
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=wire)),
+        )
+        workspace = HostedWorkspace(transport, "example-agent")
+        if case.endswith("page"):
+            result = workspace.schedules()
+        elif case == "offline_delete":
+            result = workspace.delete_schedule(wire["schedule_id"], 1, idempotency_key="delete-once")
+        else:
+            result = workspace.update_schedule(wire["schedule_id"], 1, {"enabled": case == "resume_pending"}, idempotency_key="update-once")
+        assert result == wire
