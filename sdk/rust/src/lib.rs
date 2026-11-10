@@ -44,6 +44,7 @@ pub mod a2a;
 pub mod agent_signup;
 pub mod api_keys;
 pub mod companion;
+pub mod computers;
 pub mod sender_access;
 pub use sender_access::SenderAccess;
 #[cfg(test)]
@@ -108,3 +109,5 @@ pub mod billing;
 
 pub mod whatsapp;
 pub use whatsapp::*;
+
+pub mod hosted_workspace;

@@ -539,7 +539,18 @@ from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, Ident
 
 from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppThread
 
+from inkbox.hosted_workspace import HostedWorkspace, ChatConversation, ChatTurn, ChatEvent, ChatEventPage, ChatCapabilities, ChatText, ChatFileReference
+
 __all__ = [
+    "HostedWorkspace",
+    "ChatConversation",
+    "ChatTurn",
+    "ChatEvent",
+    "ChatEventPage",
+    "ChatCapabilities",
+    "ChatText",
+    "ChatFileReference",
+
     "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppThread",
     "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",

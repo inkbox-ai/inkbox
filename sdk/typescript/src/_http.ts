@@ -536,6 +536,41 @@ export class HttpTransport {
     return (metadata) => notifyResponseObservers(metadata, this.collectMetadata, this.onResponse);
   }
 
+  async *streamEvents<T>(path:string,after?:string,signal?:AbortSignal):AsyncGenerator<T> {
+    const url=`${this.baseUrl}${path}${after ? `?after=${encodeURIComponent(after)}` : ""}`;
+    const headers:Record<string,string>={"X-API-Key":this.apiKey,Accept:"text/event-stream"};
+    if(this.userAgent)headers["User-Agent"]=this.userAgent;
+    const cookie=this.cookieJar.getHeaderValue(url);if(cookie)headers.Cookie=cookie;
+    const response=await fetch(url,{headers,signal,redirect:"error"});
+    this.cookieJar.storeFromResponse(url,response);
+    await observeResponse(response,url,"GET",this.collectMetadata,this.onResponse);
+    if(!response.ok){const error=await readErrorEnvelope(response);raiseForErrorResponse(response.status,error.detail,response.headers,error.agentSupport);}
+    if(!response.body)throw new Error("Event stream unavailable");
+    const reader=response.body.getReader(),decoder=new TextDecoder();
+    let buffer="",data:string[]=[],size=0,eventType="";
+    try {
+      while(true){
+        const {done,value}=await reader.read();if(done)return;
+        buffer+=decoder.decode(value,{stream:true});
+        if(buffer.length+size>1048576)throw new Error("Event frame exceeds limit");
+        let newline:number;
+        while((newline=buffer.indexOf("\n"))>=0){
+          const line=buffer.slice(0,newline).replace(/\r$/,"");buffer=buffer.slice(newline+1);
+          if(!line){
+            if(data.length){
+              const payload=JSON.parse(data.join("\n"));
+              if(eventType==="stream.reset")raiseForErrorResponse(payload.status ?? 410,payload);
+              yield payload as T;
+            }
+            data=[];size=0;eventType="";
+          }
+          else if(line.startsWith("event:"))eventType=line.slice(6).trim();
+          else if(line.startsWith("data:")){const part=line.slice(5).replace(/^ /,"");data.push(part);size+=part.length;}
+        }
+      }
+    } finally {await reader.cancel();reader.releaseLock();}
+  }
+
   async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number; headers?: Record<string, string> }): Promise<T> {
     return this.request<T>("GET", path, { params, timeoutMs: opts?.timeoutMs, headers: opts?.headers });
   }
@@ -576,8 +611,8 @@ export class HttpTransport {
     return this.request<T>("POST", path, { formBody: form, params: opts?.params });
   }
 
-  async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("PUT", path, { body, timeoutMs: opts?.timeoutMs });
+  async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number; headers?: Record<string,string> }): Promise<T> {
+    return this.request<T>("PUT", path, { body, timeoutMs: opts?.timeoutMs, headers: opts?.headers });
   }
 
   async patch<T>(
@@ -611,9 +646,10 @@ export class HttpTransport {
    */
   async deleteWithResponse<T>(
     path: string,
-    opts?: { timeoutMs?: number; params?: Params; headers?: Record<string, string> },
+    opts?: { body?: unknown; timeoutMs?: number; params?: Params; headers?: Record<string, string> },
   ): Promise<T> {
     return this.request<T>("DELETE", path, {
+      body: opts?.body,
       params: opts?.params,
       timeoutMs: opts?.timeoutMs,
       headers: opts?.headers,

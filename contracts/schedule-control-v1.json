@@ -1,0 +1,129 @@
+{
+  "offline_pause": {
+    "command_id": "11111111-1111-4111-8111-111111111111",
+    "state": "applied",
+    "registration_status": "pending",
+    "schedule_id": "11111111-1111-4111-8111-111111111111",
+    "revision": 1,
+    "deleted": false,
+    "controller_effective_state": "paused",
+    "native_sync_status": "deferred"
+  },
+  "offline_delete": {
+    "command_id": "11111111-1111-4111-8111-111111111111",
+    "state": "applied",
+    "registration_status": "pending",
+    "schedule_id": "11111111-1111-4111-8111-111111111111",
+    "revision": 1,
+    "deleted": true,
+    "controller_effective_state": "deleted",
+    "native_sync_status": "deferred"
+  },
+  "resume_pending": {
+    "command_id": "11111111-1111-4111-8111-111111111111",
+    "state": "applied",
+    "registration_status": "pending",
+    "schedule_id": "11111111-1111-4111-8111-111111111111",
+    "revision": 1,
+    "deleted": false,
+    "controller_effective_state": "paused",
+    "native_sync_status": "pending"
+  },
+  "offline_page": {
+    "items": [
+      {
+        "registration_error": null,
+        "id": "11111111-1111-4111-8111-111111111111",
+        "revision": 1,
+        "display": {
+          "name": "Daily review",
+          "timing": {
+            "kind": "interval",
+            "seconds": 3600
+          }
+        },
+        "conversation_id": null,
+        "timing": {
+          "kind": "interval",
+          "seconds": 3600
+        },
+        "timezone": "UTC",
+        "enabled": false,
+        "controller_effective_state": "paused",
+        "native_sync_status": "deferred",
+        "registration_status": "pending",
+        "next_run_at": null,
+        "last_result": null,
+        "allowed_actions": [
+          "pause",
+          "delete"
+        ]
+      }
+    ],
+    "next_cursor": null,
+    "computer_state": "stopped",
+    "capabilities": {
+      "task_kinds": [
+        "prompt"
+      ],
+      "late_start_seconds": 900,
+      "minimum_interval_seconds": 60,
+      "max_schedules_per_agent": 10,
+      "interval_step_seconds": 1,
+      "per_schedule_catch_up": true
+    }
+  },
+  "legacy_receipt": {
+    "command_id": "11111111-1111-4111-8111-111111111111",
+    "state": "applied",
+    "registration_status": "pending",
+    "schedule_id": "11111111-1111-4111-8111-111111111111",
+    "revision": 1,
+    "deleted": false
+  },
+  "synchronized_page": {
+    "items": [
+      {
+        "registration_error": null,
+        "id": "11111111-1111-4111-8111-111111111111",
+        "revision": 1,
+        "display": {
+          "name": "Daily review",
+          "timing": {
+            "kind": "interval",
+            "seconds": 3600
+          }
+        },
+        "conversation_id": null,
+        "timing": {
+          "kind": "interval",
+          "seconds": 3600
+        },
+        "timezone": "UTC",
+        "enabled": true,
+        "controller_effective_state": "enabled",
+        "native_sync_status": "synchronized",
+        "registration_status": "registered",
+        "next_run_at": "2026-11-11T00:00:00Z",
+        "last_result": null,
+        "allowed_actions": [
+          "update",
+          "pause",
+          "delete"
+        ]
+      }
+    ],
+    "next_cursor": null,
+    "computer_state": "running",
+    "capabilities": {
+      "task_kinds": [
+        "prompt"
+      ],
+      "late_start_seconds": 900,
+      "minimum_interval_seconds": 60,
+      "max_schedules_per_agent": 10,
+      "interval_step_seconds": 1,
+      "per_schedule_catch_up": true
+    }
+  }
+}

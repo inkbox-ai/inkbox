@@ -1,0 +1,186 @@
+[
+  {
+    "schema_version": 1,
+    "id": "event-1",
+    "sequence": 1,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "message.created",
+    "data": {
+      "id": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ],
+      "phase": "commentary"
+    },
+    "cursor": "cursor-1"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-2",
+    "sequence": 2,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "message.delta",
+    "data": {
+      "id": "message",
+      "text": "Working"
+    },
+    "cursor": "cursor-2"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-3",
+    "sequence": 3,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "tool.started",
+    "data": {
+      "id": "tool",
+      "title": "Run command",
+      "status": "running"
+    },
+    "cursor": "cursor-3"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-4",
+    "sequence": 4,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "interaction.created",
+    "data": {
+      "id": "interaction",
+      "kind": "approval",
+      "version": 1,
+      "status": "pending",
+      "title": "Run command",
+      "effective_scope": "operation",
+      "decisions": [
+        "approve_once",
+        "deny"
+      ],
+      "expires_at": "2026-01-01T00:05:00Z"
+    },
+    "cursor": "cursor-4"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-5",
+    "sequence": 5,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "interaction.updated",
+    "data": {
+      "id": "interaction",
+      "kind": "approval",
+      "version": 1,
+      "status": "submitted",
+      "title": "Run command",
+      "effective_scope": "operation",
+      "decisions": [
+        "approve_once",
+        "deny"
+      ],
+      "expires_at": "2026-01-01T00:05:00Z",
+      "decision": "approve_once"
+    },
+    "cursor": "cursor-5"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-6",
+    "sequence": 6,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "tool.completed",
+    "data": {
+      "id": "tool",
+      "title": "Run command",
+      "status": "completed"
+    },
+    "cursor": "cursor-6"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-7",
+    "sequence": 7,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "message.completed",
+    "data": {
+      "id": "message",
+      "role": "assistant",
+      "completed": true
+    },
+    "cursor": "cursor-7"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-8",
+    "sequence": 8,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "artifact.created",
+    "data": {
+      "id": "file",
+      "file_id": "00000000-0000-4000-8000-000000000003",
+      "name": "summary.csv",
+      "media_type": "text/csv",
+      "size_bytes": 12,
+      "availability": "available"
+    },
+    "cursor": "cursor-8"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-9",
+    "sequence": 9,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "turn.updated",
+    "data": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "status": "completed",
+      "terminal": true
+    },
+    "cursor": "cursor-9"
+  },
+  {
+    "schema_version": 1,
+    "id": "event-10",
+    "sequence": 10,
+    "conversation_id": "00000000-0000-4000-8000-000000000001",
+    "turn_id": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-01-01T00:00:00Z",
+    "type": "turn.updated",
+    "data": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "status": "failed",
+      "terminal": true,
+      "blocker": {
+        "code": "included_credits_exhausted",
+        "message": "Add a model key to continue.",
+        "scope": "organization",
+        "retryable": false,
+        "actions": [
+          "manage_model_key"
+        ]
+      }
+    },
+    "cursor": "cursor-10"
+  }
+]

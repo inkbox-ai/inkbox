@@ -1,0 +1,61 @@
+{
+  "hosting_update": {
+    "expected_generation": 1,
+    "default_model": "gpt-6-luna",
+    "trigger_events": [],
+    "credential_binding_id": null
+  },
+  "hosting": {
+    "mode": "inkbox",
+    "identity_id": "11111111-1111-4111-8111-111111111111",
+    "machine_id": null,
+    "harness": "codex",
+    "tier": "small",
+    "state": "ready",
+    "generation": 2,
+    "applied_generation": 2,
+    "default_model": "gpt-6-luna",
+    "instructions": "",
+    "trigger_events": [],
+    "default_trigger_events": [],
+    "follow_defaults": false,
+    "credential_binding_id": null,
+    "idle_stop_enabled": true,
+    "idle_timeout_seconds": 600,
+    "last_error": null,
+    "updated_at": null
+  },
+  "operation": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "machine_id": null,
+    "kind": "start",
+    "state": "queued",
+    "error_code": null,
+    "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-01-01T00:00:00Z"
+  },
+  "schedule_history": {
+    "items": [],
+    "conversation_id": "11111111-1111-4111-8111-111111111111",
+    "history_completeness": "partial"
+  },
+  "file_turn": {
+    "content": [
+      {
+        "type": "file",
+        "file_id": "11111111-1111-4111-8111-111111111111"
+      }
+    ]
+  },
+  "cadence_error": {
+    "detail": {
+      "code": "schedule_interval_too_short",
+      "message": "Choose a longer schedule interval that meets your organization's minimum.",
+      "retryable": false,
+      "scope": "agent",
+      "actions": [
+        "edit_schedule"
+      ]
+    }
+  }
+}

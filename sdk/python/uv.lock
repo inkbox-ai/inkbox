@@ -398,7 +398,7 @@ wheels = [
 
 [[package]]
 name = "inkbox"
-version = "0.7.30"
+version = "0.7.35"
 source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },

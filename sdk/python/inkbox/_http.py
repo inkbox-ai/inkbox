@@ -124,8 +124,9 @@ class HttpTransport:
         *,
         json: dict[str, Any],
         timeout: float | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
-        resp = self._send("PUT", path, json=json, timeout=timeout)
+        resp = self._send("PUT", path, json=json, timeout=timeout, **({"headers": headers} if headers is not None else {}))
         _raise_for_status(resp)
         return resp.json()
 
@@ -161,6 +162,7 @@ class HttpTransport:
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> Any:
@@ -171,6 +173,8 @@ class HttpTransport:
         """
         cleaned = {k: v for k, v in (params or {}).items() if v is not None}
         kwargs: dict[str, Any] = {"headers": headers, "timeout": timeout}
+        if json is not None:
+            kwargs["json"] = json
         if cleaned:
             kwargs["params"] = cleaned
         resp = self._send("DELETE", path, **kwargs)
@@ -263,6 +267,48 @@ class HttpTransport:
         self._cookie_jar.store_from_headers(str(request.url), resp.headers)
         _observe_response(resp, self._notice_collector, self._response_observer)
         return resp
+
+    def iter_sse(self, path: str, *, after: str | None = None):
+        """Yield JSON event data; callers explicitly resume after disconnects."""
+        import json
+        request = self._client.build_request("GET", path, params={"after": after} if after else {},
+            headers={"Accept": "text/event-stream"}, timeout=httpx.Timeout(30, connect=10))
+        cookie = self._cookie_jar.header_for_url(str(request.url))
+        if cookie:
+            request.headers["Cookie"] = cookie
+        response = self._client.send(request, stream=True)
+        try:
+            if response.status_code >= 400:
+                response.read()
+            _raise_for_status(response)
+            self._cookie_jar.store_from_headers(str(request.url), response.headers)
+            _observe_response(response, self._notice_collector, self._response_observer)
+            buffer = b""
+            data = []
+            event_type = b""
+            size = 0
+            for chunk in response.iter_bytes():
+                buffer += chunk
+                if len(buffer) + size > 1048576:
+                    raise ValueError("Event frame exceeds limit")
+                while b"\n" in buffer:
+                    line, buffer = buffer.split(b"\n", 1)
+                    line = line.rstrip(b"\r")
+                    if not line:
+                        if data:
+                            payload = json.loads(b"\n".join(data))
+                            if event_type == b"stream.reset":
+                                raise InkboxAPIError(payload.get("status", 410), payload)
+                            yield payload
+                        data, size, event_type = [], 0, b""
+                    elif line.startswith(b"event:"):
+                        event_type = line[6:].strip()
+                    elif line.startswith(b"data:"):
+                        part = line[5:].removeprefix(b" ")
+                        data.append(part)
+                        size += len(part)
+        finally:
+            response.close()
 
     def close(self) -> None:
         if self._owns_connections:

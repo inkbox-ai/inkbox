@@ -1,13 +1,55 @@
 # Changelog
 
+## 0.7.35
+
+### Added
+- Per-chat tool permission modes: Ask by default, or YOLO to automatically approve tool permissions for future turns. Questions still require an answer.
+- `set_permission_mode` (Python/Rust), `setPermissionMode` (TypeScript), and `identity hosting chat permissions` (CLI).
+
+## 0.7.34
+
+### Added
+
+- Rename hosted chat conversations in Python, TypeScript, Rust, and the CLI (`chat rename`).
+- Hosted chat conversation creation/activity timestamps and retained approval decisions across Python, TypeScript, and Rust.
+- Optional per-turn model selection in hosted chat across Python, TypeScript, Rust and the CLI (`chat send --model`), preserving existing default requests.
+
+## 0.7.33
+
+### Added
+
+- Typed computer template discovery in Python, TypeScript, and Rust, including current hosted defaults, disk sizes, and software metadata.
+- `inkbox computers templates` to inspect available templates and hosted defaults.
+
+## 0.7.32
+
+### Changed
+
+- Surface chat stream resets as structured API errors in Python, TypeScript, and Rust without automatically replaying requests.
+- Extend hosted workspace contract fixtures with retryable capacity blockers and a shared workspace response schema.
+
+## 0.7.31
+
+### Added
+
+- Identity workspace methods in Python, TypeScript, and Rust for retained chat, event streams, typed approvals and questions, files, lifecycle, environment, terminals, and native schedules.
+- CLI chat and workspace commands with explicit idempotency keys, event following, and versioned edits.
+- Hosted idle-stop configuration and default instruction reset.
+
+
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.30 - Conversation participant filters (unreleased)
+## 0.7.30 - Hosted-agent management and conversation participant filters (unreleased)
 
 ### Added
 
+- Python, TypeScript, and Rust methods to read and update identity hosting,
+  inspect event handoffs, and retry eligible deliveries.
+- Read-only computer usage history, conversations, and session run listings.
+- `inkbox identity hosting get|configure|remove|deliveries|retry` commands for
+  managing hosted agents, model-key selection, instructions, and event triggers.
 - Filter email, SMS, iMessage, and WhatsApp conversations by any participant or
   the active identifiers of a saved contact across Python, TypeScript, and Rust.
   Text, iMessage, and WhatsApp CLI conversation commands expose `--participants`

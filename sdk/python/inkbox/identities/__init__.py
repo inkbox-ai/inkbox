@@ -17,3 +17,6 @@ __all__ = [
     "IdentityIMessageNumber",
     "IdentityPhoneNumber",
 ]
+
+from inkbox.identities.hosting import HostingConfiguration, HostingUpdate, HostingDelivery
+__all__ += ["HostingConfiguration", "HostingUpdate", "HostingDelivery"]

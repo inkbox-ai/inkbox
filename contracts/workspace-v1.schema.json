@@ -1,0 +1,842 @@
+{
+  "$defs": {
+    "Agent": {
+      "additionalProperties": false,
+      "properties": {
+        "applied_generation": {
+          "title": "Applied Generation",
+          "type": "integer"
+        },
+        "generation": {
+          "title": "Generation",
+          "type": "integer"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observed At"
+        },
+        "stale": {
+          "title": "Stale",
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "ready",
+            "initializing",
+            "degraded",
+            "unavailable"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "observed_at",
+        "stale",
+        "generation",
+        "applied_generation"
+      ],
+      "title": "Agent",
+      "type": "object"
+    },
+    "Automation": {
+      "additionalProperties": false,
+      "properties": {
+        "idle_stop_enabled": {
+          "title": "Idle Stop Enabled",
+          "type": "boolean"
+        },
+        "idle_timeout_seconds": {
+          "title": "Idle Timeout Seconds",
+          "type": "integer"
+        },
+        "schedules_may_start": {
+          "title": "Schedules May Start",
+          "type": "boolean"
+        },
+        "selected_events_may_start": {
+          "default": false,
+          "title": "Selected Events May Start",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "idle_stop_enabled",
+        "idle_timeout_seconds",
+        "schedules_may_start"
+      ],
+      "title": "Automation",
+      "type": "object"
+    },
+    "Blocker": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "enum": [
+              "manage_model_key",
+              "reauthorize_integration",
+              "refresh_status",
+              "cancel_turn",
+              "contact_support"
+            ],
+            "type": "string"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "scope": {
+          "enum": [
+            "organization",
+            "agent",
+            "turn"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "scope",
+        "retryable",
+        "actions"
+      ],
+      "title": "Blocker",
+      "type": "object"
+    },
+    "Capabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "approvals": {
+          "title": "Approvals",
+          "type": "boolean"
+        },
+        "attachments": {
+          "title": "Attachments",
+          "type": "boolean"
+        },
+        "cancel_turn": {
+          "title": "Cancel Turn",
+          "type": "boolean"
+        },
+        "questions": {
+          "title": "Questions",
+          "type": "boolean"
+        },
+        "send_message": {
+          "title": "Send Message",
+          "type": "boolean"
+        },
+        "tool_activity": {
+          "title": "Tool Activity",
+          "type": "boolean"
+        },
+        "model_selection": {
+          "type": "boolean",
+          "default": false,
+          "title": "Model Selection"
+        },
+        "permission_mode_selection": {
+          "default": false,
+          "title": "Permission Mode Selection",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "send_message",
+        "cancel_turn",
+        "approvals",
+        "questions",
+        "attachments",
+        "tool_activity"
+      ],
+      "title": "Capabilities",
+      "type": "object"
+    },
+    "Computer": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "desired_state": {
+          "title": "Desired State",
+          "type": "string"
+        },
+        "disk_bytes": {
+          "title": "Disk Bytes",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "operation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Operation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "software": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Software"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "tier": {
+          "title": "Tier",
+          "type": "string"
+        },
+        "vcpus": {
+          "title": "Vcpus",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state",
+        "desired_state",
+        "created_at",
+        "tier",
+        "vcpus",
+        "memory_bytes",
+        "disk_bytes",
+        "software",
+        "operation"
+      ],
+      "title": "Computer",
+      "type": "object"
+    },
+    "Configuration": {
+      "additionalProperties": false,
+      "properties": {
+        "applied_environment_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Applied Environment Version"
+        },
+        "environment_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Environment Version"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "pending": {
+          "title": "Pending",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "environment_version",
+        "applied_environment_version",
+        "pending"
+      ],
+      "title": "Configuration",
+      "type": "object"
+    },
+    "CreditBalance": {
+      "additionalProperties": false,
+      "properties": {
+        "activated": {
+          "title": "Activated",
+          "type": "boolean"
+        },
+        "available_microusd": {
+          "title": "Available Microusd",
+          "type": "integer"
+        },
+        "currency": {
+          "const": "USD",
+          "title": "Currency",
+          "type": "string"
+        },
+        "eligible": {
+          "title": "Eligible",
+          "type": "boolean"
+        },
+        "exhausted": {
+          "title": "Exhausted",
+          "type": "boolean"
+        },
+        "grant_microusd": {
+          "title": "Grant Microusd",
+          "type": "integer"
+        },
+        "one_time": {
+          "title": "One Time",
+          "type": "boolean"
+        },
+        "reserved_microusd": {
+          "title": "Reserved Microusd",
+          "type": "integer"
+        },
+        "settled_microusd": {
+          "title": "Settled Microusd",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "currency",
+        "one_time",
+        "grant_microusd",
+        "settled_microusd",
+        "reserved_microusd",
+        "available_microusd",
+        "activated",
+        "eligible",
+        "exhausted"
+      ],
+      "title": "CreditBalance",
+      "type": "object"
+    },
+    "Funding": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FundingSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockers": {
+          "items": {
+            "$ref": "#/$defs/Blocker"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "credits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditBalance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "pending": {
+          "default": false,
+          "title": "Pending",
+          "type": "boolean"
+        },
+        "selected_binding_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Binding Id"
+        }
+      },
+      "required": [
+        "applied",
+        "credits",
+        "observed_at",
+        "blockers"
+      ],
+      "title": "Funding",
+      "type": "object"
+    },
+    "FundingSource": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Binding Id"
+        },
+        "key_revoked": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Key Revoked"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "binding_id",
+        "key_revoked"
+      ],
+      "title": "FundingSource",
+      "type": "object"
+    },
+    "HostingView": {
+      "description": "Public configuration without bootstrap credentials or operational leases.",
+      "properties": {
+        "applied_generation": {
+          "default": 0,
+          "title": "Applied Generation",
+          "type": "integer"
+        },
+        "credential_binding_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credential Binding Id"
+        },
+        "follow_defaults": {
+          "default": true,
+          "title": "Follow Defaults",
+          "type": "boolean"
+        },
+        "generation": {
+          "default": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "harness": {
+          "anyOf": [
+            {
+              "enum": [
+                "codex",
+                "hermes"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Harness"
+        },
+        "identity_id": {
+          "format": "uuid",
+          "title": "Identity Id",
+          "type": "string"
+        },
+        "idle_stop_enabled": {
+          "default": true,
+          "title": "Idle Stop Enabled",
+          "type": "boolean"
+        },
+        "idle_timeout_seconds": {
+          "default": 600,
+          "title": "Idle Timeout Seconds",
+          "type": "integer"
+        },
+        "instructions": {
+          "default": "",
+          "title": "Instructions",
+          "type": "string"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "machine_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Machine Id"
+        },
+        "mode": {
+          "enum": [
+            "external",
+            "inkbox"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "state": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "provisioning",
+            "ready",
+            "removing",
+            "error"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
+        },
+        "trigger_events": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trigger Events",
+          "type": "array"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated At"
+        }
+      },
+      "required": [
+        "mode",
+        "identity_id"
+      ],
+      "title": "HostingView",
+      "type": "object"
+    },
+    "Operation": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "machine_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Machine Id"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "state",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "Operation",
+      "type": "object"
+    },
+    "WorkspaceLink": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "resource": {
+          "enum": [
+            "hosting_configuration",
+            "model_keys",
+            "mcp_connections",
+            "recent_triggers"
+          ],
+          "title": "Resource",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource",
+        "path"
+      ],
+      "title": "WorkspaceLink",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent": {
+      "$ref": "#/$defs/Agent"
+    },
+    "allowed_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+    },
+    "automation": {
+      "$ref": "#/$defs/Automation"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/Capabilities"
+    },
+    "computer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Computer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "configuration": {
+      "$ref": "#/$defs/Configuration"
+    },
+    "funding": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Funding"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "hosting": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HostingView"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "identity_id": {
+      "format": "uuid",
+      "title": "Identity Id",
+      "type": "string"
+    },
+    "links": {
+      "items": {
+        "$ref": "#/$defs/WorkspaceLink"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "machine_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Machine Id"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "unavailable_sections": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unavailable Sections",
+      "type": "array"
+    }
+  },
+  "required": [
+    "identity_id",
+    "machine_id",
+    "observed_at",
+    "computer",
+    "agent",
+    "automation",
+    "funding",
+    "configuration",
+    "capabilities",
+    "allowed_actions"
+  ],
+  "title": "Workspace",
+  "type": "object"
+}
