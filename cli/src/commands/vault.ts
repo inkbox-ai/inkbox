@@ -74,13 +74,15 @@ export function registerVaultCommands(program: Command): void {
   vault
     .command("get <secret-id>")
     .description("Get and decrypt a secret (requires vault key)")
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .action(
       withErrorHandler(async function (
         this: Command,
         secretId: string,
+        cmdOpts: { vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
@@ -112,6 +114,7 @@ export function registerVaultCommands(program: Command): void {
       "--type <type>",
       "Secret type: login, api_key, ssh_key, key_pair, other",
     )
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .option("--description <desc>", "Optional description")
     .option("--username <user>", "Username (for login type)")
     .option("--password <pass>", "Password (for login type)")
@@ -134,6 +137,7 @@ export function registerVaultCommands(program: Command): void {
         cmdOpts: {
           name: string;
           type: string;
+          vaultKey?: string;
           description?: string;
           username?: string;
           password?: string;
@@ -153,7 +157,7 @@ export function registerVaultCommands(program: Command): void {
         },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
@@ -407,13 +411,14 @@ export function registerVaultCommands(program: Command): void {
     .command("logins")
     .description("List login credentials for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string },
+        cmdOpts: { identity: string; vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
@@ -436,13 +441,14 @@ export function registerVaultCommands(program: Command): void {
     .command("api-keys")
     .description("List API key credentials for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string },
+        cmdOpts: { identity: string; vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
@@ -465,13 +471,14 @@ export function registerVaultCommands(program: Command): void {
     .command("ssh-keys")
     .description("List SSH key credentials for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string },
+        cmdOpts: { identity: string; vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
@@ -494,13 +501,14 @@ export function registerVaultCommands(program: Command): void {
     .command("key-pairs")
     .description("List key pair credentials for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--vault-key <key>", "Vault key (or set INKBOX_VAULT_KEY)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string },
+        cmdOpts: { identity: string; vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
-        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
         if (!vaultKey) {
           console.error(
             "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
