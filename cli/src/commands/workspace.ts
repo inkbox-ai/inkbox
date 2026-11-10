@@ -258,7 +258,6 @@ export function registerWorkspaceCommands(hosting: Command): void {
     ["get", "status"],
     ["environment", "environment"],
     ["usage", "usage"],
-    ["schedules", "schedules"],
   ] as const) {
     workspace.command(`${name} <handle>`).action(
       withErrorHandler(async function (this: Command, h: string) {
@@ -266,6 +265,13 @@ export function registerWorkspaceCommands(hosting: Command): void {
       }),
     );
   }
+  workspace.command("schedules <handle>")
+    .description("List schedules; use next_cursor with --after for the next page")
+    .option("--after <cursor>", "Continue from next_cursor")
+    .option("--limit <count>", "Page size (1–100)", pageSize, 50)
+    .action(withErrorHandler(async function (this: Command, h: string, o: { after?: string; limit: number }) {
+      show(this, await resource(this, h).schedules(o.after, o.limit));
+    }));
   workspace.command("terminals <handle>")
     .option("--after <cursor>", "Continue from next_cursor")
     .option("--limit <count>", "Page size (1–100)", pageSize, 50)

@@ -7,18 +7,18 @@ import { fileURLToPath } from "node:url";
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2, default_model: "gpt-6-luna"};
 
-async function withApi(action) {
+async function withApi(action, response = () => config) {
   const requests = [];
   const server = http.createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     requests.push({method: req.method, path: req.url, body: chunks.length ? JSON.parse(Buffer.concat(chunks)) : null});
     res.writeHead(200, {"content-type": "application/json"});
-    res.end(JSON.stringify(config));
+    res.end(JSON.stringify(response(req)));
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-  const run = args => new Promise(resolve => execFile(process.execPath,
-    [cli, "--api-key", "test-key", "--base-url", `http://127.0.0.1:${server.address().port}`, "--json", "identity", "hosting", ...args],
+  const run = (args, json = true) => new Promise(resolve => execFile(process.execPath,
+    [cli, "--api-key", "test-key", "--base-url", `http://127.0.0.1:${server.address().port}`, ...(json ? ["--json"] : []), "identity", "hosting", ...args],
     {timeout: 15000, env: {...process.env, NODE_USE_ENV_PROXY: "0"}},
     (error, stdout, stderr) => resolve({error, stdout, stderr})));
   try { await action(run, requests); }
@@ -98,7 +98,7 @@ test("chat permissions persists the selected mode and rejects unknown modes", as
   });
 });
 
-for (const [args, endpoint] of [[['chat', 'list'], 'chat/conversations'], [['workspace', 'terminals'], 'workspace/terminals']]) {
+for (const [args, endpoint] of [[['chat', 'list'], 'chat/conversations'], [['workspace', 'terminals'], 'workspace/terminals'], [['workspace', 'schedules'], 'workspace/schedules']]) {
   test(`${args.join(' ')} forwards cursor and page size`, async () => {
     await withApi(async (run, requests) => {
       assert.ifError((await run([...args, 'example', '--after', 'next-page', '--limit', '20'])).error);
@@ -106,7 +106,7 @@ for (const [args, endpoint] of [[['chat', 'list'], 'chat/conversations'], [['wor
       assert.equal(url.pathname, `/api/v1/identities/example/hosting/${endpoint}`);
       assert.equal(url.searchParams.get('after'), 'next-page');
       assert.equal(url.searchParams.get('limit'), '20');
-      for (const limit of ['0', '101', '1.5']) {
+      for (const limit of ['0', '-1', '101', '1.5', 'abc', '9007199254740992']) {
         assert.ok((await run([...args, 'example', '--limit', limit])).error);
       }
       assert.equal(requests.length, 1);
@@ -122,4 +122,39 @@ test("chat list forwards origin and rejects unknown origins", async () => {
     assert.ok((await run(['chat', 'list', 'example', '--origin', 'invalid'])).error);
     assert.equal(requests.length, 1);
   });
+});
+
+
+test("schedule list exposes its cursor in both output modes and retrieves paused jobs beyond page one", async () => {
+  const cursor = "page2+/=";
+  await withApi(async (run, requests) => {
+    const args = ["workspace", "schedules", "example"];
+    const help = await run([...args, "--help"]);
+    assert.ifError(help.error);
+    assert.match(help.stdout, /--after <cursor>/);
+    assert.match(help.stdout, /next_cursor/);
+    assert.match(help.stdout, /--limit <count>/);
+    assert.equal(requests.length, 0);
+    const first = await run(args);
+    assert.ifError(first.error);
+    const page = JSON.parse(first.stdout);
+    assert.equal(page.items.length, 50);
+    assert.equal(page.next_cursor, cursor);
+    const initialUrl = new URL(requests[0].path, "https://example.test");
+    assert.equal(initialUrl.searchParams.get("limit"), "50");
+    assert.equal(initialUrl.searchParams.has("after"), false);
+    const human = await run(args, false);
+    assert.ifError(human.error);
+    assert.match(human.stdout, /next_cursor\s+page2\+\/=/);
+    const next = await run([...args, "--after", page.next_cursor, "--limit", "100"]);
+    assert.ifError(next.error);
+    assert.deepEqual(JSON.parse(next.stdout), {items: [{id: "job51", enabled: false}], next_cursor: null});
+    const nextUrl = new URL(requests.at(-1).path, "https://example.test");
+    assert.equal(nextUrl.searchParams.get("after"), cursor);
+    assert.equal(nextUrl.searchParams.get("limit"), "100");
+    assert.ifError((await run([...args, "--limit", "1"])).error);
+    assert.equal(new URL(requests.at(-1).path, "https://example.test").searchParams.get("limit"), "1");
+  }, req => new URL(req.url, "https://example.test").searchParams.get("after") === cursor
+    ? {items: [{id: "job51", enabled: false}], next_cursor: null}
+    : {items: Array.from({length: 50}, (_, i) => ({id: `job${i + 1}`, enabled: false})), next_cursor: cursor});
 });
