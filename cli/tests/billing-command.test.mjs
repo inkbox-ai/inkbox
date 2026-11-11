@@ -80,3 +80,12 @@ test("usage alerts preserve explicit off and use delete to restore defaults", as
   assert.equal(calls[2].method, "DELETE");
   assert.equal(calls[2].path, `/api/v1/billing/usage-alerts/${overrideId}`);
 });
+
+test("usage alert help offers total call minutes and rejects the retired pack metric", async () => {
+  const env = { ...process.env, INKBOX_API_KEY: "synthetic-test-key", INKBOX_BASE_URL: "http://127.0.0.1:1", NODE_USE_ENV_PROXY: "0" };
+  const args = [cli, "billing", "alerts", "save", "a3f22fcb-d805-4811-830c-2c61c3da5316"];
+  const help = await exec(process.execPath, [...args, "--help"], { env });
+  assert.match(help.stdout, /sms, voice, or overage/);
+  assert.doesNotMatch(help.stdout, /packs/);
+  await assert.rejects(exec(process.execPath, [...args, "--metric", "packs", "--threshold", "90"], { env }), /Unknown usage metric/);
+});

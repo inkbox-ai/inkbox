@@ -1,6 +1,6 @@
 import type { HttpTransport } from "./_http.js";
 
-export type UsageAlertMetric = "identities" | "storage" | "sms" | "voice" | "packs" | "overage";
+export type UsageAlertMetric = "identities" | "storage" | "sms" | "voice" | "overage";
 export interface UsageAlertInput {
   metric: UsageAlertMetric; threshold: number; enabled?: boolean; mailbox_id?: string | null;
 }

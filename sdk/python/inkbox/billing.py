@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 
-UsageAlertMetric = Literal["identities", "storage", "sms", "voice", "packs", "overage"]
+UsageAlertMetric = Literal["identities", "storage", "sms", "voice", "overage"]
 
 
 class UsageAlert(TypedDict):

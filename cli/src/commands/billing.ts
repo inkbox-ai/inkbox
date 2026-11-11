@@ -27,13 +27,13 @@ export function registerBillingCommands(program: Command): void {
     output(await createClient(getGlobalOpts(this)).billing.usageAlerts() as unknown as Record<string, unknown>, { json: true });
   }));
   alerts.command("save <id>").description("Create with a fresh UUIDv4, or edit using an ID from alerts list; reuse the ID when retrying")
-    .requiredOption("--metric <metric>", "identities, storage, sms, voice, packs, or overage")
+    .requiredOption("--metric <metric>", "identities, storage, sms, voice, or overage")
     .requiredOption("--threshold <percent>", "Integer percentage from 1 to 100")
     .option("--mailbox-id <uuid>").option("--disabled", "Explicitly turn this alert off")
     .action(withErrorHandler(async function (this: Command, id: string, opts: { metric: UsageAlertMetric; threshold: string; mailboxId?: string; disabled?: boolean }) {
       const threshold = Number(opts.threshold);
       if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new InvalidArgumentError("Threshold must be an integer from 1 to 100");
-      if (!["identities", "storage", "sms", "voice", "packs", "overage"].includes(opts.metric)) throw new InvalidArgumentError("Unknown usage metric");
+      if (!["identities", "storage", "sms", "voice", "overage"].includes(opts.metric)) throw new InvalidArgumentError("Unknown usage metric");
       output(await createClient(getGlobalOpts(this)).billing.saveUsageAlert(requestUuid(id), {
         metric: opts.metric, threshold, enabled: !opts.disabled, mailbox_id: opts.mailboxId ?? null,
       }) as unknown as Record<string, unknown>, { json: true });

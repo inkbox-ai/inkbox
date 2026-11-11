@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UsageAlertInput {
+    /// identities, storage, sms, voice (total call minutes), or overage.
     pub metric: String,
     pub threshold: u8,
     pub enabled: bool,
