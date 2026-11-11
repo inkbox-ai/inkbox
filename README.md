@@ -740,9 +740,9 @@ returns a message link and PNG QR code for contacting the agent. Check `ready`
 before presenting the draft; the person still taps Send in WhatsApp. This read
 does not enable WhatsApp or send a message.
 
-WhatsApp is available by approval for agents that already have a dedicated
-personal iMessage number. The approved WhatsApp channel uses that same number;
-it is not a shared-number channel. Check fresh channel status instead of assuming
+WhatsApp is available by approval on a dedicated account assigned to an agent.
+Its number can match the agent’s iMessage number or be different; an iMessage
+line is not required. It is not a shared-number channel. Check fresh channel status instead of assuming
 an old identity snapshot grants or denies access. If access is not available,
 request it in the console. Sending does not provision or enable the channel.
 

@@ -1342,8 +1342,8 @@ let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
 # Ok(()) }
 ```
 
-Available by approval on the same number as an existing dedicated personal
-iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+Available by approval on a dedicated WhatsApp account. Its number can match an
+iMessage number or be different; an iMessage line is not required. This is not a shared channel. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,

@@ -1718,8 +1718,8 @@ require a native reply instead.
 
 ## Approved dedicated WhatsApp
 
-For an approved agent with an existing dedicated personal iMessage number,
-WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
+For an approved agent with a dedicated WhatsApp account, the WhatsApp number
+can match its iMessage number or be different. An iMessage line is not required. Read fresh WhatsApp channel status;
 do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
 point the user to Request Access in the console. Direct conversations, existing groups, native quotes, and whole-message reactions are
 supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.

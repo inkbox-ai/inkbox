@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- Clarify that dedicated WhatsApp accounts do not require an iMessage line and may use a different number. Existing messaging methods and status responses are unchanged.
+
 ## 0.7.37
 
 ### Added
