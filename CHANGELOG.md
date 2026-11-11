@@ -3,10 +3,9 @@
 ## 0.7.37
 
 ### Added
-- Manage usage alert overrides with Python, TypeScript, and Rust billing resources and `inkbox billing alerts`. Defaults notify at 90%; explicit disabled overrides turn alerts off, and deleting overrides restores defaults.
+- Manage usage alert overrides with Python, TypeScript, and Rust billing resources and `inkbox billing alerts`. Call minutes include applicable add-ons and minute packs. Defaults notify at 90%; explicit disabled overrides turn alerts off, and deleting overrides restores defaults.
 
 ### Changed
-- Usage alert metric `voice` covers total call minutes, including applicable add-ons and minute packs. The separate `packs` alert metric is removed; use `voice` instead. Existing preferences remain available as call-minute alerts.
 - TypeScript usage-alert saves accept edited list results without sending read-only fields. CLI help distinguishes new UUIDv4 IDs from existing alert IDs.
 
 ## 0.7.36
