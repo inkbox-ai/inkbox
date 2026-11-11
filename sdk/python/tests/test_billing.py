@@ -55,3 +55,17 @@ def test_line_bundle_purchase_retry_and_lifecycle_paths():
     assert http.post.call_args.args == (f"/billing/line-bundles/{key}/cancel",)
     resource.resume_line_bundle(key)
     assert http.post.call_args.args == (f"/billing/line-bundles/{key}/resume",)
+
+
+def test_usage_alert_disable_and_restore_default():
+    http = MagicMock()
+    resource = BillingResource(http)
+    rule_id = UUID("a3f22fcb-d805-4811-830c-2c61c3da5316")
+    http.get.return_value = [{"id": str(rule_id), "is_default": True, "threshold": 90}]
+    assert resource.usage_alerts()[0]["is_default"]
+    resource.save_usage_alert(rule_id, metric="identities", threshold=90, enabled=False)
+    http.put.assert_called_once_with(f"/billing/usage-alerts/{rule_id}", json={
+        "metric": "identities", "threshold": 90, "enabled": False, "mailbox_id": None,
+    })
+    resource.delete_usage_alert(rule_id)
+    http.delete.assert_called_once_with(f"/billing/usage-alerts/{rule_id}")

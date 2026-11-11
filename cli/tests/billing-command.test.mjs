@@ -55,3 +55,27 @@ test("line bundle purchase requires explicit confirmation and preserves retry id
   assert.deepEqual(calls[0], { path: "/api/v1/billing/line-bundles", body: { code: "voip_line_bundle", quote: "accepted", request_key: key } });
   assert.deepEqual(calls[0], calls[1]);
 });
+
+test("usage alerts preserve explicit off and use delete to restore defaults", async (t) => {
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ method: request.method, path: request.url, body: raw ? JSON.parse(raw) : null });
+    if (request.method === "DELETE") { response.writeHead(204).end(); return; }
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify(request.method === "GET" ? [] : {}));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const env = { ...process.env, INKBOX_API_KEY: "synthetic-test-key", INKBOX_BASE_URL: `http://127.0.0.1:${server.address().port}`, NODE_USE_ENV_PROXY: "0" };
+  const run = (...args) => exec(process.execPath, [cli, "billing", "alerts", ...args], { env });
+  const id = "a3f22fcb-d805-4811-830c-2c61c3da5316";
+  await run("list");
+  await run("save", id, "--metric", "identities", "--threshold", "90", "--disabled");
+  await run("delete", id);
+  assert.equal(calls[0].method, "GET");
+  assert.deepEqual(calls[1].body, { metric: "identities", threshold: 90, enabled: false, mailbox_id: null });
+  assert.equal(calls[2].method, "DELETE");
+  assert.equal(calls[2].path, `/api/v1/billing/usage-alerts/${id}`);
+});

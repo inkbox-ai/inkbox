@@ -8,6 +8,21 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UsageAlertInput {
+    pub metric: String,
+    pub threshold: u8,
+    pub enabled: bool,
+    pub mailbox_id: Option<Uuid>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UsageAlert {
+    pub id: Uuid,
+    #[serde(flatten)]
+    pub settings: UsageAlertInput,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CatalogRate {
     pub code: String,
     pub name: String,
@@ -225,6 +240,20 @@ pub struct BillingResource {
 impl BillingResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+    pub fn usage_alerts(&self) -> Result<Vec<UsageAlert>> {
+        Ok(serde_json::from_value(
+            self.http.get("/billing/usage-alerts", NO_QUERY)?,
+        )?)
+    }
+    pub fn save_usage_alert(&self, id: &Uuid, input: &UsageAlertInput) -> Result<UsageAlert> {
+        Ok(serde_json::from_value(
+            self.http
+                .put(&format!("/billing/usage-alerts/{id}"), input)?,
+        )?)
+    }
+    pub fn delete_usage_alert(&self, id: &Uuid) -> Result<()> {
+        self.http.delete(&format!("/billing/usage-alerts/{id}"))
     }
     pub fn pricing(&self) -> Result<PricingResponse> {
         Ok(serde_json::from_value(

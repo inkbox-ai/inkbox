@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.37
+
+### Added
+- Manage usage alert overrides with Python, TypeScript, and Rust billing resources and `inkbox billing alerts`. Defaults notify at 90%; explicit disabled overrides turn alerts off, and deleting overrides restores defaults.
+
 ## 0.7.36
 
 ### Changed

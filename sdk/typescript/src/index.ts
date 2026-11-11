@@ -567,3 +567,5 @@ export { ComputersResource } from "./computers.js";
 export type { ComputerSoftware, ComputerTemplate, ComputerTemplates, ComputerMetricSummary, ComputerUsageHistory, ComputerConversation, ComputerConversationList, ComputerConversationHistory, ComputerSessionRun } from "./computers.js";
 
 export * from "./hosted-workspace.js";
+
+export type { UsageAlertMetric, UsageAlertInput, UsageAlert } from "./billing.js";

@@ -52,3 +52,15 @@ it("preserves line bundle purchase identity and encodes agreement paths", async 
   expect(requests[3][0]).toContain(`/line-bundles/${options.requestKey}/cancel`);
   expect(requests[4][0]).toContain(`/line-bundles/${options.requestKey}/resume`);
 });
+
+it("lists defaults and preserves explicit disabled alert settings", async () => {
+  const fetch = vi.fn(async (_url: unknown, init: RequestInit) => init.method === "DELETE"
+    ? new Response(null, { status: 204 }) : Response.json(init.method === "GET" ? [{ is_default: true }] : {}));
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key" });
+  expect((await client.billing.usageAlerts())[0].is_default).toBe(true);
+  await client.billing.saveUsageAlert("example", { metric: "identities", threshold: 90, enabled: false });
+  expect(JSON.parse(String(fetch.mock.calls[1][1].body))).toEqual({ metric: "identities", threshold: 90, enabled: false });
+  await client.billing.deleteUsageAlert("example");
+  expect(fetch.mock.calls[2][1].method).toBe("DELETE");
+});
