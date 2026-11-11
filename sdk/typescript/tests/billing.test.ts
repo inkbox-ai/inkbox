@@ -64,3 +64,14 @@ it("lists defaults and preserves explicit disabled alert settings", async () => 
   await client.billing.deleteUsageAlert("example");
   expect(fetch.mock.calls[2][1].method).toBe("DELETE");
 });
+
+
+it.each([true, false])("saves edits to a listed alert without response-only fields (default: %s)", async (is_default) => {
+  const alert = { id: "b7cde7d9-cf46-53c3-84fd-259a878c9874", metric: "identities", threshold: 90, enabled: true, mailbox_id: null, is_default };
+  const fetch = vi.fn(async (_url: unknown, init: RequestInit) => Response.json(init.method === "GET" ? [alert] : alert));
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key" });
+  const [listed] = await client.billing.usageAlerts();
+  await client.billing.saveUsageAlert(listed.id, { ...listed, threshold: 80, enabled: false });
+  expect(JSON.parse(String(fetch.mock.calls[1][1].body))).toEqual({ metric: "identities", threshold: 80, enabled: false, mailbox_id: null });
+});

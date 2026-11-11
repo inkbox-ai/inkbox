@@ -83,7 +83,8 @@ export class BillingResource {
   constructor(private readonly http: HttpTransport) {}
   usageAlerts(): Promise<UsageAlert[]> { return this.http.get("/billing/usage-alerts"); }
   saveUsageAlert(id: string, input: UsageAlertInput): Promise<UsageAlert> {
-    return this.http.put(`/billing/usage-alerts/${encodeURIComponent(id)}`, input);
+    const { metric, threshold, enabled, mailbox_id } = input;
+    return this.http.put(`/billing/usage-alerts/${encodeURIComponent(id)}`, { metric, threshold, enabled, mailbox_id });
   }
   deleteUsageAlert(id: string): Promise<void> {
     return this.http.delete(`/billing/usage-alerts/${encodeURIComponent(id)}`);

@@ -26,7 +26,8 @@ export function registerBillingCommands(program: Command): void {
   alerts.command("list").action(withErrorHandler(async function (this: Command) {
     output(await createClient(getGlobalOpts(this)).billing.usageAlerts() as unknown as Record<string, unknown>, { json: true });
   }));
-  alerts.command("save <id>").requiredOption("--metric <metric>", "identities, storage, sms, voice, packs, or overage")
+  alerts.command("save <id>").description("Create with a fresh UUIDv4, or edit using an ID from alerts list; reuse the ID when retrying")
+    .requiredOption("--metric <metric>", "identities, storage, sms, voice, packs, or overage")
     .requiredOption("--threshold <percent>", "Integer percentage from 1 to 100")
     .option("--mailbox-id <uuid>").option("--disabled", "Explicitly turn this alert off")
     .action(withErrorHandler(async function (this: Command, id: string, opts: { metric: UsageAlertMetric; threshold: string; mailboxId?: string; disabled?: boolean }) {
