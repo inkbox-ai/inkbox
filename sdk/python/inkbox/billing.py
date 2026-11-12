@@ -7,6 +7,18 @@ if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 
+UsageAlertMetric = Literal["identities", "storage", "sms", "voice", "overage"]
+
+
+class UsageAlert(TypedDict):
+    id: str
+    metric: UsageAlertMetric
+    threshold: int
+    mailbox_id: str | None
+    enabled: bool
+    is_default: bool
+
+
 class CatalogRate(TypedDict):
     code: str
     name: str
@@ -195,6 +207,20 @@ class BillingResource:
 
     def __init__(self, http: "HttpTransport") -> None:
         self._http = http
+
+    def usage_alerts(self) -> list[UsageAlert]:
+        return cast(list[UsageAlert], self._http.get("/billing/usage-alerts"))
+
+    def save_usage_alert(self, rule_id: UUID | str, *, metric: UsageAlertMetric,
+                         threshold: int, enabled: bool = True, mailbox_id: UUID | str | None = None) -> UsageAlert:
+        return cast(UsageAlert, self._http.put(f"/billing/usage-alerts/{rule_id}", json={
+            "metric": metric, "threshold": threshold, "enabled": enabled,
+            "mailbox_id": str(mailbox_id) if mailbox_id is not None else None,
+        }))
+
+    def delete_usage_alert(self, rule_id: UUID | str) -> None:
+        """Remove an override; the default returns when no overrides remain for its quota."""
+        self._http.delete(f"/billing/usage-alerts/{rule_id}")
 
     def pricing(self) -> PricingResponse:
         return cast(PricingResponse, self._http.get("/billing/pricing"))

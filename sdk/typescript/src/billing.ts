@@ -1,5 +1,13 @@
 import type { HttpTransport } from "./_http.js";
 
+export type UsageAlertMetric = "identities" | "storage" | "sms" | "voice" | "overage";
+export interface UsageAlertInput {
+  metric: UsageAlertMetric; threshold: number; enabled?: boolean; mailbox_id?: string | null;
+}
+export interface UsageAlert extends UsageAlertInput {
+  id: string; enabled: boolean; mailbox_id: string | null; is_default: boolean;
+}
+
 export interface CatalogRate {
   code: string; name: string; kind: string; unit: string; currency: string;
   published_amount: string; amount: string | null;
@@ -73,6 +81,14 @@ export interface IdentityPackMutationResponse {
 /** Organization-admin billing. Decimal amounts and response field names preserve the API representation. */
 export class BillingResource {
   constructor(private readonly http: HttpTransport) {}
+  usageAlerts(): Promise<UsageAlert[]> { return this.http.get("/billing/usage-alerts"); }
+  saveUsageAlert(id: string, input: UsageAlertInput): Promise<UsageAlert> {
+    const { metric, threshold, enabled, mailbox_id } = input;
+    return this.http.put(`/billing/usage-alerts/${encodeURIComponent(id)}`, { metric, threshold, enabled, mailbox_id });
+  }
+  deleteUsageAlert(id: string): Promise<void> {
+    return this.http.delete(`/billing/usage-alerts/${encodeURIComponent(id)}`);
+  }
   pricing(): Promise<PricingResponse> { return this.http.get("/billing/pricing"); }
   callingCountries(): Promise<CallingCountriesResponse> { return this.http.get("/billing/calling-countries"); }
   quoteCountry(countryCode: string): Promise<CountryQuote> {

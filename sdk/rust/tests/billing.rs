@@ -111,3 +111,44 @@ fn line_bundle_purchase_has_stable_request_identity() {
     }
     purchase.assert_hits(2);
 }
+
+#[test]
+fn usage_alert_explicit_disable_and_delete() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let id = Uuid::new_v4();
+    let payload = json!({"id":id,"metric":"identities","threshold":90,"enabled":false,"mailbox_id":null,"is_default":false});
+    let save = server.mock(|when, then| {
+        when.method(PUT)
+            .path(format!("/api/v1/billing/usage-alerts/{id}"))
+            .json_body(
+                json!({"metric":"identities","threshold":90,"enabled":false,"mailbox_id":null}),
+            );
+        then.status(200).json_body(payload.clone());
+    });
+    let input = inkbox::billing::UsageAlertInput {
+        metric: "identities".into(),
+        threshold: 90,
+        enabled: false,
+        mailbox_id: None,
+    };
+    assert!(
+        !client
+            .billing()
+            .save_usage_alert(&id, &input)
+            .unwrap()
+            .settings
+            .enabled
+    );
+    save.assert();
+    let delete = server.mock(|when, then| {
+        when.method(DELETE)
+            .path(format!("/api/v1/billing/usage-alerts/{id}"));
+        then.status(204);
+    });
+    client.billing().delete_usage_alert(&id).unwrap();
+    delete.assert();
+}

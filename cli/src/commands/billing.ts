@@ -1,4 +1,4 @@
-import type { BundleCode, IdentityPackMutationResponse } from "@inkbox/sdk";
+import type { UsageAlertMetric, BundleCode, IdentityPackMutationResponse } from "@inkbox/sdk";
 import { Command, InvalidArgumentError } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -22,6 +22,27 @@ async function identityPackMutation(requestKey: string, action: () => Promise<Id
 
 export function registerBillingCommands(program: Command): void {
   const billing = program.command("billing").description("Organization-admin pricing and add-on subscriptions");
+  const alerts = billing.command("alerts").description("Manage usage alert overrides; defaults notify at 90%");
+  alerts.command("list").action(withErrorHandler(async function (this: Command) {
+    output(await createClient(getGlobalOpts(this)).billing.usageAlerts() as unknown as Record<string, unknown>, { json: true });
+  }));
+  alerts.command("save <id>").description("Create with a fresh UUIDv4, or edit using an ID from alerts list; reuse the ID when retrying")
+    .requiredOption("--metric <metric>", "identities, storage, sms, voice, or overage")
+    .requiredOption("--threshold <percent>", "Integer percentage from 1 to 100")
+    .option("--mailbox-id <uuid>").option("--disabled", "Explicitly turn this alert off")
+    .action(withErrorHandler(async function (this: Command, id: string, opts: { metric: UsageAlertMetric; threshold: string; mailboxId?: string; disabled?: boolean }) {
+      const threshold = Number(opts.threshold);
+      if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new InvalidArgumentError("Threshold must be an integer from 1 to 100");
+      if (!["identities", "storage", "sms", "voice", "overage"].includes(opts.metric)) throw new InvalidArgumentError("Unknown usage metric");
+      output(await createClient(getGlobalOpts(this)).billing.saveUsageAlert(requestUuid(id), {
+        metric: opts.metric, threshold, enabled: !opts.disabled, mailbox_id: opts.mailboxId ?? null,
+      }) as unknown as Record<string, unknown>, { json: true });
+    }));
+  alerts.command("delete <id>").description("Delete an override, restoring the default if none remain for its quota")
+    .action(withErrorHandler(async function (this: Command, id: string) {
+      await createClient(getGlobalOpts(this)).billing.deleteUsageAlert(requestUuid(id));
+      output({ deleted: true }, { json: true });
+    }));
   billing.command("pricing").description("Read published and contracted usage rates").action(withErrorHandler(async function (this: Command) {
     output(await createClient(getGlobalOpts(this)).billing.pricing() as unknown as Record<string, unknown>, { json: true });
   }));
