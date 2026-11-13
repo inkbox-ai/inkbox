@@ -2,6 +2,40 @@ from unittest.mock import Mock
 from inkbox.identities.resources.identities import IdentitiesResource
 
 
+def test_provider_capabilities_and_admission_preserve_selected_key_and_shape():
+    import json
+    from pathlib import Path
+    from inkbox.computers import ComputersResource
+    wire = json.loads((Path(__file__).resolve().parents[3] / 'contracts/hosting-capabilities.json').read_text())
+    http = Mock()
+    http.get.return_value = wire
+    resource = ComputersResource(http)
+    assert resource.hosting_capabilities() == wire
+    http.get.assert_called_once_with('/computers/hosting/capabilities')
+    http.post.return_value = {'allowed': True}
+    selection = {'harness': 'claude_code', 'shape_id': 'v1-cpu2-ram8gb',
+                 'credential_binding_id': 'saved-key', 'default_model': 'claude-sonnet-5-5'}
+    assert resource.hosting_admission(selection)
+    http.post.assert_called_once_with('/computers/hosting/admission', json=selection)
+
+
+def test_model_key_provider_is_retained_on_create_rotation_and_revoke():
+    from inkbox.computers import ComputersResource
+    http = Mock()
+    resource = ComputersResource(http)
+    input = {'provider': 'anthropic', 'name': 'Example', 'api_key': 'synthetic-provider-key'}
+    key = {'id': 'key', 'name': 'Example', 'provider': 'anthropic', 'display_suffix': '-key', 'version': 1, 'revoked': False}
+    http.get.return_value = {'items': [key]}
+    http.post.return_value = key
+    assert resource.model_keys() == [key]
+    assert resource.create_model_key(input, idempotency_key='create-once') == key
+    http.post.assert_called_once_with('/computers/secret-bindings', json=input, headers={'Idempotency-Key': 'create-once'})
+    resource.rotate_model_key('key/path', input, expected_version=1)
+    http.put.assert_called_once_with('/computers/secret-bindings/key%2Fpath', json={**input, 'expected_version': 1})
+    resource.revoke_model_key('key/path')
+    http.delete_with_response.assert_called_once_with('/computers/secret-bindings/key%2Fpath')
+
+
 def test_hosting_keeps_empty_events_and_explicit_credit_selection():
     http = Mock()
     response = {'mode':'inkbox', 'identity_id':'identity', 'state':'provisioning', 'generation':2, 'applied_generation':1, 'future_field':True}
@@ -83,3 +117,24 @@ def test_authoritative_server_hosting_fixture():
     result = IdentitiesResource(http).update_hosting('example', wire['hosting_update'])
     assert result.default_model == wire['hosting']['default_model']
     http.put.assert_called_once_with('/example/hosting', json=wire['hosting_update'])
+
+
+def test_shapes_keep_version_numeric_allocations_and_unavailable_choices():
+    import json
+    from pathlib import Path
+    from inkbox.computers import ComputersResource
+    wire = json.loads((Path(__file__).resolve().parents[3] / 'contracts/computer-shapes.json').read_text())
+    http = Mock()
+    http.get.return_value = wire
+    assert ComputersResource(http).shapes() == wire
+    http.get.assert_called_once_with('/computers/shapes')
+    http.post.assert_not_called()
+
+
+def test_shape_preference_is_optional_and_survives_configuration():
+    http = Mock()
+    http.put.return_value = {'mode': 'inkbox', 'identity_id': 'identity', 'shape_id': 'v1-cpu2-ram8gb'}
+    command = {'expected_generation': 0, 'shape_id': 'v1-cpu2-ram8gb'}
+    result = IdentitiesResource(http).update_hosting('example', command)
+    assert result.shape_id == command['shape_id']
+    http.put.assert_called_once_with('/example/hosting', json=command)

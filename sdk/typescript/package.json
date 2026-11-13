@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/sdk",
-  "version": "0.7.37",
+  "version": "0.7.38",
   "description": "TypeScript SDK for the Inkbox API",
   "license": "MIT",
   "type": "module",
@@ -14,6 +14,10 @@
     "./tunnels/connect": {
       "types": "./dist/tunnels/client/index.d.ts",
       "node": "./dist/tunnels/client/index.js"
+    },
+    "./remote-mcp": {
+      "types": "./dist/remote-mcp.d.ts",
+      "node": "./dist/remote-mcp.js"
     }
   },
   "files": [
@@ -26,10 +30,12 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "verify:bundle": "node scripts/verify-bundle.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@peculiar/x509": "^2.0.0",
+    "ajv": "^8.20.0",
     "hash-wasm": "^4.11.0",
     "reflect-metadata": "^0.2.2",
     "undici": "^7.0.0"

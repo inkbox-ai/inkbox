@@ -355,6 +355,43 @@ impl HostedWorkspace {
             Some(key),
         )
     }
+    /// Save a continuation and keep the agent paused until explicit resume.
+    pub fn pause(&self, key: &str) -> Result<Value> {
+        self.command(
+            "POST",
+            &format!("{}/workspace/actions/pause", self.base),
+            &json!({}),
+            Some(key),
+        )
+    }
+    /// Continue a paused agent without silently cold-starting incompatible state.
+    pub fn resume(&self, key: &str) -> Result<Value> {
+        self.command(
+            "POST",
+            &format!("{}/workspace/actions/resume", self.base),
+            &json!({}),
+            Some(key),
+        )
+    }
+    /// Resize a stopped computer using its current workspace version.
+    pub fn resize(
+        &self,
+        shape_id: &str,
+        expected_version: u64,
+        key: &str,
+        disk_bytes: Option<u64>,
+    ) -> Result<Value> {
+        let mut body = json!({"shape_id": shape_id, "expected_version": expected_version});
+        if let Some(bytes) = disk_bytes {
+            body["disk_bytes"] = bytes.into();
+        }
+        self.command(
+            "POST",
+            &format!("{}/workspace/resize", self.base),
+            &body,
+            Some(key),
+        )
+    }
     pub fn operation(&self, operation: &str) -> Result<Value> {
         let query = Vec::new();
         self.http.get(

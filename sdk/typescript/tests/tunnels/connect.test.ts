@@ -35,6 +35,7 @@ it("preserves Support Agent instructions when a stored tunnel was removed", asyn
   const inkbox = {
     tunnels: {
       get: vi.fn().mockRejectedValue(new InkboxAPIError(404, "not found", null, support)),
+      list: vi.fn().mockResolvedValue([]),
     },
   } as unknown as Inkbox;
 

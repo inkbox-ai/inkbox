@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.38
+
+### Added
+- Discover qualified hosted harness/provider combinations and manage organization model API keys in Python, TypeScript and Rust. Hosted configuration supports Claude Code, OpenCode, DeepSeek and OpenClaw alongside Codex and Hermes; Anthropic and DeepSeek models require your own provider API key.
+- Pause and resume hosted computers through the workspace APIs and `inkbox identity hosting workspace pause` / `resume`, using explicit idempotency keys.
+- Discover computer sizes with `computers.shapes()`, select an initial `shape_id`, and resize stopped computers with a version-checked workspace operation and CLI command.
+- Python and Node.js integrations can discover remote MCP tools, retry write continuations with durable call identities, and reconcile source-bound terminal reply receipts across restarts.
+
+- Python integrations can share durable managed chat and inbox receipts, including cancellation and approval fencing.
+
+### Changed
+- Managed chat and inbox journals support exclusive process ownership on Windows as well as POSIX systems.
+- Tunnel reconnects preserve valid certificates, validate cached material against the requested tunnel, and rediscover a replacement tunnel when a saved ID is no longer available.
+
 ## 0.7.37
 
 ### Added

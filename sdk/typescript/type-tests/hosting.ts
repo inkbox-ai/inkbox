@@ -4,6 +4,10 @@ import type { HostingModel, HostingUpdate, ScheduleHistory, HostedWorkspace } fr
 const model: HostingModel = "gpt-6.1-terra";
 const update: HostingUpdate = {expectedGeneration: 1, defaultModel: model, tier: "medium", idleTimeoutSeconds: 60};
 void update;
+const anthropic: HostingUpdate = {expectedGeneration: 0, harness: "claude_code", defaultModel: "claude-sonnet-5-5", credentialBindingId: "key"};
+const deepseek: HostingUpdate = {expectedGeneration: 0, harness: "deepseek", defaultModel: "deepseek-v4-pro", credentialBindingId: "key"};
+void anthropic;
+void deepseek;
 const fiveMinutes: HostingUpdate = {expectedGeneration: 1, idleTimeoutSeconds: 300};
 void fiveMinutes;
 // @ts-expect-error Hosted agents require automatic idle shutdown.

@@ -78,7 +78,13 @@ def cert_expiry(state_dir: Path) -> _dt.datetime | None:
     return cert.not_valid_after_utc
 
 
-def cert_needs_sign(state_dir: Path, key: PrivateKeyTypes) -> bool:
+def cert_needs_sign(
+    state_dir: Path,
+    key: PrivateKeyTypes,
+    *,
+    public_host: str | None = None,
+    fingerprint_sha256: str | None = None,
+) -> bool:
     """Decide whether the cached cert needs resigning."""
     cert_path = state_dir / CERT_FILE
     expiry = cert_expiry(state_dir)
@@ -93,13 +99,26 @@ def cert_needs_sign(state_dir: Path, key: PrivateKeyTypes) -> bool:
     # deletion). Compare pubkeys; mismatch => resign.
     try:
         cached_cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        if cached_cert.not_valid_before_utc > now:
+            return True
+        if public_host is not None:
+            names = cached_cert.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName,
+            ).value.get_values_for_type(x509.DNSName)
+            if public_host.lower() not in {name.lower() for name in names}:
+                return True
+        if fingerprint_sha256 is not None and (
+            cached_cert.fingerprint(hashes.SHA256()).hex()
+            != fingerprint_sha256.lower()
+        ):
+            return True
         if (
             cached_cert.public_key().public_numbers()
             != key.public_key().public_numbers()
         ):
             logger.info("key/cert mismatch on disk; resigning CSR")
             return True
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, x509.ExtensionNotFound):
         return True
     return False
 

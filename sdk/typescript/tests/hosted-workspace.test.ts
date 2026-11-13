@@ -10,6 +10,24 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it.each([undefined, 16 * 1024 ** 3])("resize keeps the machine version and optional disk size %s", async (bytes) => {
+    const http = { post: vi.fn().mockResolvedValue({ operation_id: "operation" }) };
+    await new HostedWorkspace(http as unknown as HttpTransport, "example").resize("v1-cpu2-ram8gb", 4, "resize-once", bytes);
+    expect(http.post).toHaveBeenCalledExactlyOnceWith("/example/hosting/workspace/resize", {
+      shape_id: "v1-cpu2-ram8gb", expected_version: 4, ...(bytes === undefined ? {} : { disk_bytes: bytes }),
+    }, { headers: { "Idempotency-Key": "resize-once" } });
+  });
+  it.each(["pause", "resume"] as const)("%s preserves idempotency and does not fall back on incompatibility", async (action) => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ detail: { code: "checkpoint_incompatible" } }), { status: 409, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    const workspace = new HostedWorkspace(new HttpTransport("synthetic-key", "https://example.test"), "example-agent");
+    await expect(workspace[action]("continuation-once")).rejects.toMatchObject({ statusCode: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(url)).toContain(`/hosting/workspace/actions/${action}`);
+    expect(new Headers(options.headers).get("Idempotency-Key")).toBe("continuation-once");
+    expect(JSON.parse(String(options.body))).toEqual({});
+  });
   it("returns schedule history metadata without inventing pagination", async () => {
     const payload = {items:[{id:"occurrence",intended_due_at:"2026-01-01T00:00:00Z",state:"succeeded",reason:null}],conversation_id:"conversation",history_completeness:"partial"};
     const get = vi.fn().mockResolvedValue(payload);
