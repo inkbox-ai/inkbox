@@ -1,7 +1,6 @@
 """Bounded durable acceptance for supervised webhook delivery."""
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -12,6 +11,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import UUID, uuid4
+
+from ._file_lock import lock_file
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_EVENTS = 4096
@@ -31,16 +32,21 @@ class ManagedInbox:
         self.activation_id = str(UUID(activation_id))
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         info = path.parent.lstat()
-        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        if not stat.S_ISDIR(info.st_mode) or (
+            hasattr(os, 'getuid') and (info.st_uid != os.getuid() or info.st_mode & 0o077)
+        ):
             raise InboxError("Private inbox directory required")
-        self.lock = os.open(str(path) + '.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        self.lock = lock_file(Path(str(path) + '.lock'))
         self.db = None
         try:
-            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            if path.is_symlink():
+                raise InboxError("Private inbox file required")
+            descriptor = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, 'O_NOFOLLOW', 0), 0o600)
             try:
                 info = os.fstat(descriptor)
-                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                if not stat.S_ISREG(info.st_mode) or (
+                    hasattr(os, 'getuid') and (info.st_uid != os.getuid() or info.st_mode & 0o077)
+                ):
                     raise InboxError("Private inbox file required")
             finally:
                 os.close(descriptor)

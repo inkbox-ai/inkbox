@@ -11,6 +11,7 @@
 - Python integrations can share durable managed chat and inbox receipts, including cancellation and approval fencing.
 
 ### Changed
+- Managed chat and inbox journals support exclusive process ownership on Windows as well as POSIX systems.
 - Tunnel reconnects preserve valid certificates, validate cached material against the requested tunnel, and rediscover a replacement tunnel when a saved ID is no longer available.
 
 ## 0.7.37

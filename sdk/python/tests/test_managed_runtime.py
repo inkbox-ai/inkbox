@@ -45,7 +45,8 @@ os._exit(0)
         assert inbox.claim() is None
         with pytest.raises(InboxError):
             inbox.accept(event(str(uuid4())))
-        assert os.stat(path).st_mode & 0o077 == 0
+        if os.name == "posix":
+            assert os.stat(path).st_mode & 0o077 == 0
     finally:
         inbox.close()
 
@@ -140,3 +141,48 @@ def test_late_approval_cannot_revive_uncertain_execution(tmp_path):
         finally:
             await runtime.close()
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('kind', ['chat', 'inbox'])
+def test_journal_ownership_is_exclusive_and_released_on_close(tmp_path, kind):
+    path = tmp_path / 'receipts' / 'journal.sqlite'
+    owner = str(uuid4())
+    factory = Journal if kind == 'chat' else ManagedInbox
+    journal = factory(path, owner)
+    code = '''import sys
+from pathlib import Path
+from inkbox.managed_chat import Journal
+from inkbox.managed_inbox import ManagedInbox
+factory = Journal if sys.argv[1] == "chat" else ManagedInbox
+try:
+    journal = factory(Path(sys.argv[2]), sys.argv[3])
+except OSError:
+    sys.exit(23)
+journal.close()
+'''
+    try:
+        assert subprocess.run([sys.executable, '-c', code, kind, str(path), owner]).returncode == 23
+    finally:
+        journal.close()
+    subprocess.run([sys.executable, '-c', code, kind, str(path), owner], check=True)
+
+
+def test_windows_lock_uses_nonblocking_byte_lock_and_closes_on_failure(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from inkbox import _file_lock
+
+    platform = SimpleNamespace(name='nt', O_CREAT=1, O_RDWR=2,
+                               open=Mock(return_value=42), close=Mock())
+    native = SimpleNamespace(LK_NBLCK=2, locking=Mock())
+    monkeypatch.setattr(_file_lock, 'os', platform)
+    monkeypatch.setitem(sys.modules, 'msvcrt', native)
+    path = Mock(is_symlink=Mock(return_value=False))
+    assert _file_lock.lock_file(path) == 42
+    native.locking.assert_called_once_with(42, 2, 1)
+    platform.close.assert_not_called()
+    native.locking.side_effect = OSError('busy')
+    with pytest.raises(OSError, match='busy'):
+        _file_lock.lock_file(path)
+    platform.close.assert_called_once_with(42)

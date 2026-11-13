@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import asyncio
-import fcntl
 import hashlib
 import json
 import mimetypes
@@ -15,6 +14,8 @@ import stat
 import time
 import uuid
 from pathlib import Path
+
+from ._file_lock import lock_file
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted", "outcome_unknown"}
 
@@ -122,14 +123,7 @@ class Journal:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if path.is_symlink():
             raise ValueError("Private chat storage required")
-        self.lock = os.open(
-            str(path) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
-        )
-        try:
-            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BaseException:
-            os.close(self.lock)
-            raise
+        self.lock = lock_file(Path(str(path) + ".lock"))
         self.db = sqlite3.connect(path)
         os.chmod(path, 0o600)
         self.db.row_factory = sqlite3.Row
