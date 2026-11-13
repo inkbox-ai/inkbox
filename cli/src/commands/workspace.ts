@@ -278,7 +278,7 @@ export function registerWorkspaceCommands(hosting: Command): void {
     .action(withErrorHandler(async function (this: Command, h: string, o: { after?: string; limit: number }) {
       show(this, await resource(this, h).terminals(o.after, o.limit));
     }));
-  for (const action of ["start", "stop"] as const) {
+  for (const action of ["start", "stop", "pause", "resume"] as const) {
     workspace
       .command(`${action} <handle>`)
       .requiredOption("--idempotency-key <key>")

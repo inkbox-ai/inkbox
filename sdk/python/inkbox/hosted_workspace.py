@@ -317,6 +317,20 @@ class HostedWorkspace:
             headers=self._key(idempotency_key),
         )
 
+    def pause(self, *, idempotency_key: str) -> dict[str, Any]:
+        """Save a continuation and keep the agent paused until explicit resume."""
+        return self._http.post(
+            self._base + "/workspace/actions/pause",
+            json={}, headers=self._key(idempotency_key),
+        )
+
+    def resume(self, *, idempotency_key: str) -> dict[str, Any]:
+        """Continue a paused agent; incompatible state fails without a cold start."""
+        return self._http.post(
+            self._base + "/workspace/actions/resume",
+            json={}, headers=self._key(idempotency_key),
+        )
+
     def operation(self, operation_id: str) -> dict[str, Any]:
         return self._http.get(
             self._base + "/workspace/operations/" + quote(operation_id, safe="")

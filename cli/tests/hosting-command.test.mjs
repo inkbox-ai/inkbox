@@ -47,6 +47,20 @@ test("chat rename patches the selected conversation", async () => {
   });
 });
 
+test("manual pause and resume require an intent key and call the matching action once", async () => {
+  const keys = [];
+  await withApi(async (run, requests) => {
+    for (const action of ["pause", "resume"]) {
+      assert.ok((await run(["workspace", action, "example"])).error);
+      assert.ifError((await run(["workspace", action, "example", "--idempotency-key", `${action}-once`])).error);
+    }
+    assert.deepEqual(keys, ["pause-once", "resume-once"]);
+    assert.deepEqual(requests, ["pause", "resume"].map(action => ({
+      method: "POST", path: `/api/v1/identities/example/hosting/workspace/actions/${action}`, body: {},
+    })));
+  }, req => { keys.push(req.headers["idempotency-key"]); return { operation_id: "operation" }; });
+});
+
 test("removing hosting sends the generation and preserves omitted configuration", async () => {
   await withApi(async (run, requests) => {
     const result = await run(["remove", "example", "--expected-generation", "2"]);

@@ -375,6 +375,14 @@ export class HostedWorkspace {
       this.key(key),
     );
   }
+  /** Save a continuation and keep the agent paused until explicit resume. */
+  pause(key: string): Promise<ObjectValue> {
+    return this.http.post(`${this.base}/workspace/actions/pause`, {}, this.key(key));
+  }
+  /** Continue a paused agent without silently cold-starting incompatible state. */
+  resume(key: string): Promise<ObjectValue> {
+    return this.http.post(`${this.base}/workspace/actions/resume`, {}, this.key(key));
+  }
   operation(operation: string): Promise<ObjectValue> {
     return this.http.get(
       `${this.base}/workspace/operations/${enc(operation)}`,

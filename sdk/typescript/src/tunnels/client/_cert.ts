@@ -131,6 +131,7 @@ export function certExpiry(stateDir: string): Date | null {
 export async function certNeedsSign(
   stateDir: string,
   key: KeyPair,
+  expected: { publicHost?: string; fingerprintSha256?: string | null } = {},
 ): Promise<boolean> {
   const certPath = path.join(stateDir, CERT_FILE);
   const expiry = certExpiry(stateDir);
@@ -142,6 +143,13 @@ export async function certNeedsSign(
     const leafBlock = extractFirstPemBlock(pem, "CERTIFICATE");
     if (leafBlock === null) return true;
     const cert = new x509.X509Certificate(leafBlock);
+    const leaf = new crypto.X509Certificate(leafBlock);
+    if (new Date(leaf.validFrom).getTime() > now.getTime()) return true;
+    if (expected.publicHost && !leaf.checkHost(expected.publicHost, {
+      subject: "never", wildcards: false,
+    })) return true;
+    if (expected.fingerprintSha256 && leaf.fingerprint256.replaceAll(":", "").toLowerCase()
+      !== expected.fingerprintSha256.toLowerCase()) return true;
     const certPubKey = (await cert.publicKey.export(
       crypto.webcrypto as unknown as Crypto,
     )) as CryptoKey;

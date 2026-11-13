@@ -127,10 +127,13 @@ def bootstrap(
     state_dir = Path(state_dir).expanduser()
     ensure_private_state_dir(state_dir)
     state = load_state(state_dir)
+    if state and state.name != name:
+        state = None
 
     tunnels = inkbox.tunnels  # type: ignore[attr-defined]
 
     tunnel: Tunnel | None = None
+    removed_error: InkboxAPIError | None = None
     state_tunnel_id: UUID | None = None
     if state and state.tunnel_id:
         try:
@@ -141,15 +144,15 @@ def bootstrap(
     if state_tunnel_id is not None:
         try:
             tunnel = tunnels.get(state_tunnel_id)
+            if tunnel.tunnel_name != name:
+                tunnel = None
+                state = None
         except InkboxAPIError as err:
             if err.status_code == 404:
-                raise TunnelRemoved(
-                    f"tunnel {name!r} (id={state_tunnel_id}) has been removed; "
-                    f"clear {state_dir} and call inkbox.create_identity({name!r}) "
-                    "to start fresh",
-                    agent_support=err.agent_support,
-                ) from err
-            raise
+                removed_error = err
+                state = None
+            else:
+                raise
 
     if tunnel is None:
         # Look up by name (the server lists only live tunnels).
@@ -159,11 +162,20 @@ def bootstrap(
                 break
 
     if tunnel is None:
+        if removed_error is not None:
+            raise TunnelRemoved(
+                f"tunnel {name!r} has been removed; "
+                f"call inkbox.create_identity({name!r}) to start fresh",
+                agent_support=removed_error.agent_support,
+            ) from removed_error
         raise TunnelNotProvisioned(
             f"no tunnel named {name!r} exists in this org. "
             "Tunnels are provisioned atomically by "
             f"inkbox.create_identity({name!r}); call that first."
         )
+
+    if state and state.tunnel_id != str(tunnel.id):
+        state = None
 
     # Edge tunnels must be ACTIVE before we open the data plane.
     # Passthrough has its own AWAITING_CERT branch below.
@@ -179,6 +191,11 @@ def bootstrap(
     # Cert dance for passthrough.
     terminator: TLSTerminator | None = None
     if tunnel.tls_mode == TLSMode.PASSTHROUGH:
+        if tunnel.status not in (TunnelStatus.ACTIVE, TunnelStatus.AWAITING_CERT):
+            raise TunnelStateConflict(
+                status_code=409,
+                detail="tunnel is not ready for certificate setup",
+            )
         zone, public_host = resolve_zone_and_host(
             name=name,
             server_zone=tunnel.zone,
@@ -187,8 +204,13 @@ def bootstrap(
             data_plane_zone_override=data_plane_zone_override,
         )
         key = load_or_create_keypair(state_dir)
-        if tunnel.status == TunnelStatus.AWAITING_CERT or cert_needs_sign(
-            state_dir, key
+        if (
+            tunnel.status == TunnelStatus.AWAITING_CERT
+            or (state is None and not tunnel.cert_fingerprint_sha256)
+            or cert_needs_sign(
+                state_dir, key, public_host=public_host,
+                fingerprint_sha256=tunnel.cert_fingerprint_sha256,
+            )
         ):
             csr_pem = build_csr(key, public_host)
             logger.info("POST /tunnels/%s/sign-csr", tunnel.id)

@@ -11,6 +11,26 @@ from inkbox.exceptions import InkboxAPIError
 FIXTURES = Path(__file__).resolve().parents[3] / "contracts"
 
 
+@pytest.mark.parametrize("action", ["pause", "resume"])
+def test_continuation_actions_preserve_idempotency_and_do_not_fallback(action):
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(409, json={"detail": {"code": "checkpoint_incompatible"}})
+
+    with HttpTransport("synthetic-key", "https://example.test") as transport:
+        transport._client.close()
+        transport._client = httpx.Client(base_url="https://example.test", transport=httpx.MockTransport(respond))
+        workspace = HostedWorkspace(transport, "example-agent")
+        with pytest.raises(InkboxAPIError):
+            getattr(workspace, action)(idempotency_key="continuation-once")
+    assert len(requests) == 1
+    assert requests[0].url.path.endswith(f"/hosting/workspace/actions/{action}")
+    assert requests[0].headers["Idempotency-Key"] == "continuation-once"
+    assert json.loads(requests[0].content) == {}
+
+
 def test_rename_forwards_title_and_idempotency_key():
     http = MagicMock()
     HostedWorkspace(http, "example-agent").rename_conversation(

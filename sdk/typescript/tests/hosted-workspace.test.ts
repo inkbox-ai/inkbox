@@ -10,6 +10,17 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it.each(["pause", "resume"] as const)("%s preserves idempotency and does not fall back on incompatibility", async (action) => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ detail: { code: "checkpoint_incompatible" } }), { status: 409, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    const workspace = new HostedWorkspace(new HttpTransport("synthetic-key", "https://example.test"), "example-agent");
+    await expect(workspace[action]("continuation-once")).rejects.toMatchObject({ statusCode: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(url)).toContain(`/hosting/workspace/actions/${action}`);
+    expect(new Headers(options.headers).get("Idempotency-Key")).toBe("continuation-once");
+    expect(JSON.parse(String(options.body))).toEqual({});
+  });
   it("returns schedule history metadata without inventing pagination", async () => {
     const payload = {items:[{id:"occurrence",intended_due_at:"2026-01-01T00:00:00Z",state:"succeeded",reason:null}],conversation_id:"conversation",history_completeness:"partial"};
     const get = vi.fn().mockResolvedValue(payload);

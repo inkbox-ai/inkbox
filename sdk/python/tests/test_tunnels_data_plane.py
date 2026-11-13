@@ -271,6 +271,9 @@ def test_bootstrap_stale_tunnel_preserves_agent_support(tmp_path: Path):
     support = "Contact the Support Agent using its Agent Card."
 
     class Tunnels:
+        def list(self):
+            return []
+
         def get(self, requested_id: object) -> None:
             assert str(requested_id) == tunnel_id
             raise InkboxAPIError(404, "not found", agent_support=support)

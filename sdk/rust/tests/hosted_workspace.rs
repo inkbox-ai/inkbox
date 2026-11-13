@@ -5,6 +5,47 @@ use inkbox::{
 };
 use serde_json::{json, Value};
 #[test]
+fn continuation_actions_preserve_idempotency_without_cold_fallback() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let workspace = client.identities().workspace("example-agent");
+    let start = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/example-agent/hosting/workspace/actions/start");
+        then.status(202)
+            .json_body(json!({"operation_id":"unexpected"}));
+    });
+    for action in ["pause", "resume"] {
+        let expected = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!(
+                    "/api/v1/identities/example-agent/hosting/workspace/actions/{action}"
+                ))
+                .header("Idempotency-Key", "continuation-once")
+                .json_body(json!({}));
+            then.status(409)
+                .json_body(json!({"detail":{"code":"checkpoint_incompatible"}}));
+        });
+        let result = if action == "pause" {
+            workspace.pause("continuation-once")
+        } else {
+            workspace.resume("continuation-once")
+        };
+        assert!(matches!(
+            result,
+            Err(inkbox::InkboxError::Api {
+                status_code: 409,
+                ..
+            })
+        ));
+        expected.assert_hits(1);
+    }
+    start.assert_hits(0);
+}
+#[test]
 fn rename_preserves_title_and_idempotency_key() {
     let server = MockServer::start();
     let renamed = server.mock(|when, then| {

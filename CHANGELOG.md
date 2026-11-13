@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.38
+
+### Added
+- Pause and resume hosted computers through the workspace APIs and `inkbox identity hosting workspace pause` / `resume`, using explicit idempotency keys.
+
+### Changed
+- Tunnel reconnects preserve valid certificates, validate cached material against the requested tunnel, and rediscover a replacement tunnel when a saved ID is no longer available.
+
 ## 0.7.37
 
 ### Added
