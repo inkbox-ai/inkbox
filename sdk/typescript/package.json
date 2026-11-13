@@ -14,6 +14,10 @@
     "./tunnels/connect": {
       "types": "./dist/tunnels/client/index.d.ts",
       "node": "./dist/tunnels/client/index.js"
+    },
+    "./remote-mcp": {
+      "types": "./dist/remote-mcp.d.ts",
+      "node": "./dist/remote-mcp.js"
     }
   },
   "files": [
@@ -30,6 +34,7 @@
   },
   "dependencies": {
     "@peculiar/x509": "^2.0.0",
+    "ajv": "^8.20.0",
     "hash-wasm": "^4.11.0",
     "reflect-metadata": "^0.2.2",
     "undici": "^7.0.0"

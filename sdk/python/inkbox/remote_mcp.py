@@ -314,6 +314,7 @@ class RemoteMcp:
             raise RemoteToolError(
                 "Tool arguments exceed the size limit; stage files separately"
             )
+        arguments = json.loads(_json(arguments))
         journal = (
             self.journal
             if journal_path is None
