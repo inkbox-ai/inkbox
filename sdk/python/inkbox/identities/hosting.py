@@ -16,6 +16,7 @@ class HostingUpdate(TypedDict):
     harness: NotRequired[Literal['codex', 'hermes']]
     default_model: NotRequired[Literal['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra']]
     tier: NotRequired[Literal['medium']]
+    shape_id: NotRequired[str]
     instructions: NotRequired[str]
     trigger_events: NotRequired[list[str]]
     follow_defaults: NotRequired[bool]
@@ -36,6 +37,7 @@ class HostingConfiguration:
     harness: str | None = None
     default_model: str = 'gpt-6.1-terra'
     tier: str | None = None
+    shape_id: str | None = None
     instructions: str = ''
     trigger_events: list[str] = field(default_factory=list)
     follow_defaults: bool = True

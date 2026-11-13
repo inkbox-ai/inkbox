@@ -1,6 +1,24 @@
 import { expect, it, vi } from "vitest";
 import { IdentitiesResource } from "../src/identities/resources/identities.js";
 import type { HttpTransport } from "../src/_http.js";
+import { ComputersResource } from "../src/computers.js";
+import { readFileSync } from "node:fs";
+
+it("preserves shape catalog values without reserving capacity", async () => {
+  const wire = JSON.parse(readFileSync(new URL("../../../contracts/computer-shapes.json", import.meta.url), "utf8"));
+  const http = {get: vi.fn().mockResolvedValue(wire)};
+  expect(await new ComputersResource(http as unknown as HttpTransport).shapes()).toEqual(wire);
+  expect(http.get).toHaveBeenCalledExactlyOnceWith("/computers/shapes");
+});
+
+it("serializes an optional shape preference and reads it without changing legacy tiers", async () => {
+  const http = {put: vi.fn().mockResolvedValue({ mode: "inkbox", identity_id: "identity", shape_id: "v1-cpu2-ram8gb" })};
+  const result = await new IdentitiesResource(http as unknown as HttpTransport).updateHosting("example", {
+    expectedGeneration: 0, shapeId: "v1-cpu2-ram8gb",
+  });
+  expect(result.shapeId).toBe("v1-cpu2-ram8gb");
+  expect(JSON.parse(JSON.stringify(http.put.mock.calls[0][1]))).toEqual({ expected_generation: 0, shape_id: "v1-cpu2-ram8gb" });
+});
 
 it("encodes handles and preserves empty triggers, explicit credits and omitted choices", async () => {
   const wire = {mode:"inkbox",identity_id:"identity",state:"provisioning",generation:2,applied_generation:1};

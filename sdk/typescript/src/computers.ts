@@ -20,6 +20,15 @@ export interface ComputerTemplates {
   hosted_defaults: {codex: ComputerTemplate | null; hermes: ComputerTemplate | null};
 }
 
+export interface ComputerShape {
+  id: string;
+  vcpus: number;
+  memory_mib: number;
+  architecture: string;
+  available: boolean;
+}
+export interface ComputerShapes { version: number; items: ComputerShape[] }
+
 export interface ComputerMetricSummary {unit: string; average: number | null; maximum: number | null; samples: number; last_sample_at: string | null}
 export interface ComputerUsageHistory {
   machine_id: string; source: string; from: string; to: string; resolution_seconds: number;
@@ -40,6 +49,10 @@ export class ComputersResource {
   /** Current hosted defaults, without reserving capacity. */
   templates(): Promise<ComputerTemplates> {
     return this.http.get("/computers/templates");
+  }
+  /** Supported allocations; availability does not reserve capacity. */
+  shapes(): Promise<ComputerShapes> {
+    return this.http.get("/computers/shapes");
   }
   usageHistory(machineId: string, window: "1h" | "24h" | "7d" | "30d" = "24h"): Promise<ComputerUsageHistory> {
     return this.http.get(`/computers/machines/${encodeURIComponent(machineId)}/usage/history`, {window});

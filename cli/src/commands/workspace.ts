@@ -292,6 +292,21 @@ export function registerWorkspaceCommands(hosting: Command): void {
         }),
       );
   }
+  workspace.command("resize <handle>")
+    .description("Resize a stopped computer; inspect workspace and shapes first")
+    .requiredOption("--shape <id>")
+    .requiredOption("--expected-version <number>", "Current computer version", version)
+    .requiredOption("--idempotency-key <key>")
+    .option("--disk-bytes <bytes>", "Requested disk capacity", (value: string) => {
+      const bytes = version(value);
+      if (bytes === 0) throw new Error("Disk capacity must be positive");
+      return bytes;
+    })
+    .action(withErrorHandler(async function (this: Command, h: string, o: {
+      shape: string; expectedVersion: number; idempotencyKey: string; diskBytes?: number;
+    }) {
+      show(this, await resource(this, h).resize(o.shape, o.expectedVersion, o.idempotencyKey, o.diskBytes));
+    }));
   workspace.command("operation <handle> <id>").action(
     withErrorHandler(async function (this: Command, h: string, id: string) {
       show(this, await resource(this, h).operation(id));

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "items": [
+    {"id": "v1-cpu1-ram4gb", "vcpus": 1, "memory_mib": 4096, "architecture": "x86_64", "available": true},
+    {"id": "v1-cpu8-ram32gb", "vcpus": 8, "memory_mib": 32768, "architecture": "x86_64", "available": false}
+  ]
+}

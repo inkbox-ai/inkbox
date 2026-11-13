@@ -2,6 +2,36 @@ use inkbox::identities::{HostingUpdate, Unset};
 use serde_json::json;
 
 #[test]
+fn shapes_keep_version_numeric_allocations_and_unavailable_choices() {
+    use httpmock::prelude::*;
+    let server = MockServer::start();
+    let request = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/computers/shapes");
+        then.status(200)
+            .header("Content-Type", "application/json")
+            .body(include_str!("../../../contracts/computer-shapes.json"));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let catalog = client.computers().shapes().unwrap();
+    assert_eq!(catalog.version, 1);
+    assert_eq!(catalog.items[1].memory_mib, 32768);
+    assert!(!catalog.items[1].available);
+    request.assert_hits(1);
+    let update = HostingUpdate {
+        expected_generation: 0,
+        shape_id: Some(catalog.items[0].id.clone()),
+        ..Default::default()
+    };
+    assert_eq!(
+        serde_json::to_value(update).unwrap(),
+        json!({"expected_generation":0,"shape_id":"v1-cpu1-ram4gb"})
+    );
+}
+
+#[test]
 fn persistent_default_model_survives_requests_and_responses() {
     let update = HostingUpdate {
         expected_generation: 1,

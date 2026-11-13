@@ -331,6 +331,19 @@ class HostedWorkspace:
             json={}, headers=self._key(idempotency_key),
         )
 
+    def resize(
+        self, shape_id: str, *, expected_version: int,
+        idempotency_key: str, disk_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        """Resize a stopped computer using its current workspace version."""
+        body: dict[str, Any] = {"shape_id": shape_id, "expected_version": expected_version}
+        if disk_bytes is not None:
+            body["disk_bytes"] = disk_bytes
+        return self._http.post(
+            self._base + "/workspace/resize", json=body,
+            headers=self._key(idempotency_key),
+        )
+
     def operation(self, operation_id: str) -> dict[str, Any]:
         return self._http.get(
             self._base + "/workspace/operations/" + quote(operation_id, safe="")

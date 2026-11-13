@@ -31,7 +31,8 @@ export function registerHostingCommands(identity: Command): void {
     .requiredOption("--expected-generation <number>", "Current generation; 0 for initial setup")
     .addOption(new Option("--harness <name>", "Agent harness").choices(["codex", "hermes"]))
     .addOption(new Option("--default-model <model>", "Default model for turns and scheduled work").choices(["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"]))
-    .addOption(new Option("--size <size>", "Fixed computer size: 1 vCPU and 4 GiB RAM").choices(["medium"]))
+    .addOption(new Option("--size <size>", "Legacy size: 1 vCPU and 4 GiB RAM").choices(["medium"]))
+    .option("--shape <id>", "Initial CPU/RAM allocation from computers shapes")
     .option("--reset-instructions", "Restore default hosted-agent instructions")
     .option("--idle-stop", "Enable idle shutdown")
     .option("--instructions-file <path>", "Read hosted-agent instructions from a UTF-8 file")
@@ -42,6 +43,7 @@ export function registerHostingCommands(identity: Command): void {
     .option("--idle-seconds <seconds>", "Stop after 60 or 300 idle seconds")
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
       expectedGeneration: string; harness?: "codex" | "hermes"; size?: "medium";
+      shape?: string;
       defaultModel?: HostingModel;
       instructionsFile?: string; events?: string; defaultEvents?: boolean; modelKey?: string;
       credits?: boolean; idleSeconds?: string; resetInstructions?: boolean; idleStop?: boolean;
@@ -49,7 +51,8 @@ export function registerHostingCommands(identity: Command): void {
       const expectedGeneration = generation(opts.expectedGeneration);
       if (opts.events !== undefined && opts.defaultEvents) throw new Error("Choose events or default events, not both");
       if (opts.modelKey && opts.credits) throw new Error("Choose a model key or credits, not both");
-      const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size, defaultModel: opts.defaultModel };
+      if (opts.shape && opts.size) throw new Error("Choose a shape or legacy size, not both");
+      const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size, shapeId: opts.shape, defaultModel: opts.defaultModel };
       if (opts.resetInstructions && opts.instructionsFile) throw new Error("Choose reset or custom instructions");
       if (opts.idleStop) update.idleStopEnabled = true;
       if (opts.resetInstructions) update.resetInstructions = true;

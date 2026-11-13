@@ -61,6 +61,26 @@ test("manual pause and resume require an intent key and call the matching action
   }, req => { keys.push(req.headers["idempotency-key"]); return { operation_id: "operation" }; });
 });
 
+test("workspace resize forwards version and size without implicitly starting or stopping", async () => {
+  await withApi(async (run, requests) => {
+    const args = ["workspace", "resize", "example", "--shape", "v1-cpu2-ram8gb", "--expected-version", "4", "--idempotency-key", "resize-once"];
+    assert.ifError((await run(args)).error);
+    assert.deepEqual(requests, [{method:"POST",path:"/api/v1/identities/example/hosting/workspace/resize",body:{shape_id:"v1-cpu2-ram8gb",expected_version:4}}]);
+    assert.ok((await run([...args, "--disk-bytes", "-1"])).error);
+    assert.equal(requests.length, 1);
+  }, () => ({operation_id:"operation",version:5,snapshot_id:null}));
+});
+
+test("initial hosting shape is sent without the legacy size alias", async () => {
+  await withApi(async (run, requests) => {
+    const args = ["configure", "example", "--expected-generation", "0", "--shape", "v1-cpu2-ram8gb"];
+    assert.ifError((await run(args)).error);
+    assert.deepEqual(requests[0].body, {expected_generation:0,shape_id:"v1-cpu2-ram8gb"});
+    assert.ok((await run([...args,"--size","medium"])).error);
+    assert.equal(requests.length,1);
+  });
+});
+
 test("removing hosting sends the generation and preserves omitted configuration", async () => {
   await withApi(async (run, requests) => {
     const result = await run(["remove", "example", "--expected-generation", "2"]);

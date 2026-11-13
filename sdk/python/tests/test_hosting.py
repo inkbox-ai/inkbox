@@ -83,3 +83,24 @@ def test_authoritative_server_hosting_fixture():
     result = IdentitiesResource(http).update_hosting('example', wire['hosting_update'])
     assert result.default_model == wire['hosting']['default_model']
     http.put.assert_called_once_with('/example/hosting', json=wire['hosting_update'])
+
+
+def test_shapes_keep_version_numeric_allocations_and_unavailable_choices():
+    import json
+    from pathlib import Path
+    from inkbox.computers import ComputersResource
+    wire = json.loads((Path(__file__).resolve().parents[3] / 'contracts/computer-shapes.json').read_text())
+    http = Mock()
+    http.get.return_value = wire
+    assert ComputersResource(http).shapes() == wire
+    http.get.assert_called_once_with('/computers/shapes')
+    http.post.assert_not_called()
+
+
+def test_shape_preference_is_optional_and_survives_configuration():
+    http = Mock()
+    http.put.return_value = {'mode': 'inkbox', 'identity_id': 'identity', 'shape_id': 'v1-cpu2-ram8gb'}
+    command = {'expected_generation': 0, 'shape_id': 'v1-cpu2-ram8gb'}
+    result = IdentitiesResource(http).update_hosting('example', command)
+    assert result.shape_id == command['shape_id']
+    http.put.assert_called_once_with('/example/hosting', json=command)

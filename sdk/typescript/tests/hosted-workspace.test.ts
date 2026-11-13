@@ -10,6 +10,13 @@ const events: ChatEvent[] = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe("hosted workspace contract", () => {
+  it.each([undefined, 16 * 1024 ** 3])("resize keeps the machine version and optional disk size %s", async (bytes) => {
+    const http = { post: vi.fn().mockResolvedValue({ operation_id: "operation" }) };
+    await new HostedWorkspace(http as unknown as HttpTransport, "example").resize("v1-cpu2-ram8gb", 4, "resize-once", bytes);
+    expect(http.post).toHaveBeenCalledExactlyOnceWith("/example/hosting/workspace/resize", {
+      shape_id: "v1-cpu2-ram8gb", expected_version: 4, ...(bytes === undefined ? {} : { disk_bytes: bytes }),
+    }, { headers: { "Idempotency-Key": "resize-once" } });
+  });
   it.each(["pause", "resume"] as const)("%s preserves idempotency and does not fall back on incompatibility", async (action) => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({ detail: { code: "checkpoint_incompatible" } }), { status: 409, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetch);

@@ -564,6 +564,7 @@ export type {WhatsAppWebhookEventType,WhatsAppWebhookReaction,WhatsAppWebhookMes
 export type { HostingConfiguration, HostingUpdate, HostingDelivery, HostingModel } from "./identities/hosting.js";
 
 export { ComputersResource } from "./computers.js";
+export type { ComputerShape, ComputerShapes } from "./computers.js";
 export type { ComputerSoftware, ComputerTemplate, ComputerTemplates, ComputerMetricSummary, ComputerUsageHistory, ComputerConversation, ComputerConversationList, ComputerConversationHistory, ComputerSessionRun } from "./computers.js";
 
 export * from "./hosted-workspace.js";

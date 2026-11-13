@@ -31,6 +31,19 @@ class ComputerTemplates(TypedDict):
     hosted_defaults: HostedTemplateDefaults
 
 
+class ComputerShape(TypedDict):
+    id: str
+    vcpus: int
+    memory_mib: int
+    architecture: str
+    available: bool
+
+
+class ComputerShapes(TypedDict):
+    version: int
+    items: list[ComputerShape]
+
+
 class MetricSummary(TypedDict):
     unit: str
     average: float | None
@@ -94,6 +107,10 @@ class ComputersResource:
     def templates(self) -> ComputerTemplates:
         """Read templates and current hosted defaults without reserving capacity."""
         return cast(ComputerTemplates, self._http.get("/computers/templates"))
+
+    def shapes(self) -> ComputerShapes:
+        """Read supported allocations; availability does not reserve capacity."""
+        return cast(ComputerShapes, self._http.get("/computers/shapes"))
 
     def usage_history(self, machine_id: str, *, window: Literal['1h', '24h', '7d', '30d'] = '24h') -> UsageHistory:
         return cast(UsageHistory, self._http.get(f"/computers/machines/{quote(machine_id, safe='')}/usage/history", params={'window': window}))

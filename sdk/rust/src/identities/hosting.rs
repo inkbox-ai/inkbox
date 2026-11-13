@@ -11,6 +11,7 @@ pub struct HostingConfiguration {
     #[serde(default = "default_model")]
     pub default_model: String,
     pub tier: Option<String>,
+    pub shape_id: Option<String>,
     pub state: String,
     pub generation: u64,
     pub applied_generation: u64,
@@ -40,8 +41,11 @@ pub struct HostingUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// The only supported hosted size is `medium`: 1 vCPU and 4 GiB RAM.
+    /// Legacy `medium` allocation: 1 vCPU and 4 GiB RAM.
     pub tier: Option<String>,
+    /// Initial allocation; resize existing computers through the workspace.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shape_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -42,6 +42,20 @@ pub struct ComputerTemplates {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct ComputerShape {
+    pub id: String,
+    pub vcpus: u32,
+    pub memory_mib: u64,
+    pub architecture: String,
+    pub available: bool,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct ComputerShapes {
+    pub version: u32,
+    pub items: Vec<ComputerShape>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct MetricSummary {
     pub unit: String,
     pub average: Option<f64>,
@@ -112,6 +126,12 @@ impl ComputersResource {
     pub fn templates(&self) -> Result<ComputerTemplates> {
         Ok(serde_json::from_value(
             self.http.get("/computers/templates", NO_QUERY)?,
+        )?)
+    }
+    /// Read supported allocations without reserving capacity.
+    pub fn shapes(&self) -> Result<ComputerShapes> {
+        Ok(serde_json::from_value(
+            self.http.get("/computers/shapes", NO_QUERY)?,
         )?)
     }
     pub fn usage_history(&self, machine: &str, window: &str) -> Result<UsageHistory> {

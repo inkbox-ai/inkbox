@@ -12,6 +12,8 @@ export interface HostingUpdate {
   /** Default for turns and scheduled work that do not override the model. */
   defaultModel?: HostingModel;
   tier?: "medium";
+  /** Initial allocation; resize existing computers through the workspace. */
+  shapeId?: string;
   instructions?: string;
   triggerEvents?: string[];
   followDefaults?: boolean;
@@ -30,6 +32,7 @@ export interface HostingConfiguration {
   harness: string | null;
   defaultModel: HostingModel;
   tier: string | null;
+  shapeId: string | null;
   state: string;
   generation: number;
   appliedGeneration: number;
@@ -50,6 +53,7 @@ interface RawHostingConfiguration {
   harness?: string | null;
   default_model?: HostingModel;
   tier?: string | null;
+  shape_id?: string | null;
   state: string;
   generation: number;
   applied_generation: number;
@@ -67,6 +71,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
   return {
     mode: data.mode, identityId: data.identity_id, machineId: data.machine_id ?? null,
     harness: data.harness ?? null, tier: data.tier ?? null, state: data.state,
+    shapeId: data.shape_id ?? null,
     defaultModel: data.default_model ?? "gpt-6.1-terra",
     generation: data.generation, appliedGeneration: data.applied_generation,
     instructions: data.instructions ?? "", triggerEvents: data.trigger_events ?? [],
@@ -81,6 +86,7 @@ export function hostingUpdateBody(options: HostingUpdate): Record<string, unknow
     idle_stop_enabled: options.idleStopEnabled, reset_instructions: options.resetInstructions,
     expected_generation: options.expectedGeneration, enabled: options.enabled,
     harness: options.harness, tier: options.tier, instructions: options.instructions,
+    shape_id: options.shapeId,
     default_model: options.defaultModel,
     trigger_events: options.triggerEvents, follow_defaults: options.followDefaults,
     credential_binding_id: options.credentialBindingId, idle_timeout_seconds: options.idleTimeoutSeconds,

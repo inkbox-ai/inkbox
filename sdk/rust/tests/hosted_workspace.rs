@@ -5,6 +5,35 @@ use inkbox::{
 };
 use serde_json::{json, Value};
 #[test]
+fn resize_keeps_machine_version_and_optional_disk_capacity() {
+    for bytes in [None, Some(16 * 1024 * 1024 * 1024)] {
+        let server = MockServer::start();
+        let mut body = json!({"shape_id":"v1-cpu2-ram8gb","expected_version":4});
+        if let Some(bytes) = bytes {
+            body["disk_bytes"] = bytes.into();
+        }
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/identities/example/hosting/workspace/resize")
+                .header("Idempotency-Key", "resize-once")
+                .json_body(body);
+            then.status(202)
+                .json_body(json!({"operation_id":"operation","version":5,"snapshot_id":null}));
+        });
+        let client = Inkbox::builder("synthetic-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let result = client
+            .identities()
+            .workspace("example")
+            .resize("v1-cpu2-ram8gb", 4, "resize-once", bytes)
+            .unwrap();
+        assert_eq!(result["version"], 5);
+        request.assert_hits(1);
+    }
+}
+#[test]
 fn continuation_actions_preserve_idempotency_without_cold_fallback() {
     let server = MockServer::start();
     let client = Inkbox::builder("synthetic-key")

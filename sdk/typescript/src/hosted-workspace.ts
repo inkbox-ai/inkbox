@@ -383,6 +383,13 @@ export class HostedWorkspace {
   resume(key: string): Promise<ObjectValue> {
     return this.http.post(`${this.base}/workspace/actions/resume`, {}, this.key(key));
   }
+  /** Resize a stopped computer using its current workspace version. */
+  resize(shapeId: string, expectedVersion: number, key: string, diskBytes?: number): Promise<ObjectValue> {
+    return this.http.post(`${this.base}/workspace/resize`, {
+      shape_id: shapeId, expected_version: expectedVersion,
+      ...(diskBytes === undefined ? {} : { disk_bytes: diskBytes }),
+    }, this.key(key));
+  }
   operation(operation: string): Promise<ObjectValue> {
     return this.http.get(
       `${this.base}/workspace/operations/${enc(operation)}`,
