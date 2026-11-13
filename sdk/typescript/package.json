@@ -30,7 +30,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "verify:bundle": "node scripts/verify-bundle.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@peculiar/x509": "^2.0.0",
