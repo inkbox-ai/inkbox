@@ -33,6 +33,7 @@ describe("remote catalog", () => {
     const remote = client(); const catalog = await remote.refresh();
     expect(catalog).toEqual(tools); expect(remote.catalogDigest).toMatch(/^[0-9a-f]{64}$/);
     catalog[0].name = "changed";
+    catalog[0].inputSchema.required = ["other"];
     expect((await remote.call("send", { text: "hello" }, { callIdentity: "native-call-1" })).structuredContent).toEqual({ id: "receipt-test" });
     expect(calls).toHaveLength(2);
     expect(fetcher.mock.calls[0][1].redirect).toBe("error");
@@ -51,9 +52,25 @@ describe("remote catalog", () => {
     await expect(remote.refresh()).rejects.toThrow(); expect(remote.catalogDigest).toBe(digest);
     await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).resolves.toHaveProperty("content");
   });
+  it("validates the full captured schema before creating history or invoking callbacks", async () => {
+    tools[0].inputSchema = { type: "object", $defs: { text: { type: "string", minLength: 2 } }, properties: { text: { $ref: "#/$defs/text" } }, required: ["text"], additionalProperties: false };
+    const remote = client(); await remote.refresh(); const beforeExecute = vi.fn();
+    for (const args of [{ text: "x" }, {}, { text: "ok", extra: true }]) {
+      await expect(remote.call("send", args, { callIdentity: "same", beforeExecute })).rejects.toThrow("remote schema");
+    }
+    expect(beforeExecute).not.toHaveBeenCalled(); expect(calls).toEqual([]); expect(readdirSync(directory)).toEqual([]);
+    await expect(remote.call("send", { text: "ok" }, { callIdentity: "same" })).resolves.toHaveProperty("content");
+  });
+  it("rejects external references without fetching them or replacing the catalog", async () => {
+    const remote = client(); await remote.refresh(); const digest = remote.catalogDigest;
+    tools[0].inputSchema = { $ref: "https://schemas.example.test/tool" };
+    await expect(remote.refresh()).rejects.toThrow("unresolved"); expect(remote.catalogDigest).toBe(digest);
+    expect(fetcher.mock.calls.every(([url]) => url === "https://example.test/mcp")).toBe(true);
+    await expect(remote.call("send", { text: "ok" }, { callIdentity: "a" })).resolves.toHaveProperty("content");
+  });
   it("removes tools at the next successful catalog refresh", async () => {
     const remote = client(); await remote.refresh(); tools = []; await remote.refresh();
-    await expect(remote.call("send", {}, { callIdentity: "a" })).rejects.toThrow("unavailable");
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).rejects.toThrow("unavailable");
     expect(calls).toEqual([]);
   });
   it.each(["http://example.test", "https://user:secret@example.test", "https://example.test/path", "https://example.test?token=secret", "file:///tmp/x"])("rejects an unsafe origin %s", origin => {
@@ -62,7 +79,7 @@ describe("remote catalog", () => {
   it("bounds remote response size", async () => {
     const remote = client(); await remote.refresh();
     fetcher.mockResolvedValueOnce(new Response("x".repeat(1_000_001)));
-    await expect(remote.call("send", {}, { callIdentity: "a" })).rejects.toThrow("size limit");
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).rejects.toThrow("size limit");
   });
   it("rejects oversized, nonfinite and cyclic input before any call", async () => {
     const remote = client(); await remote.refresh(); const cyclic: Record<string, unknown> = {}; cyclic.self = cyclic;
@@ -109,25 +126,25 @@ describe("durable continuations", () => {
   });
   it("rechecks the source after preparation and leaves the continuation available when revoked", async () => {
     const remote = client(); await remote.refresh(); let checks = 0; const submitted = vi.fn();
-    await expect(remote.call("send", {}, { callIdentity: "a", beforeExecute: () => { if (++checks === 2) throw new Error("source revoked"); }, beforeSubmit: submitted })).rejects.toThrow("source revoked");
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "a", beforeExecute: () => { if (++checks === 2) throw new Error("source revoked"); }, beforeSubmit: submitted })).rejects.toThrow("source revoked");
     expect(submitted).not.toHaveBeenCalled(); expect(calls).toHaveLength(1);
     expect(readdirSync(directory).filter(name => name.endsWith(".state"))).toHaveLength(1);
   });
   it("does not mark a read-only operation as a submitted write", async () => {
     respond = () => ({ content: [] }); const remote = client(); await remote.refresh(); const submit = vi.fn();
-    await remote.call("send", {}, { callIdentity: "a", beforeSubmit: submit }); expect(submit).not.toHaveBeenCalled();
+    await remote.call("send", { text: "hello" }, { callIdentity: "a", beforeSubmit: submit }); expect(submit).not.toHaveBeenCalled();
   });
   it("fails closed on unsupported interactions and repeated continuations", async () => {
     const remote = client(); await remote.refresh();
     respond = () => ({ resultType: "input_required", requestState: "a", elicitation: {} });
-    await expect(remote.call("send", {}, { callIdentity: "a" })).rejects.toThrow("unsupported interaction");
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).rejects.toThrow("unsupported interaction");
     respond = () => ({ resultType: "input_required", requestState: "b" });
-    await expect(remote.call("send", {}, { callIdentity: "b" })).rejects.toThrow("unsupported interaction");
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "b" })).rejects.toThrow("unsupported interaction");
     expect(calls).toHaveLength(3);
   });
   it("rejects symlinked journal directories", async () => {
     const remote = client(); await remote.refresh(); const link = `${directory}-link`; symlinkSync(directory, link);
-    try { await expect(remote.call("send", {}, { callIdentity: "a", journalPath: link })).rejects.toThrow("owned directory"); }
+    try { await expect(remote.call("send", { text: "hello" }, { callIdentity: "a", journalPath: link })).rejects.toThrow("owned directory"); }
     finally { rmSync(link); }
   });
   it("aborts in-flight HTTP and preserves an already-published continuation", async () => {
@@ -143,7 +160,7 @@ describe("durable continuations", () => {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     try {
       const address = server.address() as { port: number }; const remote = client("a", `http://127.0.0.1:${address.port}`); await remote.refresh();
-      const abort = new AbortController(); const result = remote.call("send", {}, { callIdentity: "a", signal: abort.signal });
+      const abort = new AbortController(); const result = remote.call("send", { text: "hello" }, { callIdentity: "a", signal: abort.signal });
       const rejected = expect(result).rejects.toThrow("cancelled"); await pending; abort.abort(new Error("cancelled")); await rejected;
       expect(readdirSync(directory).filter(name => name.endsWith(".state"))).toHaveLength(1);
     } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }

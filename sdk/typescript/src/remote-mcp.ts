@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants, closeSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
+import type { ValidateFunction } from "ajv";
 
 export const REMOTE_MCP_VERSION = "2026-07-28";
 const MESSAGE_BYTES = 1_000_000;
@@ -91,6 +92,7 @@ export class RemoteMcp {
   private readonly apiKey: string;
   private readonly scope: string;
   private catalog: RemoteTool[] = [];
+  private validators = new Map<string, ValidateFunction>();
   catalogDigest: string | null = null;
   constructor(options: { apiKey: string; baseUrl: string; identity: string; journalPath: string }) {
     const url = new URL(options.baseUrl);
@@ -140,6 +142,7 @@ export class RemoteMcp {
     const discovery = await this.request('server/discover', {}, signal);
     if (!Array.isArray(discovery.supportedVersions) || !discovery.supportedVersions.includes(REMOTE_MCP_VERSION)) throw new RemoteToolError("The remote tool protocol is unsupported");
     const catalog: RemoteTool[] = []; const names = new Set<string>(); const cursors = new Set<string>();
+    const validators = new Map<string, ValidateFunction>();
     let params: Record<string, unknown> = {}; let total = 0;
     for (let page = 0; page < 16; page++) {
       const result = await this.request('tools/list', params, signal, CATALOG_BYTES);
@@ -148,10 +151,12 @@ export class RemoteMcp {
       for (const row of result.tools) {
         if (!object(row) || typeof row.name !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(row.name) || names.has(row.name) || (row.description !== undefined && typeof row.description !== 'string') || (row.annotations !== undefined && !object(row.annotations))) throw new RemoteToolError("Invalid remote tool catalog");
         validateSchema(row.inputSchema); if ('outputSchema' in row) validateSchema(row.outputSchema);
+        try { validators.set(row.name, new Ajv2020({ strict: false, validateFormats: false }).compile(row.inputSchema as Record<string, unknown>)); }
+        catch { throw new RemoteToolError("Invalid or unresolved remote tool schema"); }
         names.add(row.name); catalog.push(row as RemoteTool);
       }
       if (result.nextCursor == null) {
-        this.catalog = structuredClone(catalog); this.catalogDigest = hash(catalog);
+        this.catalog = structuredClone(catalog); this.validators = validators; this.catalogDigest = hash(catalog);
         return structuredClone(catalog);
       }
       if (typeof result.nextCursor !== 'string' || !result.nextCursor || result.nextCursor.length > 4096 || cursors.has(result.nextCursor)) throw new RemoteToolError("Invalid remote catalog cursor");
@@ -166,6 +171,7 @@ export class RemoteMcp {
     bounded(args);
     if (Buffer.byteLength(canonical(args)) > MESSAGE_BYTES) throw new RemoteToolError("Tool arguments exceed the size limit; stage files separately");
     args = JSON.parse(canonical(args));
+    if (!this.validators.get(name)!(args)) throw new RemoteToolError("Tool arguments do not match the remote schema");
     const journal = new CallJournal(options.journalPath ?? this.journalPath, this.scope);
     const record = journal.begin(options.callIdentity, name, args);
     const execute = async (state: string | null) => {
