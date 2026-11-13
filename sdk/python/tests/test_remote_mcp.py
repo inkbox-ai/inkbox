@@ -590,3 +590,37 @@ async def test_session_journals_are_independent_and_keep_identity_scope(
     assert observed[-1]["requestState"] == states[0]
     with sqlite3.connect(original_journal.path) as db:
         assert db.execute("select count(*) from calls").fetchone()[0] == 0
+
+
+async def test_full_argument_schema_precedes_journal_and_approval(remote, monkeypatch):
+    remote._catalog = (descriptor(inputSchema={
+        "type": "object", "$defs": {"text": {"type": "string", "minLength": 2}},
+        "properties": {"text": {"$ref": "#/$defs/text"}},
+        "required": ["text"], "additionalProperties": False,
+    }),)
+    calls, approved = [], []
+
+    async def request(method, params, **kwargs):
+        calls.append(params)
+        return {"content": []}
+
+    monkeypatch.setattr(remote, "request", request)
+    for arguments in ({}, {"text": "x"}, {"text": "ok", "extra": True}):
+        with pytest.raises(RemoteToolError, match="remote schema"):
+            await remote.call("example_read", arguments, call_identity="same",
+                              before_execute=lambda: approved.append(True))
+    assert not calls and not approved
+    await remote.call("example_read", {"text": "ok"}, call_identity="same")
+    assert len(calls) == 1
+
+
+async def test_external_schema_reference_never_uses_network(remote, monkeypatch):
+    import urllib.request
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Schema validation attempted network access")
+
+    monkeypatch.setattr(urllib.request, "urlopen", forbidden)
+    remote._catalog = (descriptor(inputSchema={"$ref": "https://example.test/schema"}),)
+    with pytest.raises(RemoteToolError, match="remote schema"):
+        await remote.call("example_read", {}, call_identity="a")

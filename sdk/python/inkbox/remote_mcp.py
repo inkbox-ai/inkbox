@@ -16,7 +16,9 @@ from uuid import uuid4
 
 import httpx
 from collections.abc import Callable
-from jsonschema import Draft202012Validator, SchemaError
+from jsonschema import Draft202012Validator, SchemaError, ValidationError
+from referencing import Registry
+from referencing.exceptions import Unresolvable
 
 PROTOCOL_VERSION = "2026-07-28"
 MAX_MESSAGE_BYTES = 1_000_000
@@ -303,7 +305,8 @@ class RemoteMcp:
         before_submit: Callable[[], None] | None = None,
         journal_path: Path | None = None,
     ) -> dict:
-        if not any(row["name"] == name for row in self._catalog):
+        descriptor = next((row for row in self._catalog if row["name"] == name), None)
+        if descriptor is None:
             raise RemoteToolError("The tool is unavailable in this catalog generation")
         if not isinstance(call_identity, str) or not 1 <= len(call_identity) <= 1024:
             raise ValueError("A stable tool-call identity is required")
@@ -315,6 +318,12 @@ class RemoteMcp:
                 "Tool arguments exceed the size limit; stage files separately"
             )
         arguments = json.loads(_json(arguments))
+        try:
+            Draft202012Validator(
+                descriptor["inputSchema"], registry=Registry()
+            ).validate(arguments)
+        except (ValidationError, Unresolvable):
+            raise RemoteToolError("Tool arguments do not match the remote schema") from None
         journal = (
             self.journal
             if journal_path is None
