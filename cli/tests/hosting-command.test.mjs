@@ -10,6 +10,18 @@ import { fileURLToPath } from "node:url";
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2, default_model: "gpt-6-luna"};
 
+test("provider harness configuration retains the saved key and rejects funded provider models", async () => {
+  await withApi(async (run, requests) => {
+    for (const [harness, model] of [["claude_code","claude-sonnet-5-5"],["deepseek","deepseek-v4-pro"],["opencode","claude-fable-5-2"],["openclaw","deepseek-flash"]]) {
+      const result = await run(["configure","example","--expected-generation","0","--harness",harness,"--default-model",model,"--model-key","saved-key"]);
+      assert.ifError(result.error);
+      assert.deepEqual(requests.at(-1).body, {expected_generation:0,harness,default_model:model,credential_binding_id:"saved-key"});
+    }
+    assert.ok((await run(["configure","example","--expected-generation","0","--default-model","claude-sonnet-5-5","--credits"])).error);
+    assert.equal(requests.length,4);
+  });
+});
+
 async function withApi(action, response = () => config) {
   const requests = [];
   const server = http.createServer(async (req, res) => {

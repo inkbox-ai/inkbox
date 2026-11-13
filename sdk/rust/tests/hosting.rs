@@ -2,6 +2,87 @@ use inkbox::identities::{HostingUpdate, Unset};
 use serde_json::json;
 
 #[test]
+fn provider_capabilities_and_keys_preserve_provider_and_retry_identity() {
+    use httpmock::prelude::*;
+    use inkbox::computers::{ComputerHarness, HostingAdmission, ModelKeyInput, ModelProvider};
+    let server = MockServer::start();
+    let capability = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/computers/hosting/capabilities");
+        then.status(200).json_body(
+            serde_json::from_str::<serde_json::Value>(include_str!(
+                "../../../contracts/hosting-capabilities.json"
+            ))
+            .unwrap(),
+        );
+    });
+    let admission = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/computers/hosting/admission").json_body(json!({"harness":"claude_code","shape_id":"v1-cpu2-ram8gb","credential_binding_id":"key","default_model":"claude-sonnet-5-5"}));
+        then.status(200).json_body(json!({"allowed":true}));
+    });
+    let create = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/computers/secret-bindings").header("Idempotency-Key","create-once")
+            .json_body(json!({"provider":"anthropic","name":"Example","api_key":"synthetic-provider-key"}));
+        then.status(201).json_body(json!({"id":"key","provider":"anthropic","name":"Example","display_suffix":"-key","version":1,"revoked":false}));
+    });
+    let rotate = server.mock(|when, then| {
+        when.method(PUT).path("/api/v1/computers/secret-bindings/key").json_body(json!({"provider":"anthropic","name":"Example","api_key":"synthetic-provider-key","expected_version":1}));
+        then.status(200).json_body(json!({"id":"key","version":2,"revoked":false}));
+    });
+    let revoke = server.mock(|when, then| {
+        when.method(DELETE)
+            .path("/api/v1/computers/secret-bindings/key");
+        then.status(200)
+            .json_body(json!({"id":"key","version":3,"revoked":true}));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let catalog = client.computers().hosting_capabilities().unwrap();
+    assert!(matches!(
+        catalog.items[0].harness,
+        ComputerHarness::ClaudeCode
+    ));
+    assert!(!catalog.items[1].available);
+    assert!(client
+        .computers()
+        .hosting_admission(&HostingAdmission {
+            harness: ComputerHarness::ClaudeCode,
+            tier: None,
+            shape_id: Some("v1-cpu2-ram8gb".into()),
+            credential_binding_id: Some("key".into()),
+            default_model: Some("claude-sonnet-5-5".into())
+        })
+        .unwrap());
+    let input = ModelKeyInput {
+        provider: ModelProvider::Anthropic,
+        name: "Example".into(),
+        api_key: "synthetic-provider-key".into(),
+    };
+    assert!(matches!(
+        client
+            .computers()
+            .create_model_key(&input, "create-once")
+            .unwrap()
+            .provider,
+        ModelProvider::Anthropic
+    ));
+    assert_eq!(
+        client
+            .computers()
+            .rotate_model_key("key", &input, 1)
+            .unwrap()
+            .version,
+        2
+    );
+    assert!(client.computers().revoke_model_key("key").unwrap().revoked);
+    for request in [capability, admission, create, rotate, revoke] {
+        request.assert_hits(1);
+    }
+}
+
+#[test]
 fn shapes_keep_version_numeric_allocations_and_unavailable_choices() {
     use httpmock::prelude::*;
     let server = MockServer::start();

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "items": [
+    {"harness": "claude_code", "available": true, "shape_ids": ["v1-cpu2-ram8gb"], "providers": [{"id": "anthropic", "models": ["claude-sonnet-5-5"], "funding": ["organization_key"]}]},
+    {"harness": "deepseek", "available": false, "shape_ids": [], "providers": []},
+    {"harness": "opencode", "available": true, "shape_ids": ["v1-cpu1-ram4gb"], "providers": [{"id": "openai", "models": ["gpt-6.1-terra"], "funding": ["organization_key", "inkbox_credits"]}]},
+    {"harness": "openclaw", "available": false, "shape_ids": [], "providers": []}
+  ]
+}

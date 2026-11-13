@@ -13,4 +13,8 @@ export function registerComputersCommands(program: Command): void {
     .action(withErrorHandler(async function (this: Command) {
       output(await createClient(getGlobalOpts(this)).computers.shapes() as unknown as Record<string, unknown>, { json: true });
     }));
+  computers.command("capabilities").description("Read qualified harness, shape, provider and funding choices")
+    .action(withErrorHandler(async function (this: Command) {
+      output(await createClient(getGlobalOpts(this)).computers.hostingCapabilities() as unknown as Record<string, unknown>, { json: true });
+    }));
 }

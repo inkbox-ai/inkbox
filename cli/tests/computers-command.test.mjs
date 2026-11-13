@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const wire = JSON.parse(readFileSync(new URL("../../contracts/computer-templates.json", import.meta.url), "utf8"));
-for (const command of ["templates", "shapes"]) test(`computers ${command} reads the catalog without mutating`, async () => {
-  const payload = command === "templates" ? wire : JSON.parse(readFileSync(new URL("../../contracts/computer-shapes.json", import.meta.url), "utf8"));
+for (const command of ["templates", "shapes", "capabilities"]) test(`computers ${command} reads the catalog without mutating`, async () => {
+  const payload = command === "templates" ? wire : JSON.parse(readFileSync(new URL(`../../contracts/${command === "shapes" ? "computer-shapes" : "hosting-capabilities"}.json`, import.meta.url), "utf8"));
   const requests = [];
   const server = http.createServer((req, res) => {
     requests.push([req.method, req.url]);
@@ -22,7 +22,7 @@ for (const command of ["templates", "shapes"]) test(`computers ${command} reads 
       {timeout: 15000, env: {...process.env, NODE_USE_ENV_PROXY: "0"}},
       (error, stdout) => error ? reject(error) : resolve(stdout)));
     assert.deepEqual(JSON.parse(stdout), payload);
-    assert.deepEqual(requests, [["GET", `/api/v1/computers/${command}`]]);
+    assert.deepEqual(requests, [["GET", `/api/v1/computers/${command === "capabilities" ? "hosting/capabilities" : command}`]]);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

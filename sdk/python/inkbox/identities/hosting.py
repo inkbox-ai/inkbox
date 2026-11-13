@@ -3,6 +3,14 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict, NotRequired
 
 
+HostingHarness = Literal['codex', 'hermes', 'claude_code', 'opencode', 'deepseek', 'openclaw']
+HostingModel = Literal[
+    'gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra',
+    'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2',
+    'deepseek-flash', 'deepseek-v4-pro',
+]
+
+
 class HostingUpdate(TypedDict):
     """Partial command: omit to preserve; enabled defaults to activate/retry.
 
@@ -13,8 +21,8 @@ class HostingUpdate(TypedDict):
 
     expected_generation: int
     enabled: NotRequired[bool]
-    harness: NotRequired[Literal['codex', 'hermes']]
-    default_model: NotRequired[Literal['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra']]
+    harness: NotRequired[HostingHarness]
+    default_model: NotRequired[HostingModel]
     tier: NotRequired[Literal['medium']]
     shape_id: NotRequired[str]
     instructions: NotRequired[str]

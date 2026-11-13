@@ -10,6 +10,126 @@ from inkbox import remote_mcp as module
 from inkbox.remote_mcp import PROTOCOL_VERSION, RemoteMcp, RemoteToolError
 
 
+def test_terminal_reply_receipts_survive_reopen_and_refuse_uncertain_replacement(
+    remote,
+):
+    journal = remote.terminal_replies()
+    source, arguments = "a" * 64, "b" * 64
+    assert journal.reserve(source, "reply-1", arguments)["submitted"] is False
+    journal.reject(source, "reply-1")
+    assert journal.reserve(source, "reply-2", arguments)["state"] == "pending"
+    journal.mark_submitted(source, "reply-2")
+    reopened = remote.terminal_replies()
+    assert reopened.lookup(source)["submitted"] is True
+    with pytest.raises(RemoteToolError, match="cannot be discarded"):
+        reopened.reject(source, "reply-2")
+    with pytest.raises(RemoteToolError, match="reconcile"):
+        reopened.reserve(source, "reply-3", arguments)
+    with pytest.raises(RemoteToolError, match="reconcile"):
+        reopened.reserve(source, "reply-2", "c" * 64)
+    reopened.accept(source, "reply-2", "accepted-message")
+    reopened.accept(source, "reply-2", "accepted-message")
+    with pytest.raises(RemoteToolError, match="does not match"):
+        reopened.accept(source, "reply-2", "different-message")
+    assert (
+        reopened.reserve(source, "reply-3", "c" * 64)["accepted_id"]
+        == "accepted-message"
+    )
+    assert "message body" not in reopened.path.read_bytes().decode(errors="replace")
+
+
+async def test_terminal_reply_claims_are_atomic_scoped_and_bounded(remote, monkeypatch):
+    journal = remote.terminal_replies()
+    source = "a" * 64
+
+    async def reserve(operation):
+        return await asyncio.to_thread(journal.reserve, source, operation, "b" * 64)
+
+    results = await asyncio.gather(
+        reserve("one"), reserve("two"), return_exceptions=True
+    )
+    assert sum(isinstance(result, RemoteToolError) for result in results) == 1
+    assert (
+        module.TerminalReplyJournal(journal.path, "other-identity").lookup(source)
+        is None
+    )
+    monkeypatch.setattr(module, "MAX_CALLS", 1)
+    with pytest.raises(RemoteToolError, match="full"):
+        journal.reserve("c" * 64, "three", "b" * 64)
+    with pytest.raises(ValueError, match="source hash"):
+        journal.reserve("not-a-hash", "operation", "b" * 64)
+    with pytest.raises(ValueError, match="argument hash"):
+        journal.reserve(source, "operation", "message body")
+
+
+async def test_submission_fence_runs_only_for_persisted_write_continuations(
+    remote, monkeypatch
+):
+    remote._catalog = (descriptor("example_write"),)
+    journal = remote.terminal_replies()
+    source = "a" * 64
+    journal.reserve(source, "reply", "b" * 64)
+    calls = []
+
+    async def request(method, params, **kwargs):
+        calls.append(dict(params))
+        if "requestState" not in params:
+            assert journal.lookup(source)["submitted"] is False
+            return {"resultType": "input_required", "requestState": "prepared"}
+        assert journal.lookup(source)["submitted"] is True
+        raise RemoteToolError("Outcome unknown")
+
+    monkeypatch.setattr(remote, "request", request)
+    with pytest.raises(RemoteToolError, match="Outcome unknown"):
+        await remote.call(
+            "example_write",
+            {},
+            call_identity="reply",
+            before_submit=lambda: journal.mark_submitted(source, "reply"),
+        )
+    assert len(calls) == 2
+    with pytest.raises(RemoteToolError, match="cannot be discarded"):
+        journal.reject(source, "reply")
+    submissions = []
+
+    async def reconciled(method, params, **kwargs):
+        assert params["requestState"] == "prepared"
+        return {"content": []}
+
+    monkeypatch.setattr(remote, "request", reconciled)
+    await remote.call(
+        "example_write",
+        {},
+        call_identity="reply",
+        before_submit=lambda: submissions.append("retry"),
+    )
+    assert submissions == ["retry"]
+    journal.accept(source, "reply", "accepted-id")
+
+
+async def test_definite_preparation_rejection_does_not_consume_terminal_reply(
+    remote, monkeypatch
+):
+    remote._catalog = (descriptor("example_write"),)
+    journal = remote.terminal_replies()
+    source = "a" * 64
+    journal.reserve(source, "reply", "b" * 64)
+
+    async def request(method, params, **kwargs):
+        raise RemoteToolError("Preparation rejected")
+
+    monkeypatch.setattr(remote, "request", request)
+    with pytest.raises(RemoteToolError, match="Preparation rejected"):
+        await remote.call(
+            "example_write",
+            {},
+            call_identity="reply",
+            before_submit=lambda: journal.mark_submitted(source, "reply"),
+        )
+    journal.reject(source, "reply")
+    assert journal.lookup(source)["state"] == "rejected"
+
+
 def descriptor(name="example_read", **updates):
     return {
         "name": name,

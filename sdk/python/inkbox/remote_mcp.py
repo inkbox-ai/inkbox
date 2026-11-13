@@ -300,6 +300,7 @@ class RemoteMcp:
         *,
         call_identity: str,
         before_execute: Callable[[], None] | None = None,
+        before_submit: Callable[[], None] | None = None,
         journal_path: Path | None = None,
     ) -> dict:
         if not any(row["name"] == name for row in self._catalog):
@@ -324,6 +325,8 @@ class RemoteMcp:
             params["requestState"] = state
         if before_execute is not None:
             before_execute()
+        if state is not None and before_submit is not None:
+            before_submit()
         result = await self.request("tools/call", params)
         if result.get("resultType") == "input_required":
             if set(result) != {"resultType", "requestState"}:
@@ -340,9 +343,126 @@ class RemoteMcp:
             state = journal.bind(identifier, next_state)
             if before_execute is not None:
                 before_execute()
+            if before_submit is not None:
+                before_submit()
             result = await self.request("tools/call", {**params, "requestState": state})
             if result.get("resultType") == "input_required":
                 raise RemoteToolError("The tool requires an unsupported interaction")
         if not isinstance(result.get("content"), list):
             raise RemoteToolError("Invalid remote tool result")
         return result
+
+    def terminal_replies(
+        self, *, journal_path: Path | None = None
+    ) -> TerminalReplyJournal:
+        return TerminalReplyJournal(
+            journal_path or self.journal.path, self.journal.scope
+        )
+
+
+class TerminalReplyJournal(CallJournal):
+    """Source-bound terminal intent; contains hashes and receipts, never messages."""
+
+    def __init__(self, path: Path, scope: str) -> None:
+        super().__init__(path, scope)
+        with self._db() as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS terminal_replies (
+                id TEXT PRIMARY KEY, operation_id TEXT NOT NULL,
+                arguments_hash TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN ('pending','accepted','rejected')),
+                submitted INTEGER NOT NULL DEFAULT 0 CHECK(submitted IN (0,1)),
+                accepted_id TEXT
+            )""")
+
+    def _source(self, source_hash: str) -> str:
+        if not isinstance(source_hash, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", source_hash
+        ):
+            raise ValueError("A source hash is required")
+        return hashlib.sha256(_json([self.scope, source_hash]).encode()).hexdigest()
+
+    @staticmethod
+    def _record(row: tuple) -> dict:
+        return dict(
+            zip(
+                ("operation_id", "arguments_hash", "state", "submitted", "accepted_id"),
+                row,
+            )
+        ) | {"submitted": bool(row[3])}
+
+    def lookup(self, source_hash: str) -> dict | None:
+        with self._db() as db:
+            row = db.execute(
+                "SELECT operation_id, arguments_hash, state, submitted, accepted_id FROM terminal_replies WHERE id=?",
+                (self._source(source_hash),),
+            ).fetchone()
+            return self._record(row) if row else None
+
+    def reserve(self, source_hash: str, operation_id: str, arguments_hash: str) -> dict:
+        identifier = self._source(source_hash)
+        if not isinstance(operation_id, str) or not 1 <= len(operation_id) <= 1024:
+            raise ValueError("A stable reply operation identity is required")
+        if not isinstance(arguments_hash, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", arguments_hash
+        ):
+            raise ValueError("A reply argument hash is required")
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT operation_id, arguments_hash, state, submitted, accepted_id FROM terminal_replies WHERE id=?",
+                (identifier,),
+            ).fetchone()
+            if row and row[2] == "accepted":
+                return self._record(row)
+            if row and row[2] == "pending":
+                if row[:2] != (operation_id, arguments_hash):
+                    raise RemoteToolError(
+                        "A terminal reply is pending; reconcile its original operation"
+                    )
+                return self._record(row)
+            if (
+                row is None
+                and db.execute("SELECT count(*) FROM terminal_replies").fetchone()[0]
+                >= MAX_CALLS
+            ):
+                raise RemoteToolError(
+                    "Terminal reply history is full; inspect it before continuing"
+                )
+            db.execute(
+                "INSERT INTO terminal_replies(id,operation_id,arguments_hash,state) VALUES (?,?,?,'pending') ON CONFLICT(id) DO UPDATE SET operation_id=excluded.operation_id,arguments_hash=excluded.arguments_hash,state='pending',submitted=0,accepted_id=NULL",
+                (identifier, operation_id, arguments_hash),
+            )
+            return self._record((operation_id, arguments_hash, "pending", 0, None))
+
+    def mark_submitted(self, source_hash: str, operation_id: str) -> None:
+        with self._db() as db:
+            updated = db.execute(
+                "UPDATE terminal_replies SET submitted=1 WHERE id=? AND operation_id=? AND state='pending'",
+                (self._source(source_hash), operation_id),
+            )
+            if updated.rowcount != 1:
+                raise RemoteToolError("The terminal reply is no longer pending")
+
+    def reject(self, source_hash: str, operation_id: str) -> None:
+        with self._db() as db:
+            updated = db.execute(
+                "UPDATE terminal_replies SET state='rejected' WHERE id=? AND operation_id=? AND state IN ('pending','rejected') AND submitted=0",
+                (self._source(source_hash), operation_id),
+            )
+            if updated.rowcount != 1:
+                raise RemoteToolError(
+                    "A submitted or accepted terminal reply cannot be discarded"
+                )
+
+    def accept(self, source_hash: str, operation_id: str, accepted_id: str) -> None:
+        if not isinstance(accepted_id, str) or not 1 <= len(accepted_id) <= 512:
+            raise ValueError("A reply acceptance receipt is required")
+        with self._db() as db:
+            updated = db.execute(
+                "UPDATE terminal_replies SET state='accepted',accepted_id=? WHERE id=? AND operation_id=? AND submitted=1 AND (state='pending' OR (state='accepted' AND accepted_id=?))",
+                (accepted_id, self._source(source_hash), operation_id, accepted_id),
+            )
+            if updated.rowcount != 1:
+                raise RemoteToolError(
+                    "The terminal reply receipt does not match its pending operation"
+                )

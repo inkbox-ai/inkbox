@@ -1,4 +1,5 @@
-export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra";
+export type HostingHarness = "codex" | "hermes" | "claude_code" | "opencode" | "deepseek" | "openclaw";
+export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra" | "claude-haiku-5-5" | "claude-sonnet-5-5" | "claude-opus-5-5" | "claude-fable-5-2" | "deepseek-flash" | "deepseek-v4-pro";
 
 /** Generation-checked partial command: omitted settings stay unchanged.
  * enabled defaults to true (activate/retry); false removes hosting.
@@ -8,7 +9,7 @@ export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt
 export interface HostingUpdate {
   expectedGeneration: number;
   enabled?: boolean;
-  harness?: "codex" | "hermes";
+  harness?: HostingHarness;
   /** Default for turns and scheduled work that do not override the model. */
   defaultModel?: HostingModel;
   tier?: "medium";
