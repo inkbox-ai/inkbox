@@ -21,6 +21,7 @@ from inkbox.exceptions import (
     DuplicateContactRuleError,
     InkboxAPIError,
     IdempotencyKeyReusedError,
+    WhatsAppAwaitingInboundError,
     MailImportQuotaExceededError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
@@ -406,6 +407,18 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and raw_detail.get("error") == "idempotency_key_reused"
     ):
         error = IdempotencyKeyReusedError(
+            status_code=resp.status_code,
+            detail=raw_detail,
+        )
+        error.agent_support = agent_support
+        raise error
+
+    if (
+        resp.status_code == 409
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "whatsapp_awaiting_inbound"
+    ):
+        error = WhatsAppAwaitingInboundError(
             status_code=resp.status_code,
             detail=raw_detail,
         )

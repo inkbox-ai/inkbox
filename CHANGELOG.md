@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.38
+
+### Added
+- WhatsApp shared numbers in Python, TypeScript, and Rust: `connect`, `disconnect`, `list_connections` / `listConnections`, and `get_router` / `getRouter`. Connecting reserves an organization shared number for one recipient and sends nothing; connect and disconnect take an idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request.
+- CLI: `inkbox whatsapp connect`, `disconnect`, `connections`, and `router`.
+- WhatsApp media uploads accept an optional recipient number, required when replying through a shared number (`recipient_number`, `recipientNumber`, Rust `upload_media_for_recipient`, CLI `upload-media --recipient`).
+- `WhatsAppAwaitingInboundError` (Python, TypeScript) and `InkboxError::is_whatsapp_awaiting_inbound` (Rust) identify `409 whatsapp_awaiting_inbound`.
+
+### Documentation
+- WhatsApp never starts a conversation by default: agents reply after the recipient messages first. Shared numbers never start conversations; dedicated numbers can only with approval for your organization.
+- Dedicated WhatsApp numbers do not require an iMessage number and may use a different number.
+
 ## 0.7.37
 
 ### Added

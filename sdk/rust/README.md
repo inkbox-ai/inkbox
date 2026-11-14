@@ -1342,8 +1342,12 @@ let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
 # Ok(()) }
 ```
 
-Available by approval on the same number as an existing dedicated personal
-iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with approval for your organization. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound` (check `error.is_whatsapp_awaiting_inbound()`). Dedicated numbers are
+available by approval; a dedicated number can match an iMessage number or be
+different, and an iMessage number is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
@@ -1389,6 +1393,46 @@ A `409 whatsapp_group_reply_required` means the current WhatsApp connection has 
 qualifying incoming group message, including after a connection replacement.
 Wait for an allowed message from another participant. Do not retry with a new
 idempotency key or fall back to a direct message.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; the agent can reply after the recipient messages the returned
+number. Connect and disconnect require an admin-scoped API key and an
+idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let result = client
+    .whatsapp()
+    .connect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
+println!("{}", result.number); // give this number to the recipient; nothing was sent
+let connections = client.whatsapp().list_connections(Some(&identity.id()))?;
+client
+    .whatsapp()
+    .disconnect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
+let router = client.whatsapp().get_router()?;
+# Ok(()) }
+```
+
+Use `upload_media_for_recipient` / `upload_whatsapp_media_for_recipient` when
+replying through a shared number.
+
+Shared-number errors: replying before the recipient's first message returns
+`409 whatsapp_awaiting_inbound`; sending through a shared number to a recipient
+the agent is not connected to returns `403 whatsapp_access_required`. Connect can
+also return `409 whatsapp_identity_has_dedicated_number`, `409 whatsapp_pool_unavailable`,
+`409 whatsapp_connection_busy` (retry with the same key), or
+`403 whatsapp_contact_not_allowed`. Key errors on connect and disconnect:
+`422 invalid_idempotency_key`; `409 idempotency_key_reused` (the key was used for a
+different request); `409 idempotency_in_progress` (the original request is still
+running; retry with the same key); and `409 result_unavailable` (the stored result
+expired; check `connections` before acting again with a new key).
+
 ## Conversation participant filters
 
 Conversation filtering matches **any** supplied email address or E.164 phone

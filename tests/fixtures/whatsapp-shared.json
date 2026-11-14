@@ -1,0 +1,44 @@
+{
+  "identity_id": "10000000-0000-4000-8000-000000000001",
+  "recipient_number": "+15555550101",
+  "connection": {
+    "id": "70000000-0000-4000-8000-000000000007",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "recipient_number": "+15555550101",
+    "number": "+15555550190",
+    "number_type": "dedicated_shared",
+    "created_at": "2026-10-01T12:00:00Z",
+    "last_activity_at": "2026-10-01T12:05:00Z"
+  },
+  "connect": {
+    "connection": {
+      "id": "70000000-0000-4000-8000-000000000007",
+      "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+      "recipient_number": "+15555550101",
+      "number": "+15555550190",
+      "number_type": "dedicated_shared",
+      "created_at": "2026-10-01T12:00:00Z",
+      "last_activity_at": "2026-10-01T12:05:00Z"
+    },
+    "number": "+15555550190",
+    "already_connected": false,
+    "awaiting_inbound": true
+  },
+  "disconnect": {
+    "connection_id": "70000000-0000-4000-8000-000000000007",
+    "disconnected": true
+  },
+  "already_disconnected": {
+    "connection_id": null,
+    "disconnected": true
+  },
+  "router": {
+    "number": "+15555550180",
+    "number_type": "dedicated_triage"
+  },
+  "awaiting_inbound_error": {
+    "error": "whatsapp_awaiting_inbound",
+    "message": "This recipient has not messaged this WhatsApp number yet. You can reply once they send a message.",
+    "retry_condition": "recipient_message"
+  }
+}

@@ -237,13 +237,15 @@ class AgentIdentity:
         )
 
     def upload_whatsapp_media(
-        self, *, content: bytes, filename: str, content_type: str | None = None
+        self, *, content: bytes, filename: str, content_type: str | None = None,
+        recipient_number: str | None = None,
     ) -> WhatsAppMedia:
         return self._inkbox.whatsapp.upload_media(
             content=content,
             filename=filename,
             content_type=content_type,
             agent_identity_id=self.id,
+            recipient_number=recipient_number,
         )
 
     def get_whatsapp_media(self, media_id: UUID | str) -> WhatsAppMedia:

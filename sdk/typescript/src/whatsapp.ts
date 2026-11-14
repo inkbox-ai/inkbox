@@ -1,6 +1,6 @@
 import { conversationFilterParams } from "./_conversationFilters.js";
 import type { SenderAccess } from "./sender_access.js";
-/** Approved WhatsApp conversations, quoted replies, reactions, and owned media. */
+/** WhatsApp conversations, shared-number connections, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
 import { messageKey, postMessage } from "./message_sends.js";
 export type WhatsAppDirection = "inbound" | "outbound";
@@ -41,7 +41,7 @@ export interface WhatsAppReactionOptions {
 const reactionTypes = new Set(["love", "like", "dislike", "laugh", "emphasize", "question", "eyes"]);
 const validUuid = (value: string) => /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
 const validPhone = (value: string) => /^\+[1-9][0-9]{6,14}$/.test(value);
-function reactionKey(value: string): Record<string, string> {
+function requiredKey(value: string): Record<string, string> {
   if (typeof value !== "string" || !value.trim() || value.length > 255) throw new Error("A stable idempotencyKey is required");
   return { "Idempotency-Key": value };
 }
@@ -50,6 +50,42 @@ function reactionBody(o: WhatsAppReactionOptions): Record<string, string> {
   if (o.reaction != null && !reactionTypes.has(o.reaction)) throw new Error("Unsupported WhatsApp reaction");
   if (o.customEmoji != null && (!o.customEmoji || Array.from(o.customEmoji).length > 32 || /[\s\p{Cc}\p{Cs}]/u.test(o.customEmoji))) throw new Error("customEmoji must contain 1–32 non-whitespace characters");
   return { message_id: o.messageId, ...(o.reaction != null ? { reaction: o.reaction } : { custom_emoji: o.customEmoji! }) };
+}
+/** An agent's current route to one recipient through a shared WhatsApp number. */
+export interface WhatsAppConnection {
+  id: string; agentIdentityId: string; recipientNumber: string; number: string;
+  numberType: "dedicated_shared" | "shared_inbound" | (string & {}); createdAt: Date; lastActivityAt: Date;
+}
+export interface RawWhatsAppConnection {
+  id: string; agent_identity_id: string; recipient_number: string; number: string;
+  number_type: string; created_at: string; last_activity_at: string;
+}
+export function parseWhatsAppConnection(r: RawWhatsAppConnection): WhatsAppConnection {
+  return { id: r.id, agentIdentityId: r.agent_identity_id, recipientNumber: r.recipient_number, number: r.number,
+    numberType: r.number_type, createdAt: new Date(r.created_at), lastActivityAt: new Date(r.last_activity_at) };
+}
+/**
+ * A shared-number connection and the number the recipient should message first.
+ * Connecting sends nothing; `awaitingInbound` stays true until the recipient
+ * messages `number`, and replies are rejected until then.
+ */
+export interface WhatsAppConnectResult {
+  connection: WhatsAppConnection; number: string; alreadyConnected: boolean; awaitingInbound: boolean;
+}
+export interface RawWhatsAppConnectResult {
+  connection: RawWhatsAppConnection; number: string; already_connected: boolean; awaiting_inbound: boolean;
+}
+/** The released connection ID, or null when the pair was already disconnected. */
+export interface WhatsAppDisconnectResult { connectionId: string | null; disconnected: boolean; }
+export interface RawWhatsAppDisconnectResult { connection_id?: string | null; disconnected?: boolean; }
+/** The router number people message to reach an organization's agents. */
+export interface WhatsAppRouter { number: string; numberType: "triage" | "dedicated_triage" | (string & {}); }
+export interface RawWhatsAppRouter { number: string; number_type: string; }
+export interface WhatsAppConnectOptions { agentIdentityId: string; recipientNumber: string; idempotencyKey: string; }
+function connectionBody(o: WhatsAppConnectOptions): Record<string, string> {
+  if (!validUuid(o.agentIdentityId)) throw new Error("agentIdentityId must be a UUID");
+  if (typeof o.recipientNumber !== "string" || !validPhone(o.recipientNumber)) throw new Error("Provide one E.164 recipientNumber");
+  return { agent_identity_id: o.agentIdentityId, recipient_number: o.recipientNumber };
 }
 export type WhatsAppMediaStatus = "pending" | "ready" | "unavailable";
 export interface WhatsAppMedia {
@@ -417,9 +453,19 @@ export function parseWhatsAppLimits(row: RawWhatsAppLimits): WhatsAppLimits {
     usage: { ...row.usage },
   };
 }
+/**
+ * WhatsApp on dedicated and shared numbers. WhatsApp never starts a conversation
+ * by default: an agent replies after the recipient messages first. Shared numbers
+ * never start conversations; dedicated numbers can only with approval for
+ * your organization. Otherwise sends throw `WhatsAppAwaitingInboundError`.
+ */
 export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
-  /** Queue one message. Reuse its key and owned media IDs after uncertainty. */
+  /**
+   * Queue one message. Reuse its key and owned media IDs after uncertainty.
+   * @throws {WhatsAppAwaitingInboundError} 409 until the recipient messages this number.
+   * @throws {InkboxAPIError} 403 `whatsapp_access_required` when replying through a shared number to an unconnected recipient.
+   */
   async send(o: WhatsAppSendOptions): Promise<WhatsAppMessage> {
     if (o.gifPlayback !== undefined && typeof o.gifPlayback !== "boolean")
       throw new Error("gifPlayback must be a boolean");
@@ -538,7 +584,7 @@ export class WhatsAppResource {
   }
   /** The receipt may be queued or uncertain; only applied reactions are live. */
   async sendReaction(o: WhatsAppReactionOptions): Promise<WhatsAppReaction> {
-    const body = reactionBody(o), headers = reactionKey(o.idempotencyKey);
+    const body = reactionBody(o), headers = requiredKey(o.idempotencyKey);
     const result = await this.http.post<{ reaction: RawWhatsAppReaction }>("/reactions", body, { params: owner(o.agentIdentityId), headers });
     return parseWhatsAppReaction(result.reaction);
   }
@@ -548,7 +594,7 @@ export class WhatsAppResource {
   }
   /** Replay a removal with its original key; a superseded receipt removes nothing newer. */
   async removeReaction(id: string, o: { idempotencyKey: string; agentIdentityId?: string }): Promise<WhatsAppReaction> {
-    const result = await this.http.deleteWithResponse<{ reaction: RawWhatsAppReaction }>(`/reactions/${encodeURIComponent(id)}`, { params: owner(o.agentIdentityId), headers: reactionKey(o.idempotencyKey) });
+    const result = await this.http.deleteWithResponse<{ reaction: RawWhatsAppReaction }>(`/reactions/${encodeURIComponent(id)}`, { params: owner(o.agentIdentityId), headers: requiredKey(o.idempotencyKey) });
     return parseWhatsAppReaction(result.reaction);
   }
   async uploadMedia(o: {
@@ -556,11 +602,15 @@ export class WhatsAppResource {
     filename: string;
     contentType?: string;
     agentIdentityId?: string;
+    /** Required when the agent replies through a shared number. */
+    recipientNumber?: string;
   }): Promise<WhatsAppMedia> {
     const size =
       o.content instanceof Blob ? o.content.size : o.content.byteLength;
     if (size > 20 * 1024 * 1024)
       throw new Error("WhatsApp media must be at most 20 MiB");
+    if (o.recipientNumber !== undefined && (typeof o.recipientNumber !== "string" || !validPhone(o.recipientNumber)))
+      throw new Error("Provide one E.164 recipientNumber");
     const row = await this.http.postMultipart<RawWhatsAppMedia>(
       "/media",
       {
@@ -571,7 +621,7 @@ export class WhatsAppResource {
           : o.content,
         contentType: o.contentType ?? "application/octet-stream",
       },
-      { params: owner(o.agentIdentityId) },
+      { params: { ...owner(o.agentIdentityId), ...(o.recipientNumber !== undefined ? { recipient_number: o.recipientNumber } : {}) } },
     );
     return parseWhatsAppMedia(row);
   }
@@ -603,6 +653,39 @@ export class WhatsAppResource {
         { params: owner(o.agentIdentityId) },
       ),
     );
+  }
+  /**
+   * Reserve one of the organization's shared numbers for a recipient. Nothing is
+   * sent; the agent can reply after the recipient messages the returned number.
+   * Requires an admin-scoped API key. Use a new key (for example
+   * `crypto.randomUUID()`) for each new connect or disconnect; reuse a key only
+   * to retry that same request, because a reused key replays the earlier result.
+   * @throws {IdempotencyKeyReusedError} 409 when the key was used for a different request.
+   * @throws {InkboxAPIError} 409 `whatsapp_identity_has_dedicated_number`, `whatsapp_pool_unavailable`,
+   * `whatsapp_connection_busy` or `idempotency_in_progress` (retry with the same key), `result_unavailable`
+   * (check `listConnections` first); 403 `whatsapp_contact_not_allowed`; 422 `invalid_idempotency_key`.
+   */
+  async connect(o: WhatsAppConnectOptions): Promise<WhatsAppConnectResult> {
+    const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
+    const r = await this.http.post<RawWhatsAppConnectResult>("/connect", body, { headers });
+    return { connection: parseWhatsAppConnection(r.connection), number: r.number,
+      alreadyConnected: r.already_connected, awaitingInbound: r.awaiting_inbound };
+  }
+  /** Release an agent's shared-number connection; history is kept. Use a new key per disconnect; key errors match `connect`. */
+  async disconnect(o: WhatsAppConnectOptions): Promise<WhatsAppDisconnectResult> {
+    const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
+    const r = await this.http.post<RawWhatsAppDisconnectResult>("/disconnect", body, { headers });
+    return { connectionId: r.connection_id ?? null, disconnected: r.disconnected ?? true };
+  }
+  /** List an agent's current shared-number connections. */
+  async listConnections(o: { agentIdentityId?: string } = {}): Promise<WhatsAppConnection[]> {
+    const r = await this.http.get<{ items: RawWhatsAppConnection[] }>("/connections", owner(o.agentIdentityId));
+    return r.items.map(parseWhatsAppConnection);
+  }
+  /** The router number people message to connect with the organization's agents; 404 when none is active. */
+  async getRouter(): Promise<WhatsAppRouter> {
+    const r = await this.http.get<RawWhatsAppRouter>("/router");
+    return { number: r.number, numberType: r.number_type };
   }
   /** Read a link and QR for messaging the agent, without sending or enabling WhatsApp. */
   async getOnboarding(o: { agentIdentityId?: string } = {}): Promise<WhatsAppOnboarding> {
