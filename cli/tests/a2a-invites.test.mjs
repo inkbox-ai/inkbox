@@ -277,6 +277,56 @@ test("signup warns when a server does not confirm the supplied invitation", asyn
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret));
 });
 
+test("signup verify, resend-verification, and status honor INKBOX_BASE_URL", async (t) => {
+  const requests = [];
+  const baseUrl = await withServer(t, async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    requests.push({ method: request.method, url: request.url, body });
+    response.setHeader("Content-Type", "application/json");
+    if (request.url === "/api/v1/agent-signup/verify") {
+      response.end(JSON.stringify({
+        claim_status: "agent_claimed",
+        organization_id: "org_2",
+        message: "Verified.",
+      }));
+    } else if (request.url === "/api/v1/agent-signup/resend-verification") {
+      response.end(JSON.stringify({
+        claim_status: "agent_unclaimed",
+        human_email: "person@example.test",
+        message: "Verification email resent.",
+      }));
+    } else {
+      response.end(JSON.stringify({
+        claim_status: "agent_unclaimed",
+        human_state: "pending_verification",
+        human_email: "person@example.test",
+        restrictions: {
+          max_sends_per_day: 5,
+          allowed_recipients: ["person@example.test"],
+          can_receive: true,
+          can_create_mailboxes: false,
+        },
+      }));
+    }
+  });
+  const env = {
+    ...process.env,
+    INKBOX_API_KEY: "ApiKey_agent",
+    INKBOX_BASE_URL: baseUrl,
+    NODE_USE_ENV_PROXY: "0",
+  };
+  await execFileAsync(process.execPath, [cli, "--json", "signup", "verify", "--code", "123456"], { env });
+  await execFileAsync(process.execPath, [cli, "--json", "signup", "resend-verification"], { env });
+  await execFileAsync(process.execPath, [cli, "--json", "signup", "status"], { env });
+
+  assert.equal(requests.length, 3);
+  assert.equal(requests[0].url, "/api/v1/agent-signup/verify");
+  assert.deepEqual(JSON.parse(requests[0].body), { verification_code: "123456" });
+  assert.equal(requests[1].url, "/api/v1/agent-signup/resend-verification");
+  assert.equal(requests[2].url, "/api/v1/agent-signup/status");
+});
+
 async function withServer(t, handler) {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
