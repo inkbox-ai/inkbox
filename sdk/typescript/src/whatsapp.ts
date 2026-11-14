@@ -456,14 +456,15 @@ export function parseWhatsAppLimits(row: RawWhatsAppLimits): WhatsAppLimits {
 /**
  * WhatsApp on dedicated and shared numbers. WhatsApp never starts a conversation
  * by default: an agent replies after the recipient messages first. Shared numbers
- * never start conversations; dedicated numbers can only with an approved account
- * setting. Otherwise sends throw `WhatsAppAwaitingInboundError`.
+ * never start conversations; dedicated numbers can only with approval for
+ * your organization. Otherwise sends throw `WhatsAppAwaitingInboundError`.
  */
 export class WhatsAppResource {
   constructor(private readonly http: HttpTransport) {}
   /**
    * Queue one message. Reuse its key and owned media IDs after uncertainty.
    * @throws {WhatsAppAwaitingInboundError} 409 until the recipient messages this number.
+   * @throws {InkboxAPIError} 403 `whatsapp_access_required` when replying through a shared number to an unconnected recipient.
    */
   async send(o: WhatsAppSendOptions): Promise<WhatsAppMessage> {
     if (o.gifPlayback !== undefined && typeof o.gifPlayback !== "boolean")
@@ -656,7 +657,13 @@ export class WhatsAppResource {
   /**
    * Reserve one of the organization's shared numbers for a recipient. Nothing is
    * sent; the agent can reply after the recipient messages the returned number.
-   * Reuse `idempotencyKey` when retrying the same connect. Requires an admin-scoped API key.
+   * Requires an admin-scoped API key. Use a new key (for example
+   * `crypto.randomUUID()`) for each new connect or disconnect; reuse a key only
+   * to retry that same request, because a reused key replays the earlier result.
+   * @throws {IdempotencyKeyReusedError} 409 when the key was used for a different request.
+   * @throws {InkboxAPIError} 409 `whatsapp_identity_has_dedicated_number`, `whatsapp_pool_unavailable`,
+   * `whatsapp_connection_busy` or `idempotency_in_progress` (retry with the same key), `result_unavailable`
+   * (check `listConnections` first); 403 `whatsapp_contact_not_allowed`; 422 `invalid_idempotency_key`.
    */
   async connect(o: WhatsAppConnectOptions): Promise<WhatsAppConnectResult> {
     const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
@@ -664,7 +671,7 @@ export class WhatsAppResource {
     return { connection: parseWhatsAppConnection(r.connection), number: r.number,
       alreadyConnected: r.already_connected, awaitingInbound: r.awaiting_inbound };
   }
-  /** Release an agent's shared-number connection to a recipient; history is kept. */
+  /** Release an agent's shared-number connection; history is kept. Use a new key per disconnect; key errors match `connect`. */
   async disconnect(o: WhatsAppConnectOptions): Promise<WhatsAppDisconnectResult> {
     const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
     const r = await this.http.post<RawWhatsAppDisconnectResult>("/disconnect", body, { headers });

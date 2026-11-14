@@ -104,7 +104,7 @@ export function registerWhatsAppCommands(program: Command): void {
   ] as const) {
     identityCommand(name, `${description} (admin API key only)`)
       .requiredOption("--recipient <number>", "One E.164 recipient")
-      .requiredOption("--idempotency-key <key>", "Stable key; reuse it when retrying")
+      .requiredOption("--idempotency-key <key>", "New UUID for each connect or disconnect; reuse it only to retry that same request")
       .action(withErrorHandler(async function (this: Command, opts) {
         if (!/^\+[1-9][0-9]{6,14}$/.test(opts.recipient)) throw new Error("Provide one E.164 recipient.");
         const global = getGlobalOpts(this), client = createClient(global);

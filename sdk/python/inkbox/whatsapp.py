@@ -434,7 +434,7 @@ class WhatsAppResource:
 
     WhatsApp never starts a conversation by default: an agent replies after the
     recipient messages first. Shared numbers never start conversations; dedicated
-    numbers can only with an approved account setting. Otherwise sends fail with
+    numbers can only with approval for your organization. Otherwise sends fail with
     ``409 whatsapp_awaiting_inbound``.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
@@ -467,6 +467,8 @@ class WhatsAppResource:
         Raises:
             WhatsAppAwaitingInboundError: The recipient has not messaged this
                 number yet; reply after they do.
+            InkboxAPIError: 403 ``whatsapp_access_required`` when replying through
+                a shared number to a recipient the agent is not connected to.
         """
         if not isinstance(gif_playback, bool):
             raise ValueError("gif_playback must be a boolean")
@@ -717,13 +719,20 @@ class WhatsAppResource:
         """Reserve one of the organization's shared numbers for a recipient.
 
         Nothing is sent. Give the recipient the returned ``number``; the agent can
-        reply after they message it. ``idempotency_key`` must be stable across
-        retries of the same logical connect. Requires an admin-scoped API key.
+        reply after they message it. Requires an admin-scoped API key.
+
+        Use a new key (for example ``str(uuid4())``) for each new connect or
+        disconnect; reuse a key only to retry that same request. A reused key
+        replays the earlier result.
 
         Raises:
+            IdempotencyKeyReusedError: The key was used for a different request.
             InkboxAPIError: 409 ``whatsapp_identity_has_dedicated_number``,
-                ``whatsapp_pool_unavailable`` or ``whatsapp_connection_busy``
-                (retry with the same key); 403 ``whatsapp_contact_not_allowed``.
+                ``whatsapp_pool_unavailable``, ``whatsapp_connection_busy`` or
+                ``idempotency_in_progress`` (retry with the same key),
+                ``result_unavailable`` (the stored result expired; check
+                ``list_connections`` first); 403 ``whatsapp_contact_not_allowed``;
+                422 ``invalid_idempotency_key``.
         """
         body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
         data = self._http.post("/connect", json=body, headers=_key_headers(idempotency_key))
@@ -736,7 +745,11 @@ class WhatsAppResource:
         recipient_number: str,
         idempotency_key: str,
     ) -> WhatsAppDisconnectResult:
-        """Release an agent's shared-number connection to a recipient; history is kept."""
+        """Release an agent's shared-number connection to a recipient; history is kept.
+
+        Use a new key for each new disconnect; reuse a key only to retry that
+        same request. Key errors match :meth:`connect`.
+        """
         body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
         data = self._http.post("/disconnect", json=body, headers=_key_headers(idempotency_key))
         return WhatsAppDisconnectResult._from_dict(data)

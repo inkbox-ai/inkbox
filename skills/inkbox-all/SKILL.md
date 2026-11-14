@@ -291,17 +291,17 @@ supported target may still fail after native delivery becomes unavailable; fallb
 does not resend rejected replies. Read queued message status and error fields,
 because delivery webhooks do not cover every failure before dispatch.
 
-## Approved dedicated WhatsApp
+## WhatsApp dedicated and shared numbers
 
 WhatsApp never starts a conversation by default: the agent replies after the
 recipient messages first. Shared numbers never start conversations; dedicated
-numbers can only with an approved account setting. Until the recipient writes,
+numbers can only with approval for your organization. Until the recipient writes,
 sends fail with `409 whatsapp_awaiting_inbound`; wait for their message instead
 of retrying or switching channels. A dedicated WhatsApp number can match the
-agent's iMessage number or be different; an iMessage line is not required.
+agent's iMessage number or be different; an iMessage number is not required.
 For an agent without a dedicated number, the WhatsApp resource's `connect` /
 `inkbox whatsapp connect` reserves an organization shared number for one
-recipient and sends nothing: give the recipient the returned number. Pass the
+recipient and sends nothing: give the recipient the returned number. Connect and disconnect need a fresh UUID idempotency key per action. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. Sending through a shared number to a recipient the agent is not connected to returns `403 whatsapp_access_required`; key errors are `invalid_idempotency_key`, `idempotency_key_reused`, `idempotency_in_progress` (retry with the same key), and `result_unavailable` (check connections first). Pass the
 recipient number when uploading media for a shared-number reply. People can also
 text the router number (`get_router` / `getRouter` / `inkbox whatsapp router`).
 Read fresh WhatsApp channel status;

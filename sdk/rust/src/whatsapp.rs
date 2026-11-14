@@ -3,8 +3,10 @@
 //!
 //! WhatsApp never starts a conversation by default: an agent replies after the
 //! recipient messages first. Shared numbers never start conversations; dedicated
-//! numbers can only with an approved account setting. Otherwise sends fail with
+//! numbers can only with approval for your organization. Otherwise sends fail with
 //! `409 whatsapp_awaiting_inbound` (see [`InkboxError::is_whatsapp_awaiting_inbound`]).
+//! Replying through a shared number to a recipient the agent is not connected to
+//! returns `403 whatsapp_access_required`.
 use crate::{http::HttpTransport, InkboxError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -627,8 +629,16 @@ impl WhatsAppResource {
     /// Reserve one of the organization's shared numbers for a recipient.
     ///
     /// Nothing is sent. Give the recipient the returned `number`; the agent can
-    /// reply after they message it. Reuse `idempotency_key` when retrying the
-    /// same connect. Requires an admin-scoped API key.
+    /// reply after they message it. Requires an admin-scoped API key.
+    ///
+    /// Use a new key (for example `Uuid::new_v4()`) for each new connect or
+    /// disconnect; reuse a key only to retry that same request, because a
+    /// reused key replays the earlier result. Errors include 409
+    /// `whatsapp_identity_has_dedicated_number`, `whatsapp_pool_unavailable`,
+    /// `whatsapp_connection_busy` or `idempotency_in_progress` (retry with the
+    /// same key), [`InkboxError::IdempotencyKeyReused`], 409 `result_unavailable`
+    /// (check [`Self::list_connections`] first), 403 `whatsapp_contact_not_allowed`,
+    /// and 422 `invalid_idempotency_key`.
     pub fn connect(
         &self,
         agent_identity_id: &Uuid,
@@ -643,6 +653,7 @@ impl WhatsAppResource {
         )
     }
     /// Release an agent's shared-number connection to a recipient; history is kept.
+    /// Use a new key for each new disconnect; key errors match [`Self::connect`].
     pub fn disconnect(
         &self,
         agent_identity_id: &Uuid,

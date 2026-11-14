@@ -1453,10 +1453,10 @@ does not enable WhatsApp or send a message.
 
 WhatsApp never starts a conversation by default: an agent replies after the
 recipient messages first. Shared numbers never start conversations; dedicated
-numbers can only with an approved account setting. Until the recipient writes,
+numbers can only with approval for your organization. Until the recipient writes,
 sends fail with `409 whatsapp_awaiting_inbound`. Dedicated numbers are
 available by approval; a dedicated number can match an iMessage number or be
-different, and an iMessage line is not required. Read fresh WhatsApp channel status and
+different, and an iMessage number is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
@@ -1474,21 +1474,32 @@ reactions are supported. Typing, remote read receipts, and WhatsApp calls are no
 An agent without a dedicated number can reach a recipient through one of the
 organization's shared numbers. Connecting reserves a number for that recipient
 and sends nothing; the agent can reply after the recipient messages the returned
-number. Connect and disconnect require an admin-scoped API key and a stable
-idempotency key. People can also text the router number to connect with an agent.
+number. Connect and disconnect require an admin-scoped API key and an
+idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. People can also text the router number to connect with an agent.
 Groups work only on dedicated numbers.
 
 ```bash
 inkbox whatsapp connect --identity my-agent --recipient +15555550101 \
-  --idempotency-key connect-15555550101   # prints the number to give the recipient
+  --idempotency-key "$(uuidgen)"   # prints the number to give the recipient
 inkbox whatsapp connections --identity my-agent
 inkbox whatsapp disconnect --identity my-agent --recipient +15555550101 \
-  --idempotency-key disconnect-15555550101
+  --idempotency-key "$(uuidgen)"
 inkbox whatsapp router
 inkbox whatsapp upload-media photo.jpg --identity my-agent --recipient +15555550101
 ```
 
 Pass `--recipient` to `upload-media` when replying through a shared number.
+
+Shared-number errors: replying before the recipient's first message returns
+`409 whatsapp_awaiting_inbound`; sending through a shared number to a recipient
+the agent is not connected to returns `403 whatsapp_access_required`. Connect can
+also return `409 whatsapp_identity_has_dedicated_number`, `409 whatsapp_pool_unavailable`,
+`409 whatsapp_connection_busy` (retry with the same key), or
+`403 whatsapp_contact_not_allowed`. Key errors on connect and disconnect:
+`422 invalid_idempotency_key`; `409 idempotency_key_reused` (the key was used for a
+different request); `409 idempotency_in_progress` (the original request is still
+running; retry with the same key); and `409 result_unavailable` (the stored result
+expired; check `connections` before acting again with a new key).
 
 ### WhatsApp history filters
 

@@ -255,15 +255,17 @@ test("native reply requirement is explicit and irrelevant without a quote", () =
   assert.equal(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "Hello", plainReplyFallback: false}).plainReplyFallback, undefined);
 });
 
-test("bundled WhatsApp skills teach direct recipients and inbound-only groups", () => {
+test("bundled WhatsApp skills teach direct recipients, inbound-only groups, and fresh connection keys", () => {
   for (const name of ["inkbox-cli", "inkbox-python", "inkbox-ts", "inkbox-all"]) {
     const document = readFileSync(new URL(`../../skills/${name}/SKILL.md`, import.meta.url), "utf8");
-    const section = document.split("## Approved dedicated WhatsApp\n")[1]?.split("\n## ")[0];
+    const section = document.split("## WhatsApp dedicated and shared numbers\n")[1]?.split("\n## ")[0];
     assert.ok(section, `missing WhatsApp section in ${name}`);
     assert.match(section, /one E\.164 string or an existing conversation ID/);
     assert.match(section, /arrays, including singleton arrays, and comma-separated lists are rejected/);
     assert.match(section, /receive a message from another participant before sending content/);
     assert.match(section, /Do not create groups/);
+    assert.match(section, /Use a new key for each new connect or disconnect; reuse a key only to retry that same request\./);
+    assert.match(section, /Shared numbers never start conversations/);
     assert.doesNotMatch(section, /1–8 unique|create\/select a group|Group uncertainty|Group sends require/);
   }
 });
