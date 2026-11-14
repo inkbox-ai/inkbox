@@ -1,4 +1,4 @@
-"""Dedicated, approved WhatsApp messaging and owned attachments."""
+"""WhatsApp messaging, shared-number connections, and owned attachments."""
 
 from __future__ import annotations
 
@@ -350,8 +350,92 @@ class WhatsAppLimits:
         return cls(UUID(d["agent_identity_id"]), dict(d["limits"]), dict(d["usage"]))
 
 
+@dataclass
+class WhatsAppConnection:
+    """An agent's current route to one recipient through a shared WhatsApp number."""
+
+    id: UUID
+    agent_identity_id: UUID
+    recipient_number: str
+    number: str
+    number_type: str
+    created_at: datetime
+    last_activity_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConnection:
+        return cls(
+            id=UUID(d["id"]),
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            recipient_number=d["recipient_number"],
+            number=d["number"],
+            number_type=d["number_type"],
+            created_at=datetime.fromisoformat(d["created_at"]),
+            last_activity_at=datetime.fromisoformat(d["last_activity_at"]),
+        )
+
+
+@dataclass
+class WhatsAppConnectResult:
+    """A shared-number connection and the number the recipient should message first.
+
+    Connecting sends nothing. ``awaiting_inbound`` stays true until the
+    recipient messages ``number``; replies are rejected until then.
+    """
+
+    connection: WhatsAppConnection
+    number: str
+    already_connected: bool
+    awaiting_inbound: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConnectResult:
+        return cls(
+            connection=WhatsAppConnection._from_dict(d["connection"]),
+            number=d["number"],
+            already_connected=d["already_connected"],
+            awaiting_inbound=d["awaiting_inbound"],
+        )
+
+
+@dataclass
+class WhatsAppDisconnectResult:
+    """The released connection ID, or None when the pair was already disconnected."""
+
+    connection_id: UUID | None
+    disconnected: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppDisconnectResult:
+        value = d.get("connection_id")
+        return cls(UUID(value) if value else None, d.get("disconnected", True))
+
+
+@dataclass
+class WhatsAppRouter:
+    """The router number people message to reach an organization's agents."""
+
+    number: str
+    number_type: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppRouter:
+        return cls(d["number"], d["number_type"])
+
+
+def _recipient(value: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", value):
+        raise ValueError("Provide one E.164 recipient_number")
+    return value
+
+
 class WhatsAppResource:
-    """Direct and existing-group WhatsApp on an approved dedicated number.
+    """Direct and existing-group WhatsApp on dedicated and shared numbers.
+
+    WhatsApp never starts a conversation by default: an agent replies after the
+    recipient messages first. Shared numbers never start conversations; dedicated
+    numbers can only with an approved account setting. Otherwise sends fail with
+    ``409 whatsapp_awaiting_inbound``.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
     and owned media IDs after an uncertain outcome; never re-upload to retry it.
@@ -379,6 +463,10 @@ class WhatsAppResource:
         plain_reply_fallback defaults to True; False explicitly requires a native
         quote. Current supported targets use native quotes; missing evidence or
         rejected/uncertain sends never trigger a plain replacement.
+
+        Raises:
+            WhatsAppAwaitingInboundError: The recipient has not messaged this
+                number yet; reply after they do.
         """
         if not isinstance(gif_playback, bool):
             raise ValueError("gif_playback must be a boolean")
@@ -548,7 +636,7 @@ class WhatsAppResource:
                 or any(char.isspace() or unicodedata.category(char) in {"Cc", "Cs"} for char in custom_emoji)):
             raise ValueError("custom_emoji must contain 1–32 non-whitespace characters")
         body = {"message_id": str(message_id), **({"reaction": str(reaction)} if reaction is not None else {"custom_emoji": custom_emoji})}
-        result = self._http.post("/reactions", json=body, params=_owner(agent_identity_id), headers=_reaction_headers(idempotency_key))
+        result = self._http.post("/reactions", json=body, params=_owner(agent_identity_id), headers=_key_headers(idempotency_key))
         return WhatsAppReaction._from_dict(result["reaction"])
 
     def get_reaction(self, reaction_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
@@ -560,7 +648,7 @@ class WhatsAppResource:
                         agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
         """Return the removal receipt; a stale receipt never removes a newer reaction."""
         result = self._http.delete_with_response(f"/reactions/{reaction_id}", params=_owner(agent_identity_id),
-            headers=_reaction_headers(idempotency_key))
+            headers=_key_headers(idempotency_key))
         return WhatsAppReaction._from_dict(result["reaction"])
 
     def upload_media(
@@ -570,17 +658,24 @@ class WhatsAppResource:
         filename: str,
         content_type: str | None = None,
         agent_identity_id: UUID | str | None = None,
+        recipient_number: str | None = None,
     ) -> WhatsAppMedia:
-        """Upload at most 20 MiB and retain the returned media ID for send."""
+        """Upload at most 20 MiB and retain the returned media ID for send.
+
+        Pass ``recipient_number`` when the agent replies through a shared number.
+        """
         if len(content) > 20 * 1024 * 1024:
             raise ValueError("WhatsApp media must be at most 20 MiB")
+        params = _owner(agent_identity_id)
+        if recipient_number is not None:
+            params["recipient_number"] = _recipient(recipient_number)
         data = self._http.post_multipart(
             "/media",
             field_name="file",
             filename=filename,
             content=content,
             content_type=content_type or "application/octet-stream",
-            params=_owner(agent_identity_id),
+            params=params,
         )
         return WhatsAppMedia._from_dict(data)
 
@@ -612,6 +707,53 @@ class WhatsAppResource:
             UUID(data["conversation_id"]), data["updated_count"]
         )
 
+    def connect(
+        self,
+        *,
+        agent_identity_id: UUID | str,
+        recipient_number: str,
+        idempotency_key: str,
+    ) -> WhatsAppConnectResult:
+        """Reserve one of the organization's shared numbers for a recipient.
+
+        Nothing is sent. Give the recipient the returned ``number``; the agent can
+        reply after they message it. ``idempotency_key`` must be stable across
+        retries of the same logical connect. Requires an admin-scoped API key.
+
+        Raises:
+            InkboxAPIError: 409 ``whatsapp_identity_has_dedicated_number``,
+                ``whatsapp_pool_unavailable`` or ``whatsapp_connection_busy``
+                (retry with the same key); 403 ``whatsapp_contact_not_allowed``.
+        """
+        body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
+        data = self._http.post("/connect", json=body, headers=_key_headers(idempotency_key))
+        return WhatsAppConnectResult._from_dict(data)
+
+    def disconnect(
+        self,
+        *,
+        agent_identity_id: UUID | str,
+        recipient_number: str,
+        idempotency_key: str,
+    ) -> WhatsAppDisconnectResult:
+        """Release an agent's shared-number connection to a recipient; history is kept."""
+        body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
+        data = self._http.post("/disconnect", json=body, headers=_key_headers(idempotency_key))
+        return WhatsAppDisconnectResult._from_dict(data)
+
+    def list_connections(self, *, agent_identity_id: UUID | str | None = None) -> list[WhatsAppConnection]:
+        """List an agent's current shared-number connections."""
+        data = self._http.get("/connections", params=_owner(agent_identity_id))
+        return [WhatsAppConnection._from_dict(row) for row in data["items"]]
+
+    def get_router(self) -> WhatsAppRouter:
+        """Return the router number people message to connect with the organization's agents.
+
+        Raises:
+            InkboxAPIError: 404 ``whatsapp_router_unavailable`` when none is active.
+        """
+        return WhatsAppRouter._from_dict(self._http.get("/router"))
+
     def get_onboarding(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppOnboarding:
         """Read a link and QR for messaging the agent, without sending or enabling WhatsApp."""
         return WhatsAppOnboarding._from_dict(
@@ -638,7 +780,7 @@ class WhatsAppThread:
             [WhatsAppMessage._from_dict(row) for row in d["messages"]], d["next_cursor"])
 
 
-def _reaction_headers(key: str) -> dict[str, str]:
+def _key_headers(key: str) -> dict[str, str]:
     if not isinstance(key, str) or not key.strip() or len(key) > 255:
         raise ValueError("A stable idempotency_key is required")
     return {"Idempotency-Key": key}

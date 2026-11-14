@@ -296,3 +296,51 @@ test("group names appear in conversation tables and nullable metadata survives J
   const row = JSON.parse(await run(true))[0];
   assert.equal(row.isGroup, true); assert.equal(row.groupName, "Project garden"); assert.equal(row.remoteNumber, null);
 });
+
+test("shared-number connect, connections, disconnect, router, and media recipient use the real SDK", async (t) => {
+  const shared = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-shared.json", import.meta.url), "utf8"));
+  const calls = [];
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    calls.push({ path: url.pathname, query: Object.fromEntries(url.searchParams), method: req.method,
+      body: raw && req.headers["content-type"]?.includes("json") ? JSON.parse(raw) : null, key: req.headers["idempotency-key"] });
+    res.setHeader("content-type", "application/json");
+    const routes = {
+      "/api/v1/identities/agent": { id: shared.identity_id, organization_id: "org_example", agent_handle: "agent",
+        created_at: shared.connection.created_at, updated_at: shared.connection.created_at },
+      "/api/v1/whatsapp/connect": shared.connect,
+      "/api/v1/whatsapp/disconnect": shared.disconnect,
+      "/api/v1/whatsapp/connections": { items: [shared.connection] },
+      "/api/v1/whatsapp/router": shared.router,
+      "/api/v1/whatsapp/media": f.media,
+    };
+    if (!(url.pathname in routes)) { res.writeHead(404).end(); return; }
+    res.end(JSON.stringify(routes[url.pathname]));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+  const run = async (...args) => JSON.parse((await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "--json", "whatsapp", ...args],
+    { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 })).stdout);
+  const body = { agent_identity_id: shared.identity_id, recipient_number: shared.recipient_number };
+  const connected = await run("connect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "c-1");
+  assert.equal(connected.number, shared.connect.number);
+  assert.equal(connected.awaitingInbound, true);
+  assert.deepEqual(calls.at(-1).body, body);
+  assert.equal(calls.at(-1).key, "c-1");
+  assert.equal((await run("connections", "--identity", "agent"))[0].recipientNumber, shared.recipient_number);
+  assert.equal(calls.at(-1).query.agent_identity_id, shared.identity_id);
+  const released = await run("disconnect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "d-1");
+  assert.deepEqual(released, { connectionId: shared.disconnect.connection_id, disconnected: true });
+  assert.deepEqual(calls.at(-1).body, body);
+  assert.equal(calls.at(-1).key, "d-1");
+  assert.equal((await run("router")).numberType, "dedicated_triage");
+  await run("upload-media", fileURLToPath(new URL("../package.json", import.meta.url)), "--identity", "agent", "--recipient", shared.recipient_number);
+  assert.equal(calls.at(-1).query.recipient_number, shared.recipient_number);
+  const before = calls.length;
+  await assert.rejects(() => run("connect", "--identity", "agent", "--recipient", "+1555,+1556", "--idempotency-key", "c-2"));
+  await assert.rejects(() => run("connect", "--identity", "agent", "--recipient", shared.recipient_number));
+  assert.equal(calls.length, before);
+});

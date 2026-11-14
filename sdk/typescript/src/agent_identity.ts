@@ -162,6 +162,7 @@ export class AgentIdentity {
     content: Uint8Array | Blob;
     filename: string;
     contentType?: string;
+    recipientNumber?: string;
   }) {
     return this._inkbox.whatsapp.uploadMedia({
       ...o,

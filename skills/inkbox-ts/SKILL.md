@@ -1718,11 +1718,21 @@ require a native reply instead.
 
 ## Approved dedicated WhatsApp
 
-For an approved agent with a dedicated WhatsApp account, the WhatsApp number
-can match its iMessage number or be different. An iMessage line is not required. Read fresh WhatsApp channel status;
+WhatsApp never starts a conversation by default: the agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with an approved account setting. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound`; wait for their message instead
+of retrying or switching channels. A dedicated WhatsApp number can match the
+agent's iMessage number or be different; an iMessage line is not required.
+For an agent without a dedicated number, the WhatsApp resource's `connect` /
+`inkbox whatsapp connect` reserves an organization shared number for one
+recipient and sends nothing: give the recipient the returned number. Pass the
+recipient number when uploading media for a shared-number reply. People can also
+text the router number (`get_router` / `getRouter` / `inkbox whatsapp router`).
+Read fresh WhatsApp channel status;
 do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
 point the user to Request Access in the console. Direct conversations, existing groups, native quotes, and whole-message reactions are
-supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
+supported; groups work only on dedicated numbers. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
 Send to one E.164 string or an existing conversation ID. Recipient
 arrays, including singleton arrays, and comma-separated lists are rejected.
 For groups, use the conversation ID, never its display name. The agent must be added

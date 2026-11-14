@@ -740,9 +740,16 @@ returns a message link and PNG QR code for contacting the agent. Check `ready`
 before presenting the draft; the person still taps Send in WhatsApp. This read
 does not enable WhatsApp or send a message.
 
-WhatsApp is available by approval on a dedicated account assigned to an agent.
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with an approved account setting. Until the recipient writes,
+sends return `409 whatsapp_awaiting_inbound` (Python and TypeScript raise
+`WhatsAppAwaitingInboundError`; in Rust, `error.is_whatsapp_awaiting_inbound()`
+is true). Wait for the recipient's message instead of retrying with a new key.
+
+Dedicated numbers are available by approval on an account assigned to an agent.
 Its number can match the agent’s iMessage number or be different; an iMessage
-line is not required. It is not a shared-number channel. Check fresh channel status instead of assuming
+line is not required. Agents without one can use [shared numbers](#shared-whatsapp-numbers). Check fresh channel status instead of assuming
 an old identity snapshot grants or denies access. If access is not available,
 request it in the console. Sending does not provision or enable the channel.
 
@@ -790,6 +797,72 @@ Use either one E.164 recipient string (`to`) or an existing `conversation_id` /
 `conversationId`, never both. Recipient arrays are not supported. WhatsApp supports
 direct conversations and existing groups. Outbound text is at most 4,000 Unicode code points.
 Each message can contain text, one owned attachment, or both.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; give the recipient the returned `number`. `awaiting_inbound` /
+`awaitingInbound` stays true until they message it, and the agent can reply
+after that. Connect and disconnect require an admin-scoped API key and a stable
+idempotency key; reuse it when retrying. Disconnecting keeps conversation
+history. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```python
+result = client.whatsapp.connect(
+    agent_identity_id=identity.id, recipient_number="+15555550101",
+    idempotency_key="connect-15555550101",
+)
+connections = client.whatsapp.list_connections(agent_identity_id=identity.id)
+client.whatsapp.disconnect(
+    agent_identity_id=identity.id, recipient_number="+15555550101",
+    idempotency_key="disconnect-15555550101",
+)
+router = client.whatsapp.get_router()
+```
+
+```typescript
+const result = await client.whatsapp.connect({
+  agentIdentityId: identity.id, recipientNumber: "+15555550101",
+  idempotencyKey: "connect-15555550101",
+});
+const connections = await client.whatsapp.listConnections({ agentIdentityId: identity.id });
+await client.whatsapp.disconnect({
+  agentIdentityId: identity.id, recipientNumber: "+15555550101",
+  idempotencyKey: "disconnect-15555550101",
+});
+const router = await client.whatsapp.getRouter();
+```
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let result = client
+    .whatsapp()
+    .connect(&identity.id(), "+15555550101", "connect-15555550101")?;
+let connections = client.whatsapp().list_connections(Some(&identity.id()))?;
+client
+    .whatsapp()
+    .disconnect(&identity.id(), "+15555550101", "disconnect-15555550101")?;
+let router = client.whatsapp().get_router()?;
+# Ok(()) }
+```
+
+```bash
+inkbox whatsapp connect --identity my-agent --recipient +15555550101 \
+  --idempotency-key connect-15555550101
+inkbox whatsapp connections --identity my-agent
+inkbox whatsapp disconnect --identity my-agent --recipient +15555550101 \
+  --idempotency-key disconnect-15555550101
+inkbox whatsapp router
+```
+
+When replying through a shared number with an attachment, pass the recipient
+number on upload: `recipient_number=` (Python), `recipientNumber` (TypeScript),
+`upload_media_for_recipient` / `upload_whatsapp_media_for_recipient` (Rust), or
+`--recipient` (`inkbox whatsapp upload-media`).
 
 ### Existing groups
 

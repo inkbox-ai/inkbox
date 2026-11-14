@@ -1451,8 +1451,12 @@ does not enable WhatsApp or send a message.
 
 `inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello --idempotency-key stable-key`
 
-Available by approval on a dedicated WhatsApp account. Its number can match an
-iMessage number or be different; an iMessage line is not required. This is not a shared channel. Read fresh WhatsApp channel status and
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with an approved account setting. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound`. Dedicated numbers are
+available by approval; a dedicated number can match an iMessage number or be
+different, and an iMessage line is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
@@ -1464,6 +1468,27 @@ The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-what
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
 reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; the agent can reply after the recipient messages the returned
+number. Connect and disconnect require an admin-scoped API key and a stable
+idempotency key. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```bash
+inkbox whatsapp connect --identity my-agent --recipient +15555550101 \
+  --idempotency-key connect-15555550101   # prints the number to give the recipient
+inkbox whatsapp connections --identity my-agent
+inkbox whatsapp disconnect --identity my-agent --recipient +15555550101 \
+  --idempotency-key disconnect-15555550101
+inkbox whatsapp router
+inkbox whatsapp upload-media photo.jpg --identity my-agent --recipient +15555550101
+```
+
+Pass `--recipient` to `upload-media` when replying through a shared number.
 
 ### WhatsApp history filters
 

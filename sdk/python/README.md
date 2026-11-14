@@ -2301,8 +2301,12 @@ does not enable WhatsApp or send a message.
 
 `identity.send_whatsapp(to="+15555550101", text="Hello", idempotency_key="stable-key")`
 
-Available by approval on a dedicated WhatsApp account. Its number can match an
-iMessage number or be different; an iMessage line is not required. This is not a shared channel. Read fresh WhatsApp channel status and
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with an approved account setting. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound` (`WhatsAppAwaitingInboundError`). Dedicated numbers are
+available by approval; a dedicated number can match an iMessage number or be
+different, and an iMessage line is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
@@ -2336,6 +2340,33 @@ A `409 whatsapp_group_reply_required` means the current WhatsApp connection has 
 qualifying incoming group message, including after a connection replacement.
 Wait for an allowed message from another participant. Do not retry with a new
 idempotency key or fall back to a direct message.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; the agent can reply after the recipient messages the returned
+number. Connect and disconnect require an admin-scoped API key and a stable
+idempotency key. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```python
+result = client.whatsapp.connect(
+    agent_identity_id=identity.id, recipient_number="+15555550101",
+    idempotency_key="connect-15555550101",
+)
+print(result.number)  # give this number to the recipient; nothing was sent
+connections = client.whatsapp.list_connections(agent_identity_id=identity.id)
+client.whatsapp.disconnect(
+    agent_identity_id=identity.id, recipient_number="+15555550101",
+    idempotency_key="disconnect-15555550101",
+)
+router = client.whatsapp.get_router()
+```
+
+Pass `recipient_number=` to `upload_media` / `upload_whatsapp_media` when replying
+through a shared number.
+
 ## Conversation participant filters
 
 Conversation filtering matches **any** supplied email address or E.164 phone

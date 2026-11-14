@@ -60,7 +60,14 @@ const WHATSAPP_MESSAGE_COLUMNS = [
 export function registerWhatsAppCommands(program: Command): void {
   const whatsapp = program
     .command("whatsapp")
-    .description("WhatsApp direct and inbound group conversations, quoted replies, and reactions");
+    .description("WhatsApp conversations, shared-number connections, quoted replies, and reactions");
+  whatsapp
+    .command("router")
+    .description("Show the WhatsApp router number people message to connect with your agents")
+    .action(withErrorHandler(async function (this: Command) {
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.getRouter(), { json: !!global.json });
+    }));
   const identityCommand = (name: string, description: string) =>
     whatsapp
       .command(name)
@@ -90,6 +97,29 @@ export function registerWhatsAppCommands(program: Command): void {
         output(await identity.sendWhatsApp(options), { json: !!global.json });
       }),
     );
+
+  for (const [name, description, method] of [
+    ["connect", "Reserve a shared number for a recipient; sends nothing, and the agent replies after they message it", "connect"],
+    ["disconnect", "Release a shared-number connection to a recipient; history is kept", "disconnect"],
+  ] as const) {
+    identityCommand(name, `${description} (admin API key only)`)
+      .requiredOption("--recipient <number>", "One E.164 recipient")
+      .requiredOption("--idempotency-key <key>", "Stable key; reuse it when retrying")
+      .action(withErrorHandler(async function (this: Command, opts) {
+        if (!/^\+[1-9][0-9]{6,14}$/.test(opts.recipient)) throw new Error("Provide one E.164 recipient.");
+        const global = getGlobalOpts(this), client = createClient(global);
+        const identity = await client.getIdentity(opts.identity);
+        output(await client.whatsapp[method]({ agentIdentityId: identity.id, recipientNumber: opts.recipient,
+          idempotencyKey: opts.idempotencyKey }), { json: !!global.json });
+      }));
+  }
+  identityCommand("connections", "List recipients connected to this identity through shared numbers")
+    .action(withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this), client = createClient(global);
+      const identity = await client.getIdentity(opts.identity);
+      output(await client.whatsapp.listConnections({ agentIdentityId: identity.id }), { json: !!global.json,
+        columns: ["id", "recipientNumber", "number", "numberType", "lastActivityAt"] });
+    }));
 
   identityCommand(
     "status",
@@ -280,8 +310,11 @@ export function registerWhatsAppCommands(program: Command): void {
       "Attachment MIME type",
       "application/octet-stream",
     )
+    .option("--recipient <number>", "E.164 recipient; required when replying through a shared number")
     .action(
       withErrorHandler(async function (this: Command, file: string, opts) {
+        if (opts.recipient !== undefined && !/^\+[1-9][0-9]{6,14}$/.test(opts.recipient))
+          throw new Error("Provide one E.164 recipient.");
         if ((await stat(file)).size > 20 * 1024 * 1024)
           throw new Error("WhatsApp media must be at most 20 MiB.");
         const global = getGlobalOpts(this);
@@ -291,6 +324,7 @@ export function registerWhatsAppCommands(program: Command): void {
             content: await readFile(file),
             filename: basename(file),
             contentType: opts.contentType,
+            ...(opts.recipient !== undefined ? { recipientNumber: opts.recipient } : {}),
           }),
           { json: !!global.json },
         );

@@ -205,6 +205,24 @@ class IdempotencyKeyReusedError(InkboxAPIError):
         self.message: str = str(detail.get("message", ""))
 
 
+class WhatsAppAwaitingInboundError(InkboxAPIError):
+    """
+    Raised on 409 when a WhatsApp recipient has not messaged the agent's number yet.
+
+    WhatsApp never starts a conversation by default. Wait for the recipient's
+    message, then reply; do not retry with a new idempotency key.
+
+    Attributes:
+        message: Human-readable explanation from the server.
+        retry_condition: When a retry can succeed (``"recipient_message"``).
+    """
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+        self.retry_condition: str = str(detail.get("retry_condition", "recipient_message"))
+
+
 class RecipientBlockedError(InkboxAPIError):
     """
     Raised on 403 when an SMS, call, or iMessage destination is blocked

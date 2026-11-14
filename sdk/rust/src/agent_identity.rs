@@ -2394,6 +2394,22 @@ impl AgentIdentity {
             .whatsapp()
             .upload_media(content, filename, content_type, Some(&self.id()))
     }
+    /// Upload media for a reply through a shared number to `recipient_number`.
+    pub fn upload_whatsapp_media_for_recipient(
+        &self,
+        content: Vec<u8>,
+        filename: &str,
+        content_type: Option<&str>,
+        recipient_number: &str,
+    ) -> Result<crate::whatsapp::WhatsAppMedia> {
+        self.inkbox.whatsapp().upload_media_for_recipient(
+            content,
+            filename,
+            content_type,
+            Some(&self.id()),
+            Some(recipient_number),
+        )
+    }
     pub fn get_whatsapp_media(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMedia> {
         self.inkbox.whatsapp().get_media(id, Some(&self.id()))
     }
