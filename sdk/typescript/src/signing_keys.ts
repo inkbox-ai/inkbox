@@ -16,7 +16,7 @@ import { HttpTransport } from "./_http.js";
 const ORG_PATH = "/signing-keys";
 
 function identityPath(agentHandle: string): string {
-  return `/identities/${agentHandle}/signing-key`;
+  return `/identities/${encodeURIComponent(agentHandle)}/signing-key`;
 }
 
 export interface SigningKey {

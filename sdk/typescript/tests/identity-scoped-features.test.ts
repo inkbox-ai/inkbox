@@ -279,6 +279,18 @@ describe("SigningKeysResource (per-identity + org-level)", () => {
     expect(key.createdAt).toBeInstanceOf(Date);
   });
 
+  it("createOrRotate(handle) URL-encodes handles with @ or special characters", async () => {
+    const { resource, http } = makeSigningResource();
+    http.post.mockResolvedValue({
+      signing_key: "sk-fresh",
+      created_at: "2026-06-09T00:00:00Z",
+    });
+
+    await resource.createOrRotate("@support-agent");
+
+    expect(http.post).toHaveBeenCalledWith("/identities/%40support-agent/signing-key", {});
+  });
+
   it("createOrRotate() with no handle hits the deprecated org path", async () => {
     const { resource, http } = makeSigningResource();
     http.post.mockResolvedValue({
@@ -304,6 +316,18 @@ describe("SigningKeysResource (per-identity + org-level)", () => {
     expect(status).toMatchObject<Partial<SigningKeyStatus>>({ configured: true });
     expect(status.createdAt).toBeInstanceOf(Date);
     expect(status.createdAt?.toISOString()).toBe("2026-06-09T00:00:00.000Z");
+  });
+
+  it("getStatus(handle) URL-encodes handles with @ or special characters", async () => {
+    const { resource, http } = makeSigningResource();
+    http.get.mockResolvedValue({
+      configured: true,
+      created_at: "2026-06-09T00:00:00Z",
+    });
+
+    await resource.getStatus("@support-agent");
+
+    expect(http.get).toHaveBeenCalledWith("/identities/%40support-agent/signing-key");
   });
 
   it("getStatus parses the not-configured shape (createdAt null)", async () => {
