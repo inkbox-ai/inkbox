@@ -389,7 +389,6 @@ class WhatsAppAssignment:
                    datetime.fromisoformat(d["created_at"]), datetime.fromisoformat(d["updated_at"]))
 
 
-
 @dataclass
 class WhatsAppConnectResult:
     """An assignment and conversation; connecting sends no message.
@@ -435,7 +434,6 @@ class WhatsAppTriageNumber:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppTriageNumber:
         return cls(d["number"], d["connect_command"], d["whatsapp_link"], d["connect_qr_png_data_url"])
-
 
 
 def _recipient(value: str) -> str:

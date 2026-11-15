@@ -51,6 +51,9 @@ const assignments: Promise<WhatsAppAssignment[]> = client.whatsapp.listAssignmen
 const triage: Promise<WhatsAppTriageNumber> = client.whatsapp.getTriageNumber({ agentIdentityId: "agent-id" });
 const allRead: Promise<WhatsAppMarkReadResult> = identity.markWhatsAppRead("conversation-id");
 const typing: Promise<{ status: string }> = identity.sendWhatsAppTyping("conversation-id");
-const removal: Promise<void> = identity.removeWhatsAppReaction("reaction-id", "stable-key");
+const removal: Promise<import("../dist/index.js").WhatsAppReaction> = identity.removeWhatsAppReaction("reaction-id", "stable-key");
 const localNumber: string | null = groupMessage.localNumber;
 void [assignments, triage, allRead, typing, removal, localNumber];
+
+const directRemoval: Promise<import("../dist/index.js").WhatsAppReaction> = client.whatsapp.removeReaction("reaction-id", { idempotencyKey: "stable-key" });
+void directRemoval;
