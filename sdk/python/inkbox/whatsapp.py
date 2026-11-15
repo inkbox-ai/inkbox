@@ -191,6 +191,7 @@ class WhatsAppMessage:
     thread_root_message_id: UUID | None = None
     reactions: list[WhatsAppReaction] = field(default_factory=list)
 
+    logical_conversation_id: UUID | None = field(default=None, kw_only=True)
     sender_access: SenderAccess | None = field(default=None, kw_only=True)
     mentions: list[WhatsAppMention] = field(default_factory=list, kw_only=True)
     agent_mentioned: bool = field(default=False, kw_only=True)
@@ -210,6 +211,7 @@ class WhatsAppMessage:
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),
             conversation_id=UUID(d["conversation_id"]),
+            logical_conversation_id=UUID(d["logical_conversation_id"]) if d.get("logical_conversation_id") else None,
             direction=WhatsAppDirection(d["direction"]),
             local_number=d["local_number"],
             remote_number=d["remote_number"],
@@ -251,6 +253,7 @@ class WhatsAppConversation:
     created_at: datetime
     updated_at: datetime
 
+    active_conversation_id: UUID | None = field(default=None, kw_only=True)
     is_group: bool = field(default=False, kw_only=True)
     group_name: str | None = field(default=None, kw_only=True)
     unresolved_participant_count: int = field(default=0, kw_only=True)
@@ -265,6 +268,7 @@ class WhatsAppConversation:
             d["participants"],
             datetime.fromisoformat(d["created_at"]),
             datetime.fromisoformat(d["updated_at"]),
+            active_conversation_id=UUID(d["active_conversation_id"]) if d.get("active_conversation_id") else None,
             is_group=d.get("is_group", False),
             group_name=d.get("group_name"),
             unresolved_participant_count=d.get("unresolved_participant_count", 0),

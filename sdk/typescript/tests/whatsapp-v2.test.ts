@@ -80,3 +80,16 @@ it("normalizes omitted nullable WhatsApp correspondence fields without changing 
     expect(item.remoteNumber).toBeNull(); expect(item.text).toBeNull(); expect(item.media).toBeNull();
   }
 });
+
+it("keeps logical history, original message and current route IDs separate", () => {
+  const logicalId = "00000000-0000-4000-8000-000000000101";
+  const activeId = "00000000-0000-4000-8000-000000000102";
+  const message = parseWhatsAppMessage({ ...f.message, logical_conversation_id: logicalId });
+  expect(message.logicalConversationId).toBe(logicalId);
+  expect(message.conversationId).toBe(f.message.conversation_id);
+  const conversation = parseWhatsAppConversation({ ...f.conversation, active_conversation_id: activeId });
+  expect(conversation.activeConversationId).toBe(activeId);
+  expect(conversation.id).toBe(f.conversation.id);
+  expect(parseWhatsAppMessage(old.message).logicalConversationId).toBeNull();
+  expect(parseWhatsAppConversation(f.conversation).activeConversationId).toBeNull();
+});

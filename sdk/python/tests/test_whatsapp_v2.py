@@ -149,3 +149,16 @@ def test_reaction_fixture_preserves_one_actor_per_receipt():
     for reaction in [data["reaction"], *data["message"]["reactions"]]:
         actor = (reaction["direction"], reaction["remote_number"], reaction["target_message_id"])
         assert receipts.setdefault(reaction["id"], actor) == actor
+
+
+def test_logical_history_keeps_original_message_and_current_route_ids_separate():
+    logical_id = "00000000-0000-4000-8000-000000000101"
+    active_id = "00000000-0000-4000-8000-000000000102"
+    message = WhatsAppMessage._from_dict({**F["message"], "logical_conversation_id": logical_id})
+    assert message.logical_conversation_id == UUID(logical_id)
+    assert str(message.conversation_id) == F["message"]["conversation_id"]
+    conversation = WhatsAppConversation._from_dict({**F["conversation"], "active_conversation_id": active_id})
+    assert conversation.active_conversation_id == UUID(active_id)
+    assert str(conversation.id) == F["conversation"]["id"]
+    assert WhatsAppMessage._from_dict(OLD["message"]).logical_conversation_id is None
+    assert WhatsAppConversation._from_dict(F["conversation"]).active_conversation_id is None

@@ -175,6 +175,8 @@ export interface RawWhatsAppMention {
   is_agent: boolean;
 }
 export interface WhatsAppMessage {
+  /** Stable direct-conversation ID across number changes. */
+  logicalConversationId?: string | null;
   id: string;
   agentIdentityId: string;
   conversationId: string;
@@ -212,6 +214,7 @@ export interface WhatsAppMessage {
   unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppMessage {
+  logical_conversation_id?: string | null;
   id: string;
   agent_identity_id: string;
   conversation_id: string;
@@ -259,6 +262,7 @@ export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     conversationId: r.conversation_id,
+    logicalConversationId: r.logical_conversation_id ?? null,
     direction: r.direction,
     localNumber: r.local_number,
     remoteNumber: r.remote_number,
@@ -290,6 +294,8 @@ export function parseWhatsAppMessage(r: RawWhatsAppMessage): WhatsAppMessage {
   };
 }
 export interface WhatsAppConversation {
+  /** Current conversation for sending; absent before current-route history exists. */
+  activeConversationId?: string | null;
   id: string;
   agentIdentityId: string;
   localNumber: string | null;
@@ -302,6 +308,7 @@ export interface WhatsAppConversation {
   unresolvedParticipantCount: number;
 }
 export interface RawWhatsAppConversation {
+  active_conversation_id?: string | null;
   id: string;
   agent_identity_id: string;
   local_number: string | null;
@@ -320,6 +327,7 @@ export function parseWhatsAppConversation(
     isGroup: r.is_group ?? false,
     groupName: r.group_name ?? null,
     unresolvedParticipantCount: r.unresolved_participant_count ?? 0,
+    activeConversationId: r.active_conversation_id ?? null,
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     localNumber: r.local_number,

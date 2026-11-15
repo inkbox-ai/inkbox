@@ -218,6 +218,8 @@ pub struct WhatsAppMention {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppMessage {
+    #[serde(default)]
+    pub logical_conversation_id: Option<Uuid>,
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub conversation_id: Uuid,
@@ -266,6 +268,8 @@ pub struct WhatsAppMessage {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConversation {
+    #[serde(default)]
+    pub active_conversation_id: Option<Uuid>,
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub local_number: Option<String>,
