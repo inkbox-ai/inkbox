@@ -4,5 +4,9 @@
   "connect_command": "connect @agent",
   "connect_link": "https://wa.me/15555550100?text=connect%20%40agent",
   "connect_qr_png_data_url": "data:image/png;base64,cXI=",
-  "ready": true
+  "ready": true,
+  "number": "+15555550100",
+  "message_text": "connect @agent",
+  "message_link": "https://wa.me/15555550100?text=connect%20%40agent",
+  "message_qr_png_data_url": "data:image/png;base64,cXI="
 }

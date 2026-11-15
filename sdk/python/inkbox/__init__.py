@@ -5,6 +5,8 @@ inkbox — Python SDK for the Inkbox APIs.
 from inkbox.webhooks import WhatsAppWebhookMention, WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
 from inkbox.whatsapp import (
     WhatsAppOnboarding,
+    WhatsAppNumber, WhatsAppNumberList, WhatsAppRouter, WhatsAppRouterThread,
+    WhatsAppRouterThreads, WhatsAppRouterMessage, WhatsAppRouterMessages,
     WhatsAppLimits,
     WhatsAppDirection,
     WhatsAppResource,
@@ -565,6 +567,8 @@ __all__ = [
     "WhatsAppWebhookEventType",
 
     "WhatsAppOnboarding",
+    "WhatsAppNumber", "WhatsAppNumberList", "WhatsAppRouter", "WhatsAppRouterThread",
+    "WhatsAppRouterThreads", "WhatsAppRouterMessage", "WhatsAppRouterMessages",
     "WhatsAppLimits",
     "WhatsAppDirection",
     "WhatsAppResource",

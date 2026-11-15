@@ -1,6 +1,6 @@
 import { conversationFilterParams } from "./_conversationFilters.js";
 import type { SenderAccess } from "./sender_access.js";
-/** WhatsApp conversations, shared-number connections, quoted replies, reactions, and owned media. */
+/** WhatsApp conversations, recipient connections, quoted replies, reactions, and owned media. */
 import { HttpTransport } from "./_http.js";
 import { messageKey, postMessage } from "./message_sends.js";
 export type WhatsAppDirection = "inbound" | "outbound";
@@ -425,22 +425,56 @@ export type WhatsAppConversationListOptions = Omit<
 > & { participants?: string[]; contactId?: string };
 const owner = (id?: string): Record<string, string> =>
   id === undefined ? {} : { agent_identity_id: id };
-/** Connect instructions; opening the draft or QR does not send a message. */
+/** A message draft. Router fields are null for legacy direct-link responses. */
 export interface WhatsAppOnboarding {
-  agentIdentityId: string; triageNumber: string; connectCommand: string; connectLink: string;
-  connectQrPngDataUrl: string; ready: boolean;
-  /** Compatibility aliases for the triage number and connect draft. */
-  number: string; messageText: string; messageLink: string; messageQrPngDataUrl: string;
+  agentIdentityId: string; triageNumber: string | null; connectCommand: string | null; connectLink: string | null;
+  connectQrPngDataUrl: string | null; ready: boolean;
+  number: string | null; messageText: string; messageLink: string | null; messageQrPngDataUrl: string | null;
 }
 export interface RawWhatsAppOnboarding {
-  agent_identity_id: string; triage_number: string; connect_command: string; connect_link: string;
-  connect_qr_png_data_url: string; ready: boolean;
+  agent_identity_id: string; triage_number?: string; connect_command?: string; connect_link?: string;
+  connect_qr_png_data_url?: string; ready: boolean;
+  number?: string | null; message_text?: string; message_link?: string | null; message_qr_png_data_url?: string | null;
 }
 export function parseWhatsAppOnboarding(r: RawWhatsAppOnboarding): WhatsAppOnboarding {
-  return { agentIdentityId: r.agent_identity_id, triageNumber: r.triage_number, connectCommand: r.connect_command,
-    connectLink: r.connect_link, connectQrPngDataUrl: r.connect_qr_png_data_url, ready: r.ready,
-    number: r.triage_number, messageText: r.connect_command, messageLink: r.connect_link,
-    messageQrPngDataUrl: r.connect_qr_png_data_url };
+  return { agentIdentityId: r.agent_identity_id, triageNumber: r.triage_number ?? null, connectCommand: r.connect_command ?? null,
+    connectLink: r.connect_link ?? null, connectQrPngDataUrl: r.connect_qr_png_data_url ?? null, ready: r.ready,
+    number: r.triage_number ?? r.number ?? null, messageText: r.connect_command ?? r.message_text ?? "",
+    messageLink: r.connect_link ?? r.message_link ?? null,
+    messageQrPngDataUrl: r.connect_qr_png_data_url ?? r.message_qr_png_data_url ?? null };
+}
+export interface WhatsAppNumber {
+  id: string; number: string; agentIdentityId: string | null; revision: number; state: string;
+  bindingState: string | null; assignable: boolean; unavailableReason: string | null;
+}
+interface RawWhatsAppNumber {
+  id: string; number: string; agent_identity_id: string | null; revision: number; state: string;
+  binding_state: string | null; assignable: boolean; unavailable_reason: string | null;
+}
+export interface WhatsAppNumberList { numbers: WhatsAppNumber[]; hasMore: boolean }
+export interface WhatsAppRouter {
+  id: string; number: string; revision: number; state: string; profileDisplayName: string | null;
+  acceptingNewConnections: boolean;
+}
+interface RawWhatsAppRouter {
+  id: string; number: string; revision: number; state: string; profile_display_name: string | null;
+  accepting_new_connections: boolean;
+}
+export interface WhatsAppRouterUpdate {
+  expectedRouterId: string; expectedRevision: number; profileDisplayName?: string | null;
+  acceptingNewConnections?: boolean;
+}
+export interface WhatsAppRouterThread { remoteNumber: string; lastMessageAt: Date; latestText: string; messageCount: number }
+export interface WhatsAppRouterThreads { items: WhatsAppRouterThread[]; hasMore: boolean }
+export interface WhatsAppRouterMessage { id: string; direction: WhatsAppDirection; content: string; status: string; createdAt: Date }
+export interface WhatsAppRouterMessages { items: WhatsAppRouterMessage[]; hasMore: boolean }
+function parseNumber(r: RawWhatsAppNumber): WhatsAppNumber {
+  return { id: r.id, number: r.number, agentIdentityId: r.agent_identity_id, revision: r.revision, state: r.state,
+    bindingState: r.binding_state, assignable: r.assignable, unavailableReason: r.unavailable_reason };
+}
+function parseRouter(r: RawWhatsAppRouter): WhatsAppRouter {
+  return { id: r.id, number: r.number, revision: r.revision, state: r.state,
+    profileDisplayName: r.profile_display_name, acceptingNewConnections: r.accepting_new_connections };
 }
 export interface WhatsAppLimits {
   agentIdentityId: string;
@@ -680,13 +714,13 @@ export class WhatsAppResource {
     return { assignment, conversationId: r.conversation_id, assignedNumber: r.assigned_number,
       alreadyConnected: r.already_connected, awaitingInbound: r.awaiting_inbound };
   }
-  /** Release an agent's shared-number connection; history is kept. Use a new key per disconnect; key errors match `connect`. */
+  /** Release an agent's recipient connection; history is kept. Use a new key per disconnect; key errors match `connect`. */
   async disconnect(o: WhatsAppConnectOptions): Promise<WhatsAppDisconnectResult> {
     const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
     const r = await this.http.post<RawWhatsAppDisconnectResult>("/disconnect", body, { headers });
     return { assignmentId: r.assignment_id ?? null, disconnected: r.disconnected ?? true };
   }
-  /** List active shared-number assignments. */
+  /** List active dedicated or shared recipient connections. */
   async listAssignments(o: { agentIdentityId?: string; limit?: number; offset?: number } = {}): Promise<WhatsAppAssignment[]> {
     const r = await this.http.get<RawWhatsAppAssignment[]>("/assignments", { ...owner(o.agentIdentityId), limit: o.limit ?? 50, offset: o.offset ?? 0 });
     return r.map(parseWhatsAppAssignment);
@@ -706,6 +740,45 @@ export class WhatsAppResource {
     return this.http.post("/typing", { conversation_id: conversationId }, { params: owner(o.agentIdentityId) });
   }
   /** Read a link and QR for messaging the agent, without sending or enabling WhatsApp. */
+  /** List up to 100 already-owned dedicated numbers; requires an admin-scoped API key. */
+  async listNumbers(o: { offset?: number } = {}): Promise<WhatsAppNumberList> {
+    const r = await this.http.get<{ numbers: RawWhatsAppNumber[]; has_more: boolean }>("/numbers", { offset: o.offset ?? 0 });
+    return { numbers: r.numbers.map(parseNumber), hasMore: r.has_more };
+  }
+  /** Attach or detach an already-owned number. This never purchases a number. */
+  async assignNumber(id: string, o: { agentIdentityId: string | null; expectedRevision: number; confirmedImessageNumber?: string }): Promise<WhatsAppNumber> {
+    return parseNumber(await this.http.patch<RawWhatsAppNumber>(`/numbers/${encodeURIComponent(id)}`, {
+      agent_identity_id: o.agentIdentityId, expected_revision: o.expectedRevision,
+      ...(o.confirmedImessageNumber !== undefined ? { confirmed_imessage_number: o.confirmedImessageNumber } : {}),
+    }));
+  }
+  /** Read your organization's dedicated router; requires an admin-scoped API key. */
+  async getRouter(): Promise<WhatsAppRouter | null> {
+    const r = await this.http.get<{ router: RawWhatsAppRouter | null }>("/router");
+    return r.router === null ? null : parseRouter(r.router);
+  }
+  /** Edit the router you read. Omit the name to preserve it; pass null to clear it. */
+  async updateRouter(o: WhatsAppRouterUpdate): Promise<WhatsAppRouter> {
+    const r = await this.http.patch<{ router: RawWhatsAppRouter }>("/router", {
+      expected_router_id: o.expectedRouterId, expected_revision: o.expectedRevision,
+      ...(o.profileDisplayName !== undefined ? { profile_display_name: o.profileDisplayName } : {}),
+      ...(o.acceptingNewConnections !== undefined ? { accepting_new_connections: o.acceptingNewConnections } : {}),
+    });
+    return parseRouter(r.router);
+  }
+  /** List recipient threads on your organization's dedicated router, newest first. */
+  async listRouterThreads(o: { offset?: number; limit?: number } = {}): Promise<WhatsAppRouterThreads> {
+    const r = await this.http.get<{ items: { remote_number: string; last_message_at: string; latest_text: string; message_count: number }[]; has_more: boolean }>(
+      "/router/conversations", { offset: o.offset ?? 0, limit: o.limit ?? 50 });
+    return { items: r.items.map(i => ({ remoteNumber: i.remote_number, lastMessageAt: new Date(i.last_message_at), latestText: i.latest_text, messageCount: i.message_count })), hasMore: r.has_more };
+  }
+  /** Read one dedicated-router recipient thread; requires an admin-scoped API key. */
+  async listRouterMessages(remoteNumber: string, o: { offset?: number; limit?: number } = {}): Promise<WhatsAppRouterMessages> {
+    if (!validPhone(remoteNumber)) throw new Error("Provide one E.164 recipient.");
+    const r = await this.http.get<{ items: { id: string; direction: WhatsAppDirection; content: string; status: string; created_at: string }[]; has_more: boolean }>(
+      `/router/conversations/${encodeURIComponent(remoteNumber)}/messages`, { offset: o.offset ?? 0, limit: o.limit ?? 50 });
+    return { items: r.items.map(i => ({ id: i.id, direction: i.direction, content: i.content, status: i.status, createdAt: new Date(i.created_at) })), hasMore: r.has_more };
+  }
   async getOnboarding(o: { agentIdentityId?: string } = {}): Promise<WhatsAppOnboarding> {
     return parseWhatsAppOnboarding(
       await this.http.get<RawWhatsAppOnboarding>("/onboarding", owner(o.agentIdentityId)),

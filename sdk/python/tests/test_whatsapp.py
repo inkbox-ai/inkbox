@@ -406,3 +406,57 @@ def test_whatsapp_webhook_companion_metadata_is_optional_and_typed():
     annotation = get_type_hints(WhatsAppWebhookPayload, include_extras=True)["companion"]
     assert annotation == NotRequired[CompanionMetadata]
     assert get_args(annotation) == (CompanionMetadata,)
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_legacy_onboarding_retains_direct_draft_without_inventing_router(available):
+    http = MagicMock()
+    http.get.return_value = {"agent_identity_id": OWNER, "number": "+15555550100" if available else None,
+        "message_text": "Hello!", "message_link": "https://wa.me/15555550100?text=Hello!" if available else None,
+        "message_qr_png_data_url": "data:image/png;base64,cXI=" if available else None, "ready": available}
+    result = WhatsAppResource(http).get_onboarding()
+    assert result.number == http.get.return_value["number"]
+    assert result.message_text == "Hello!"
+    assert result.message_link == http.get.return_value["message_link"]
+    assert result.message_qr_png_data_url == http.get.return_value["message_qr_png_data_url"]
+    assert result.triage_number is None and result.connect_command is None
+    assert result.connect_link is None and result.connect_qr_png_data_url is None
+
+
+def test_management_router_fence_and_explicit_clear_are_preserved():
+    http = MagicMock()
+    router = {"id": CONV, "number": "+15555550100", "revision": 2, "state": "enabled",
+              "profile_display_name": None, "accepting_new_connections": False}
+    http.patch.return_value = {"router": router}
+    api = WhatsAppResource(http)
+    result = api.update_router(expected_router_id=CONV, expected_revision=1,
+                               profile_display_name=None, accepting_new_connections=False)
+    assert result.id == UUID(CONV) and result.accepting_new_connections is False
+    http.patch.assert_called_once_with("/router", json={"expected_router_id": CONV, "expected_revision": 1,
+        "profile_display_name": None, "accepting_new_connections": False})
+    http.patch.reset_mock()
+    api.update_router(expected_router_id=CONV, expected_revision=2)
+    http.patch.assert_called_once_with("/router", json={"expected_router_id": CONV, "expected_revision": 2})
+    http.get.return_value = {"router": None}
+    assert api.get_router() is None
+
+
+def test_management_number_detach_and_history_pagination():
+    http = MagicMock()
+    number = {"id": CONV, "number": "+15555550100", "agent_identity_id": None, "revision": 3,
+        "state": "disabled", "binding_state": None, "assignable": False, "unavailable_reason": "Requires setup"}
+    api = WhatsAppResource(http)
+    http.get.return_value = {"numbers": [number], "has_more": True}
+    assert api.list_numbers(offset=100).has_more
+    http.get.assert_called_with("/numbers", params={"offset": 100})
+    http.patch.return_value = number
+    assert api.assign_number(CONV, agent_identity_id=None, expected_revision=2).agent_identity_id is None
+    http.patch.assert_called_with(f"/numbers/{CONV}", json={"agent_identity_id": None, "expected_revision": 2})
+    http.get.return_value = {"items": [{"remote_number": "+15555550101", "last_message_at": "2026-10-01T12:00:00Z",
+                                      "latest_text": "Hello", "message_count": 1}], "has_more": False}
+    assert api.list_router_threads(limit=10, offset=20).items[0].message_count == 1
+    http.get.assert_called_with("/router/conversations", params={"offset": 20, "limit": 10})
+    http.get.return_value = {"items": [{"id": MESSAGE, "direction": "inbound", "content": "Hello",
+                                      "status": "received", "created_at": "2026-10-01T12:00:00Z"}], "has_more": False}
+    assert api.list_router_messages("+15555550101", offset=10).items[0].id == UUID(MESSAGE)
+    http.get.assert_called_with("/router/conversations/+15555550101/messages", params={"offset": 10, "limit": 50})

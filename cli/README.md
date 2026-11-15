@@ -1554,3 +1554,20 @@ inkbox whatsapp conversations --identity support-bot --participants +14155550123
 
 Use `--participants` or `--contact-id`, not both. Existing group-listing rules
 still apply.
+
+
+### Manage owned WhatsApp numbers and routers
+
+Use an admin-scoped API key. These commands manage already-owned numbers; they do not purchase or provision them.
+
+```bash
+inkbox whatsapp numbers --offset 0
+inkbox whatsapp assign-number NUMBER_ID --identity my-agent --revision 2
+inkbox whatsapp assign-number NUMBER_ID --detach --revision 3
+inkbox whatsapp router
+inkbox whatsapp update-router ROUTER_ID --revision 2 --accepting false
+inkbox whatsapp router-threads --limit 50 --offset 0
+inkbox whatsapp router-messages +15555550101 --limit 50 --offset 0
+```
+
+Read the current resource before updating it. A changed router ID or revision returns a conflict; refresh before retrying. Omit `--name` to preserve the name, or pass `--name ""` to clear it.

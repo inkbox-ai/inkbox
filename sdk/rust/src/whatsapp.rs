@@ -12,15 +12,113 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
-/// A message draft link and QR code; opening either does not send a message.
+/// A message draft; router-specific fields are absent in legacy direct-link responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "RawWhatsAppOnboarding")]
 pub struct WhatsAppOnboarding {
     pub agent_identity_id: Uuid,
-    pub triage_number: String,
-    pub connect_command: String,
-    pub connect_link: String,
-    pub connect_qr_png_data_url: String,
+    pub number: Option<String>,
+    pub message_text: String,
+    pub message_link: Option<String>,
+    pub message_qr_png_data_url: Option<String>,
     pub ready: bool,
+    pub triage_number: Option<String>,
+    pub connect_command: Option<String>,
+    pub connect_link: Option<String>,
+    pub connect_qr_png_data_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawWhatsAppOnboarding {
+    agent_identity_id: Uuid,
+    number: Option<String>,
+    message_text: Option<String>,
+    message_link: Option<String>,
+    message_qr_png_data_url: Option<String>,
+    ready: bool,
+    triage_number: Option<String>,
+    connect_command: Option<String>,
+    connect_link: Option<String>,
+    connect_qr_png_data_url: Option<String>,
+}
+
+impl From<RawWhatsAppOnboarding> for WhatsAppOnboarding {
+    fn from(raw: RawWhatsAppOnboarding) -> Self {
+        Self {
+            agent_identity_id: raw.agent_identity_id,
+            number: raw.triage_number.clone().or(raw.number),
+            message_text: raw
+                .connect_command
+                .clone()
+                .or(raw.message_text)
+                .unwrap_or_default(),
+            message_link: raw.connect_link.clone().or(raw.message_link),
+            message_qr_png_data_url: raw
+                .connect_qr_png_data_url
+                .clone()
+                .or(raw.message_qr_png_data_url),
+            ready: raw.ready,
+            triage_number: raw.triage_number,
+            connect_command: raw.connect_command,
+            connect_link: raw.connect_link,
+            connect_qr_png_data_url: raw.connect_qr_png_data_url,
+        }
+    }
+}
+/// An already-owned dedicated number and its assignment readiness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppNumber {
+    pub id: Uuid,
+    pub number: String,
+    pub agent_identity_id: Option<Uuid>,
+    pub revision: u64,
+    pub state: String,
+    pub binding_state: Option<String>,
+    pub assignable: bool,
+    pub unavailable_reason: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppNumberList {
+    pub numbers: Vec<WhatsAppNumber>,
+    pub has_more: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppRouter {
+    pub id: Uuid,
+    pub number: String,
+    pub revision: u64,
+    pub state: String,
+    pub profile_display_name: Option<String>,
+    pub accepting_new_connections: bool,
+}
+#[derive(Deserialize)]
+struct WhatsAppRouterResponse {
+    router: Option<WhatsAppRouter>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppRouterThread {
+    pub remote_number: String,
+    pub last_message_at: String,
+    pub latest_text: String,
+    pub message_count: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppRouterThreads {
+    pub items: Vec<WhatsAppRouterThread>,
+    pub has_more: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppRouterMessage {
+    pub id: Uuid,
+    pub direction: WhatsAppDirection,
+    pub content: String,
+    pub status: String,
+    pub created_at: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhatsAppRouterMessages {
+    pub items: Vec<WhatsAppRouterMessage>,
+    pub has_more: bool,
 }
 /// Effective server limits and independent usage. Unknown public policy keys remain available.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -669,7 +767,7 @@ impl WhatsAppResource {
             idempotency_key,
         )
     }
-    /// Release an agent's shared-number connection to a recipient; history is kept.
+    /// Release an agent's recipient connection on a dedicated or shared number; history is kept.
     /// Use a new key for each new disconnect; key errors match [`Self::connect`].
     pub fn disconnect(
         &self,
@@ -702,7 +800,7 @@ impl WhatsAppResource {
             &[("Idempotency-Key", idempotency_key)],
         )?)?)
     }
-    /// List an agent's current shared-number connections.
+    /// List an agent's current dedicated or shared recipient connections.
     pub fn list_assignments(&self, identity: Option<&Uuid>) -> Result<Vec<WhatsAppAssignment>> {
         self.list_assignments_page(identity, 50, 0)
     }
@@ -762,6 +860,75 @@ impl WhatsAppResource {
             "/mark-read",
             Some(&body),
             &owner(identity),
+        )?)?)
+    }
+    /// List up to 100 already-owned dedicated numbers; requires an admin-scoped API key.
+    pub fn list_numbers(&self, offset: u64) -> Result<WhatsAppNumberList> {
+        Ok(serde_json::from_value(
+            self.http
+                .get("/numbers", &[("offset", offset.to_string())])?,
+        )?)
+    }
+    /// Attach an owned number, or detach with None. This never purchases a number.
+    pub fn assign_number(
+        &self,
+        account_id: &Uuid,
+        agent_identity_id: Option<&Uuid>,
+        expected_revision: u64,
+        confirmed_imessage_number: Option<&str>,
+    ) -> Result<WhatsAppNumber> {
+        let mut body =
+            json!({"agent_identity_id": agent_identity_id, "expected_revision": expected_revision});
+        if let Some(number) = confirmed_imessage_number {
+            body["confirmed_imessage_number"] = json!(number);
+        }
+        Ok(serde_json::from_value(
+            self.http.patch(&format!("/numbers/{account_id}"), &body)?,
+        )?)
+    }
+    /// Read your organization's dedicated router; requires an admin-scoped API key.
+    pub fn get_router(&self) -> Result<Option<WhatsAppRouter>> {
+        let response: WhatsAppRouterResponse =
+            serde_json::from_value(self.http.get("/router", crate::http::NO_QUERY)?)?;
+        Ok(response.router)
+    }
+    /// Edit the router you read. None preserves the name; Some(None) clears it.
+    pub fn update_router(
+        &self,
+        expected_router_id: &Uuid,
+        expected_revision: u64,
+        profile_display_name: Option<Option<&str>>,
+        accepting_new_connections: Option<bool>,
+    ) -> Result<Option<WhatsAppRouter>> {
+        let mut body = json!({"expected_router_id": expected_router_id, "expected_revision": expected_revision});
+        if let Some(name) = profile_display_name {
+            body["profile_display_name"] = json!(name);
+        }
+        if let Some(accepting) = accepting_new_connections {
+            body["accepting_new_connections"] = json!(accepting);
+        }
+        let response: WhatsAppRouterResponse =
+            serde_json::from_value(self.http.patch("/router", &body)?)?;
+        Ok(response.router)
+    }
+    /// List dedicated-router recipient threads, newest first. Limit is 1–100.
+    pub fn list_router_threads(&self, limit: u64, offset: u64) -> Result<WhatsAppRouterThreads> {
+        Ok(serde_json::from_value(self.http.get(
+            "/router/conversations",
+            &[("limit", limit.to_string()), ("offset", offset.to_string())],
+        )?)?)
+    }
+    /// Read one dedicated-router recipient thread; requires an admin-scoped API key.
+    pub fn list_router_messages(
+        &self,
+        remote_number: &str,
+        limit: u64,
+        offset: u64,
+    ) -> Result<WhatsAppRouterMessages> {
+        recipient(remote_number)?;
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/router/conversations/{remote_number}/messages"),
+            &[("limit", limit.to_string()), ("offset", offset.to_string())],
         )?)?)
     }
     /// Read a link and QR for messaging the agent, without sending or enabling WhatsApp.

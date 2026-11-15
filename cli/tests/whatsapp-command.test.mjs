@@ -351,3 +351,35 @@ test("shared-number connect, connections, disconnect, router, and media recipien
   await assert.rejects(() => run("connect", "--identity", "agent", "--recipient", shared.recipient_number));
   assert.equal(calls.length, before);
 });
+
+test("management commands preserve router identity, false, clear and pagination", async t => {
+  const calls = [];
+  const router = { id: f.conversation.id, number: "+15555550100", revision: 2, state: "enabled", profile_display_name: null, accepting_new_connections: false };
+  const number = { id: f.conversation.id, number: "+15555550100", revision: 2, state: "disabled", agent_identity_id: null, binding_state: null, assignable: false, unavailable_reason: "Requires setup" };
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    calls.push({ path: decodeURIComponent(url.pathname), query: Object.fromEntries(url.searchParams), body: raw ? JSON.parse(raw) : null });
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(url.pathname === "/api/v1/whatsapp/numbers" ? { numbers: [number], has_more: true }
+      : url.pathname.startsWith("/api/v1/whatsapp/numbers/") ? number
+      : url.pathname === "/api/v1/whatsapp/router" ? { router } : { items: [], has_more: false }));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const run = async (...args) => JSON.parse((await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "--json", "whatsapp", ...args],
+    { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 })).stdout);
+  assert.equal((await run("numbers", "--offset", "100")).hasMore, true);
+  assert.equal(calls.at(-1).query.offset, "100");
+  await run("assign-number", f.conversation.id, "--revision", "1", "--detach");
+  assert.deepEqual(calls.at(-1).body, { expected_revision: 1, agent_identity_id: null });
+  assert.equal((await run("router")).id, router.id);
+  await run("update-router", router.id, "--revision", "1", "--name", "", "--accepting", "false");
+  assert.deepEqual(calls.at(-1).body, { expected_router_id: router.id, expected_revision: 1, profile_display_name: null, accepting_new_connections: false });
+  await run("router-threads", "--offset", "50", "--limit", "10");
+  assert.deepEqual(calls.at(-1).query, { offset: "50", limit: "10" });
+  await run("router-messages", "+15555550101", "--offset", "10");
+  assert.equal(calls.at(-1).path, "/api/v1/whatsapp/router/conversations/+15555550101/messages");
+});

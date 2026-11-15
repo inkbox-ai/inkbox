@@ -963,3 +963,133 @@ fn empty_removal_reads_factual_receipt_state() {
     remove.assert();
     read.assert();
 }
+
+#[test]
+fn onboarding_keeps_documented_fields_for_both_response_generations() {
+    for ready in [true, false] {
+        let raw = json!({"agent_identity_id": "11111111-1111-4111-8111-111111111111", "ready": ready,
+            "number": if ready { Some("+15555550100") } else { None }, "message_text": "Hello!",
+            "message_link": if ready { Some("https://wa.me/15555550100?text=Hello!") } else { None },
+            "message_qr_png_data_url": null});
+        let value: inkbox::WhatsAppOnboarding = serde_json::from_value(raw).unwrap();
+        assert_eq!(
+            value.number.as_deref(),
+            if ready { Some("+15555550100") } else { None }
+        );
+        assert_eq!(value.message_text, "Hello!");
+        assert_eq!(
+            value.message_link.as_deref().unwrap_or_default(),
+            if ready {
+                "https://wa.me/15555550100?text=Hello!"
+            } else {
+                ""
+            }
+        );
+        assert!(value.message_qr_png_data_url.is_none());
+        assert!(value.triage_number.is_none());
+        assert!(value.connect_command.is_none());
+    }
+    let value: inkbox::WhatsAppOnboarding = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    assert_eq!(value.number, value.triage_number);
+    assert_eq!(Some(value.message_text), value.connect_command);
+    assert_eq!(value.message_link, value.connect_link);
+    assert_eq!(value.message_qr_png_data_url, value.connect_qr_png_data_url);
+}
+
+#[test]
+fn management_updates_keep_router_identity_and_explicit_clear() {
+    let server = MockServer::start();
+    let id = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let router = json!({"id":id,"number":"+15555550100","revision":2,"state":"enabled","profile_display_name":null,"accepting_new_connections":false});
+    let update = server.mock(|when, then| {
+        when.method(PATCH).path("/api/v1/whatsapp/router").json_body(json!({"expected_router_id":id,"expected_revision":1,"profile_display_name":null,"accepting_new_connections":false}));
+        then.status(200).json_body(json!({"router":router}));
+    });
+    let absent = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/whatsapp/router");
+        then.status(200).json_body(json!({"router":null}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    assert!(
+        !client
+            .whatsapp()
+            .update_router(&id, 1, Some(None), Some(false))
+            .unwrap()
+            .unwrap()
+            .accepting_new_connections
+    );
+    assert!(client.whatsapp().get_router().unwrap().is_none());
+    update.assert();
+    absent.assert();
+}
+
+#[test]
+fn management_numbers_and_router_history_use_exact_wire_paths() {
+    let server = MockServer::start();
+    let id = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let number = json!({"id":id,"number":"+15555550100","revision":2,"state":"disabled","agent_identity_id":null,"binding_state":null,"assignable":false,"unavailable_reason":"Requires setup"});
+    let numbers = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/numbers")
+            .query_param("offset", "100");
+        then.status(200)
+            .json_body(json!({"numbers":[number.clone()],"has_more":true}));
+    });
+    let assign = server.mock(|when, then| {
+        when.method(PATCH)
+            .path(format!("/api/v1/whatsapp/numbers/{id}"))
+            .json_body(json!({"agent_identity_id":null,"expected_revision":1}));
+        then.status(200).json_body(number);
+    });
+    let threads = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/router/conversations")
+            .query_param("limit", "10")
+            .query_param("offset", "20");
+        then.status(200)
+            .json_body(json!({"items":[],"has_more":false}));
+    });
+    let messages = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/router/conversations/+15555550101/messages")
+            .query_param("limit", "50")
+            .query_param("offset", "10");
+        then.status(200)
+            .json_body(json!({"items":[],"has_more":true}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    assert!(client.whatsapp().list_numbers(100).unwrap().has_more);
+    assert!(client
+        .whatsapp()
+        .assign_number(&id, None, 1, None)
+        .unwrap()
+        .agent_identity_id
+        .is_none());
+    assert!(
+        !client
+            .whatsapp()
+            .list_router_threads(10, 20)
+            .unwrap()
+            .has_more
+    );
+    assert!(
+        client
+            .whatsapp()
+            .list_router_messages("+15555550101", 50, 10)
+            .unwrap()
+            .has_more
+    );
+    numbers.assert();
+    assign.assert();
+    threads.assert();
+    messages.assert();
+}

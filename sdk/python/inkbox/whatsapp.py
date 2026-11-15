@@ -323,39 +323,31 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
 
 @dataclass
 class WhatsAppOnboarding:
-    """Connect instructions; opening the draft or QR sends nothing."""
+    """A message draft. Router fields are absent for legacy direct-link responses."""
 
     agent_identity_id: UUID
-    triage_number: str
-    connect_command: str
-    connect_link: str
-    connect_qr_png_data_url: str
+    number: str | None
+    message_text: str
+    message_link: str | None
+    message_qr_png_data_url: str | None
     ready: bool
-
-    @property
-    def number(self) -> str:
-        """Compatibility alias for triage_number."""
-        return self.triage_number
-
-    @property
-    def message_text(self) -> str:
-        """Compatibility alias for connect_command."""
-        return self.connect_command
-
-    @property
-    def message_link(self) -> str:
-        """Compatibility alias for connect_link."""
-        return self.connect_link
-
-    @property
-    def message_qr_png_data_url(self) -> str:
-        """Compatibility alias for connect_qr_png_data_url."""
-        return self.connect_qr_png_data_url
+    triage_number: str | None = None
+    connect_command: str | None = None
+    connect_link: str | None = None
+    connect_qr_png_data_url: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppOnboarding:
-        return cls(UUID(d["agent_identity_id"]), d["triage_number"], d["connect_command"],
-                   d["connect_link"], d["connect_qr_png_data_url"], d["ready"])
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            number=d.get("triage_number", d.get("number")),
+            message_text=d.get("connect_command", d.get("message_text", "")),
+            message_link=d.get("connect_link", d.get("message_link")),
+            message_qr_png_data_url=d.get("connect_qr_png_data_url", d.get("message_qr_png_data_url")),
+            ready=d["ready"], triage_number=d.get("triage_number"),
+            connect_command=d.get("connect_command"), connect_link=d.get("connect_link"),
+            connect_qr_png_data_url=d.get("connect_qr_png_data_url"),
+        )
 
 
 @dataclass
@@ -440,6 +432,77 @@ def _recipient(value: str) -> str:
     if not isinstance(value, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", value):
         raise ValueError("Provide one E.164 recipient_number")
     return value
+
+
+@dataclass
+class WhatsAppNumber:
+    """An already-owned dedicated number and its assignment readiness."""
+    id: UUID
+    number: str
+    agent_identity_id: UUID | None
+    revision: int
+    state: str
+    binding_state: str | None
+    assignable: bool
+    unavailable_reason: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppNumber:
+        return cls(UUID(d["id"]), d["number"], UUID(d["agent_identity_id"]) if d.get("agent_identity_id") else None,
+                   d["revision"], d["state"], d.get("binding_state"), d["assignable"], d.get("unavailable_reason"))
+
+
+@dataclass
+class WhatsAppNumberList:
+    numbers: list[WhatsAppNumber]
+    has_more: bool
+
+
+@dataclass
+class WhatsAppRouter:
+    id: UUID
+    number: str
+    revision: int
+    state: str
+    profile_display_name: str | None
+    accepting_new_connections: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppRouter:
+        return cls(UUID(d["id"]), d["number"], d["revision"], d["state"],
+                   d.get("profile_display_name"), d["accepting_new_connections"])
+
+
+@dataclass
+class WhatsAppRouterThread:
+    remote_number: str
+    last_message_at: datetime
+    latest_text: str
+    message_count: int
+
+
+@dataclass
+class WhatsAppRouterThreads:
+    items: list[WhatsAppRouterThread]
+    has_more: bool
+
+
+@dataclass
+class WhatsAppRouterMessage:
+    id: UUID
+    direction: str
+    content: str
+    status: str
+    created_at: datetime
+
+
+@dataclass
+class WhatsAppRouterMessages:
+    items: list[WhatsAppRouterMessage]
+    has_more: bool
+
+
+_UNSET = object()
 
 
 class WhatsAppResource:
@@ -761,7 +824,7 @@ class WhatsAppResource:
         recipient_number: str,
         idempotency_key: str,
     ) -> WhatsAppDisconnectResult:
-        """Release an agent's shared-number connection to a recipient; history is kept.
+        """Release an agent's recipient connection on a dedicated or shared number; history is kept.
 
         Use a new key for each new disconnect; reuse a key only to retry that
         same request. Key errors match :meth:`connect`.
@@ -771,7 +834,7 @@ class WhatsAppResource:
         return WhatsAppDisconnectResult._from_dict(data)
 
     def list_assignments(self, *, agent_identity_id: UUID | str | None = None, limit: int = 50, offset: int = 0) -> list[WhatsAppAssignment]:
-        """List active shared-number assignments for an agent."""
+        """List active dedicated or shared recipient connections for an agent."""
         data = self._http.get("/assignments", params={**_owner(agent_identity_id), "limit": limit, "offset": offset})
         return [WhatsAppAssignment._from_dict(row) for row in data]
 
@@ -786,6 +849,49 @@ class WhatsAppResource:
     def send_typing(self, conversation_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> dict[str, str]:
         """Send a typing indicator in an existing direct conversation."""
         return self._http.post("/typing", json={"conversation_id": str(conversation_id)}, params=_owner(agent_identity_id))
+
+    def list_numbers(self, *, offset: int = 0) -> WhatsAppNumberList:
+        """List up to 100 already-owned dedicated numbers; requires an admin-scoped API key."""
+        d = self._http.get("/numbers", params={"offset": offset})
+        return WhatsAppNumberList([WhatsAppNumber._from_dict(item) for item in d["numbers"]], d["has_more"])
+
+    def assign_number(self, account_id: UUID | str, *, agent_identity_id: UUID | str | None,
+                      expected_revision: int, confirmed_imessage_number: str | None = None) -> WhatsAppNumber:
+        """Attach an owned number, or detach with None. This never purchases a number."""
+        body: dict[str, Any] = {"agent_identity_id": str(agent_identity_id) if agent_identity_id is not None else None,
+                                "expected_revision": expected_revision}
+        if confirmed_imessage_number is not None:
+            body["confirmed_imessage_number"] = confirmed_imessage_number
+        return WhatsAppNumber._from_dict(self._http.patch(f"/numbers/{account_id}", json=body))
+
+    def get_router(self) -> WhatsAppRouter | None:
+        """Read your organization's dedicated router; requires an admin-scoped API key."""
+        d = self._http.get("/router")["router"]
+        return WhatsAppRouter._from_dict(d) if d is not None else None
+
+    def update_router(self, *, expected_router_id: UUID | str, expected_revision: int,
+                      profile_display_name: str | None | object = _UNSET,
+                      accepting_new_connections: bool | None = None) -> WhatsAppRouter:
+        """Edit the router you read. Omit its name to preserve it, or pass None to clear it."""
+        body: dict[str, Any] = {"expected_router_id": str(expected_router_id), "expected_revision": expected_revision}
+        if profile_display_name is not _UNSET:
+            body["profile_display_name"] = profile_display_name
+        if accepting_new_connections is not None:
+            body["accepting_new_connections"] = accepting_new_connections
+        return WhatsAppRouter._from_dict(self._http.patch("/router", json=body)["router"])
+
+    def list_router_threads(self, *, offset: int = 0, limit: int = 50) -> WhatsAppRouterThreads:
+        """List recipient threads on your organization's dedicated router, newest first."""
+        d = self._http.get("/router/conversations", params={"offset": offset, "limit": limit})
+        return WhatsAppRouterThreads([WhatsAppRouterThread(item["remote_number"], datetime.fromisoformat(item["last_message_at"]),
+            item["latest_text"], item["message_count"]) for item in d["items"]], d["has_more"])
+
+    def list_router_messages(self, remote_number: str, *, offset: int = 0, limit: int = 50) -> WhatsAppRouterMessages:
+        """Read one dedicated-router recipient thread; requires an admin-scoped API key."""
+        remote_number = _recipient(remote_number)
+        d = self._http.get(f"/router/conversations/{remote_number}/messages", params={"offset": offset, "limit": limit})
+        return WhatsAppRouterMessages([WhatsAppRouterMessage(UUID(item["id"]), item["direction"], item["content"],
+            item["status"], datetime.fromisoformat(item["created_at"])) for item in d["items"]], d["has_more"])
 
     def get_onboarding(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppOnboarding:
         """Read a link and QR for messaging the agent, without sending or enabling WhatsApp."""

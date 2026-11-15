@@ -68,6 +68,52 @@ export function registerWhatsAppCommands(program: Command): void {
       const global = getGlobalOpts(this);
       output(await createClient(global).whatsapp.getTriageNumber(), { json: !!global.json });
     }));
+  whatsapp.command("numbers").description("List already-owned dedicated numbers (admin API key)")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.listNumbers({ offset: Number(opts.offset) }), { json: !!global.json });
+    }));
+  whatsapp.command("assign-number <account-id>").description("Attach or detach an already-owned number (admin API key)")
+    .requiredOption("--revision <n>", "Revision returned by numbers")
+    .option("--identity <handle>", "Agent to attach")
+    .option("--detach", "Detach the currently attached agent")
+    .option("--confirmed-imessage-number <number>", "Explicitly confirmed different iMessage number")
+    .action(withErrorHandler(async function (this: Command, id: string, opts) {
+      if (!!opts.identity === !!opts.detach) throw new Error("Pass exactly one of --identity or --detach.");
+      const global = getGlobalOpts(this), client = createClient(global);
+      const identity = opts.identity ? await client.getIdentity(opts.identity) : null;
+      output(await client.whatsapp.assignNumber(id, { agentIdentityId: identity?.id ?? null,
+        expectedRevision: Number(opts.revision), confirmedImessageNumber: opts.confirmedImessageNumber }), { json: !!global.json });
+    }));
+  whatsapp.command("router").description("Read your dedicated router (admin API key)")
+    .action(withErrorHandler(async function (this: Command) {
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.getRouter(), { json: !!global.json });
+    }));
+  whatsapp.command("update-router <router-id>").description("Edit the dedicated router you read (admin API key)")
+    .requiredOption("--revision <n>", "Revision returned by router")
+    .option("--name <name>", "Display name; empty string clears it")
+    .option("--accepting <boolean>", "Accept new connections: true or false")
+    .action(withErrorHandler(async function (this: Command, id: string, opts) {
+      if (opts.accepting !== undefined && !["true", "false"].includes(opts.accepting)) throw new Error("--accepting must be true or false.");
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.updateRouter({ expectedRouterId: id, expectedRevision: Number(opts.revision),
+        ...(opts.name !== undefined ? { profileDisplayName: opts.name || null } : {}),
+        ...(opts.accepting !== undefined ? { acceptingNewConnections: opts.accepting === "true" } : {}) }), { json: !!global.json });
+    }));
+  whatsapp.command("router-threads").description("List dedicated-router recipient threads (admin API key)")
+    .option("--limit <n>", "Maximum results, 1–100", "50").option("--offset <n>", "Pagination offset", "0")
+    .action(withErrorHandler(async function (this: Command, opts) {
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.listRouterThreads({ limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json });
+    }));
+  whatsapp.command("router-messages <recipient>").description("Read a dedicated-router recipient thread (admin API key)")
+    .option("--limit <n>", "Maximum results, 1–100", "50").option("--offset <n>", "Pagination offset", "0")
+    .action(withErrorHandler(async function (this: Command, remote: string, opts) {
+      const global = getGlobalOpts(this);
+      output(await createClient(global).whatsapp.listRouterMessages(remote, { limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json });
+    }));
   const identityCommand = (name: string, description: string) =>
     whatsapp
       .command(name)
@@ -100,7 +146,7 @@ export function registerWhatsAppCommands(program: Command): void {
 
   for (const [name, description, method] of [
     ["connect", "Reserve a shared number for a recipient; sends nothing, and the agent replies after they message it", "connect"],
-    ["disconnect", "Release a shared-number connection to a recipient; history is kept", "disconnect"],
+    ["disconnect", "Release a dedicated or shared recipient connection; history is kept", "disconnect"],
   ] as const) {
     identityCommand(name, `${description} (admin API key only)`)
       .requiredOption("--recipient <number>", "One E.164 recipient")
@@ -113,7 +159,7 @@ export function registerWhatsAppCommands(program: Command): void {
           idempotencyKey: opts.idempotencyKey }), { json: !!global.json });
       }));
   }
-  identityCommand("assignments", "List recipients connected to this identity through shared numbers")
+  identityCommand("assignments", "List dedicated or shared recipient connections for this identity")
     .option("--limit <n>", "Maximum results, 1–200", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(withErrorHandler(async function (this: Command, opts) {
