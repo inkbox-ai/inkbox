@@ -2312,12 +2312,12 @@ request access in the console when unavailable. Direct and eligible group messag
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
-unknown delivery does not mean a send failed. Mark-read updates only local history.
+unknown delivery does not mean a send failed. Mark-read updates history and sends supported read receipts.
 
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
-reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+reactions are supported. Typing and read receipts are supported for eligible direct conversations; WhatsApp calls are not.
 
 Group names are display metadata; use the conversation ID to send. Groups must be
 joined in WhatsApp and receive a message from another participant before the agent
@@ -2357,13 +2357,13 @@ result = client.whatsapp.connect(
     agent_identity_id=identity.id, recipient_number="+15555550101",
     idempotency_key=str(uuid4()),
 )
-print(result.number)  # give this number to the recipient; nothing was sent
-connections = client.whatsapp.list_connections(agent_identity_id=identity.id)
+print(result.assigned_number)  # organization-owned number; None for global shared assignments
+connections = client.whatsapp.list_assignments(agent_identity_id=identity.id)
 client.whatsapp.disconnect(
     agent_identity_id=identity.id, recipient_number="+15555550101",
     idempotency_key=str(uuid4()),
 )
-router = client.whatsapp.get_router()
+router = client.whatsapp.get_triage_number()
 ```
 
 Pass `recipient_number=` to `upload_media` / `upload_whatsapp_media` when replying

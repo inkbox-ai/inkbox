@@ -1,44 +1,49 @@
 {
   "identity_id": "10000000-0000-4000-8000-000000000001",
   "recipient_number": "+15555550101",
-  "connection": {
-    "id": "70000000-0000-4000-8000-000000000007",
-    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
-    "recipient_number": "+15555550101",
-    "number": "+15555550190",
-    "number_type": "dedicated_shared",
-    "created_at": "2026-10-01T12:00:00Z",
-    "last_activity_at": "2026-10-01T12:05:00Z"
-  },
   "connect": {
-    "connection": {
+    "already_connected": false,
+    "awaiting_inbound": true,
+    "assignment": {
       "id": "70000000-0000-4000-8000-000000000007",
       "agent_identity_id": "10000000-0000-4000-8000-000000000001",
-      "recipient_number": "+15555550101",
-      "number": "+15555550190",
-      "number_type": "dedicated_shared",
       "created_at": "2026-10-01T12:00:00Z",
-      "last_activity_at": "2026-10-01T12:05:00Z"
+      "remote_number": "+15555550101",
+      "organization_id": "org_example",
+      "status": "active",
+      "released_at": null,
+      "updated_at": "2026-10-01T12:05:00Z"
     },
-    "number": "+15555550190",
-    "already_connected": false,
-    "awaiting_inbound": true
+    "conversation_id": "20000000-0000-4000-8000-000000000002",
+    "assigned_number": "+15555550190"
   },
   "disconnect": {
-    "connection_id": "70000000-0000-4000-8000-000000000007",
-    "disconnected": true
+    "disconnected": true,
+    "assignment_id": "70000000-0000-4000-8000-000000000007"
   },
   "already_disconnected": {
-    "connection_id": null,
-    "disconnected": true
-  },
-  "router": {
-    "number": "+15555550180",
-    "number_type": "dedicated_triage"
+    "disconnected": true,
+    "assignment_id": null
   },
   "awaiting_inbound_error": {
     "error": "whatsapp_awaiting_inbound",
     "message": "This recipient has not messaged this WhatsApp number yet. You can reply once they send a message.",
     "retry_condition": "recipient_message"
+  },
+  "assignment": {
+    "id": "70000000-0000-4000-8000-000000000007",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "created_at": "2026-10-01T12:00:00Z",
+    "remote_number": "+15555550101",
+    "organization_id": "org_example",
+    "status": "active",
+    "released_at": null,
+    "updated_at": "2026-10-01T12:05:00Z"
+  },
+  "triage": {
+    "number": "+15555550180",
+    "connect_command": "connect @agent",
+    "whatsapp_link": "https://wa.me/15555550180?text=connect%20%40agent",
+    "connect_qr_png_data_url": "data:image/png;base64,cXI="
   }
 }

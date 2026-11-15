@@ -802,7 +802,7 @@ Each message can contain text, one owned attachment, or both.
 
 An agent without a dedicated number can reach a recipient through one of the
 organization's shared numbers. Connecting reserves a number for that recipient
-and sends nothing; give the recipient the returned `number`. `awaiting_inbound` /
+and sends nothing; give the recipient the returned `assigned_number` / `assignedNumber` when present. `awaiting_inbound` /
 `awaitingInbound` stays true until they message it, and the agent can reply
 after that. Connect and disconnect require an admin-scoped API key and an
 idempotency key. Disconnecting keeps conversation history. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. People can also text the router number to connect with an agent.
@@ -815,12 +815,12 @@ result = client.whatsapp.connect(
     agent_identity_id=identity.id, recipient_number="+15555550101",
     idempotency_key=str(uuid4()),
 )
-connections = client.whatsapp.list_connections(agent_identity_id=identity.id)
+connections = client.whatsapp.list_assignments(agent_identity_id=identity.id)
 client.whatsapp.disconnect(
     agent_identity_id=identity.id, recipient_number="+15555550101",
     idempotency_key=str(uuid4()),
 )
-router = client.whatsapp.get_router()
+router = client.whatsapp.get_triage_number()
 ```
 
 ```typescript
@@ -828,12 +828,12 @@ const result = await client.whatsapp.connect({
   agentIdentityId: identity.id, recipientNumber: "+15555550101",
   idempotencyKey: crypto.randomUUID(),
 });
-const connections = await client.whatsapp.listConnections({ agentIdentityId: identity.id });
+const connections = await client.whatsapp.listAssignments({ agentIdentityId: identity.id });
 await client.whatsapp.disconnect({
   agentIdentityId: identity.id, recipientNumber: "+15555550101",
   idempotencyKey: crypto.randomUUID(),
 });
-const router = await client.whatsapp.getRouter();
+const router = await client.whatsapp.getTriageNumber();
 ```
 
 ```rust,no_run
@@ -843,21 +843,21 @@ let identity = client.get_identity("my-agent")?;
 let result = client
     .whatsapp()
     .connect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
-let connections = client.whatsapp().list_connections(Some(&identity.id()))?;
+let connections = client.whatsapp().list_assignments(Some(&identity.id()))?;
 client
     .whatsapp()
     .disconnect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
-let router = client.whatsapp().get_router()?;
+let router = client.whatsapp().get_triage_number(None)?;
 # Ok(()) }
 ```
 
 ```bash
 inkbox whatsapp connect --identity my-agent --recipient +15555550101 \
   --idempotency-key "$(uuidgen)"
-inkbox whatsapp connections --identity my-agent
+inkbox whatsapp assignments --identity my-agent
 inkbox whatsapp disconnect --identity my-agent --recipient +15555550101 \
   --idempotency-key "$(uuidgen)"
-inkbox whatsapp router
+inkbox whatsapp triage-number
 ```
 
 When replying through a shared number with an attachment, pass the recipient
@@ -933,8 +933,7 @@ A queued response is acceptance, not delivery. Inspect message `status` separate
 from `delivery_state` / `deliveryState`. A confirmed `sent` message with delivery
 `unknown` has not become a failed send. Do not resend automatically to chase a
 missing delivery confirmation. `mark_whatsapp_read` / `markWhatsAppRead` /
-`mark_read` updates local unread history through an exact message boundary; it
-never sends a remote read receipt.
+`mark_read` updates unread history and sends supported read receipts. Omit the message boundary to mark all unread messages; inspect `read_receipts_sent` / `readReceiptsSent`.
 
 ### Notifications and contact history
 
@@ -951,8 +950,9 @@ Contact correspondence is explicitly opt-in: select `channels=["whatsapp"]` and
 optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp
 --whatsapp-limit 10` in the CLI). Default correspondence selectors are unchanged.
 Conversation participants contain remote numbers only, and `sender_number` /
-`senderNumber` is the actual message author. Typing indicators, remote read
-receipts, and WhatsApp calls are not supported.
+`senderNumber` is the message author, or null when the number is hidden. Typing
+indicators and read receipts are supported for eligible direct conversations.
+WhatsApp calls are not supported.
 
 ### Native quotes and reactions
 

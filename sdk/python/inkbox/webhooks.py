@@ -978,7 +978,7 @@ class WhatsAppWebhookMessage(TypedDict):
     agent_identity_id: str
     conversation_id: str
     direction: str
-    local_number: str
+    local_number: str | None
     remote_number: str | None
     sender_number: str | None
     participants: list[str]

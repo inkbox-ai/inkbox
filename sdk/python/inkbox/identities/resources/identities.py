@@ -84,6 +84,7 @@ class IdentitiesResource:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        whatsapp_enabled: bool | None = None,
         contact_sharing_enabled: bool | None = None,
         claim_imessage_number: Literal[True] | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
@@ -130,6 +131,8 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if whatsapp_enabled is not None:
+            body["whatsapp_enabled"] = whatsapp_enabled
         if contact_sharing_enabled is not None:
             body["contact_sharing_enabled"] = contact_sharing_enabled
         if claim_imessage_number is True:
@@ -171,6 +174,7 @@ class IdentitiesResource:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        whatsapp_enabled: bool | None = None,
         contact_sharing_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
         claim_imessage_number: Literal[True] | None = None,
@@ -232,6 +236,8 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if whatsapp_enabled is not None:
+            body["whatsapp_enabled"] = whatsapp_enabled
         if contact_sharing_enabled is not None:
             body["contact_sharing_enabled"] = contact_sharing_enabled
         if claim_imessage_number is True and imessage_number_id is not _UNSET:

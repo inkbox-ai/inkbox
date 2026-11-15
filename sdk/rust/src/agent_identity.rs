@@ -2375,11 +2375,7 @@ impl AgentIdentity {
     pub fn get_whatsapp_reaction(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppReaction> {
         self.inkbox.whatsapp().get_reaction(id, Some(&self.id()))
     }
-    pub fn remove_whatsapp_reaction(
-        &self,
-        id: &Uuid,
-        key: &str,
-    ) -> Result<crate::whatsapp::WhatsAppReaction> {
+    pub fn remove_whatsapp_reaction(&self, id: &Uuid, key: &str) -> Result<()> {
         self.inkbox
             .whatsapp()
             .remove_reaction(id, key, Some(&self.id()))
@@ -2413,10 +2409,29 @@ impl AgentIdentity {
     pub fn get_whatsapp_media(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMedia> {
         self.inkbox.whatsapp().get_media(id, Some(&self.id()))
     }
-    pub fn mark_whatsapp_read(
+    /// Toggle WhatsApp reachability and refresh the cached identity.
+    pub fn set_whatsapp_enabled(&self, enabled: bool) -> Result<()> {
+        let data = self
+            .inkbox
+            .identities()
+            .set_whatsapp_enabled(&self.agent_handle(), enabled)?;
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
+        Ok(())
+    }
+
+    /// Send a typing indicator in an existing direct conversation.
+    pub fn send_whatsapp_typing(&self, conversation_id: &Uuid) -> Result<serde_json::Value> {
+        self.inkbox
+            .whatsapp()
+            .send_typing(conversation_id, Some(&self.id()))
+    }
+    pub fn mark_whatsapp_read<'a>(
         &self,
         id: &Uuid,
-        through: &Uuid,
+        through: impl Into<Option<&'a Uuid>>,
     ) -> Result<crate::whatsapp::WhatsAppMarkReadResult> {
         self.inkbox
             .whatsapp()

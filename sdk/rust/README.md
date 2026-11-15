@@ -1353,7 +1353,7 @@ request access in the console when unavailable. Direct and eligible group messag
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
-unknown delivery does not mean a send failed. Mark-read updates only local history.
+unknown delivery does not mean a send failed. Mark-read updates history and sends supported read receipts.
 
 If submission fails, `error.idempotency_key()` returns the submitted key, including
 an automatically generated key. Retry the unchanged request with that key rather
@@ -1370,7 +1370,7 @@ access. Older responses default it to `false`; manually constructed
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
-reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+reactions are supported. Typing and read receipts are supported for eligible direct conversations; WhatsApp calls are not.
 
 Group names are display metadata; use the conversation ID to send. Groups must be
 joined in WhatsApp and receive a message from another participant before the agent
@@ -1410,12 +1410,12 @@ let identity = client.get_identity("my-agent")?;
 let result = client
     .whatsapp()
     .connect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
-println!("{}", result.number); // give this number to the recipient; nothing was sent
-let connections = client.whatsapp().list_connections(Some(&identity.id()))?;
+println!("{:?}", result.assigned_number); // None for global shared assignments
+let connections = client.whatsapp().list_assignments(Some(&identity.id()))?;
 client
     .whatsapp()
     .disconnect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
-let router = client.whatsapp().get_router()?;
+let router = client.whatsapp().get_triage_number(None)?;
 # Ok(()) }
 ```
 

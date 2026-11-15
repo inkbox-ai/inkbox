@@ -177,7 +177,10 @@ export class AgentIdentity {
   getWhatsAppMedia(id: string) {
     return this._inkbox.whatsapp.getMedia(id, { agentIdentityId: this.id });
   }
-  markWhatsAppRead(conversationId: string, throughMessageId: string) {
+  sendWhatsAppTyping(conversationId: string) {
+    return this._inkbox.whatsapp.sendTyping(conversationId, { agentIdentityId: this.id });
+  }
+  markWhatsAppRead(conversationId: string, throughMessageId?: string) {
     return this._inkbox.whatsapp.markRead(conversationId, throughMessageId, {
       agentIdentityId: this.id,
     });

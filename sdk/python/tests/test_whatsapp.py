@@ -372,8 +372,6 @@ def test_onboarding_is_an_owned_read_and_preserves_availability(identity_id, sta
     raw = json.loads((Path(__file__).parents[3] / "tests/fixtures/whatsapp-onboarding.json").read_text())
     raw["agent_identity_id"] = OWNER
     raw["ready"] = state == "ready"
-    if state == "disabled":
-        raw.update(number=None, message_link=None, message_qr_png_data_url=None)
     http = MagicMock()
     http.get.return_value = raw
     result = WhatsAppResource(http).get_onboarding(agent_identity_id=identity_id)
@@ -393,8 +391,8 @@ def test_identity_onboarding_reads_fresh_details_with_own_identity():
     with Inkbox(api_key="test-only") as client:
         client.whatsapp._http = MagicMock()
         client.whatsapp._http.get.return_value = {
-            "agent_identity_id": OWNER, "number": None, "message_text": "Hello!",
-            "message_link": None, "message_qr_png_data_url": None, "ready": False,
+            "agent_identity_id": OWNER, "triage_number": "+15555550100", "connect_command": "connect @agent",
+            "connect_link": "https://wa.me/15555550100?text=connect%20%40agent", "connect_qr_png_data_url": "data:image/png;base64,cXI=", "ready": False,
         }
         assert AgentIdentity(data, client).get_whatsapp_onboarding().ready is False
         client.whatsapp._http.get.assert_called_once_with("/onboarding", params={"agent_identity_id": OWNER})

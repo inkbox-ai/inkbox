@@ -62,11 +62,12 @@ export function registerWhatsAppCommands(program: Command): void {
     .command("whatsapp")
     .description("WhatsApp conversations, shared-number connections, quoted replies, and reactions");
   whatsapp
-    .command("router")
+    .command("triage-number")
+    .alias("router")
     .description("Show the WhatsApp router number people message to connect with your agents")
     .action(withErrorHandler(async function (this: Command) {
       const global = getGlobalOpts(this);
-      output(await createClient(global).whatsapp.getRouter(), { json: !!global.json });
+      output(await createClient(global).whatsapp.getTriageNumber(), { json: !!global.json });
     }));
   const identityCommand = (name: string, description: string) =>
     whatsapp
@@ -113,12 +114,15 @@ export function registerWhatsAppCommands(program: Command): void {
           idempotencyKey: opts.idempotencyKey }), { json: !!global.json });
       }));
   }
-  identityCommand("connections", "List recipients connected to this identity through shared numbers")
+  identityCommand("assignments", "List recipients connected to this identity through shared numbers")
+    .alias("connections")
+    .option("--limit <n>", "Maximum results, 1–200", "50")
+    .option("--offset <n>", "Pagination offset", "0")
     .action(withErrorHandler(async function (this: Command, opts) {
       const global = getGlobalOpts(this), client = createClient(global);
       const identity = await client.getIdentity(opts.identity);
-      output(await client.whatsapp.listConnections({ agentIdentityId: identity.id }), { json: !!global.json,
-        columns: ["id", "recipientNumber", "number", "numberType", "lastActivityAt"] });
+      output(await client.whatsapp.listAssignments({ agentIdentityId: identity.id, limit: Number(opts.limit), offset: Number(opts.offset) }), { json: !!global.json,
+        columns: ["id", "remoteNumber", "status", "updatedAt"] });
     }));
 
   identityCommand(
@@ -246,7 +250,8 @@ export function registerWhatsAppCommands(program: Command): void {
     .requiredOption("--idempotency-key <key>", "Stable removal key; reuse it after uncertainty")
     .action(withErrorHandler(async function (this: Command, reactionId: string, opts) {
       const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
-      output(await identity.removeWhatsAppReaction(reactionId, opts.idempotencyKey), { json: !!global.json });
+      await identity.removeWhatsAppReaction(reactionId, opts.idempotencyKey);
+      output({ accepted: true }, { json: !!global.json });
     }));
   identityCommand("thread <message-id>", "Read chronological visible replies to a quote-chain root")
     .option("--limit <n>", "Maximum results, 1–200", "50").option("--cursor <cursor>", "Opaque cursor from this thread")
@@ -331,12 +336,26 @@ export function registerWhatsAppCommands(program: Command): void {
       }),
     );
 
+  whatsapp.command("delete-assignment <assignment-id>")
+    .description("Release a shared-number assignment; keeps history (admin API key only)")
+    .action(withErrorHandler(async function (this: Command, assignmentId: string) {
+      const global = getGlobalOpts(this);
+      await createClient(global).whatsapp.deleteAssignment(assignmentId);
+      output({ released: true }, { json: !!global.json });
+    }));
+
+  identityCommand("typing <conversation-id>", "Send a typing indicator in an existing direct conversation")
+    .action(withErrorHandler(async function (this: Command, conversationId: string, opts) {
+      const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
+      output(await identity.sendWhatsAppTyping(conversationId), { json: !!global.json });
+    }));
+
   identityCommand(
     "mark-read",
-    "Mark local history read through an exact message; sends no remote receipt",
+    "Mark history read and send supported read receipts",
   )
     .requiredOption("--conversation-id <id>", "Conversation ID")
-    .requiredOption("--through-message-id <id>", "Last visible message ID")
+    .option("--through-message-id <id>", "Last visible message ID; omit for all unread messages")
     .action(
       withErrorHandler(async function (this: Command, opts) {
         const global = getGlobalOpts(this);

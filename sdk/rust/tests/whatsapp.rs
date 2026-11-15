@@ -307,13 +307,13 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
             .path("/api/v1/whatsapp/reactions")
             .header("Idempotency-Key", "reaction-original")
             .json_body(json!({"message_id":id,"custom_emoji":"👨‍👩‍👧‍👦"}));
-        then.status(201).json_body(json!({"reaction":uncertain}));
+        then.status(201).json_body(uncertain);
     });
     let remove = server.mock(|when, then| {
         when.method(DELETE)
             .path(format!("/api/v1/whatsapp/reactions/{rid}"))
             .header("Idempotency-Key", "remove-original");
-        then.json_body(json!({"reaction":data["removed_reaction"]}));
+        then.status(204);
     });
     let client = Inkbox::builder("test-only")
         .base_url(server.base_url())
@@ -352,14 +352,10 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
         .unwrap();
     assert_eq!(reaction.status, inkbox::WhatsAppReactionStatus::Uncertain);
     assert!(reaction.remote_number.is_none());
-    assert_eq!(
-        client
-            .whatsapp()
-            .remove_reaction(&rid, "remove-original", None)
-            .unwrap()
-            .status,
-        inkbox::WhatsAppReactionStatus::Removed
-    );
+    client
+        .whatsapp()
+        .remove_reaction(&rid, "remove-original", None)
+        .unwrap();
     thread_mock.assert();
     conversation_mock.assert();
     react.assert();
@@ -701,7 +697,7 @@ fn group_metadata_and_quoted_animation_preserve_stable_ids() {
     assert!(message.remote_number.is_none() && message.recipients.is_empty());
     assert_eq!(
         message.sender_number.as_deref(),
-        Some(message.local_number.as_str())
+        message.local_number.as_deref()
     );
     assert_eq!(message.unresolved_participant_count, 0);
     let blocked: inkbox::WhatsAppMessage =
@@ -718,7 +714,7 @@ fn group_metadata_and_quoted_animation_preserve_stable_ids() {
     assert!(webhook.is_group);
     assert_eq!(
         webhook.sender_number.as_deref(),
-        Some(message.local_number.as_str())
+        message.local_number.as_deref()
     );
     let server = MockServer::start();
     let send = server.mock(|when, then| {
@@ -827,11 +823,6 @@ fn onboarding_preserves_ownership_and_availability_without_sending() {
             let server = MockServer::start();
             let mut raw = base.clone();
             raw["ready"] = json!(state == "ready");
-            if state == "disabled" {
-                raw["number"] = Value::Null;
-                raw["message_link"] = Value::Null;
-                raw["message_qr_png_data_url"] = Value::Null;
-            }
             let get = server.mock(|when, then| {
                 let when = when.method(GET).path("/api/v1/whatsapp/onboarding");
                 if let Some(id) = identity {

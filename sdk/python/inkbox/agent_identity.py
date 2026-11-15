@@ -188,7 +188,7 @@ class AgentIdentity:
     def get_whatsapp_reaction(self, reaction_id: UUID | str) -> WhatsAppReaction:
         return self._inkbox.whatsapp.get_reaction(reaction_id, agent_identity_id=self.id)
 
-    def remove_whatsapp_reaction(self, reaction_id: UUID | str, *, idempotency_key: str) -> WhatsAppReaction:
+    def remove_whatsapp_reaction(self, reaction_id: UUID | str, *, idempotency_key: str) -> None:
         return self._inkbox.whatsapp.remove_reaction(reaction_id, idempotency_key=idempotency_key, agent_identity_id=self.id)
 
     def get_whatsapp_message(self, message_id: UUID | str) -> WhatsAppMessage:
@@ -251,8 +251,12 @@ class AgentIdentity:
     def get_whatsapp_media(self, media_id: UUID | str) -> WhatsAppMedia:
         return self._inkbox.whatsapp.get_media(media_id, agent_identity_id=self.id)
 
+    def send_whatsapp_typing(self, conversation_id: UUID | str) -> dict[str, str]:
+        """Send a typing indicator in an existing direct conversation."""
+        return self._inkbox.whatsapp.send_typing(conversation_id, agent_identity_id=self.id)
+
     def mark_whatsapp_read(
-        self, conversation_id: UUID | str, through_message_id: UUID | str
+        self, conversation_id: UUID | str, through_message_id: UUID | str | None = None
     ) -> WhatsAppMarkReadResult:
         return self._inkbox.whatsapp.mark_read(
             conversation_id, through_message_id, agent_identity_id=self.id
@@ -2253,6 +2257,7 @@ class AgentIdentity:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        whatsapp_enabled: bool | None = None,
         contact_sharing_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
         claim_imessage_number: Literal[True] | None = None,
@@ -2313,6 +2318,8 @@ class AgentIdentity:
             update_kwargs["description"] = description
         if imessage_enabled is not None:
             update_kwargs["imessage_enabled"] = imessage_enabled
+        if whatsapp_enabled is not None:
+            update_kwargs["whatsapp_enabled"] = whatsapp_enabled
         if contact_sharing_enabled is not None:
             update_kwargs["contact_sharing_enabled"] = contact_sharing_enabled
         if imessage_number_id is not _UNSET:

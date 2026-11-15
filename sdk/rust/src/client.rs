@@ -637,6 +637,28 @@ impl Inkbox {
 
     /// Convenience wrapper for the common case: create an identity by handle
     /// with all options defaulted.
+    pub fn create_identity_with_whatsapp(
+        self: &Arc<Self>,
+        agent_handle: &str,
+        enabled: bool,
+    ) -> Result<AgentIdentity> {
+        let data = self.identities.create_with_whatsapp(
+            agent_handle,
+            None,
+            Unset::Omit,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(enabled),
+        )?;
+        Ok(AgentIdentity::new(data, self.clone()))
+    }
+
+    /// Create an identity with default channel settings.
     pub fn create_identity(self: &Arc<Self>, agent_handle: &str) -> Result<AgentIdentity> {
         self.create_identity_with(
             agent_handle,

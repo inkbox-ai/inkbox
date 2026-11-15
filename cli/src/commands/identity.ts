@@ -448,6 +448,7 @@ export function registerIdentityCommands(program: Command): void {
       "--description <text>",
       "Free-form org-internal description (never surfaces in outbound mail).",
     )
+    .option("--whatsapp-enabled", "Enable WhatsApp for the new identity")
     .option(
       "--imessage-enabled",
       "Enable iMessage reachability for this identity.",
@@ -482,6 +483,7 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string;
           description?: string;
           imessageEnabled?: boolean;
+          whatsappEnabled?: boolean;
           contactSharingEnabled?: string;
           emailLocalPart?: string;
           sendingDomain?: string;
@@ -504,6 +506,7 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string;
           description?: string | null;
           imessageEnabled?: boolean;
+          whatsappEnabled?: boolean;
           contactSharingEnabled?: boolean;
           emailLocalPart?: string;
           sendingDomain?: string | null;
@@ -512,6 +515,7 @@ export function registerIdentityCommands(program: Command): void {
         if (cmdOpts.displayName !== undefined) createOpts.displayName = cmdOpts.displayName;
         if (cmdOpts.description !== undefined) createOpts.description = cmdOpts.description;
         if (cmdOpts.imessageEnabled) createOpts.imessageEnabled = true;
+        if (cmdOpts.whatsappEnabled) createOpts.whatsappEnabled = true;
         if (cmdOpts.contactSharingEnabled !== undefined) {
           createOpts.contactSharingEnabled = cmdOpts.contactSharingEnabled === "true";
         }
@@ -572,6 +576,7 @@ export function registerIdentityCommands(program: Command): void {
     .option("--display-name <name>", "New display name (pass '' to clear)")
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
+    .option("--whatsapp-enabled <bool>", "Toggle WhatsApp reachability: true or false")
     .option("--imessage-enabled <bool>", "Toggle identity-level iMessage reachability: true or false")
     .option("--contact-sharing-enabled <bool>", "Toggle automatic name and optional photo sharing on a personal iMessage line: true or false")
     .option("--imessage-filter-mode <mode>", "Alias for the shared phone and iMessage contact-rule mode (admin API key required)")
@@ -593,6 +598,7 @@ export function registerIdentityCommands(program: Command): void {
           description?: string;
           clearDescription?: boolean;
           imessageEnabled?: string;
+          whatsappEnabled?: string;
           contactSharingEnabled?: string;
           imessageFilterMode?: string;
           mailFilterMode?: string;
@@ -648,6 +654,7 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string | null;
           description?: string | null;
           imessageEnabled?: boolean;
+          whatsappEnabled?: boolean;
           contactSharingEnabled?: boolean;
           imessageFilterMode?: "whitelist" | "blacklist";
           mailFilterMode?: "whitelist" | "blacklist";
@@ -666,6 +673,10 @@ export function registerIdentityCommands(program: Command): void {
           updateOpts.description = cmdOpts.description === "" ? null : cmdOpts.description;
         } else if (cmdOpts.clearDescription) {
           updateOpts.description = null;
+        }
+        if (cmdOpts.whatsappEnabled !== undefined) {
+          if (cmdOpts.whatsappEnabled !== "true" && cmdOpts.whatsappEnabled !== "false") throw new Error("--whatsapp-enabled must be 'true' or 'false'");
+          updateOpts.whatsappEnabled = cmdOpts.whatsappEnabled === "true";
         }
         if (cmdOpts.imessageEnabled !== undefined) {
           updateOpts.imessageEnabled = cmdOpts.imessageEnabled === "true";

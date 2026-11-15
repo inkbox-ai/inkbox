@@ -2350,12 +2350,12 @@ request access in the console when unavailable. Direct and eligible group messag
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
-unknown delivery does not mean a send failed. Mark-read updates only local history.
+unknown delivery does not mean a send failed. Mark-read updates history and sends supported read receipts.
 
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
-reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+reactions are supported. Typing and read receipts are supported for eligible direct conversations; WhatsApp calls are not.
 
 Group names are display metadata; use the conversation ID to send. Groups must be
 joined in WhatsApp and receive a message from another participant before the agent
@@ -2393,13 +2393,13 @@ const result = await client.whatsapp.connect({
   agentIdentityId: identity.id, recipientNumber: "+15555550101",
   idempotencyKey: crypto.randomUUID(),
 });
-console.log(result.number); // give this number to the recipient; nothing was sent
-const connections = await client.whatsapp.listConnections({ agentIdentityId: identity.id });
+console.log(result.assignedNumber); // null for global shared assignments
+const connections = await client.whatsapp.listAssignments({ agentIdentityId: identity.id });
 await client.whatsapp.disconnect({
   agentIdentityId: identity.id, recipientNumber: "+15555550101",
   idempotencyKey: crypto.randomUUID(),
 });
-const router = await client.whatsapp.getRouter();
+const router = await client.whatsapp.getTriageNumber();
 ```
 
 Pass `recipientNumber` to `uploadMedia` / `uploadWhatsAppMedia` when replying

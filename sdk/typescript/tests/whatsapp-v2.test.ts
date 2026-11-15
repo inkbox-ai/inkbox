@@ -39,15 +39,15 @@ describe("WhatsApp v2 shared wire contract", () => {
     await expect(api().getThread(f.message.id, { limit: 0 })).rejects.toThrow(); await expect(api().list({ threadId: f.thread.thread_id })).rejects.toThrow(); expect(fetch).toHaveBeenCalledTimes(calls);
   });
   it("reactions preserve explicit write keys, unknown actors, and uncertain/removal receipts", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok({ reaction: { ...f.uncertain_reaction, remote_number: null } }))));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok({ ...f.uncertain_reaction, remote_number: null }))));
     const options = { messageId: f.message.id, customEmoji: "👨‍👩‍👧‍👦", idempotencyKey: "reaction-original", agentIdentityId: f.message.agent_identity_id };
     const result = await api().sendReaction(options); expect(result.status).toBe("uncertain"); expect(result.remoteNumber).toBeNull();
     expect(request().body).toEqual({ message_id: f.message.id, custom_emoji: options.customEmoji });
     expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("reaction-original");
     await api().getReaction(f.reaction.id); expect(request().init.method).toBe("GET");
-    vi.mocked(fetch).mockImplementation(() => Promise.resolve(ok({ reaction: f.removed_reaction })));
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
     const removed = await api().removeReaction(f.reaction.id, { idempotencyKey: "remove-original", agentIdentityId: f.message.agent_identity_id });
-    expect(removed.status).toBe("removed"); expect(request().init.method).toBe("DELETE"); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("remove-original"); expect(request().url.searchParams.get("agent_identity_id")).toBe(f.message.agent_identity_id);
+    expect(removed).toBeUndefined(); expect(request().init.method).toBe("DELETE"); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("remove-original"); expect(request().url.searchParams.get("agent_identity_id")).toBe(f.message.agent_identity_id);
   });
   it("rejects malformed reaction alternatives before any transport call", async () => {
     vi.stubGlobal("fetch", vi.fn());

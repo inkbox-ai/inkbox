@@ -78,6 +78,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       "/api/v1/whatsapp/onboarding": onboarding,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
+      "/api/v1/whatsapp/typing": { status: "sent" },
       "/api/v1/whatsapp/mark-read": {
         conversation_id: f.conversation.id,
         updated_count: 2,
@@ -154,10 +155,14 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
+  assert.equal((await run("typing", f.conversation.id)).status, "sent");
+  assert.deepEqual(calls.at(-1).body, { conversation_id: f.conversation.id });
+  await run("mark-read", "--conversation-id", f.conversation.id);
+  assert.deepEqual(calls.at(-1).body, { conversation_id: f.conversation.id });
   const draft = await run("onboarding");
-  assert.equal(draft.messageLink, onboarding.message_link);
-  assert.equal(draft.messageQrPngDataUrl, onboarding.message_qr_png_data_url);
-  assert.equal(draft.messageText, "Hello!");
+  assert.equal(draft.messageLink, onboarding.connect_link);
+  assert.equal(draft.messageQrPngDataUrl, onboarding.connect_qr_png_data_url);
+  assert.equal(draft.connectCommand, onboarding.connect_command);
   assert.equal(draft.ready, true);
   assert.equal(calls.at(-1).path, "/api/v1/whatsapp/onboarding");
   assert.equal(calls.at(-1).method, "GET");
@@ -197,10 +202,10 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal(calls.at(-1).key, "reaction-stable");
   assert.equal(calls.at(-1).query.agent_identity_id, f.identity_id);
   assert.equal((await run("get-reaction", v2.reaction.id)).id, v2.reaction.id);
-  assert.equal((await run("remove-reaction", v2.reaction.id, "--idempotency-key", "remove-stable")).status, "removed");
+  assert.equal((await run("remove-reaction", v2.reaction.id, "--idempotency-key", "remove-stable")).accepted, true);
   assert.equal(calls.at(-1).method, "DELETE");
   assert.equal(calls.at(-1).key, "remove-stable");
-  assert.equal((await run("unreact", v2.reaction.id, "--idempotency-key", "remove-alias")).status, "removed");
+  assert.equal((await run("unreact", v2.reaction.id, "--idempotency-key", "remove-alias")).accepted, true);
   assert.equal(calls.at(-1).method, "DELETE");
   assert.equal(calls.at(-1).key, "remove-alias");
   assert.equal((await run("thread", v2.message.id, "--cursor", "opaque+cursor")).threadId, v2.thread.thread_id);
@@ -311,11 +316,11 @@ test("shared-number connect, connections, disconnect, router, and media recipien
     res.setHeader("content-type", "application/json");
     const routes = {
       "/api/v1/identities/agent": { id: shared.identity_id, organization_id: "org_example", agent_handle: "agent",
-        created_at: shared.connection.created_at, updated_at: shared.connection.created_at },
+        created_at: shared.assignment.created_at, updated_at: shared.assignment.created_at },
       "/api/v1/whatsapp/connect": shared.connect,
       "/api/v1/whatsapp/disconnect": shared.disconnect,
-      "/api/v1/whatsapp/connections": { items: [shared.connection] },
-      "/api/v1/whatsapp/router": shared.router,
+      "/api/v1/whatsapp/assignments": [shared.assignment],
+      "/api/v1/whatsapp/triage-number": shared.triage,
       "/api/v1/whatsapp/media": f.media,
     };
     if (!(url.pathname in routes)) { res.writeHead(404).end(); return; }
@@ -328,17 +333,17 @@ test("shared-number connect, connections, disconnect, router, and media recipien
     { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 })).stdout);
   const body = { agent_identity_id: shared.identity_id, recipient_number: shared.recipient_number };
   const connected = await run("connect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "c-1");
-  assert.equal(connected.number, shared.connect.number);
+  assert.equal(connected.number, shared.connect.assigned_number);
   assert.equal(connected.awaitingInbound, true);
   assert.deepEqual(calls.at(-1).body, body);
   assert.equal(calls.at(-1).key, "c-1");
   assert.equal((await run("connections", "--identity", "agent"))[0].recipientNumber, shared.recipient_number);
   assert.equal(calls.at(-1).query.agent_identity_id, shared.identity_id);
   const released = await run("disconnect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "d-1");
-  assert.deepEqual(released, { connectionId: shared.disconnect.connection_id, disconnected: true });
+  assert.deepEqual(released, { assignmentId: shared.disconnect.assignment_id, connectionId: shared.disconnect.assignment_id, disconnected: true });
   assert.deepEqual(calls.at(-1).body, body);
   assert.equal(calls.at(-1).key, "d-1");
-  assert.equal((await run("router")).numberType, "dedicated_triage");
+  assert.equal((await run("router")).connectCommand, "connect @agent");
   await run("upload-media", fileURLToPath(new URL("../package.json", import.meta.url)), "--identity", "agent", "--recipient", shared.recipient_number);
   assert.equal(calls.at(-1).query.recipient_number, shared.recipient_number);
   const before = calls.length;

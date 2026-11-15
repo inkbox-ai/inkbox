@@ -29,10 +29,10 @@ fn connect_sends_exact_body_and_required_key_without_a_message() {
         .connect(&owner, recipient, "connect-1")
         .unwrap();
     connect.assert();
-    assert_eq!(result.number, "+15555550190");
+    assert_eq!(result.assigned_number.as_deref(), Some("+15555550190"));
     assert!(result.awaiting_inbound && !result.already_connected);
-    assert_eq!(result.connection.number_type, "dedicated_shared");
-    assert_eq!(result.connection.recipient_number, recipient);
+    assert_eq!(result.assignment.status, "active");
+    assert_eq!(result.assignment.remote_number, recipient);
     for (number, key) in [
         ("+15555550101,+15555550102", "k"),
         ("5555550101", "k"),
@@ -72,14 +72,13 @@ fn disconnect_list_and_router_preserve_wire_shapes() {
     });
     let list = server.mock(|when, then| {
         when.method(GET)
-            .path("/api/v1/whatsapp/connections")
+            .path("/api/v1/whatsapp/assignments")
             .query_param("agent_identity_id", owner.to_string());
-        then.status(200)
-            .json_body(json!({"items": [f["connection"]]}));
+        then.status(200).json_body(json!([f["assignment"]]));
     });
     let router = server.mock(|when, then| {
-        when.method(GET).path("/api/v1/whatsapp/router");
-        then.status(200).json_body(f["router"].clone());
+        when.method(GET).path("/api/v1/whatsapp/triage-number");
+        then.status(200).json_body(f["triage"].clone());
     });
     let whatsapp = client(&server);
     let first = whatsapp
@@ -87,24 +86,24 @@ fn disconnect_list_and_router_preserve_wire_shapes() {
         .disconnect(&owner, recipient, "d-1")
         .unwrap();
     assert_eq!(
-        first.connection_id.unwrap().to_string(),
-        f["disconnect"]["connection_id"].as_str().unwrap()
+        first.assignment_id.unwrap().to_string(),
+        f["disconnect"]["assignment_id"].as_str().unwrap()
     );
     assert!(first.disconnected);
     let second = whatsapp
         .whatsapp()
         .disconnect(&owner, recipient, "d-2")
         .unwrap();
-    assert!(second.connection_id.is_none() && second.disconnected);
+    assert!(second.assignment_id.is_none() && second.disconnected);
     let rows = whatsapp.whatsapp().list_connections(Some(&owner)).unwrap();
     assert_eq!(
         rows[0].id.to_string(),
-        f["connection"]["id"].as_str().unwrap()
+        f["assignment"]["id"].as_str().unwrap()
     );
     let found = whatsapp.whatsapp().get_router().unwrap();
     assert_eq!(
-        (found.number.as_str(), found.number_type.as_str()),
-        ("+15555550180", "dedicated_triage")
+        (found.number.as_str(), found.connect_command.as_str()),
+        ("+15555550180", "connect @agent")
     );
     released.assert();
     already.assert();
@@ -167,4 +166,77 @@ fn reply_before_recipient_message_is_identifiable_and_keeps_its_key() {
     send.assert_hits(1);
     let other = inkbox::InkboxError::InvalidArgument("x".into());
     assert!(!other.is_whatsapp_awaiting_inbound());
+}
+
+#[test]
+fn assignment_delete_typing_and_all_read_use_current_wire() {
+    let f = fixture();
+    let server = MockServer::start();
+    let id = Uuid::parse_str(f["assignment"]["id"].as_str().unwrap()).unwrap();
+    let conv = Uuid::parse_str(f["connect"]["conversation_id"].as_str().unwrap()).unwrap();
+    let owner = Uuid::parse_str(f["identity_id"].as_str().unwrap()).unwrap();
+    let delete = server.mock(|when, then| {
+        when.method(DELETE)
+            .path(format!("/api/v1/whatsapp/assignments/{id}"));
+        then.status(204);
+    });
+    let typing = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/typing")
+            .query_param("agent_identity_id", owner.to_string())
+            .json_body(json!({"conversation_id": conv}));
+        then.json_body(json!({"status":"sent"}));
+    });
+    let read = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/mark-read")
+            .query_param("agent_identity_id", owner.to_string())
+            .json_body(json!({"conversation_id":conv}));
+        then.json_body(json!({"conversation_id":conv,"updated_count":2,"read_receipts_sent":true}));
+    });
+    let c = client(&server);
+    c.whatsapp().delete_assignment(&id).unwrap();
+    c.whatsapp().send_typing(&conv, Some(&owner)).unwrap();
+    assert!(
+        c.whatsapp()
+            .mark_read(&conv, None, Some(&owner))
+            .unwrap()
+            .read_receipts_sent
+    );
+    let mut hidden = f["connect"].clone();
+    hidden["assigned_number"] = Value::Null;
+    assert!(
+        serde_json::from_value::<inkbox::WhatsAppConnectResult>(hidden)
+            .unwrap()
+            .assigned_number
+            .is_none()
+    );
+    delete.assert();
+    typing.assert();
+    read.assert();
+}
+
+#[test]
+fn whatsapp_identity_enablement_is_atomic_and_preserves_false() {
+    let server = MockServer::start();
+    let f = fixture();
+    let data = json!({"id":f["identity_id"],"organization_id":"org_example","agent_handle":"agent",
+        "created_at":f["assignment"]["created_at"],"updated_at":f["assignment"]["updated_at"]});
+    let create = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/")
+            .json_body(json!({"agent_handle":"agent","whatsapp_enabled":true}));
+        then.json_body(data.clone());
+    });
+    let update = server.mock(|when, then| {
+        when.method(httpmock::Method::PATCH)
+            .path("/api/v1/identities/agent")
+            .json_body(json!({"whatsapp_enabled":false}));
+        then.json_body(data.clone());
+    });
+    let c = client(&server);
+    let identity = c.create_identity_with_whatsapp("agent", true).unwrap();
+    identity.set_whatsapp_enabled(false).unwrap();
+    create.assert();
+    update.assert();
 }

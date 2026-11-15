@@ -59,6 +59,7 @@ export interface CreateIdentityOptions {
    * service. Defaults server-side to `false`; pass `true` to opt in.
    */
   imessageEnabled?: boolean;
+  whatsappEnabled?: boolean;
   /** Automatically share this identity's name and optional avatar on an attached dedicated iMessage line. */
   contactSharingEnabled?: boolean;
   /**
@@ -92,6 +93,7 @@ export interface UpdateIdentityOptions {
   displayName?: string | null;
   description?: string | null;
   imessageEnabled?: boolean;
+  whatsappEnabled?: boolean;
   /** Toggle automatic name and optional photo sharing for an attached dedicated iMessage line. */
   contactSharingEnabled?: boolean;
   /**
@@ -189,7 +191,7 @@ export interface AgentIdentitySummary {
   description: string | null;
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
-  /** Approved dedicated WhatsApp capability; omitted on older responses. */
+  /** WhatsApp enablement; omitted on older responses. */
   whatsappEnabled?: boolean;
   /** Historical WhatsApp configuration, independent of sending access. */
   whatsappConfigured?: boolean;
