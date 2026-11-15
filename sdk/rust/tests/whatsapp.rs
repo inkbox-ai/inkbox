@@ -1,4 +1,5 @@
 use httpmock::prelude::*;
+use httpmock::Method::PATCH;
 use inkbox::webhooks::WhatsAppWebhookPayload;
 use inkbox::{
     Inkbox, WhatsAppDeliveryState, WhatsAppListOptions, WhatsAppMessageStatus, WhatsAppSendOptions,
