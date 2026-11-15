@@ -134,9 +134,26 @@ describe("durable continuations", () => {
     respond = () => ({ content: [] }); const remote = client(); await remote.refresh(); const submit = vi.fn();
     await remote.call("send", { text: "hello" }, { callIdentity: "a", beforeSubmit: submit }); expect(submit).not.toHaveBeenCalled();
   });
+  it("accepts response metadata while persisting and reusing write continuations", async () => {
+    const metadata = { "io.modelcontextprotocol/serverInfo": { name: "example", version: "1" } };
+    const accepted = { content: [], structuredContent: { id: "receipt" }, _meta: metadata };
+    respond = params => params.requestState ? accepted : { resultType: "input_required", requestState: "signed-state", _meta: metadata };
+    const remote = client(); await remote.refresh();
+    expect(await remote.call("send", { text: "hello" }, { callIdentity: "a" })).toEqual(accepted);
+    expect(calls.map(call => call.requestState)).toEqual([undefined, "signed-state"]);
+    await remote.call("send", { text: "hello" }, { callIdentity: "a" });
+    expect(calls.map(call => call.requestState)).toEqual([undefined, "signed-state", "signed-state"]);
+  });
+  it.each([null, [], "metadata"])("rejects malformed continuation metadata: %j", async metadata => {
+    const remote = client(); await remote.refresh();
+    respond = () => ({ resultType: "input_required", requestState: "signed-state", _meta: metadata });
+    await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).rejects.toThrow("unsupported interaction");
+    expect(calls).toHaveLength(1);
+    expect(readdirSync(directory).filter(name => name.endsWith(".state"))).toEqual([]);
+  });
   it("fails closed on unsupported interactions and repeated continuations", async () => {
     const remote = client(); await remote.refresh();
-    respond = () => ({ resultType: "input_required", requestState: "a", elicitation: {} });
+    respond = () => ({ resultType: "input_required", requestState: "a", elicitation: {}, _meta: {} });
     await expect(remote.call("send", { text: "hello" }, { callIdentity: "a" })).rejects.toThrow("unsupported interaction");
     respond = () => ({ resultType: "input_required", requestState: "b" });
     await expect(remote.call("send", { text: "hello" }, { callIdentity: "b" })).rejects.toThrow("unsupported interaction");

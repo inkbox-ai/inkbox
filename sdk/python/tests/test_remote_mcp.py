@@ -499,6 +499,38 @@ async def test_concurrent_preparations_converge_on_persisted_continuation(
         assert db.execute("select count(*) from calls").fetchone()[0] == 1
 
 
+async def test_write_continuation_accepts_response_metadata(remote, monkeypatch):
+    remote._catalog = (descriptor(),)
+    calls = []
+    metadata = {"io.modelcontextprotocol/serverInfo": {"name": "example", "version": "1"}}
+
+    async def request(method, params, **kwargs):
+        calls.append(dict(params))
+        if "requestState" not in params:
+            return {"resultType": "input_required", "requestState": "signed-state", "_meta": metadata}
+        return {"content": [], "structuredContent": {"id": "receipt"}, "_meta": metadata}
+
+    monkeypatch.setattr(remote, "request", request)
+    result = await remote.call("example_read", {}, call_identity="call")
+    assert result == {"content": [], "structuredContent": {"id": "receipt"}, "_meta": metadata}
+    assert [call.get("requestState") for call in calls] == [None, "signed-state"]
+    await remote.call("example_read", {}, call_identity="call")
+    assert calls[-1]["requestState"] == "signed-state"
+
+
+@pytest.mark.parametrize("metadata", [None, [], "metadata"])
+async def test_write_continuation_rejects_malformed_metadata(remote, monkeypatch, metadata):
+    remote._catalog = (descriptor(),)
+
+    async def request(method, params, **kwargs):
+        return {"resultType": "input_required", "requestState": "signed-state", "_meta": metadata}
+
+    monkeypatch.setattr(remote, "request", request)
+    with pytest.raises(RemoteToolError, match="unsupported interaction"):
+        await remote.call("example_read", {}, call_identity="call")
+    assert remote.journal.begin("call", "example_read", {})[1] is None
+
+
 async def test_real_interaction_is_never_automatically_approved(remote, monkeypatch):
     remote._catalog = (descriptor(),)
     calls = []
@@ -509,6 +541,7 @@ async def test_real_interaction_is_never_automatically_approved(remote, monkeypa
             "resultType": "input_required",
             "requestState": "signed-state",
             "inputRequests": [{"method": "elicitation/create"}],
+            "_meta": {},
         }
 
     monkeypatch.setattr(remote, "request", request)
