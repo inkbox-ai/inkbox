@@ -351,8 +351,10 @@ class RemoteMcp:
             before_submit()
         result = await self.request("tools/call", params)
         if result.get("resultType") == "input_required":
-            if set(result) - {"_meta"} != {"resultType", "requestState"} or (
-                "_meta" in result and not isinstance(result["_meta"], dict)
+            if (
+                set(result) - {"_meta", "inputRequests"} != {"resultType", "requestState"}
+                or result.get("inputRequests", {}) != {}
+                or ("_meta" in result and not isinstance(result["_meta"], dict))
             ):
                 raise RemoteToolError("The tool requires an unsupported interaction")
             next_state = result.get("requestState")

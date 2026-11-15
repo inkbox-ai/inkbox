@@ -182,7 +182,8 @@ export class RemoteMcp {
     };
     let result = await execute(record.state);
     if (result.resultType === 'input_required') {
-      if (Object.keys(result).filter(key => key !== '_meta').sort().join(',') !== 'requestState,resultType'
+      if (Object.keys(result).filter(key => key !== '_meta' && key !== 'inputRequests').sort().join(',') !== 'requestState,resultType'
+          || ('inputRequests' in result && (!object(result.inputRequests) || Object.keys(result.inputRequests).length !== 0))
           || ('_meta' in result && !object(result._meta))) throw new RemoteToolError("The tool requires an unsupported interaction");
       if (record.state !== null || typeof result.requestState !== 'string' || !result.requestState || result.requestState.length > 2048) throw new RemoteToolError("Invalid tool continuation; the operation was not repeated");
       const state = journal.bind(record.id, result.requestState);

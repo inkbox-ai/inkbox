@@ -12,7 +12,7 @@
 
 ### Changed
 - Python remote MCP clients can supply fresh supplemental headers for each request, including continuation submissions and retries.
-- Remote MCP write continuations accept response metadata while retaining durable retry identity and rejecting unsupported interactions.
+- Remote MCP write continuations accept response metadata and empty input-request maps while retaining durable retry identity and rejecting nonempty or malformed interaction requests.
 - Managed chat and inbox journals support exclusive process ownership on Windows as well as POSIX systems.
 - Tunnel reconnects preserve valid certificates, validate cached material against the requested tunnel, and rediscover a replacement tunnel when a saved ID is no longer available.
 
