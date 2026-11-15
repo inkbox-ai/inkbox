@@ -427,6 +427,64 @@ async def test_protocol_headers_results_and_safe_errors(remote, monkeypatch):
     assert len(requests) == 1
 
 
+async def test_request_headers_refresh_across_continuation_and_retry(remote, monkeypatch):
+    original_client = httpx.AsyncClient
+    calls, proofs = [], iter(["first", "second", "third"])
+
+    async def headers(method):
+        assert method == "tools/call"
+        return {"X-Request-Proof": next(proofs)}
+
+    def handle(request):
+        payload = json.loads(request.content)
+        calls.append((request.headers["x-request-proof"], payload["params"]))
+        result = (
+            {"content": []}
+            if "requestState" in payload["params"]
+            else {"resultType": "input_required", "requestState": "prepared"}
+        )
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": payload["id"], "result": result})
+
+    monkeypatch.setattr(remote, "request_headers", headers)
+    monkeypatch.setattr(
+        httpx, "AsyncClient",
+        lambda **kwargs: original_client(transport=httpx.MockTransport(handle), **kwargs),
+    )
+    remote._catalog = (descriptor("example_write"),)
+    await remote.call("example_write", {}, call_identity="call")
+    await remote.call("example_write", {}, call_identity="call")
+    assert [proof for proof, _ in calls] == ["first", "second", "third"]
+    assert [params.get("requestState") for _, params in calls] == [None, "prepared", "prepared"]
+    assert all(proof.encode() not in remote.journal.path.read_bytes() for proof in ("first", "second", "third"))
+
+
+async def test_request_header_failure_stops_submission(remote, monkeypatch):
+    async def headers(method):
+        raise ValueError("Request no longer authorized")
+
+    def forbidden(**kwargs):
+        pytest.fail("Transport opened after authorization failed")
+
+    monkeypatch.setattr(remote, "request_headers", headers)
+    monkeypatch.setattr(httpx, "AsyncClient", forbidden)
+    with pytest.raises(ValueError, match="no longer authorized"):
+        await remote.request("tools/call", {"name": "example_write"})
+
+
+@pytest.mark.parametrize("name", [
+    "x-api-key", "AUTHORIZATION", "X-Service-Token", "Host", "Cookie",
+    "Content-Type", "Content-Length", "Transfer-Encoding", "Connection",
+    "MCP-Method", "Mcp-Name", "MCP-Protocol-Version", "Accept",
+])
+async def test_request_headers_cannot_replace_credentials_or_protocol(remote, monkeypatch, name):
+    async def headers(method):
+        return {name: "replacement"}
+
+    monkeypatch.setattr(remote, "request_headers", headers)
+    with pytest.raises(RemoteToolError, match="cannot replace"):
+        await remote.request("tools/list", {})
+
+
 @pytest.mark.parametrize("failure", ["status", "protocol", "json", "large", "timeout"])
 async def test_transport_errors_are_bounded_and_do_not_leak(
     remote, monkeypatch, failure

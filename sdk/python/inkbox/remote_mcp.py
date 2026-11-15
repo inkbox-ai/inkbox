@@ -161,6 +161,10 @@ class RemoteMcp:
         self._catalog: tuple[dict, ...] = ()
         self.catalog_digest: str | None = None
 
+    async def request_headers(self, method: str) -> dict[str, str]:
+        """Override to supply fresh supplemental headers before each HTTP request."""
+        return {}
+
     async def request(
         self, method: str, params: dict, *, limit: int = MAX_MESSAGE_BYTES
     ) -> dict:
@@ -194,6 +198,14 @@ class RemoteMcp:
         }
         if method == "tools/call":
             headers["Mcp-Name"] = params["name"]
+        extra = await self.request_headers(method)
+        reserved = {name.lower() for name in headers} | {
+            "authorization", "x-service-token", "host", "cookie",
+            "content-length", "transfer-encoding", "connection", "mcp-name",
+        }
+        if any(name.lower() in reserved for name in extra):
+            raise RemoteToolError("Supplemental headers cannot replace request credentials or protocol headers")
+        headers.update(extra)
         try:
             async with httpx.AsyncClient(timeout=55, follow_redirects=False) as session:
                 async with session.stream(
