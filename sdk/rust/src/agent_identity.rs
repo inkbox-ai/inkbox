@@ -2375,7 +2375,11 @@ impl AgentIdentity {
     pub fn get_whatsapp_reaction(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppReaction> {
         self.inkbox.whatsapp().get_reaction(id, Some(&self.id()))
     }
-    pub fn remove_whatsapp_reaction(&self, id: &Uuid, key: &str) -> Result<()> {
+    pub fn remove_whatsapp_reaction(
+        &self,
+        id: &Uuid,
+        key: &str,
+    ) -> Result<crate::whatsapp::WhatsAppReaction> {
         self.inkbox
             .whatsapp()
             .remove_reaction(id, key, Some(&self.id()))

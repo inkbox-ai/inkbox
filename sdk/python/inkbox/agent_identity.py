@@ -188,7 +188,7 @@ class AgentIdentity:
     def get_whatsapp_reaction(self, reaction_id: UUID | str) -> WhatsAppReaction:
         return self._inkbox.whatsapp.get_reaction(reaction_id, agent_identity_id=self.id)
 
-    def remove_whatsapp_reaction(self, reaction_id: UUID | str, *, idempotency_key: str) -> None:
+    def remove_whatsapp_reaction(self, reaction_id: UUID | str, *, idempotency_key: str) -> WhatsAppReaction:
         return self._inkbox.whatsapp.remove_reaction(reaction_id, idempotency_key=idempotency_key, agent_identity_id=self.id)
 
     def get_whatsapp_message(self, message_id: UUID | str) -> WhatsAppMessage:

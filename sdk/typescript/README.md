@@ -1974,7 +1974,7 @@ private contact sessions. Unknown notice codes/levels remain available to caller
 
 With organization management credentials, use `client.slack.removeApplication`
 to remove an identity's app without creating another. Supply `expectedApplicationGeneration`
-from `listConnections` and a `requestId` UUID; reuse both with identical arguments
+from `listAssignments` and a `requestId` UUID; reuse both with identical arguments
 when retrying an uncertain request. Removal always attempts permanent deletion of
 the old app from Slack. Read removal and remote deletion progress with
 `getApplicationRemoval`. Already-deleted apps need no further deletion.
@@ -2333,9 +2333,11 @@ results. Preserve the query and filters when following a cursor.
 ## Dedicated WhatsApp
 
 From version 0.7.29, `await identity.getWhatsAppOnboarding()`
-returns a message link and PNG QR code for contacting the agent. Check `ready`
-before presenting the draft; the person still taps Send in WhatsApp. This read
-does not enable WhatsApp or send a message.
+returns a router connect link and PNG QR code for dedicated and shared-number agents.
+The draft is `connect @handle` to the router; the person taps Send, follows the
+returned destination link with `start` prefilled, and taps Send again. Check `ready`
+before presenting the draft. Onboarding does not enable WhatsApp or send a message.
+Read channel status to find an agent's dedicated number; onboarding publishes the router number.
 
 `identity.sendWhatsApp({to: "+15555550101", text: "Hello", idempotencyKey: "stable-key"})`
 
@@ -2369,7 +2371,7 @@ The upload default is `application/octet-stream`, which does not select MP4 play
 All group participants must have known phone numbers (`unresolved_participant_count`
 must be zero). Receiving checks every participant against inbound contact rules;
 blocked incoming messages do not trigger `whatsapp.received`. Sending content or
-reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+reactions checks outbound contact rules and returns `recipient_blocked`
 if any participant is unresolved or not allowed for outbound traffic. An outbound-only
 block does not block incoming messages or erase an earlier qualifying incoming
 message. A new allowed incoming message is needed only when none already qualifies.
@@ -2408,13 +2410,15 @@ through a shared number.
 Shared-number errors: replying before the recipient's first message returns
 `409 whatsapp_awaiting_inbound`; sending through a shared number to a recipient
 the agent is not connected to returns `403 whatsapp_access_required`. Connect can
-also return `409 whatsapp_identity_has_dedicated_number`, `409 whatsapp_pool_unavailable`,
+also return `409 whatsapp_identity_has_dedicated_line`, `409 whatsapp_pool_unavailable`,
+`409 whatsapp_recipient_connections_full` (disconnect an existing assignment first),
 `409 whatsapp_connection_busy` (retry with the same key), or
-`403 whatsapp_contact_not_allowed`. Key errors on connect and disconnect:
+`403 recipient_blocked`. A disabled agent returns `400` with
+`detail: "Agent identity is not enabled for WhatsApp"`. Key errors on connect and disconnect:
 `422 invalid_idempotency_key`; `409 idempotency_key_reused` (the key was used for a
 different request); `409 idempotency_in_progress` (the original request is still
 running; retry with the same key); and `409 result_unavailable` (the stored result
-expired; check `connections` before acting again with a new key).
+expired; check `assignments` before acting again with a new key).
 
 ## Conversation participant filters
 

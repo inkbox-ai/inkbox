@@ -95,12 +95,12 @@ fn disconnect_list_and_router_preserve_wire_shapes() {
         .disconnect(&owner, recipient, "d-2")
         .unwrap();
     assert!(second.assignment_id.is_none() && second.disconnected);
-    let rows = whatsapp.whatsapp().list_connections(Some(&owner)).unwrap();
+    let rows = whatsapp.whatsapp().list_assignments(Some(&owner)).unwrap();
     assert_eq!(
         rows[0].id.to_string(),
         f["assignment"]["id"].as_str().unwrap()
     );
-    let found = whatsapp.whatsapp().get_router().unwrap();
+    let found = whatsapp.whatsapp().get_triage_number(None).unwrap();
     assert_eq!(
         (found.number.as_str(), found.connect_command.as_str()),
         ("+15555550180", "connect @agent")

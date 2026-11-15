@@ -22,7 +22,7 @@ describe("WhatsApp shared-number connections", () => {
     expect(last().init.method).toBe("POST");
     expect(last().body).toEqual({ agent_identity_id: owner, recipient_number: recipient });
     expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe("connect-1");
-    expect(result.number).toBe(s.connect.assigned_number);
+    expect(result.assignedNumber).toBe(s.connect.assigned_number);
     expect(result.awaitingInbound).toBe(true);
     expect(result.alreadyConnected).toBe(false);
     expect(result.assignment.status).toBe("active");
@@ -52,19 +52,19 @@ describe("WhatsApp shared-number connections", () => {
     expect(last().url.pathname).toBe("/api/v1/whatsapp/disconnect");
     expect(last().body).toEqual({ agent_identity_id: owner, recipient_number: recipient });
     expect(new Headers(last().init.headers).get("Idempotency-Key")).toBe("d-1");
-    expect(first).toEqual({ assignmentId: s.disconnect.assignment_id, connectionId: s.disconnect.assignment_id, disconnected: true });
+    expect(first).toEqual({ assignmentId: s.disconnect.assignment_id, disconnected: true });
     const second = await resource().disconnect({ agentIdentityId: owner, recipientNumber: recipient, idempotencyKey: "d-2" });
-    expect(second).toEqual({ assignmentId: null, connectionId: null, disconnected: true });
+    expect(second).toEqual({ assignmentId: null, disconnected: true });
   });
 
   it("lists connections for an owner and reads the router", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok([s.assignment])).mockResolvedValueOnce(ok(s.triage)));
-    const rows = await resource().listConnections({ agentIdentityId: owner });
+    const rows = await resource().listAssignments({ agentIdentityId: owner });
     expect(last().url.pathname).toBe("/api/v1/whatsapp/assignments");
     expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
     expect(rows.map((row) => row.id)).toEqual([s.assignment.id]);
-    expect(rows[0].recipientNumber).toBe(recipient);
-    expect(await resource().getRouter()).toEqual({ number: s.triage.number, connectCommand: s.triage.connect_command, whatsappLink: s.triage.whatsapp_link, connectQrPngDataUrl: s.triage.connect_qr_png_data_url });
+    expect(rows[0].remoteNumber).toBe(recipient);
+    expect(await resource().getTriageNumber()).toEqual({ number: s.triage.number, connectCommand: s.triage.connect_command, whatsappLink: s.triage.whatsapp_link, connectQrPngDataUrl: s.triage.connect_qr_png_data_url });
     expect(last().url.pathname).toBe("/api/v1/whatsapp/triage-number");
   });
 

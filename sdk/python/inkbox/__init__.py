@@ -539,7 +539,7 @@ from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
 from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppThread
-from .whatsapp import WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppConnection, WhatsAppConnectResult, WhatsAppDisconnectResult, WhatsAppRouter
+from .whatsapp import WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppConnectResult, WhatsAppDisconnectResult
 
 from inkbox.hosted_workspace import HostedWorkspace, ChatConversation, ChatTurn, ChatEvent, ChatEventPage, ChatCapabilities, ChatText, ChatFileReference
 
@@ -554,7 +554,7 @@ __all__ = [
     "ChatFileReference",
 
     "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppThread",
-    "WhatsAppAssignment", "WhatsAppTriageNumber", "WhatsAppConnection", "WhatsAppConnectResult", "WhatsAppDisconnectResult", "WhatsAppRouter",
+    "WhatsAppAssignment", "WhatsAppTriageNumber", "WhatsAppConnectResult", "WhatsAppDisconnectResult",
     "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",
     "WhatsAppWebhookData",

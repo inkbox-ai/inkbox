@@ -382,19 +382,12 @@ class WhatsAppAssignment:
     created_at: datetime
     updated_at: datetime
 
-    @property
-    def recipient_number(self) -> str:
-        """Compatibility alias for remote_number."""
-        return self.remote_number
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppAssignment:
         return cls(UUID(d["id"]), d["remote_number"], UUID(d["agent_identity_id"]),
                    d["organization_id"], d["status"], _dt(d.get("released_at")),
                    datetime.fromisoformat(d["created_at"]), datetime.fromisoformat(d["updated_at"]))
 
-
-WhatsAppConnection = WhatsAppAssignment
 
 
 @dataclass
@@ -411,16 +404,6 @@ class WhatsAppConnectResult:
     already_connected: bool
     awaiting_inbound: bool
 
-    @property
-    def connection(self) -> WhatsAppAssignment:
-        """Compatibility alias for assignment."""
-        return self.assignment
-
-    @property
-    def number(self) -> str | None:
-        """Compatibility alias for assigned_number."""
-        return self.assigned_number
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConnectResult:
         return cls(WhatsAppAssignment._from_dict(d["assignment"]), UUID(d["conversation_id"]),
@@ -433,11 +416,6 @@ class WhatsAppDisconnectResult:
 
     assignment_id: UUID | None
     disconnected: bool
-
-    @property
-    def connection_id(self) -> UUID | None:
-        """Compatibility alias for assignment_id."""
-        return self.assignment_id
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppDisconnectResult:
@@ -458,8 +436,6 @@ class WhatsAppTriageNumber:
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppTriageNumber:
         return cls(d["number"], d["connect_command"], d["whatsapp_link"], d["connect_qr_png_data_url"])
 
-
-WhatsAppRouter = WhatsAppTriageNumber
 
 
 def _recipient(value: str) -> str:
@@ -686,10 +662,13 @@ class WhatsAppResource:
         return WhatsAppReaction._from_dict(result["reaction"] if isinstance(result.get("reaction"), dict) else result)
 
     def remove_reaction(self, reaction_id: UUID | str, *, idempotency_key: str,
-                        agent_identity_id: UUID | str | None = None) -> None:
-        """Request removal; a stale receipt never removes a newer reaction."""
-        self._http.delete(f"/reactions/{reaction_id}", params=_owner(agent_identity_id),
+                        agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
+        """Return the removal receipt; a stale receipt never removes a newer reaction."""
+        result = self._http.delete_with_response(f"/reactions/{reaction_id}", params=_owner(agent_identity_id),
             headers=_key_headers(idempotency_key))
+        if result is None:
+            return self.get_reaction(reaction_id, agent_identity_id=agent_identity_id)
+        return WhatsAppReaction._from_dict(result["reaction"] if isinstance(result.get("reaction"), dict) else result)
 
     def upload_media(
         self,
@@ -765,12 +744,13 @@ class WhatsAppResource:
 
         Raises:
             IdempotencyKeyReusedError: The key was used for a different request.
-            InkboxAPIError: 409 ``whatsapp_identity_has_dedicated_number``,
-                ``whatsapp_pool_unavailable``, ``whatsapp_connection_busy`` or
+            InkboxAPIError: 409 ``whatsapp_identity_has_dedicated_line``,
+                ``whatsapp_pool_unavailable``, ``whatsapp_recipient_connections_full``,
+                ``whatsapp_connection_busy`` or
                 ``idempotency_in_progress`` (retry with the same key),
                 ``result_unavailable`` (the stored result expired; check
-                ``list_connections`` first); 403 ``whatsapp_contact_not_allowed``;
-                422 ``invalid_idempotency_key``.
+                ``list_assignments`` first); 403 ``recipient_blocked``;
+                422 ``invalid_idempotency_key``; 400 when WhatsApp is disabled.
         """
         body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
         data = self._http.post("/connect", json=body, headers=_key_headers(idempotency_key))
@@ -801,17 +781,9 @@ class WhatsAppResource:
         """Release an assignment without deleting its conversation history."""
         self._http.delete(f"/assignments/{UUID(str(assignment_id))}")
 
-    def list_connections(self, *, agent_identity_id: UUID | str | None = None) -> list[WhatsAppAssignment]:
-        """Compatibility alias for list_assignments."""
-        return self.list_assignments(agent_identity_id=agent_identity_id)
-
     def get_triage_number(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppTriageNumber:
         """Get the triage number and connect link; optionally select an agent."""
         return WhatsAppTriageNumber._from_dict(self._http.get("/triage-number", params=_owner(agent_identity_id)))
-
-    def get_router(self) -> WhatsAppTriageNumber:
-        """Compatibility alias for get_triage_number."""
-        return self.get_triage_number()
 
     def send_typing(self, conversation_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> dict[str, str]:
         """Send a typing indicator in an existing direct conversation."""

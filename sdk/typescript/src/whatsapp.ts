@@ -55,8 +55,6 @@ function reactionBody(o: WhatsAppReactionOptions): Record<string, string> {
 export interface WhatsAppAssignment {
   id: string; agentIdentityId: string; remoteNumber: string; organizationId: string;
   status: "active" | "released" | (string & {}); releasedAt: Date | null; createdAt: Date; updatedAt: Date;
-  /** Compatibility alias for remoteNumber. */
-  recipientNumber: string;
 }
 export interface RawWhatsAppAssignment {
   id: string; agent_identity_id: string; remote_number: string; organization_id: string;
@@ -64,19 +62,14 @@ export interface RawWhatsAppAssignment {
 }
 export function parseWhatsAppAssignment(r: RawWhatsAppAssignment): WhatsAppAssignment {
   return { id: r.id, agentIdentityId: r.agent_identity_id, remoteNumber: r.remote_number,
-    recipientNumber: r.remote_number, organizationId: r.organization_id, status: r.status,
+    organizationId: r.organization_id, status: r.status,
     releasedAt: r.released_at ? new Date(r.released_at) : null,
     createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at) };
 }
-export type WhatsAppConnection = WhatsAppAssignment;
-export type RawWhatsAppConnection = RawWhatsAppAssignment;
-export const parseWhatsAppConnection = parseWhatsAppAssignment;
 /** Connecting sends nothing. Global shared numbers have no assignedNumber. */
 export interface WhatsAppConnectResult {
   assignment: WhatsAppAssignment; conversationId: string; assignedNumber: string | null;
   alreadyConnected: boolean; awaitingInbound: boolean;
-  /** Compatibility aliases for assignment and assignedNumber. */
-  connection: WhatsAppAssignment; number: string | null;
 }
 export interface RawWhatsAppConnectResult {
   assignment: RawWhatsAppAssignment; conversation_id: string; assigned_number: string | null;
@@ -84,8 +77,6 @@ export interface RawWhatsAppConnectResult {
 }
 export interface WhatsAppDisconnectResult {
   assignmentId: string | null; disconnected: boolean;
-  /** Compatibility alias for assignmentId. */
-  connectionId: string | null;
 }
 export interface RawWhatsAppDisconnectResult { assignment_id?: string | null; disconnected?: boolean; }
 /** The triage number and a draft connect link and QR code. */
@@ -95,8 +86,6 @@ export interface WhatsAppTriageNumber {
 export interface RawWhatsAppTriageNumber {
   number: string; connect_command: string; whatsapp_link: string; connect_qr_png_data_url: string;
 }
-export type WhatsAppRouter = WhatsAppTriageNumber;
-export type RawWhatsAppRouter = RawWhatsAppTriageNumber;
 export interface WhatsAppConnectOptions { agentIdentityId: string; recipientNumber: string; idempotencyKey: string; }
 function connectionBody(o: WhatsAppConnectOptions): Record<string, string> {
   if (!validUuid(o.agentIdentityId)) throw new Error("agentIdentityId must be a UUID");
@@ -610,8 +599,10 @@ export class WhatsAppResource {
     return parseWhatsAppReaction(typeof result.reaction === "object" ? result.reaction : result as RawWhatsAppReaction);
   }
   /** Replay a removal with its original key; a superseded receipt removes nothing newer. */
-  async removeReaction(id: string, o: { idempotencyKey: string; agentIdentityId?: string }): Promise<void> {
-    await this.http.delete(`/reactions/${encodeURIComponent(id)}`, { params: owner(o.agentIdentityId), headers: requiredKey(o.idempotencyKey) });
+  async removeReaction(id: string, o: { idempotencyKey: string; agentIdentityId?: string }): Promise<WhatsAppReaction> {
+    const result = await this.http.deleteWithResponse<RawWhatsAppReaction | { reaction: RawWhatsAppReaction } | undefined>(`/reactions/${encodeURIComponent(id)}`, { params: owner(o.agentIdentityId), headers: requiredKey(o.idempotencyKey) });
+    if (result === undefined) return this.getReaction(id, o);
+    return parseWhatsAppReaction(typeof result.reaction === "object" ? result.reaction : result as RawWhatsAppReaction);
   }
   async uploadMedia(o: {
     content: Uint8Array | Blob;
@@ -677,23 +668,23 @@ export class WhatsAppResource {
    * `crypto.randomUUID()`) for each new connect or disconnect; reuse a key only
    * to retry that same request, because a reused key replays the earlier result.
    * @throws {IdempotencyKeyReusedError} 409 when the key was used for a different request.
-   * @throws {InkboxAPIError} 409 `whatsapp_identity_has_dedicated_number`, `whatsapp_pool_unavailable`,
+   * @throws {InkboxAPIError} 409 `whatsapp_identity_has_dedicated_line`, `whatsapp_pool_unavailable`,
+   * `whatsapp_recipient_connections_full`,
    * `whatsapp_connection_busy` or `idempotency_in_progress` (retry with the same key), `result_unavailable`
-   * (check `listConnections` first); 403 `whatsapp_contact_not_allowed`; 422 `invalid_idempotency_key`.
+   * (check `listAssignments` first); 403 `recipient_blocked`; 422 `invalid_idempotency_key`; 400 when WhatsApp is disabled.
    */
   async connect(o: WhatsAppConnectOptions): Promise<WhatsAppConnectResult> {
     const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
     const r = await this.http.post<RawWhatsAppConnectResult>("/connect", body, { headers });
     const assignment = parseWhatsAppAssignment(r.assignment);
     return { assignment, conversationId: r.conversation_id, assignedNumber: r.assigned_number,
-      connection: assignment, number: r.assigned_number,
       alreadyConnected: r.already_connected, awaitingInbound: r.awaiting_inbound };
   }
   /** Release an agent's shared-number connection; history is kept. Use a new key per disconnect; key errors match `connect`. */
   async disconnect(o: WhatsAppConnectOptions): Promise<WhatsAppDisconnectResult> {
     const body = connectionBody(o), headers = requiredKey(o.idempotencyKey);
     const r = await this.http.post<RawWhatsAppDisconnectResult>("/disconnect", body, { headers });
-    return { assignmentId: r.assignment_id ?? null, connectionId: r.assignment_id ?? null, disconnected: r.disconnected ?? true };
+    return { assignmentId: r.assignment_id ?? null, disconnected: r.disconnected ?? true };
   }
   /** List active shared-number assignments. */
   async listAssignments(o: { agentIdentityId?: string; limit?: number; offset?: number } = {}): Promise<WhatsAppAssignment[]> {
@@ -704,18 +695,12 @@ export class WhatsAppResource {
   async deleteAssignment(id: string): Promise<void> {
     await this.http.delete(`/assignments/${encodeURIComponent(id)}`);
   }
-  /** Compatibility alias for listAssignments. */
-  async listConnections(o: { agentIdentityId?: string } = {}): Promise<WhatsAppAssignment[]> {
-    return this.listAssignments(o);
-  }
   /** Get the triage number and a connect draft; optionally select an agent. */
   async getTriageNumber(o: { agentIdentityId?: string } = {}): Promise<WhatsAppTriageNumber> {
     const r = await this.http.get<RawWhatsAppTriageNumber>("/triage-number", owner(o.agentIdentityId));
     return { number: r.number, connectCommand: r.connect_command, whatsappLink: r.whatsapp_link,
       connectQrPngDataUrl: r.connect_qr_png_data_url };
   }
-  /** Compatibility alias for getTriageNumber. */
-  async getRouter(): Promise<WhatsAppTriageNumber> { return this.getTriageNumber(); }
   /** Send a typing indicator in an existing direct conversation. */
   async sendTyping(conversationId: string, o: { agentIdentityId?: string } = {}): Promise<{ status: string }> {
     return this.http.post("/typing", { conversation_id: conversationId }, { params: owner(o.agentIdentityId) });

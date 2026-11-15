@@ -28,12 +28,12 @@ def test_connect_sends_exact_body_and_required_key_without_a_message():
         json={"agent_identity_id": OWNER, "recipient_number": RECIPIENT},
         headers={"Idempotency-Key": "connect-1"},
     )
-    assert result.number == S["connect"]["assigned_number"]
+    assert result.assigned_number == S["connect"]["assigned_number"]
     assert result.awaiting_inbound is True and result.already_connected is False
-    assert result.connection.id == UUID(S["assignment"]["id"])
+    assert result.assignment.id == UUID(S["assignment"]["id"])
     assert result.assignment.status == "active"
     assert result.conversation_id == UUID(S["connect"]["conversation_id"])
-    assert result.connection.recipient_number == RECIPIENT
+    assert result.assignment.remote_number == RECIPIENT
 
 
 @pytest.mark.parametrize(
@@ -65,20 +65,20 @@ def test_disconnect_preserves_released_and_already_disconnected_results():
     assert http.post.call_args.args[0] == "/disconnect"
     assert http.post.call_args.kwargs["json"] == {"agent_identity_id": OWNER, "recipient_number": RECIPIENT}
     assert http.post.call_args.kwargs["headers"] == {"Idempotency-Key": "d-1"}
-    assert first.connection_id == UUID(S["disconnect"]["assignment_id"]) and first.disconnected
+    assert first.assignment_id == UUID(S["disconnect"]["assignment_id"]) and first.disconnected
     second = resource.disconnect(agent_identity_id=OWNER, recipient_number=RECIPIENT, idempotency_key="d-2")
-    assert second.connection_id is None and second.disconnected
+    assert second.assignment_id is None and second.disconnected
 
 
-def test_list_connections_and_router():
+def test_list_assignments_and_router():
     http = MagicMock()
     http.get.side_effect = [[S["assignment"]], S["triage"]]
     resource = WhatsAppResource(http)
-    rows = resource.list_connections(agent_identity_id=OWNER)
+    rows = resource.list_assignments(agent_identity_id=OWNER)
     http.get.assert_called_with("/assignments", params={"agent_identity_id": OWNER, "limit": 50, "offset": 0})
     assert [str(row.id) for row in rows] == [S["assignment"]["id"]]
     assert rows[0].updated_at.isoformat().startswith("2026-10-01T12:05")
-    router = resource.get_router()
+    router = resource.get_triage_number()
     http.get.assert_called_with("/triage-number", params={})
     assert (router.number, router.connect_command) == ("+15555550180", "connect @agent")
 

@@ -313,7 +313,8 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
         when.method(DELETE)
             .path(format!("/api/v1/whatsapp/reactions/{rid}"))
             .header("Idempotency-Key", "remove-original");
-        then.status(204);
+        then.status(200)
+            .json_body(json!({"reaction": data["removed_reaction"]}));
     });
     let client = Inkbox::builder("test-only")
         .base_url(server.base_url())
@@ -352,10 +353,11 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
         .unwrap();
     assert_eq!(reaction.status, inkbox::WhatsAppReactionStatus::Uncertain);
     assert!(reaction.remote_number.is_none());
-    client
+    let removed = client
         .whatsapp()
         .remove_reaction(&rid, "remove-original", None)
         .unwrap();
+    assert_eq!(removed.status, inkbox::WhatsAppReactionStatus::Removed);
     thread_mock.assert();
     conversation_mock.assert();
     react.assert();
@@ -929,4 +931,35 @@ fn logical_history_keeps_original_message_and_current_route_ids_separate() {
         serde_json::from_value(f["conversation"].clone()).unwrap();
     assert!(legacy.logical_conversation_id.is_none());
     assert!(legacy_conversation.active_conversation_id.is_none());
+}
+
+#[test]
+fn empty_removal_reads_factual_receipt_state() {
+    let data: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let id = Uuid::parse_str(data["reaction"]["id"].as_str().unwrap()).unwrap();
+    let server = MockServer::start();
+    let remove = server.mock(|when, then| {
+        when.method(DELETE)
+            .path(format!("/api/v1/whatsapp/reactions/{id}"))
+            .header("Idempotency-Key", "remove-original");
+        then.status(204);
+    });
+    let read = server.mock(|when, then| {
+        when.method(GET)
+            .path(format!("/api/v1/whatsapp/reactions/{id}"));
+        then.status(200)
+            .json_body(json!({"reaction": data["uncertain_reaction"]}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let receipt = client
+        .whatsapp()
+        .remove_reaction(&id, "remove-original", None)
+        .unwrap();
+    assert_eq!(receipt.status, inkbox::WhatsAppReactionStatus::Uncertain);
+    remove.assert();
+    read.assert();
 }

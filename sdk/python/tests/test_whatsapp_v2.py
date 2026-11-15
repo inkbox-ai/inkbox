@@ -99,8 +99,12 @@ def test_reaction_and_removal_return_receipts_not_live_state():
     assert http.post.call_args.kwargs["headers"] == {"Idempotency-Key": "original"}
     http.get.return_value = F["reaction"]
     assert resource.get_reaction(F["reaction"]["id"]).id == UUID(F["reaction"]["id"])
-    assert resource.remove_reaction(F["reaction"]["id"], idempotency_key="remove-original") is None
-    assert http.delete.call_args.kwargs["headers"] == {"Idempotency-Key": "remove-original"}
+    http.delete_with_response.return_value = {"reaction": F["removed_reaction"]}
+    assert resource.remove_reaction(F["reaction"]["id"], idempotency_key="remove-original").status == "removed"
+    assert http.delete_with_response.call_args.kwargs["headers"] == {"Idempotency-Key": "remove-original"}
+    http.delete_with_response.return_value = None
+    http.get.return_value = F["uncertain_reaction"]
+    assert resource.remove_reaction(F["reaction"]["id"], idempotency_key="remove-original").status == "uncertain"
 
 
 

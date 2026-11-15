@@ -45,9 +45,17 @@ describe("WhatsApp v2 shared wire contract", () => {
     expect(request().body).toEqual({ message_id: f.message.id, custom_emoji: options.customEmoji });
     expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("reaction-original");
     await api().getReaction(f.reaction.id); expect(request().init.method).toBe("GET");
-    vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(ok({ reaction: f.removed_reaction })));
     const removed = await api().removeReaction(f.reaction.id, { idempotencyKey: "remove-original", agentIdentityId: f.message.agent_identity_id });
-    expect(removed).toBeUndefined(); expect(request().init.method).toBe("DELETE"); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("remove-original"); expect(request().url.searchParams.get("agent_identity_id")).toBe(f.message.agent_identity_id);
+    expect(removed.status).toBe("removed"); expect(request().init.method).toBe("DELETE"); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("remove-original"); expect(request().url.searchParams.get("agent_identity_id")).toBe(f.message.agent_identity_id);
+  });
+  it("reads factual receipt state after an empty removal response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(ok({ reaction: f.uncertain_reaction })));
+    const result = await api().removeReaction(f.reaction.id, { idempotencyKey: "remove-original" });
+    expect(result.status).toBe("uncertain");
+    expect(request().init.method).toBe("GET");
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it("rejects malformed reaction alternatives before any transport call", async () => {
     vi.stubGlobal("fetch", vi.fn());

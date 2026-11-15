@@ -63,7 +63,6 @@ export function registerWhatsAppCommands(program: Command): void {
     .description("WhatsApp conversations, shared-number connections, quoted replies, and reactions");
   whatsapp
     .command("triage-number")
-    .alias("router")
     .description("Show the WhatsApp router number people message to connect with your agents")
     .action(withErrorHandler(async function (this: Command) {
       const global = getGlobalOpts(this);
@@ -115,7 +114,6 @@ export function registerWhatsAppCommands(program: Command): void {
       }));
   }
   identityCommand("assignments", "List recipients connected to this identity through shared numbers")
-    .alias("connections")
     .option("--limit <n>", "Maximum results, 1–200", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(withErrorHandler(async function (this: Command, opts) {
@@ -250,8 +248,7 @@ export function registerWhatsAppCommands(program: Command): void {
     .requiredOption("--idempotency-key <key>", "Stable removal key; reuse it after uncertainty")
     .action(withErrorHandler(async function (this: Command, reactionId: string, opts) {
       const global = getGlobalOpts(this), identity = await createClient(global).getIdentity(opts.identity);
-      await identity.removeWhatsAppReaction(reactionId, opts.idempotencyKey);
-      output({ accepted: true }, { json: !!global.json });
+      output(await identity.removeWhatsAppReaction(reactionId, opts.idempotencyKey), { json: !!global.json });
     }));
   identityCommand("thread <message-id>", "Read chronological visible replies to a quote-chain root")
     .option("--limit <n>", "Maximum results, 1–200", "50").option("--cursor <cursor>", "Opaque cursor from this thread")

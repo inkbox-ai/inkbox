@@ -147,8 +147,6 @@ pub struct WhatsAppAssignment {
     pub created_at: String,
     pub updated_at: String,
 }
-/// Compatibility name for a shared-number assignment.
-pub type WhatsAppConnection = WhatsAppAssignment;
 /// Connecting sends nothing. Global shared numbers have no assigned_number.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppConnectResult {
@@ -172,8 +170,6 @@ pub struct WhatsAppTriageNumber {
     pub whatsapp_link: String,
     pub connect_qr_png_data_url: String,
 }
-/// Compatibility name for triage-number instructions.
-pub type WhatsAppRouter = WhatsAppTriageNumber;
 fn recipient(value: &str) -> Result<()> {
     if !valid_phone(value) {
         return Err(InkboxError::InvalidArgument(
@@ -583,13 +579,28 @@ impl WhatsAppResource {
                 .clone(),
         )?)
     }
-    pub fn remove_reaction(&self, id: &Uuid, key: &str, identity: Option<&Uuid>) -> Result<()> {
+    pub fn remove_reaction(
+        &self,
+        id: &Uuid,
+        key: &str,
+        identity: Option<&Uuid>,
+    ) -> Result<WhatsAppReaction> {
         reaction_key(key)?;
-        self.http.delete_with_params_and_headers(
+        let result = self.http.delete_with_response_params_and_headers(
             &format!("/reactions/{id}"),
             &owner(identity),
             &[("Idempotency-Key", key)],
-        )
+        )?;
+        if result.is_null() {
+            return self.get_reaction(id, identity);
+        }
+        Ok(serde_json::from_value(
+            result
+                .get("reaction")
+                .filter(|value| value.is_object())
+                .unwrap_or(&result)
+                .clone(),
+        )?)
     }
     pub fn upload_media(
         &self,
@@ -633,17 +644,18 @@ impl WhatsAppResource {
     }
     /// Reserve one of the organization's shared numbers for a recipient.
     ///
-    /// Nothing is sent. Give the recipient the returned `number`; the agent can
+    /// Nothing is sent. Give the recipient the returned `assigned_number`; the agent can
     /// reply after they message it. Requires an admin-scoped API key.
     ///
     /// Use a new key (for example `Uuid::new_v4()`) for each new connect or
     /// disconnect; reuse a key only to retry that same request, because a
     /// reused key replays the earlier result. Errors include 409
-    /// `whatsapp_identity_has_dedicated_number`, `whatsapp_pool_unavailable`,
+    /// `whatsapp_identity_has_dedicated_line`, `whatsapp_pool_unavailable`,
+    /// `whatsapp_recipient_connections_full`,
     /// `whatsapp_connection_busy` or `idempotency_in_progress` (retry with the
     /// same key), [`InkboxError::IdempotencyKeyReused`], 409 `result_unavailable`
-    /// (check [`Self::list_connections`] first), 403 `whatsapp_contact_not_allowed`,
-    /// and 422 `invalid_idempotency_key`.
+    /// (check [`Self::list_assignments`] first), 403 `recipient_blocked`,
+    /// and 422 `invalid_idempotency_key`, or 400 when WhatsApp is disabled.
     pub fn connect(
         &self,
         agent_identity_id: &Uuid,
@@ -712,19 +724,11 @@ impl WhatsAppResource {
     pub fn delete_assignment(&self, id: &Uuid) -> Result<()> {
         self.http.delete(&format!("/assignments/{id}"))
     }
-    /// Compatibility alias for list_assignments.
-    pub fn list_connections(&self, identity: Option<&Uuid>) -> Result<Vec<WhatsAppAssignment>> {
-        self.list_assignments(identity)
-    }
     /// Get the triage number and a connect draft, optionally for a selected agent.
     pub fn get_triage_number(&self, identity: Option<&Uuid>) -> Result<WhatsAppTriageNumber> {
         Ok(serde_json::from_value(
             self.http.get("/triage-number", &owner(identity))?,
         )?)
-    }
-    /// Compatibility alias for get_triage_number.
-    pub fn get_router(&self) -> Result<WhatsAppTriageNumber> {
-        self.get_triage_number(None)
     }
     /// Send a typing indicator in an existing direct conversation.
     pub fn send_typing(
