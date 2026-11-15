@@ -904,21 +904,29 @@ fn whatsapp_null_sender_access_decodes_outbound_rest_and_webhooks() {
 
 #[test]
 fn logical_history_keeps_original_message_and_current_route_ids_separate() {
-    let f: Value = serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
     let logical_id = Uuid::parse_str("00000000-0000-4000-8000-000000000101").unwrap();
     let active_id = Uuid::parse_str("00000000-0000-4000-8000-000000000102").unwrap();
     let mut payload = f["message"].clone();
     payload["logical_conversation_id"] = json!(logical_id);
     let message: inkbox::WhatsAppMessage = serde_json::from_value(payload).unwrap();
     assert_eq!(message.logical_conversation_id, Some(logical_id));
-    assert_eq!(message.conversation_id.to_string(), f["message"]["conversation_id"].as_str().unwrap());
+    assert_eq!(
+        message.conversation_id.to_string(),
+        f["message"]["conversation_id"].as_str().unwrap()
+    );
     let mut payload = f["conversation"].clone();
     payload["active_conversation_id"] = json!(active_id);
     let conversation: inkbox::WhatsAppConversation = serde_json::from_value(payload).unwrap();
     assert_eq!(conversation.active_conversation_id, Some(active_id));
-    assert_eq!(conversation.id.to_string(), f["conversation"]["id"].as_str().unwrap());
+    assert_eq!(
+        conversation.id.to_string(),
+        f["conversation"]["id"].as_str().unwrap()
+    );
     let legacy: inkbox::WhatsAppMessage = serde_json::from_value(f["message"].clone()).unwrap();
-    let legacy_conversation: inkbox::WhatsAppConversation = serde_json::from_value(f["conversation"].clone()).unwrap();
+    let legacy_conversation: inkbox::WhatsAppConversation =
+        serde_json::from_value(f["conversation"].clone()).unwrap();
     assert!(legacy.logical_conversation_id.is_none());
     assert!(legacy_conversation.active_conversation_id.is_none());
 }
