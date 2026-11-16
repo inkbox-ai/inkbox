@@ -1144,13 +1144,23 @@ cover every failure before dispatch. Omitting the target preserves ordinary send
 Add `--no-plain-reply-fallback` to `imessage send` to require a native reply
 instead.
 
-## Approved dedicated WhatsApp
+## WhatsApp dedicated and shared numbers
 
-For an approved agent with an existing dedicated personal iMessage number,
-WhatsApp uses the same dedicated number. Read fresh WhatsApp channel status;
+WhatsApp never starts a conversation by default: the agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with approval for your organization. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound`; wait for their message instead
+of retrying or switching channels. A dedicated WhatsApp number can match the
+agent's iMessage number or be different; an iMessage number is not required.
+For an agent without a dedicated number, the WhatsApp resource's `connect` /
+`inkbox whatsapp connect` reserves an organization shared number for one
+recipient and sends nothing: give the recipient the returned number. Connect and disconnect need a fresh UUID idempotency key per action. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. Sending through a shared number to a recipient the agent is not connected to returns `403 whatsapp_access_required`; key errors are `invalid_idempotency_key`, `idempotency_key_reused`, `idempotency_in_progress` (retry with the same key), and `result_unavailable` (check connections first). Pass the
+recipient number when uploading media for a shared-number reply. People can also
+text the router number (`get_triage_number` / `getTriageNumber` / `inkbox whatsapp triage-number`).
+Read fresh WhatsApp channel status;
 do not attempt self-service enablement or substitute SMS/iMessage. If unavailable,
 point the user to Request Access in the console. Direct conversations, existing groups, native quotes, and whole-message reactions are
-supported. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
+supported; groups work only on dedicated numbers. Use the SDK's WhatsApp resource or `inkbox whatsapp` CLI commands.
 Send to one E.164 string or an existing conversation ID. Recipient
 arrays, including singleton arrays, and comma-separated lists are rejected.
 For groups, use the conversation ID, never its display name. The agent must be added
@@ -1159,15 +1169,14 @@ or reactions. Do not create groups or fan out into separate sends. Upload at mos
 (default policy 5 MiB, hard ceiling 20 MiB) first and reuse its owned media ID. Outbound text is at most 4,000 Unicode
 code points. Preserve a stable logical-send key and media ID after ambiguity;
 check message/lookup state rather than sending a duplicate. Attachment URLs expire:
-refresh metadata by media ID before downloading. Local mark-read sends no remote
-receipt. Only `whatsapp.received` is new incoming content; delivery notifications
+refresh metadata by media ID before downloading. Mark-read sends supported read receipts and reports whether they were sent. Only `whatsapp.received` is new incoming content; delivery notifications
 must not trigger replies. Quote only an authorized message in the selected conversation using
 reply_to_message_id / replyToMessageId. Never silently fall back to a plain send.
 Read quote chains with the thread helpers. React with named love/like/dislike/laugh/
 emphasize/question/eyes or exclusive custom emoji and an explicit stable key.
 Keep pending/uncertain receipts separate from live applied reactions. Remove only
 the selected receipt version. Reaction notifications are not new text-reply turns.
-Typing, voice calls, and remote read receipts are not supported.
+Typing and read receipts are supported for eligible direct conversations. WhatsApp calls are not supported.
 
 All group participants must have known phone numbers (`unresolved_participant_count`
 / `unresolvedParticipantCount` must be zero). Incoming content checks inbound

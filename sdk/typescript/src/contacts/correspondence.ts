@@ -79,7 +79,7 @@ export interface IMessageCorrespondenceItem extends CorrespondenceItemBase {
 export interface WhatsAppCorrespondenceItem extends CorrespondenceItemBase {
   channel: "whatsapp";
   conversationId: string;
-  localNumber: string;
+  localNumber: string | null;
   remoteNumber: string | null;
   participants: string[];
   text: string | null;
@@ -188,7 +188,7 @@ export interface RawIMessageCorrespondenceItem extends RawCorrespondenceItemBase
 export interface RawWhatsAppCorrespondenceItem extends RawCorrespondenceItemBase {
   channel: "whatsapp";
   conversation_id: string;
-  local_number: string;
+  local_number: string | null;
   remote_number: string | null;
   participants: string[];
   text: string | null;

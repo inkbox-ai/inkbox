@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.38
+
+### Compatibility
+
+- Preserve the documented onboarding `number`, `message_text` / `messageText`, `message_link` / `messageLink`, and QR fields across SDKs, including Rust. New SDKs accept both direct-link and router-based onboarding responses without converting a direct draft into a connect command. Router-specific fields are absent/null for a legacy direct response.
+- Shared-number responses can have null phone-number fields. Upgrade clients to 0.7.38 before consuming shared-number responses; older Rust clients that require strings cannot parse those responses. Check optional numbers before displaying or using them.
+- Router-based onboarding returns a connect draft rather than a direct greeting. Opening a link sends nothing. Management methods require an API supporting those endpoints.
+
+### Management
+
+- Add organization-owned number listing/assignment and dedicated-router settings/history in Python, TypeScript, Rust and CLI. Router updates carry both the expected router ID and revision. These operations manage already-owned resources and do not provision numbers.
+
+### Added
+
+- WhatsApp typing indicators, optional mark-read boundaries and read-receipt results across SDKs and CLI.
+- WhatsApp enablement during identity creation and updates; CLI `identity create --whatsapp-enabled` and `identity update --whatsapp-enabled true|false`.
+- Assignment and conversation IDs in connect results, connect instructions in onboarding, and nullable global shared numbers. Reaction reads and sends accept both enveloped and bare receipts; removal preserves its returned receipt. An empty removal response is followed by a receipt read rather than treated as confirmed removal.
+- WhatsApp shared numbers in Python, TypeScript, and Rust: `connect`, `disconnect`, `list_assignments` / `listAssignments`, and `get_triage_number` / `getTriageNumber`. Connecting reserves an organization shared number for one recipient and sends nothing; connect and disconnect take an idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request.
+- CLI: `inkbox whatsapp connect`, `disconnect`, `assignments`, `delete-assignment`, and `triage-number`.
+- WhatsApp media uploads accept an optional recipient number, required when replying through a shared number (`recipient_number`, `recipientNumber`, Rust `upload_media_for_recipient`, CLI `upload-media --recipient`).
+- `WhatsAppAwaitingInboundError` (Python, TypeScript) and `InkboxError::is_whatsapp_awaiting_inbound` (Rust) identify `409 whatsapp_awaiting_inbound`.
+
+### Documentation
+- WhatsApp never starts a conversation by default: agents reply after the recipient messages first. Shared numbers never start conversations; dedicated numbers can only with approval for your organization.
+- Dedicated WhatsApp numbers do not require an iMessage number and may use a different number.
+
 ## 0.7.37
 
 ### Added

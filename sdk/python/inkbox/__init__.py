@@ -5,6 +5,8 @@ inkbox — Python SDK for the Inkbox APIs.
 from inkbox.webhooks import WhatsAppWebhookMention, WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
 from inkbox.whatsapp import (
     WhatsAppOnboarding,
+    WhatsAppNumber, WhatsAppNumberList, WhatsAppRouter, WhatsAppRouterThread,
+    WhatsAppRouterThreads, WhatsAppRouterMessage, WhatsAppRouterMessages,
     WhatsAppLimits,
     WhatsAppDirection,
     WhatsAppResource,
@@ -156,6 +158,7 @@ from inkbox.exceptions import (
     MailImportQuotaExceededError,
     MailImportUploadError,
     IdempotencyKeyReusedError,
+    WhatsAppAwaitingInboundError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
@@ -538,6 +541,7 @@ from inkbox.domain_affiliation import DomainAffiliation
 from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
 
 from .whatsapp import WhatsAppReaction, WhatsAppReactionType, WhatsAppReactionStatus, WhatsAppThread
+from .whatsapp import WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppConnectResult, WhatsAppDisconnectResult
 
 from inkbox.hosted_workspace import HostedWorkspace, ChatConversation, ChatTurn, ChatEvent, ChatEventPage, ChatCapabilities, ChatText, ChatFileReference
 
@@ -552,6 +556,7 @@ __all__ = [
     "ChatFileReference",
 
     "WhatsAppReaction", "WhatsAppReactionType", "WhatsAppReactionStatus", "WhatsAppThread",
+    "WhatsAppAssignment", "WhatsAppTriageNumber", "WhatsAppConnectResult", "WhatsAppDisconnectResult",
     "WhatsAppWebhookReaction",
     "WhatsAppWebhookPayload",
     "WhatsAppWebhookData",
@@ -562,6 +567,8 @@ __all__ = [
     "WhatsAppWebhookEventType",
 
     "WhatsAppOnboarding",
+    "WhatsAppNumber", "WhatsAppNumberList", "WhatsAppRouter", "WhatsAppRouterThread",
+    "WhatsAppRouterThreads", "WhatsAppRouterMessage", "WhatsAppRouterMessages",
     "WhatsAppLimits",
     "WhatsAppDirection",
     "WhatsAppResource",
@@ -709,6 +716,7 @@ __all__ = [
     "DedicatedIMessageNumberQuotaExceededError",
     "DuplicateContactRuleError",
     "IdempotencyKeyReusedError",
+    "WhatsAppAwaitingInboundError",
     "RecipientBlockedError",
     "RedundantContactAccessGrantError",
     "StorageLimitExceededError",

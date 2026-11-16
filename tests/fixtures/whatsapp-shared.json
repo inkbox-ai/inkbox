@@ -1,0 +1,49 @@
+{
+  "identity_id": "10000000-0000-4000-8000-000000000001",
+  "recipient_number": "+15555550101",
+  "connect": {
+    "already_connected": false,
+    "awaiting_inbound": true,
+    "assignment": {
+      "id": "70000000-0000-4000-8000-000000000007",
+      "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+      "created_at": "2026-10-01T12:00:00Z",
+      "remote_number": "+15555550101",
+      "organization_id": "org_example",
+      "status": "active",
+      "released_at": null,
+      "updated_at": "2026-10-01T12:05:00Z"
+    },
+    "conversation_id": "20000000-0000-4000-8000-000000000002",
+    "assigned_number": "+15555550190"
+  },
+  "disconnect": {
+    "disconnected": true,
+    "assignment_id": "70000000-0000-4000-8000-000000000007"
+  },
+  "already_disconnected": {
+    "disconnected": true,
+    "assignment_id": null
+  },
+  "awaiting_inbound_error": {
+    "error": "whatsapp_awaiting_inbound",
+    "message": "This recipient has not messaged this WhatsApp number yet. You can reply once they send a message.",
+    "retry_condition": "recipient_message"
+  },
+  "assignment": {
+    "id": "70000000-0000-4000-8000-000000000007",
+    "agent_identity_id": "10000000-0000-4000-8000-000000000001",
+    "created_at": "2026-10-01T12:00:00Z",
+    "remote_number": "+15555550101",
+    "organization_id": "org_example",
+    "status": "active",
+    "released_at": null,
+    "updated_at": "2026-10-01T12:05:00Z"
+  },
+  "triage": {
+    "number": "+15555550180",
+    "connect_command": "connect @agent",
+    "whatsapp_link": "https://wa.me/15555550180?text=connect%20%40agent",
+    "connect_qr_png_data_url": "data:image/png;base64,cXI="
+  }
+}

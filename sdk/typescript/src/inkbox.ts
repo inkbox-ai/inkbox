@@ -533,6 +533,7 @@ export class Inkbox {
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
     if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
+    if (options.whatsappEnabled !== undefined) createArgs.whatsappEnabled = options.whatsappEnabled;
     if (options.contactSharingEnabled !== undefined) createArgs.contactSharingEnabled = options.contactSharingEnabled;
     if (options.claimIMessageNumber === true) {
       createArgs.claimIMessageNumber = true;

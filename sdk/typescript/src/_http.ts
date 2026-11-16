@@ -231,6 +231,25 @@ export class IdempotencyKeyReusedError extends InkboxAPIError {
   }
 }
 
+/**
+ * Thrown on 409 when a WhatsApp recipient has not messaged the agent's number yet.
+ * WhatsApp never starts a conversation by default: wait for the recipient's
+ * message, then reply. Do not retry with a new idempotency key.
+ */
+export class WhatsAppAwaitingInboundError extends InkboxAPIError {
+  readonly detailMessage: string;
+  /** When a retry can succeed (`"recipient_message"`). */
+  readonly retryCondition: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "WhatsAppAwaitingInboundError";
+    this.detailMessage = String(detail["message"] ?? "");
+    this.retryCondition = String(detail["retry_condition"] ?? "recipient_message");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
 function raiseForErrorResponse(
   status: number,
   rawDetail: InkboxAPIErrorDetail,
@@ -244,6 +263,9 @@ function raiseForErrorResponse(
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
     if (rawDetail["error"] === "idempotency_key_reused") {
       throw guided(new IdempotencyKeyReusedError(status, rawDetail));
+    }
+    if (rawDetail["error"] === "whatsapp_awaiting_inbound") {
+      throw guided(new WhatsAppAwaitingInboundError(status, rawDetail));
     }
     if ("existing_rule_id" in rawDetail) {
       throw guided(new DuplicateContactRuleError(status, rawDetail));

@@ -102,6 +102,7 @@ export class IdentitiesResource {
     displayName?: string;
     description?: string | null;
     imessageEnabled?: boolean;
+    whatsappEnabled?: boolean;
     contactSharingEnabled?: boolean;
     claimIMessageNumber?: true;
     mailbox?: IdentityMailboxCreateOptions;
@@ -119,6 +120,7 @@ export class IdentitiesResource {
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.whatsappEnabled !== undefined) body["whatsapp_enabled"] = options.whatsappEnabled;
     if (options.contactSharingEnabled !== undefined) body["contact_sharing_enabled"] = options.contactSharingEnabled;
     if (options.claimIMessageNumber === true) {
       body["claim_imessage_number"] = true;
@@ -214,6 +216,7 @@ export class IdentitiesResource {
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.whatsappEnabled !== undefined) body["whatsapp_enabled"] = options.whatsappEnabled;
     if (options.contactSharingEnabled !== undefined) body["contact_sharing_enabled"] = options.contactSharingEnabled;
     if ("imessageNumberId" in options) body["imessage_number_id"] = options.imessageNumberId;
     if (options.claimIMessageNumber === true) {

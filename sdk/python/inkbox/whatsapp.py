@@ -1,4 +1,4 @@
-"""Dedicated, approved WhatsApp messaging and owned attachments."""
+"""WhatsApp messaging, shared-number connections, and owned attachments."""
 
 from __future__ import annotations
 
@@ -165,7 +165,7 @@ class WhatsAppMessage:
     agent_identity_id: UUID
     conversation_id: UUID
     direction: WhatsAppDirection
-    local_number: str
+    local_number: str | None
     remote_number: str | None
     sender_number: str | None
     participants: list[str]
@@ -191,6 +191,7 @@ class WhatsAppMessage:
     thread_root_message_id: UUID | None = None
     reactions: list[WhatsAppReaction] = field(default_factory=list)
 
+    logical_conversation_id: UUID | None = field(default=None, kw_only=True)
     sender_access: SenderAccess | None = field(default=None, kw_only=True)
     mentions: list[WhatsAppMention] = field(default_factory=list, kw_only=True)
     agent_mentioned: bool = field(default=False, kw_only=True)
@@ -210,6 +211,7 @@ class WhatsAppMessage:
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),
             conversation_id=UUID(d["conversation_id"]),
+            logical_conversation_id=UUID(d["logical_conversation_id"]) if d.get("logical_conversation_id") else None,
             direction=WhatsAppDirection(d["direction"]),
             local_number=d["local_number"],
             remote_number=d["remote_number"],
@@ -245,12 +247,13 @@ class WhatsAppMessage:
 class WhatsAppConversation:
     id: UUID
     agent_identity_id: UUID
-    local_number: str
+    local_number: str | None
     remote_number: str | None
     participants: list[str]
     created_at: datetime
     updated_at: datetime
 
+    active_conversation_id: UUID | None = field(default=None, kw_only=True)
     is_group: bool = field(default=False, kw_only=True)
     group_name: str | None = field(default=None, kw_only=True)
     unresolved_participant_count: int = field(default=0, kw_only=True)
@@ -265,6 +268,7 @@ class WhatsAppConversation:
             d["participants"],
             datetime.fromisoformat(d["created_at"]),
             datetime.fromisoformat(d["updated_at"]),
+            active_conversation_id=UUID(d["active_conversation_id"]) if d.get("active_conversation_id") else None,
             is_group=d.get("is_group", False),
             group_name=d.get("group_name"),
             unresolved_participant_count=d.get("unresolved_participant_count", 0),
@@ -299,6 +303,7 @@ class WhatsAppConversationSummary(WhatsAppConversation):
 class WhatsAppMarkReadResult:
     conversation_id: UUID
     updated_count: int
+    read_receipts_sent: bool = False
 
 
 @dataclass
@@ -318,7 +323,7 @@ def _owner(value: UUID | str | None) -> dict[str, str]:
 
 @dataclass
 class WhatsAppOnboarding:
-    """A message draft link and QR code; opening either does not send a message."""
+    """A message draft. Router fields are absent for legacy direct-link responses."""
 
     agent_identity_id: UUID
     number: str | None
@@ -326,16 +331,22 @@ class WhatsAppOnboarding:
     message_link: str | None
     message_qr_png_data_url: str | None
     ready: bool
+    triage_number: str | None = None
+    connect_command: str | None = None
+    connect_link: str | None = None
+    connect_qr_png_data_url: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppOnboarding:
         return cls(
             agent_identity_id=UUID(d["agent_identity_id"]),
-            number=d["number"],
-            message_text=d["message_text"],
-            message_link=d["message_link"],
-            message_qr_png_data_url=d["message_qr_png_data_url"],
-            ready=d["ready"],
+            number=d.get("triage_number", d.get("number")),
+            message_text=d.get("connect_command", d.get("message_text", "")),
+            message_link=d.get("connect_link", d.get("message_link")),
+            message_qr_png_data_url=d.get("connect_qr_png_data_url", d.get("message_qr_png_data_url")),
+            ready=d["ready"], triage_number=d.get("triage_number"),
+            connect_command=d.get("connect_command"), connect_link=d.get("connect_link"),
+            connect_qr_png_data_url=d.get("connect_qr_png_data_url"),
         )
 
 
@@ -350,8 +361,157 @@ class WhatsAppLimits:
         return cls(UUID(d["agent_identity_id"]), dict(d["limits"]), dict(d["usage"]))
 
 
+@dataclass
+class WhatsAppAssignment:
+    """An agent's shared-number assignment, without exposing the shared number."""
+
+    id: UUID
+    remote_number: str
+    agent_identity_id: UUID
+    organization_id: str
+    status: str
+    released_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppAssignment:
+        return cls(UUID(d["id"]), d["remote_number"], UUID(d["agent_identity_id"]),
+                   d["organization_id"], d["status"], _dt(d.get("released_at")),
+                   datetime.fromisoformat(d["created_at"]), datetime.fromisoformat(d["updated_at"]))
+
+
+@dataclass
+class WhatsAppConnectResult:
+    """An assignment and conversation; connecting sends no message.
+
+    assigned_number is absent for global shared numbers. The recipient connects
+    through the triage number and must write first before the agent can reply.
+    """
+
+    assignment: WhatsAppAssignment
+    conversation_id: UUID
+    assigned_number: str | None
+    already_connected: bool
+    awaiting_inbound: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppConnectResult:
+        return cls(WhatsAppAssignment._from_dict(d["assignment"]), UUID(d["conversation_id"]),
+                   d.get("assigned_number"), d["already_connected"], d["awaiting_inbound"])
+
+
+@dataclass
+class WhatsAppDisconnectResult:
+    """The released assignment ID, or None when already disconnected."""
+
+    assignment_id: UUID | None
+    disconnected: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppDisconnectResult:
+        value = d.get("assignment_id")
+        return cls(UUID(value) if value else None, d.get("disconnected", True))
+
+
+@dataclass
+class WhatsAppTriageNumber:
+    """The number, connect draft and QR code used to reach agents."""
+
+    number: str
+    connect_command: str
+    whatsapp_link: str
+    connect_qr_png_data_url: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppTriageNumber:
+        return cls(d["number"], d["connect_command"], d["whatsapp_link"], d["connect_qr_png_data_url"])
+
+
+def _recipient(value: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"\+[1-9][0-9]{6,14}", value):
+        raise ValueError("Provide one E.164 recipient_number")
+    return value
+
+
+@dataclass
+class WhatsAppNumber:
+    """An already-owned dedicated number and its assignment readiness."""
+    id: UUID
+    number: str
+    agent_identity_id: UUID | None
+    revision: int
+    state: str
+    binding_state: str | None
+    assignable: bool
+    unavailable_reason: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppNumber:
+        return cls(UUID(d["id"]), d["number"], UUID(d["agent_identity_id"]) if d.get("agent_identity_id") else None,
+                   d["revision"], d["state"], d.get("binding_state"), d["assignable"], d.get("unavailable_reason"))
+
+
+@dataclass
+class WhatsAppNumberList:
+    numbers: list[WhatsAppNumber]
+    has_more: bool
+
+
+@dataclass
+class WhatsAppRouter:
+    id: UUID
+    number: str
+    revision: int
+    state: str
+    profile_display_name: str | None
+    accepting_new_connections: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WhatsAppRouter:
+        return cls(UUID(d["id"]), d["number"], d["revision"], d["state"],
+                   d.get("profile_display_name"), d["accepting_new_connections"])
+
+
+@dataclass
+class WhatsAppRouterThread:
+    remote_number: str
+    last_message_at: datetime
+    latest_text: str
+    message_count: int
+
+
+@dataclass
+class WhatsAppRouterThreads:
+    items: list[WhatsAppRouterThread]
+    has_more: bool
+
+
+@dataclass
+class WhatsAppRouterMessage:
+    id: UUID
+    direction: str
+    content: str
+    status: str
+    created_at: datetime
+
+
+@dataclass
+class WhatsAppRouterMessages:
+    items: list[WhatsAppRouterMessage]
+    has_more: bool
+
+
+_UNSET = object()
+
+
 class WhatsAppResource:
-    """Direct and existing-group WhatsApp on an approved dedicated number.
+    """Direct and existing-group WhatsApp on dedicated and shared numbers.
+
+    WhatsApp never starts a conversation by default: an agent replies after the
+    recipient messages first. Shared numbers never start conversations; dedicated
+    numbers can only with approval for your organization. Otherwise sends fail with
+    ``409 whatsapp_awaiting_inbound``.
 
     Send acceptance is not delivery confirmation. Reuse a logical send's key
     and owned media IDs after an uncertain outcome; never re-upload to retry it.
@@ -379,6 +539,12 @@ class WhatsAppResource:
         plain_reply_fallback defaults to True; False explicitly requires a native
         quote. Current supported targets use native quotes; missing evidence or
         rejected/uncertain sends never trigger a plain replacement.
+
+        Raises:
+            WhatsAppAwaitingInboundError: The recipient has not messaged this
+                number yet; reply after they do.
+            InkboxAPIError: 403 ``whatsapp_access_required`` when replying through
+                a shared number to a recipient the agent is not connected to.
         """
         if not isinstance(gif_playback, bool):
             raise ValueError("gif_playback must be a boolean")
@@ -548,20 +714,22 @@ class WhatsAppResource:
                 or any(char.isspace() or unicodedata.category(char) in {"Cc", "Cs"} for char in custom_emoji)):
             raise ValueError("custom_emoji must contain 1–32 non-whitespace characters")
         body = {"message_id": str(message_id), **({"reaction": str(reaction)} if reaction is not None else {"custom_emoji": custom_emoji})}
-        result = self._http.post("/reactions", json=body, params=_owner(agent_identity_id), headers=_reaction_headers(idempotency_key))
-        return WhatsAppReaction._from_dict(result["reaction"])
+        result = self._http.post("/reactions", json=body, params=_owner(agent_identity_id), headers=_key_headers(idempotency_key))
+        return WhatsAppReaction._from_dict(result["reaction"] if isinstance(result.get("reaction"), dict) else result)
 
     def get_reaction(self, reaction_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
         """Read queued, applied or uncertain state without repeating the operation."""
         result = self._http.get(f"/reactions/{reaction_id}", params=_owner(agent_identity_id))
-        return WhatsAppReaction._from_dict(result["reaction"])
+        return WhatsAppReaction._from_dict(result["reaction"] if isinstance(result.get("reaction"), dict) else result)
 
     def remove_reaction(self, reaction_id: UUID | str, *, idempotency_key: str,
                         agent_identity_id: UUID | str | None = None) -> WhatsAppReaction:
         """Return the removal receipt; a stale receipt never removes a newer reaction."""
         result = self._http.delete_with_response(f"/reactions/{reaction_id}", params=_owner(agent_identity_id),
-            headers=_reaction_headers(idempotency_key))
-        return WhatsAppReaction._from_dict(result["reaction"])
+            headers=_key_headers(idempotency_key))
+        if result is None:
+            return self.get_reaction(reaction_id, agent_identity_id=agent_identity_id)
+        return WhatsAppReaction._from_dict(result["reaction"] if isinstance(result.get("reaction"), dict) else result)
 
     def upload_media(
         self,
@@ -570,17 +738,24 @@ class WhatsAppResource:
         filename: str,
         content_type: str | None = None,
         agent_identity_id: UUID | str | None = None,
+        recipient_number: str | None = None,
     ) -> WhatsAppMedia:
-        """Upload at most 20 MiB and retain the returned media ID for send."""
+        """Upload at most 20 MiB and retain the returned media ID for send.
+
+        Pass ``recipient_number`` when the agent replies through a shared number.
+        """
         if len(content) > 20 * 1024 * 1024:
             raise ValueError("WhatsApp media must be at most 20 MiB")
+        params = _owner(agent_identity_id)
+        if recipient_number is not None:
+            params["recipient_number"] = _recipient(recipient_number)
         data = self._http.post_multipart(
             "/media",
             field_name="file",
             filename=filename,
             content=content,
             content_type=content_type or "application/octet-stream",
-            params=_owner(agent_identity_id),
+            params=params,
         )
         return WhatsAppMedia._from_dict(data)
 
@@ -595,22 +770,128 @@ class WhatsAppResource:
     def mark_read(
         self,
         conversation_id: UUID | str,
-        through_message_id: UUID | str,
+        through_message_id: UUID | str | None = None,
         *,
         agent_identity_id: UUID | str | None = None,
     ) -> WhatsAppMarkReadResult:
-        """Mark local inbound history read through a visible message; no remote receipt."""
+        """Mark history read and send supported read receipts; omit the boundary for all unread messages."""
         data = self._http.post(
             "/mark-read",
             json={
                 "conversation_id": str(conversation_id),
-                "through_message_id": str(through_message_id),
+                **({"through_message_id": str(through_message_id)} if through_message_id is not None else {}),
             },
             params=_owner(agent_identity_id),
         )
         return WhatsAppMarkReadResult(
-            UUID(data["conversation_id"]), data["updated_count"]
+            UUID(data["conversation_id"]), data["updated_count"], data.get("read_receipts_sent", False)
         )
+
+    def connect(
+        self,
+        *,
+        agent_identity_id: UUID | str,
+        recipient_number: str,
+        idempotency_key: str,
+    ) -> WhatsAppConnectResult:
+        """Reserve one of the organization's shared numbers for a recipient.
+
+        Nothing is sent. For organization-owned numbers, give the recipient ``assigned_number``; the agent can
+        reply after they message it. Requires an admin-scoped API key.
+
+        Use a new key (for example ``str(uuid4())``) for each new connect or
+        disconnect; reuse a key only to retry that same request. A reused key
+        replays the earlier result.
+
+        Raises:
+            IdempotencyKeyReusedError: The key was used for a different request.
+            InkboxAPIError: 409 ``whatsapp_identity_has_dedicated_line``,
+                ``whatsapp_pool_unavailable``, ``whatsapp_recipient_connections_full``,
+                ``whatsapp_connection_busy`` or
+                ``idempotency_in_progress`` (retry with the same key),
+                ``result_unavailable`` (the stored result expired; check
+                ``list_assignments`` first); 403 ``recipient_blocked``;
+                422 ``invalid_idempotency_key``; 400 when WhatsApp is disabled.
+        """
+        body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
+        data = self._http.post("/connect", json=body, headers=_key_headers(idempotency_key))
+        return WhatsAppConnectResult._from_dict(data)
+
+    def disconnect(
+        self,
+        *,
+        agent_identity_id: UUID | str,
+        recipient_number: str,
+        idempotency_key: str,
+    ) -> WhatsAppDisconnectResult:
+        """Release an agent's recipient connection on a dedicated or shared number; history is kept.
+
+        Use a new key for each new disconnect; reuse a key only to retry that
+        same request. Key errors match :meth:`connect`.
+        """
+        body = {"agent_identity_id": str(UUID(str(agent_identity_id))), "recipient_number": _recipient(recipient_number)}
+        data = self._http.post("/disconnect", json=body, headers=_key_headers(idempotency_key))
+        return WhatsAppDisconnectResult._from_dict(data)
+
+    def list_assignments(self, *, agent_identity_id: UUID | str | None = None, limit: int = 50, offset: int = 0) -> list[WhatsAppAssignment]:
+        """List active dedicated or shared recipient connections for an agent."""
+        data = self._http.get("/assignments", params={**_owner(agent_identity_id), "limit": limit, "offset": offset})
+        return [WhatsAppAssignment._from_dict(row) for row in data]
+
+    def delete_assignment(self, assignment_id: UUID | str) -> None:
+        """Release an assignment without deleting its conversation history."""
+        self._http.delete(f"/assignments/{UUID(str(assignment_id))}")
+
+    def get_triage_number(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppTriageNumber:
+        """Get the triage number and connect link; optionally select an agent."""
+        return WhatsAppTriageNumber._from_dict(self._http.get("/triage-number", params=_owner(agent_identity_id)))
+
+    def send_typing(self, conversation_id: UUID | str, *, agent_identity_id: UUID | str | None = None) -> dict[str, str]:
+        """Send a typing indicator in an existing direct conversation."""
+        return self._http.post("/typing", json={"conversation_id": str(conversation_id)}, params=_owner(agent_identity_id))
+
+    def list_numbers(self, *, offset: int = 0) -> WhatsAppNumberList:
+        """List up to 100 already-owned dedicated numbers; requires an admin-scoped API key."""
+        d = self._http.get("/numbers", params={"offset": offset})
+        return WhatsAppNumberList([WhatsAppNumber._from_dict(item) for item in d["numbers"]], d["has_more"])
+
+    def assign_number(self, account_id: UUID | str, *, agent_identity_id: UUID | str | None,
+                      expected_revision: int, confirmed_imessage_number: str | None = None) -> WhatsAppNumber:
+        """Attach an owned number, or detach with None. This never purchases a number."""
+        body: dict[str, Any] = {"agent_identity_id": str(agent_identity_id) if agent_identity_id is not None else None,
+                                "expected_revision": expected_revision}
+        if confirmed_imessage_number is not None:
+            body["confirmed_imessage_number"] = confirmed_imessage_number
+        return WhatsAppNumber._from_dict(self._http.patch(f"/numbers/{account_id}", json=body))
+
+    def get_router(self) -> WhatsAppRouter | None:
+        """Read your organization's dedicated router; requires an admin-scoped API key."""
+        d = self._http.get("/router")["router"]
+        return WhatsAppRouter._from_dict(d) if d is not None else None
+
+    def update_router(self, *, expected_router_id: UUID | str, expected_revision: int,
+                      profile_display_name: str | None | object = _UNSET,
+                      accepting_new_connections: bool | None = None) -> WhatsAppRouter:
+        """Edit the router you read. Omit its name to preserve it, or pass None to clear it."""
+        body: dict[str, Any] = {"expected_router_id": str(expected_router_id), "expected_revision": expected_revision}
+        if profile_display_name is not _UNSET:
+            body["profile_display_name"] = profile_display_name
+        if accepting_new_connections is not None:
+            body["accepting_new_connections"] = accepting_new_connections
+        return WhatsAppRouter._from_dict(self._http.patch("/router", json=body)["router"])
+
+    def list_router_threads(self, *, offset: int = 0, limit: int = 50) -> WhatsAppRouterThreads:
+        """List recipient threads on your organization's dedicated router, newest first."""
+        d = self._http.get("/router/conversations", params={"offset": offset, "limit": limit})
+        return WhatsAppRouterThreads([WhatsAppRouterThread(item["remote_number"], datetime.fromisoformat(item["last_message_at"]),
+            item["latest_text"], item["message_count"]) for item in d["items"]], d["has_more"])
+
+    def list_router_messages(self, remote_number: str, *, offset: int = 0, limit: int = 50) -> WhatsAppRouterMessages:
+        """Read one dedicated-router recipient thread; requires an admin-scoped API key."""
+        remote_number = _recipient(remote_number)
+        d = self._http.get(f"/router/conversations/{remote_number}/messages", params={"offset": offset, "limit": limit})
+        return WhatsAppRouterMessages([WhatsAppRouterMessage(UUID(item["id"]), item["direction"], item["content"],
+            item["status"], datetime.fromisoformat(item["created_at"])) for item in d["items"]], d["has_more"])
 
     def get_onboarding(self, *, agent_identity_id: UUID | str | None = None) -> WhatsAppOnboarding:
         """Read a link and QR for messaging the agent, without sending or enabling WhatsApp."""
@@ -638,7 +919,7 @@ class WhatsAppThread:
             [WhatsAppMessage._from_dict(row) for row in d["messages"]], d["next_cursor"])
 
 
-def _reaction_headers(key: str) -> dict[str, str]:
+def _key_headers(key: str) -> dict[str, str]:
     if not isinstance(key, str) or not key.strip() or len(key) > 255:
         raise ValueError("A stable idempotency_key is required")
     return {"Idempotency-Key": key}

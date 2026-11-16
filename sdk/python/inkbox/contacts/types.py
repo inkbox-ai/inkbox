@@ -692,7 +692,7 @@ class IMessageCorrespondenceItem(CorrespondenceItem):
 @dataclass
 class WhatsAppCorrespondenceItem(CorrespondenceItem):
     conversation_id: UUID
-    local_number: str
+    local_number: str | None
     remote_number: str | None
     participants: list[str]
     text: str | None = None

@@ -1445,25 +1445,65 @@ Optional `threadTs` in reply context selects a reply thread; it does not limit s
 ## Dedicated WhatsApp
 
 From version 0.7.29, `inkbox whatsapp onboarding --identity my-agent`
-returns a message link and PNG QR code for contacting the agent. Check `ready`
-before presenting the draft; the person still taps Send in WhatsApp. This read
-does not enable WhatsApp or send a message.
+returns a router connect link and PNG QR code for dedicated and shared-number agents.
+The draft is `connect @handle` to the router; the person taps Send, follows the
+returned destination link with `start` prefilled, and taps Send again. Check `ready`
+before presenting the draft. Onboarding does not enable WhatsApp or send a message.
+Read channel status to find an agent's dedicated number; onboarding publishes the router number.
 
 `inkbox whatsapp send --identity my-agent --to +15555550101 --text Hello --idempotency-key stable-key`
 
-Available by approval on the same number as an existing dedicated personal
-iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with approval for your organization. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound`. Dedicated numbers are
+available by approval; a dedicated number can match an iMessage number or be
+different, and an iMessage number is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
-unknown delivery does not mean a send failed. Mark-read updates only local history.
+unknown delivery does not mean a send failed. Mark-read updates history and sends supported read receipts.
 
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
-reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+reactions are supported. Typing and read receipts are supported for eligible direct conversations; WhatsApp calls are not.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; the agent can reply after the recipient messages the returned
+number. Connect and disconnect require an admin-scoped API key and an
+idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```bash
+inkbox whatsapp connect --identity my-agent --recipient +15555550101 \
+  --idempotency-key "$(uuidgen)"   # prints the number to give the recipient
+inkbox whatsapp assignments --identity my-agent
+inkbox whatsapp disconnect --identity my-agent --recipient +15555550101 \
+  --idempotency-key "$(uuidgen)"
+inkbox whatsapp triage-number
+inkbox whatsapp upload-media photo.jpg --identity my-agent --recipient +15555550101
+```
+
+Pass `--recipient` to `upload-media` when replying through a shared number.
+
+Shared-number errors: replying before the recipient's first message returns
+`409 whatsapp_awaiting_inbound`; sending through a shared number to a recipient
+the agent is not connected to returns `403 whatsapp_access_required`. Connect can
+also return `409 whatsapp_identity_has_dedicated_line`, `409 whatsapp_pool_unavailable`,
+`409 whatsapp_recipient_connections_full` (disconnect an existing assignment first),
+`409 whatsapp_connection_busy` (retry with the same key), or
+`403 recipient_blocked`. A disabled agent returns `400` with
+`detail: "Agent identity is not enabled for WhatsApp"`. Key errors on connect and disconnect:
+`422 invalid_idempotency_key`; `409 idempotency_key_reused` (the key was used for a
+different request); `409 idempotency_in_progress` (the original request is still
+running; retry with the same key); and `409 result_unavailable` (the stored result
+expired; check `assignments` before acting again with a new key).
 
 ### WhatsApp history filters
 
@@ -1489,7 +1529,7 @@ to play the MP4 as an animation.
 All group participants must have known phone numbers (`unresolved_participant_count`
 must be zero). Receiving checks every participant against inbound contact rules;
 blocked incoming messages do not trigger `whatsapp.received`. Sending content or
-reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+reactions checks outbound contact rules and returns `recipient_blocked`
 if any participant is unresolved or not allowed for outbound traffic. An outbound-only
 block does not block incoming messages or erase an earlier qualifying incoming
 message. A new allowed incoming message is needed only when none already qualifies.
@@ -1514,3 +1554,20 @@ inkbox whatsapp conversations --identity support-bot --participants +14155550123
 
 Use `--participants` or `--contact-id`, not both. Existing group-listing rules
 still apply.
+
+
+### Manage owned WhatsApp numbers and routers
+
+Use an admin-scoped API key. These commands manage already-owned numbers; they do not purchase or provision them.
+
+```bash
+inkbox whatsapp numbers --offset 0
+inkbox whatsapp assign-number NUMBER_ID --identity my-agent --revision 2
+inkbox whatsapp assign-number NUMBER_ID --detach --revision 3
+inkbox whatsapp router
+inkbox whatsapp update-router ROUTER_ID --revision 2 --accepting false
+inkbox whatsapp router-threads --limit 50 --offset 0
+inkbox whatsapp router-messages +15555550101 --limit 50 --offset 0
+```
+
+Read the current resource before updating it. A changed router ID or revision returns a conflict; refresh before retrying. Omit `--name` to preserve the name, or pass `--name ""` to clear it.

@@ -1743,7 +1743,7 @@ pub struct WhatsAppWebhookMessage {
     pub agent_identity_id: String,
     pub conversation_id: String,
     pub direction: crate::whatsapp::WhatsAppDirection,
-    pub local_number: String,
+    pub local_number: Option<String>,
     pub remote_number: Option<String>,
     pub sender_number: Option<String>,
     pub participants: Vec<String>,

@@ -301,6 +301,22 @@ impl InkboxError {
     pub fn is_tunnel_superseded(&self) -> bool {
         matches!(self.original_error(), InkboxError::Tunnel(m) if m.starts_with("tunnel-superseded:"))
     }
+
+    /// True iff a WhatsApp send was rejected because the recipient has not
+    /// messaged the agent's number yet (`409 whatsapp_awaiting_inbound`).
+    /// WhatsApp never starts a conversation by default: wait for the
+    /// recipient's message, then reply. Do not retry with a new idempotency key.
+    pub fn is_whatsapp_awaiting_inbound(&self) -> bool {
+        matches!(
+            self.original_error(),
+            InkboxError::Api { status_code: 409, detail, .. }
+                if detail
+                    .as_object()
+                    .and_then(|value| value.get("error"))
+                    .and_then(Value::as_str)
+                    == Some("whatsapp_awaiting_inbound")
+        )
+    }
 }
 
 /// The `detail` payload on an [`InkboxError::Api`]: either a human-readable
