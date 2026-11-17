@@ -279,6 +279,25 @@ describe("thread routing", () => {
     );
     await bot.shutdown();
   });
+  it("unwraps scoped message IDs for SDK reads and rejects cross-thread IDs", async () => {
+    const { adapter, bot } = await setup();
+    const route = routes[1];
+    const native = {
+      id: "native-message",
+      text: "Hello",
+      authorId: "sender",
+      isMe: false,
+      createdAt: new Date(),
+    };
+    const get = vi.spyOn(adapter.transport, "getMessage").mockResolvedValue(native);
+    const parsed = adapter.parseMessage({ ...native, route });
+    expect((await adapter.fetchMessage(parsed.threadId, parsed.id)).id).toBe(parsed.id);
+    expect(get).toHaveBeenCalledWith(route, "native-message");
+    get.mockClear();
+    await expect(adapter.fetchMessage(adapter.encodeThreadId(routes[4]), parsed.id)).rejects.toThrow("different thread");
+    expect(get).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
   it("refuses file loss on unsupported channels", async () => {
     const { adapter, bot } = await setup();
     await expect(
