@@ -22,7 +22,12 @@ for (const command of ["templates", "shapes", "capabilities"]) test(`computers $
       {timeout: 15000, env: {...process.env, NODE_USE_ENV_PROXY: "0"}},
       (error, stdout) => error ? reject(error) : resolve(stdout)));
     assert.deepEqual(JSON.parse(stdout), payload);
-    assert.deepEqual(requests, [["GET", `/api/v1/computers/${command === "capabilities" ? "hosting/capabilities" : command}`]]);
+    const endpoint = {
+      templates: "templates?include_all_harnesses=true",
+      shapes: "shapes",
+      capabilities: "hosting/capabilities",
+    }[command];
+    assert.deepEqual(requests, [["GET", `/api/v1/computers/${endpoint}`]]);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
