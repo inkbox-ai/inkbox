@@ -1,0 +1,24 @@
+{
+  "name": "inkbox-chat-sdk-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "setup": "tsx src/setup.ts"
+  },
+  "dependencies": {
+    "@inkbox/chat-sdk-adapter": "file:../../adapters/chat-sdk",
+    "@chat-adapter/state-redis": "4.45.0",
+    "chat": "4.45.0",
+    "@inkbox/sdk": "file:../../sdk/typescript"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0"
+  }
+}

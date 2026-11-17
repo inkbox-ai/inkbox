@@ -13,6 +13,17 @@ API-first communication infrastructure for AI agents — email (with custom send
 | [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
+| [`@inkbox/chat-sdk-adapter`](./adapters/chat-sdk/) | Chat SDK / Node ≥ 22 | `npm install @inkbox/chat-sdk-adapter chat` |
+
+## Chat SDK and Eve
+
+Connect email, SMS/MMS, iMessage, Slack, A2A, and completed-call transcripts to
+Chat SDK through [`@inkbox/chat-sdk-adapter`](./adapters/chat-sdk/). Receive
+messages through one webhook handler and reply in the originating conversation.
+The [Eve example](./examples/eve-agent/) connects that adapter to durable agent
+sessions; the [standalone example](./examples/chat-sdk/) works with a Fetch API
+web framework. Voice supplies post-call context, not a realtime audio bridge.
+WhatsApp is not included in the adapter.
 
 ## Companion mode
 

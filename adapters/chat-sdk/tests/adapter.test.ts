@@ -1,0 +1,390 @@
+import { createHmac } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
+import { Chat } from "chat";
+import { createMemoryState } from "@chat-adapter/state-memory";
+import { createInkboxAdapter, type InkboxRoute } from "../src/index.js";
+import { normalizeEvent } from "../src/events.js";
+
+const identity = { id: "identity-test", emailAddress: "assistant@example.com" };
+const secret = "test-signing-secret";
+const event = (event_type: string, data: unknown) => ({
+  id: "evt-test",
+  event_type,
+  timestamp: new Date().toISOString(),
+  data,
+});
+const incoming = () =>
+  event("text.received", {
+    text_message: {
+      id: "message-test",
+      direction: "inbound",
+      conversation_id: "conversation-test",
+      text: "Hello",
+      sender_phone_number: "+12025550123",
+      created_at: new Date().toISOString(),
+    },
+  });
+function signed(payload: unknown, extra: Record<string, string> = {}) {
+  const body = JSON.stringify(payload);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const requestId = "request-test";
+  const signature = createHmac("sha256", secret)
+    .update(`${requestId}.${timestamp}.${body}`)
+    .digest("hex");
+  return new Request("https://example.com/webhook", {
+    method: "POST",
+    body,
+    headers: {
+      "x-inkbox-timestamp": timestamp,
+      "x-inkbox-request-id": requestId,
+      "x-inkbox-signature": `sha256=${signature}`,
+      ...extra,
+    },
+  });
+}
+async function setup() {
+  const adapter = createInkboxAdapter({
+    apiKey: "test-key",
+    agentHandle: "assistant",
+    signingSecret: secret,
+  });
+  vi.spyOn(adapter.transport, "identity").mockResolvedValue(identity as never);
+  const bot = new Chat({
+    userName: "assistant",
+    adapters: { inkbox: adapter },
+    state: createMemoryState(),
+  });
+  const handler = vi.fn(async (thread) => {
+    await thread.subscribe();
+  });
+  bot.onNewMention(handler);
+  bot.onSubscribedMessage(handler);
+  await bot.initialize();
+  return { adapter, bot, handler };
+}
+
+describe("signed webhook delivery", () => {
+  it("processes and deduplicates a replay through real Chat state", async () => {
+    const { bot, handler } = await setup();
+    const payload = incoming();
+    expect((await bot.webhooks.inkbox(signed(payload))).status).toBe(200);
+    expect((await bot.webhooks.inkbox(signed(payload))).status).toBe(200);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][1].text).toBe("Hello");
+    await bot.shutdown();
+  });
+  it.each([
+    { "x-inkbox-signature": "sha256=short" },
+    { "x-inkbox-signature": `sha256=${"0".repeat(64)}` },
+    { "x-inkbox-timestamp": "0" },
+    { "x-inkbox-timestamp": "NaN" },
+    { "x-inkbox-request-id": "" },
+  ])("rejects malformed, mismatched, and stale signatures", async (headers) => {
+    const { bot, handler } = await setup();
+    expect(
+      (await bot.webhooks.inkbox(signed(incoming(), headers))).status,
+    ).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
+  it("does not turn receipts or outbound traffic into messages", async () => {
+    const { bot, handler } = await setup();
+    expect(
+      (await bot.webhooks.inkbox(signed(event("text.delivered", {})))).status,
+    ).toBe(200);
+    const outbound = incoming();
+    outbound.data.text_message.direction = "outbound";
+    expect((await bot.webhooks.inkbox(signed(outbound))).status).toBe(200);
+    expect(handler).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
+  it("rejects malformed supported events", async () => {
+    const { bot } = await setup();
+    expect(
+      (await bot.webhooks.inkbox(signed(event("text.received", {})))).status,
+    ).toBe(400);
+    await bot.shutdown();
+  });
+  it("hydrates full mail before invoking the handler", async () => {
+    const { bot, adapter, handler } = await setup();
+    vi.spyOn(adapter.transport, "getMessage").mockResolvedValue({
+      id: "email-test",
+      text: "Complete email",
+      authorId: "sender@example.com",
+      isMe: false,
+      createdAt: new Date(),
+      raw: {},
+    });
+    const payload = event("message.received", {
+      message: {
+        id: "email-test",
+        thread_id: "thread-test",
+        direction: "inbound",
+        from_address: "sender@example.com",
+        body: "Complete",
+        body_truncated: true,
+      },
+    });
+    expect((await bot.webhooks.inkbox(signed(payload))).status).toBe(200);
+    expect(handler.mock.calls[0][1].text).toBe("Complete email");
+    await bot.shutdown();
+  });
+  it("registers background work with waitUntil", async () => {
+    const { bot, handler } = await setup();
+    const pending: Promise<unknown>[] = [];
+    expect(
+      (
+        await bot.webhooks.inkbox(signed(incoming()), {
+          waitUntil: (p) => pending.push(p),
+        })
+      ).status,
+    ).toBe(200);
+    await Promise.all(pending);
+    expect(handler).toHaveBeenCalledTimes(1);
+    await bot.shutdown();
+  });
+  it("returns the webhook response before a waitUntil handler finishes", async () => {
+    const { bot, handler } = await setup();
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    handler.mockImplementation(async () => {
+      await gate;
+    });
+    const pending: Promise<unknown>[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response = await Promise.race([
+        bot.webhooks.inkbox(signed(incoming()), {
+          waitUntil: (task) => pending.push(task),
+        }),
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), 1000);
+        }),
+      ]);
+      expect(response?.status).toBe(200);
+      expect(pending).toHaveLength(1);
+    } finally {
+      clearTimeout(timer);
+      finish();
+      await Promise.all(pending);
+      await bot.shutdown();
+    }
+  });
+  it("does not deduplicate equal Slack timestamps from different conversations", async () => {
+    const { bot, handler } = await setup();
+    for (const conversation of ["channel-one", "channel-two"]) {
+      const payload = event("slack.mention_received", {
+        identity_id: identity.id,
+        connection_id: "connection-test",
+        conversation_id: conversation,
+        message_ts: "123.456",
+        actor_id: "user-test",
+        event: { text: "Hello" },
+      });
+      payload.id = `evt-${conversation}`;
+      expect((await bot.webhooks.inkbox(signed(payload))).status).toBe(200);
+    }
+    expect(handler).toHaveBeenCalledTimes(2);
+    const first = handler.mock.calls[0][1];
+    const second = handler.mock.calls[1][1];
+    expect(first.id).not.toBe(second.id);
+    expect(first.raw.id).toBe("123.456");
+    expect(second.raw.id).toBe("123.456");
+    await bot.shutdown();
+  });
+});
+
+describe("thread routing", () => {
+  const routes: InkboxRoute[] = [
+    {
+      identityId: identity.id,
+      channel: "email",
+      emailAddress: identity.emailAddress,
+      threadId: "thread:with/unicode-☀",
+    },
+    { identityId: identity.id, channel: "sms", conversationId: "group-text" },
+    {
+      identityId: identity.id,
+      channel: "imessage",
+      conversationId: "group-imessage",
+      threadId: "nested",
+      replyToMessageId: "root",
+      isGroup: true,
+    },
+    {
+      identityId: identity.id,
+      channel: "slack",
+      connectionId: "connection",
+      conversationId: "channel",
+      threadTs: "123.456",
+    },
+    { identityId: identity.id, channel: "a2a", taskId: "task" },
+    { identityId: identity.id, channel: "voice", callId: "call" },
+  ];
+  it.each(routes)(
+    "round trips $channel and survives a new adapter instance",
+    (route) => {
+      const first = createInkboxAdapter({
+        apiKey: "test",
+        agentHandle: "assistant",
+        signingSecret: secret,
+      });
+      const second = createInkboxAdapter({
+        apiKey: "test",
+        agentHandle: "assistant",
+        signingSecret: secret,
+      });
+      expect(second.decodeThreadId(first.encodeThreadId(route))).toEqual(route);
+    },
+  );
+  it("does not split email threads when the reply anchor changes", () => {
+    const adapter = createInkboxAdapter({
+      apiKey: "test",
+      agentHandle: "assistant",
+      signingSecret: secret,
+    });
+    const route = routes[0] as Extract<InkboxRoute, { channel: "email" }>;
+    expect(adapter.encodeThreadId({ ...route, anchorMessageId: "one" })).toBe(
+      adapter.encodeThreadId({ ...route, anchorMessageId: "two" }),
+    );
+  });
+  it("rejects another identity's serialized route", async () => {
+    const { adapter, bot } = await setup();
+    const id = adapter.encodeThreadId({
+      ...routes[1],
+      identityId: "different",
+    });
+    expect(() => adapter.decodeThreadId(id)).toThrow(
+      "different Inkbox identity",
+    );
+    await bot.shutdown();
+  });
+  it("posts in the originating group conversation and passes retry keys", async () => {
+    const { adapter, bot } = await setup();
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "sent", raw: {} });
+    const threadId = adapter.encodeThreadId(routes[1]);
+    await adapter.send(threadId, "reply", {
+      idempotencyKey: "stable-operation-key",
+    });
+    expect(send).toHaveBeenCalledWith(
+      routes[1],
+      expect.objectContaining({
+        text: "reply",
+        idempotencyKey: "stable-operation-key",
+      }),
+    );
+    await bot.shutdown();
+  });
+  it("refuses file loss on unsupported channels", async () => {
+    const { adapter, bot } = await setup();
+    await expect(
+      adapter.postMessage(adapter.encodeThreadId(routes[4]), {
+        raw: "file",
+        files: [{ filename: "test.txt", data: Buffer.from("content") }],
+      }),
+    ).rejects.toThrow("File posting");
+    await bot.shutdown();
+  });
+});
+
+describe("channel event normalization", () => {
+  it("keeps group iMessage threads and media", () => {
+    const message = normalizeEvent(
+      event("imessage.received", {
+        message: {
+          id: "message",
+          direction: "inbound",
+          conversation_id: "group",
+          thread_id: "thread",
+          thread_root_message_id: "root",
+          sender_number: "+12025550123",
+          is_group: true,
+          content: "photo",
+          media: [
+            { url: "https://example.com/photo", content_type: "image/jpeg" },
+          ],
+        },
+      }),
+      identity,
+    );
+    expect(message?.route).toMatchObject({
+      channel: "imessage",
+      conversationId: "group",
+      threadId: "thread",
+      replyToMessageId: "root",
+      isGroup: true,
+    });
+    expect(message?.attachments?.[0].type).toBe("image");
+  });
+  it("separates Slack connection/thread and excludes bots", () => {
+    const data = {
+      identity_id: identity.id,
+      connection_id: "conn",
+      conversation_id: "channel",
+      message_ts: "2.0",
+      thread_ts: "1.0",
+      actor_id: "user",
+      event: { text: "hello" },
+    };
+    const message = normalizeEvent(
+      event("slack.thread_reply_received", data),
+      identity,
+    );
+    expect(message?.route).toMatchObject({
+      channel: "slack",
+      threadTs: "1.0",
+      connectionId: "conn",
+    });
+    expect(
+      normalizeEvent(
+        event("slack.thread_reply_received", {
+          ...data,
+          actor_profile: { is_bot: true },
+        }),
+        identity,
+      ),
+    ).toBeNull();
+  });
+  it("normalizes A2A user parts without accepting self echoes", () => {
+    const data = {
+      task_id: "task",
+      message_id: "message",
+      caller: { identity_id: "caller" },
+      parts: [{ kind: "text", text: "work" }],
+    };
+    expect(
+      normalizeEvent(event("a2a.task.created", data), identity)?.text,
+    ).toBe("work");
+    expect(
+      normalizeEvent(
+        event("a2a.task.message", {
+          ...data,
+          sender: { identity_id: identity.id },
+        }),
+        identity,
+      ),
+    ).toBeNull();
+  });
+  it("represents completed calls as transcript observations", () => {
+    const message = normalizeEvent(
+      event("call.ended", {
+        call: {
+          id: "call",
+          remote_phone_number: "+12025550123",
+          direction: "inbound",
+          status: "completed",
+        },
+        transcript: {
+          entries: [{ party: "remote", text: "Follow up tomorrow" }],
+        },
+      }),
+      identity,
+    );
+    expect(message?.route.channel).toBe("voice");
+    expect(message?.text).toContain("remote: Follow up tomorrow");
+  });
+});

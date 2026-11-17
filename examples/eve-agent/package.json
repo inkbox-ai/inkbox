@@ -1,0 +1,27 @@
+{
+  "name": "inkbox-eve-agent-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "26.x"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "eve dev",
+    "build": "eve build",
+    "start": "eve start"
+  },
+  "dependencies": {
+    "@inkbox/chat-sdk-adapter": "file:../../adapters/chat-sdk",
+    "@chat-adapter/state-redis": "4.45.0",
+    "chat": "4.45.0",
+    "eve": "1.0.2",
+    "ai": "^7.0.172",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.40
+
+### Added
+
+- `@inkbox/chat-sdk-adapter`: email, SMS/MMS, iMessage, Slack, A2A, and completed-call transcript channels for Chat SDK, with standalone and Eve examples.
+- Signed webhook ingestion, identity-scoped reply routing, conversation history, media, and channel-specific reactions.
+
+### Releasing
+
+- Publish the Chat SDK adapter with each TypeScript SDK release, using the same version. Prepare both packages before publication and support resuming an interrupted paired release.
+
 ## 0.7.39
 
 ### Added
