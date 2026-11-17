@@ -2297,8 +2297,11 @@ require a native reply instead.
 From version 0.7.29, `identity.get_whatsapp_onboarding()`
 returns a router connect link and PNG QR code for dedicated and shared-number agents.
 The draft is `connect @handle` to the router; the person taps Send, follows the
-returned destination link with `start` prefilled, and taps Send again. Check `ready`
-before presenting the draft. Onboarding does not enable WhatsApp or send a message.
+returned destination link with `start` prefilled, and taps Send again. Enable
+WhatsApp on the agent first: a disabled agent receives HTTP 400 with
+`Agent identity is not enabled for WhatsApp` instead of instructions. `ready` is
+`true` on success, retained for compatibility, and does not guarantee delivery.
+Onboarding does not enable WhatsApp or send a message.
 Read channel status to find an agent's dedicated number; onboarding publishes the router number.
 
 `identity.send_whatsapp(to="+15555550101", text="Hello", idempotency_key="stable-key")`
