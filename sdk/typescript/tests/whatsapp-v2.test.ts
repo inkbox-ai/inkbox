@@ -39,7 +39,7 @@ describe("WhatsApp v2 shared wire contract", () => {
     await expect(api().getThread(f.message.id, { limit: 0 })).rejects.toThrow(); await expect(api().list({ threadId: f.thread.thread_id })).rejects.toThrow(); expect(fetch).toHaveBeenCalledTimes(calls);
   });
   it("reactions preserve explicit write keys, unknown actors, and uncertain/removal receipts", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok({ reaction: { ...f.uncertain_reaction, remote_number: null } }))));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok({ ...f.uncertain_reaction, remote_number: null }))));
     const options = { messageId: f.message.id, customEmoji: "👨‍👩‍👧‍👦", idempotencyKey: "reaction-original", agentIdentityId: f.message.agent_identity_id };
     const result = await api().sendReaction(options); expect(result.status).toBe("uncertain"); expect(result.remoteNumber).toBeNull();
     expect(request().body).toEqual({ message_id: f.message.id, custom_emoji: options.customEmoji });
@@ -48,6 +48,14 @@ describe("WhatsApp v2 shared wire contract", () => {
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(ok({ reaction: f.removed_reaction })));
     const removed = await api().removeReaction(f.reaction.id, { idempotencyKey: "remove-original", agentIdentityId: f.message.agent_identity_id });
     expect(removed.status).toBe("removed"); expect(request().init.method).toBe("DELETE"); expect(new Headers(request().init.headers).get("Idempotency-Key")).toBe("remove-original"); expect(request().url.searchParams.get("agent_identity_id")).toBe(f.message.agent_identity_id);
+  });
+  it("reads factual receipt state after an empty removal response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(ok({ reaction: f.uncertain_reaction })));
+    const result = await api().removeReaction(f.reaction.id, { idempotencyKey: "remove-original" });
+    expect(result.status).toBe("uncertain");
+    expect(request().init.method).toBe("GET");
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it("rejects malformed reaction alternatives before any transport call", async () => {
     vi.stubGlobal("fetch", vi.fn());
@@ -79,4 +87,17 @@ it("normalizes omitted nullable WhatsApp correspondence fields without changing 
     if (item.channel !== "whatsapp") throw new Error("Incorrect correspondence channel");
     expect(item.remoteNumber).toBeNull(); expect(item.text).toBeNull(); expect(item.media).toBeNull();
   }
+});
+
+it("keeps logical history, original message and current route IDs separate", () => {
+  const logicalId = "00000000-0000-4000-8000-000000000101";
+  const activeId = "00000000-0000-4000-8000-000000000102";
+  const message = parseWhatsAppMessage({ ...f.message, logical_conversation_id: logicalId });
+  expect(message.logicalConversationId).toBe(logicalId);
+  expect(message.conversationId).toBe(f.message.conversation_id);
+  const conversation = parseWhatsAppConversation({ ...f.conversation, active_conversation_id: activeId });
+  expect(conversation.activeConversationId).toBe(activeId);
+  expect(conversation.id).toBe(f.conversation.id);
+  expect(parseWhatsAppMessage(old.message).logicalConversationId).toBeNull();
+  expect(parseWhatsAppConversation(f.conversation).activeConversationId).toBeNull();
 });

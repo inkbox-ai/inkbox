@@ -1,8 +1,12 @@
 {
   "agent_identity_id": "11111111-1111-4111-8111-111111111111",
+  "triage_number": "+15555550100",
+  "connect_command": "connect @agent",
+  "connect_link": "https://wa.me/15555550100?text=connect%20%40agent",
+  "connect_qr_png_data_url": "data:image/png;base64,cXI=",
+  "ready": true,
   "number": "+15555550100",
-  "message_text": "Hello!",
-  "message_link": "https://wa.me/15555550100?text=Hello%21",
-  "message_qr_png_data_url": "data:image/png;base64,cXI=",
-  "ready": true
+  "message_text": "connect @agent",
+  "message_link": "https://wa.me/15555550100?text=connect%20%40agent",
+  "message_qr_png_data_url": "data:image/png;base64,cXI="
 }

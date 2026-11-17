@@ -78,6 +78,7 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
       "/api/v1/whatsapp/onboarding": onboarding,
       "/api/v1/whatsapp/conversations": [f.conversation_summary],
       [`/api/v1/whatsapp/media/${f.media.id}`]: f.media,
+      "/api/v1/whatsapp/typing": { status: "sent" },
       "/api/v1/whatsapp/mark-read": {
         conversation_id: f.conversation.id,
         updated_count: 2,
@@ -154,10 +155,14 @@ test("CLI uses real SDK ownership, current delivery state, fresh media, and loca
   assert.equal((await run("conversations"))[0].unreadCount, 2);
   assert.equal((await run("get-media", f.media.id)).id, f.media.id);
   assert.equal((await run("status")).enabled, true);
+  assert.equal((await run("typing", f.conversation.id)).status, "sent");
+  assert.deepEqual(calls.at(-1).body, { conversation_id: f.conversation.id });
+  await run("mark-read", "--conversation-id", f.conversation.id);
+  assert.deepEqual(calls.at(-1).body, { conversation_id: f.conversation.id });
   const draft = await run("onboarding");
-  assert.equal(draft.messageLink, onboarding.message_link);
-  assert.equal(draft.messageQrPngDataUrl, onboarding.message_qr_png_data_url);
-  assert.equal(draft.messageText, "Hello!");
+  assert.equal(draft.messageLink, onboarding.connect_link);
+  assert.equal(draft.messageQrPngDataUrl, onboarding.connect_qr_png_data_url);
+  assert.equal(draft.connectCommand, onboarding.connect_command);
   assert.equal(draft.ready, true);
   assert.equal(calls.at(-1).path, "/api/v1/whatsapp/onboarding");
   assert.equal(calls.at(-1).method, "GET");
@@ -255,15 +260,17 @@ test("native reply requirement is explicit and irrelevant without a quote", () =
   assert.equal(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "Hello", plainReplyFallback: false}).plainReplyFallback, undefined);
 });
 
-test("bundled WhatsApp skills teach direct recipients and inbound-only groups", () => {
+test("bundled WhatsApp skills teach direct recipients, inbound-only groups, and fresh connection keys", () => {
   for (const name of ["inkbox-cli", "inkbox-python", "inkbox-ts", "inkbox-all"]) {
     const document = readFileSync(new URL(`../../skills/${name}/SKILL.md`, import.meta.url), "utf8");
-    const section = document.split("## Approved dedicated WhatsApp\n")[1]?.split("\n## ")[0];
+    const section = document.split("## WhatsApp dedicated and shared numbers\n")[1]?.split("\n## ")[0];
     assert.ok(section, `missing WhatsApp section in ${name}`);
     assert.match(section, /one E\.164 string or an existing conversation ID/);
     assert.match(section, /arrays, including singleton arrays, and comma-separated lists are rejected/);
     assert.match(section, /receive a message from another participant before sending content/);
     assert.match(section, /Do not create groups/);
+    assert.match(section, /Use a new key for each new connect or disconnect; reuse a key only to retry that same request\./);
+    assert.match(section, /Shared numbers never start conversations/);
     assert.doesNotMatch(section, /1–8 unique|create\/select a group|Group uncertainty|Group sends require/);
   }
 });
@@ -295,4 +302,84 @@ test("group names appear in conversation tables and nullable metadata survives J
   assert.match(messages, /\+15555550101/);
   const row = JSON.parse(await run(true))[0];
   assert.equal(row.isGroup, true); assert.equal(row.groupName, "Project garden"); assert.equal(row.remoteNumber, null);
+});
+
+test("shared-number connect, connections, disconnect, router, and media recipient use the real SDK", async (t) => {
+  const shared = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-shared.json", import.meta.url), "utf8"));
+  const calls = [];
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    calls.push({ path: url.pathname, query: Object.fromEntries(url.searchParams), method: req.method,
+      body: raw && req.headers["content-type"]?.includes("json") ? JSON.parse(raw) : null, key: req.headers["idempotency-key"] });
+    res.setHeader("content-type", "application/json");
+    const routes = {
+      "/api/v1/identities/agent": { id: shared.identity_id, organization_id: "org_example", agent_handle: "agent",
+        created_at: shared.assignment.created_at, updated_at: shared.assignment.created_at },
+      "/api/v1/whatsapp/connect": shared.connect,
+      "/api/v1/whatsapp/disconnect": shared.disconnect,
+      "/api/v1/whatsapp/assignments": [shared.assignment],
+      "/api/v1/whatsapp/triage-number": shared.triage,
+      "/api/v1/whatsapp/media": f.media,
+    };
+    if (!(url.pathname in routes)) { res.writeHead(404).end(); return; }
+    res.end(JSON.stringify(routes[url.pathname]));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+  const run = async (...args) => JSON.parse((await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "--json", "whatsapp", ...args],
+    { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 })).stdout);
+  const body = { agent_identity_id: shared.identity_id, recipient_number: shared.recipient_number };
+  const connected = await run("connect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "c-1");
+  assert.equal(connected.assignedNumber, shared.connect.assigned_number);
+  assert.equal(connected.awaitingInbound, true);
+  assert.deepEqual(calls.at(-1).body, body);
+  assert.equal(calls.at(-1).key, "c-1");
+  assert.equal((await run("assignments", "--identity", "agent"))[0].remoteNumber, shared.recipient_number);
+  assert.equal(calls.at(-1).query.agent_identity_id, shared.identity_id);
+  const released = await run("disconnect", "--identity", "agent", "--recipient", shared.recipient_number, "--idempotency-key", "d-1");
+  assert.deepEqual(released, { assignmentId: shared.disconnect.assignment_id, disconnected: true });
+  assert.deepEqual(calls.at(-1).body, body);
+  assert.equal(calls.at(-1).key, "d-1");
+  assert.equal((await run("triage-number")).connectCommand, "connect @agent");
+  await run("upload-media", fileURLToPath(new URL("../package.json", import.meta.url)), "--identity", "agent", "--recipient", shared.recipient_number);
+  assert.equal(calls.at(-1).query.recipient_number, shared.recipient_number);
+  const before = calls.length;
+  await assert.rejects(() => run("connect", "--identity", "agent", "--recipient", "+1555,+1556", "--idempotency-key", "c-2"));
+  await assert.rejects(() => run("connect", "--identity", "agent", "--recipient", shared.recipient_number));
+  assert.equal(calls.length, before);
+});
+
+test("management commands preserve router identity, false, clear and pagination", async t => {
+  const calls = [];
+  const router = { id: f.conversation.id, number: "+15555550100", revision: 2, state: "enabled", profile_display_name: null, accepting_new_connections: false };
+  const number = { id: f.conversation.id, number: "+15555550100", revision: 2, state: "disabled", agent_identity_id: null, binding_state: null, assignable: false, unavailable_reason: "Requires setup" };
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    calls.push({ path: decodeURIComponent(url.pathname), query: Object.fromEntries(url.searchParams), body: raw ? JSON.parse(raw) : null });
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(url.pathname === "/api/v1/whatsapp/numbers" ? { numbers: [number], has_more: true }
+      : url.pathname.startsWith("/api/v1/whatsapp/numbers/") ? number
+      : url.pathname === "/api/v1/whatsapp/router" ? { router } : { items: [], has_more: false }));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const run = async (...args) => JSON.parse((await exec(process.execPath, [cli, "--api-key", "test-only", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "--json", "whatsapp", ...args],
+    { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 10000 })).stdout);
+  assert.equal((await run("numbers", "--offset", "100")).hasMore, true);
+  assert.equal(calls.at(-1).query.offset, "100");
+  await run("assign-number", f.conversation.id, "--revision", "1", "--detach");
+  assert.deepEqual(calls.at(-1).body, { expected_revision: 1, agent_identity_id: null });
+  assert.equal((await run("router")).id, router.id);
+  await run("update-router", router.id, "--revision", "1", "--name", "", "--accepting", "false");
+  assert.deepEqual(calls.at(-1).body, { expected_router_id: router.id, expected_revision: 1, profile_display_name: null, accepting_new_connections: false });
+  await run("router-threads", "--offset", "50", "--limit", "10");
+  assert.deepEqual(calls.at(-1).query, { offset: "50", limit: "10" });
+  await run("router-messages", "+15555550101", "--offset", "10");
+  assert.equal(calls.at(-1).path, "/api/v1/whatsapp/router/conversations/+15555550101/messages");
 });

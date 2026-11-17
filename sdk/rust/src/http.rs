@@ -348,7 +348,7 @@ impl HttpTransport {
         self.delete_with_params_and_headers(path, NO_QUERY, headers)
     }
 
-    fn delete_with_params_and_headers(
+    pub(crate) fn delete_with_params_and_headers(
         &self,
         path: &str,
         params: Query,

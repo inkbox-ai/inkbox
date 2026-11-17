@@ -214,7 +214,7 @@ pub struct WhatsAppCorrespondenceItem {
     #[serde(flatten)]
     pub common: CorrespondenceItemBase,
     pub conversation_id: Uuid,
-    pub local_number: String,
+    pub local_number: Option<String>,
     pub remote_number: Option<String>,
     pub participants: Vec<String>,
     pub text: Option<String>,

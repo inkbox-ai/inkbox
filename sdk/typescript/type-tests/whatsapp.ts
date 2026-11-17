@@ -37,3 +37,23 @@ const ownOnboarding: Promise<WhatsAppOnboarding> = identity.getWhatsAppOnboardin
 void [onboarding, ownOnboarding];
 const companionPhase: "ordinary" | "initialization" | "live" | undefined = webhook.companion?.phase;
 void companionPhase;
+
+const connected: Promise<import("../dist/index.js").WhatsAppConnectResult> = client.whatsapp.connect({agentIdentityId:"identity-id",recipientNumber:"+15555550101",idempotencyKey:"stable-key"});
+// @ts-expect-error Connecting never sends an opening message.
+client.whatsapp.connect({agentIdentityId:"identity-id",recipientNumber:"+15555550101",idempotencyKey:"stable-key",firstMessage:"Hi"});
+// @ts-expect-error Connect requires a stable idempotency key.
+client.whatsapp.connect({agentIdentityId:"identity-id",recipientNumber:"+15555550101"});
+const sharedMedia: Promise<WhatsAppMedia> = identity.uploadWhatsAppMedia({content:new Uint8Array([1]),filename:"a.png",recipientNumber:"+15555550101"});
+void [connected, sharedMedia];
+
+import type { WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppMarkReadResult } from "../dist/index.js";
+const assignments: Promise<WhatsAppAssignment[]> = client.whatsapp.listAssignments({ limit: 20, offset: 0 });
+const triage: Promise<WhatsAppTriageNumber> = client.whatsapp.getTriageNumber({ agentIdentityId: "agent-id" });
+const allRead: Promise<WhatsAppMarkReadResult> = identity.markWhatsAppRead("conversation-id");
+const typing: Promise<{ status: string }> = identity.sendWhatsAppTyping("conversation-id");
+const removal: Promise<import("../dist/index.js").WhatsAppReaction> = identity.removeWhatsAppReaction("reaction-id", "stable-key");
+const localNumber: string | null = groupMessage.localNumber;
+void [assignments, triage, allRead, typing, removal, localNumber];
+
+const directRemoval: Promise<import("../dist/index.js").WhatsAppReaction> = client.whatsapp.removeReaction("reaction-id", { idempotencyKey: "stable-key" });
+void directRemoval;

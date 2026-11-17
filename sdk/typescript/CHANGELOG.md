@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.38
+
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0738) for onboarding compatibility, nullable shared numbers and number/router management.
+
 ## 0.7.29 - Existing WhatsApp groups (unreleased)
 
 See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0729---whatsapp-groups-companion-and-onboarding-unreleased) for this release.

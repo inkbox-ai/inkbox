@@ -1324,9 +1324,11 @@ Preserve the query and filters when following a cursor.
 ## Dedicated WhatsApp
 
 From version 0.7.29, `identity.get_whatsapp_onboarding()?`
-returns a message link and PNG QR code for contacting the agent. Check `ready`
-before presenting the draft; the person still taps Send in WhatsApp. This read
-does not enable WhatsApp or send a message.
+returns a router connect link and PNG QR code for dedicated and shared-number agents.
+The draft is `connect @handle` to the router; the person taps Send, follows the
+returned destination link with `start` prefilled, and taps Send again. Check `ready`
+before presenting the draft. Onboarding does not enable WhatsApp or send a message.
+Read channel status to find an agent's dedicated number; onboarding publishes the router number.
 
 ```rust,no_run
 # fn example() -> inkbox::Result<()> {
@@ -1342,14 +1344,18 @@ let message = identity.send_whatsapp(&inkbox::WhatsAppSendOptions {
 # Ok(()) }
 ```
 
-Available by approval on the same number as an existing dedicated personal
-iMessage line; not a shared channel. Read fresh WhatsApp channel status and
+WhatsApp never starts a conversation by default: an agent replies after the
+recipient messages first. Shared numbers never start conversations; dedicated
+numbers can only with approval for your organization. Until the recipient writes,
+sends fail with `409 whatsapp_awaiting_inbound` (check `error.is_whatsapp_awaiting_inbound()`). Dedicated numbers are
+available by approval; a dedicated number can match an iMessage number or be
+different, and an iMessage number is not required. Read fresh WhatsApp channel status and
 request access in the console when unavailable. Direct and eligible group messages support text
 (up to 4,000 Unicode code points), one owned attachment (default policy 5 MiB, hard ceiling 20 MiB), or both.
 Upload media first, preserve its ID and a stable logical-send key before sending,
 and reuse both after an uncertain outcome. Refresh expired attachment URLs by
 media ID. Send acceptance and confirmed sending are separate from delivery;
-unknown delivery does not mean a send failed. Mark-read updates only local history.
+unknown delivery does not mean a send failed. Mark-read updates history and sends supported read receipts.
 
 If submission fails, `error.idempotency_key()` returns the submitted key, including
 an automatically generated key. Retry the unchanged request with that key rather
@@ -1366,7 +1372,7 @@ access. Older responses default it to `false`; manually constructed
 The [complete WhatsApp guide](https://github.com/inkbox-ai/inkbox#dedicated-whatsapp)
 covers resource/identity methods, CLI commands, typed notifications, and explicit
 opt-in contact correspondence. Native quoted replies and versioned whole-message
-reactions are supported. Typing, remote read receipts, and WhatsApp calls are not.
+reactions are supported. Typing and read receipts are supported for eligible direct conversations; WhatsApp calls are not.
 
 Group names are display metadata; use the conversation ID to send. Groups must be
 joined in WhatsApp and receive a message from another participant before the agent
@@ -1380,7 +1386,7 @@ The upload default is `application/octet-stream`, which does not select MP4 play
 All group participants must have known phone numbers (`unresolved_participant_count`
 must be zero). Receiving checks every participant against inbound contact rules;
 blocked incoming messages do not trigger `whatsapp.received`. Sending content or
-reactions checks outbound contact rules and returns `whatsapp_contact_not_allowed`
+reactions checks outbound contact rules and returns `recipient_blocked`
 if any participant is unresolved or not allowed for outbound traffic. An outbound-only
 block does not block incoming messages or erase an earlier qualifying incoming
 message. A new allowed incoming message is needed only when none already qualifies.
@@ -1389,6 +1395,48 @@ A `409 whatsapp_group_reply_required` means the current WhatsApp connection has 
 qualifying incoming group message, including after a connection replacement.
 Wait for an allowed message from another participant. Do not retry with a new
 idempotency key or fall back to a direct message.
+
+### Shared WhatsApp numbers
+
+An agent without a dedicated number can reach a recipient through one of the
+organization's shared numbers. Connecting reserves a number for that recipient
+and sends nothing; the agent can reply after the recipient messages the returned
+number. Connect and disconnect require an admin-scoped API key and an
+idempotency key. Use a new key for each new connect or disconnect; reuse a key only to retry that same request. People can also text the router number to connect with an agent.
+Groups work only on dedicated numbers.
+
+```rust,no_run
+# fn example() -> inkbox::Result<()> {
+let client = inkbox::Inkbox::builder("your-api-key").build()?;
+let identity = client.get_identity("my-agent")?;
+let result = client
+    .whatsapp()
+    .connect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
+println!("{:?}", result.assigned_number); // None for global shared assignments
+let connections = client.whatsapp().list_assignments(Some(&identity.id()))?;
+client
+    .whatsapp()
+    .disconnect(&identity.id(), "+15555550101", &uuid::Uuid::new_v4().to_string())?;
+let router = client.whatsapp().get_triage_number(None)?;
+# Ok(()) }
+```
+
+Use `upload_media_for_recipient` / `upload_whatsapp_media_for_recipient` when
+replying through a shared number.
+
+Shared-number errors: replying before the recipient's first message returns
+`409 whatsapp_awaiting_inbound`; sending through a shared number to a recipient
+the agent is not connected to returns `403 whatsapp_access_required`. Connect can
+also return `409 whatsapp_identity_has_dedicated_line`, `409 whatsapp_pool_unavailable`,
+`409 whatsapp_recipient_connections_full` (disconnect an existing assignment first),
+`409 whatsapp_connection_busy` (retry with the same key), or
+`403 recipient_blocked`. A disabled agent returns `400` with
+`detail: "Agent identity is not enabled for WhatsApp"`. Key errors on connect and disconnect:
+`422 invalid_idempotency_key`; `409 idempotency_key_reused` (the key was used for a
+different request); `409 idempotency_in_progress` (the original request is still
+running; retry with the same key); and `409 result_unavailable` (the stored result
+expired; check `assignments` before acting again with a new key).
+
 ## Conversation participant filters
 
 Conversation filtering matches **any** supplied email address or E.164 phone

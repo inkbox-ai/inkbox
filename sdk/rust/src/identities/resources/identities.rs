@@ -126,6 +126,14 @@ impl IdentitiesResource {
         }
         Ok(serde_json::from_value(data)?)
     }
+    /// Toggle WhatsApp reachability without changing other identity settings.
+    pub fn set_whatsapp_enabled(&self, handle: &str, enabled: bool) -> Result<AgentIdentityData> {
+        Ok(serde_json::from_value(self.http.patch(
+            &format!("/{}", path_segment(handle)),
+            &serde_json::json!({"whatsapp_enabled": enabled}),
+        )?)?)
+    }
+
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }
@@ -246,6 +254,37 @@ impl IdentitiesResource {
         vault_secret_ids: Option<&VaultSecretIds>,
         claim_imessage_number: Option<bool>,
     ) -> Result<AgentIdentityData> {
+        self.create_with_whatsapp(
+            agent_handle,
+            display_name,
+            description,
+            imessage_enabled,
+            contact_sharing_enabled,
+            mailbox,
+            tunnel,
+            phone_number,
+            vault_secret_ids,
+            claim_imessage_number,
+            None,
+        )
+    }
+
+    /// Create an identity with optional WhatsApp enablement in the same request.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_whatsapp(
+        &self,
+        agent_handle: &str,
+        display_name: Option<&str>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        contact_sharing_enabled: Option<bool>,
+        mailbox: Option<&IdentityMailboxCreateOptions>,
+        tunnel: Option<&IdentityTunnelCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
+        claim_imessage_number: Option<bool>,
+        whatsapp_enabled: Option<bool>,
+    ) -> Result<AgentIdentityData> {
         if claim_imessage_number == Some(false) {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "claim_imessage_number only accepts true when supplied".into(),
@@ -275,6 +314,9 @@ impl IdentitiesResource {
                     None => Value::Null,
                 },
             );
+        }
+        if let Some(flag) = whatsapp_enabled {
+            body.insert("whatsapp_enabled".into(), Value::Bool(flag));
         }
         if let Some(flag) = imessage_enabled {
             body.insert("imessage_enabled".into(), Value::Bool(flag));

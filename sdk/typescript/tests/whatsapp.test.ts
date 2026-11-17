@@ -151,7 +151,7 @@ describe("WhatsApp public wire", () => {
     );
     expect(
       await resource().markRead(conv, f.message.id, { agentIdentityId: owner }),
-    ).toEqual({ conversationId: conv, updatedCount: 2 });
+    ).toEqual({ conversationId: conv, updatedCount: 2, readReceiptsSent: false });
     expect(last().body).toEqual({
       conversation_id: conv,
       through_message_id: f.message.id,
@@ -280,12 +280,12 @@ it.each([
 
 const onboarding = JSON.parse(readFileSync(new URL("../../../tests/fixtures/whatsapp-onboarding.json", import.meta.url), "utf8"));
 it.each(["ready", "unavailable", "disabled"])("onboarding preserves %s state and optional identity without sending", async (state) => {
-  const raw = { ...onboarding, ready: state === "ready", ...(state === "disabled" ? { number: null, message_link: null, message_qr_png_data_url: null } : {}) };
+  const raw = { ...onboarding, ready: state === "ready" };
   vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(ok(raw))));
   for (const agentIdentityId of [undefined, owner]) {
     const result = await resource().getOnboarding({ agentIdentityId });
-    expect(result).toEqual({ agentIdentityId: raw.agent_identity_id, number: raw.number, messageText: raw.message_text,
-      messageLink: raw.message_link, messageQrPngDataUrl: raw.message_qr_png_data_url, ready: raw.ready });
+    expect(result).toEqual({ agentIdentityId: raw.agent_identity_id, triageNumber: raw.triage_number, connectCommand: raw.connect_command, connectLink: raw.connect_link, connectQrPngDataUrl: raw.connect_qr_png_data_url,
+      number: raw.triage_number, messageText: raw.connect_command, messageLink: raw.connect_link, messageQrPngDataUrl: raw.connect_qr_png_data_url, ready: raw.ready });
     expect(last().url.pathname).toBe("/api/v1/whatsapp/onboarding");
     expect(Object.fromEntries(last().url.searchParams)).toEqual(agentIdentityId ? { agent_identity_id: owner } : {});
     expect(last().init.method).toBe("GET");
@@ -296,6 +296,45 @@ it("identity onboarding uses fresh details for its own identity", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok({ id: owner, organization_id: "org_example", agent_handle: "agent",
     created_at: f.message.created_at, updated_at: f.message.updated_at })).mockResolvedValueOnce(ok(onboarding)));
   const identity = await new Inkbox({ apiKey: "test-only" }).getIdentity("agent");
-  expect((await identity.getWhatsAppOnboarding()).messageLink).toBe(onboarding.message_link);
+  expect((await identity.getWhatsAppOnboarding()).messageLink).toBe(onboarding.connect_link);
   expect(last().url.searchParams.get("agent_identity_id")).toBe(owner);
+});
+
+
+it.each([true, false])("preserves legacy direct onboarding without inventing a router: %s", async available => {
+  const raw = { agent_identity_id: owner, number: available ? "+15555550100" : null, message_text: "Hello!",
+    message_link: available ? "https://wa.me/15555550100?text=Hello!" : null,
+    message_qr_png_data_url: available ? "data:image/png;base64,cXI=" : null, ready: available };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok(raw)));
+  const value = await resource().getOnboarding();
+  expect(value.number).toBe(raw.number);
+  expect(value.messageText).toBe("Hello!");
+  expect(value.messageLink).toBe(raw.message_link);
+  expect(value.messageQrPngDataUrl).toBe(raw.message_qr_png_data_url);
+  expect(value.triageNumber).toBeNull();
+  expect(value.connectCommand).toBeNull();
+  expect(value.connectLink).toBeNull();
+});
+
+it("management requests preserve ownership fences, clear, false and pagination", async () => {
+  const router = { id: conv, number: "+15555550100", revision: 2, state: "enabled", profile_display_name: null, accepting_new_connections: false };
+  const number = { id: conv, number: "+15555550100", agent_identity_id: null, revision: 2, state: "disabled", binding_state: null, assignable: false, unavailable_reason: "Requires setup" };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok({ numbers: [number], has_more: true }))
+    .mockResolvedValueOnce(ok(number)).mockResolvedValueOnce(ok({ router: null })).mockResolvedValueOnce(ok({ router }))
+    .mockResolvedValueOnce(ok({ router })).mockResolvedValueOnce(ok({ items: [], has_more: false })).mockResolvedValueOnce(ok({ items: [], has_more: true })));
+  const api = resource();
+  expect((await api.listNumbers({ offset: 100 })).hasMore).toBe(true);
+  expect(last().url.searchParams.get("offset")).toBe("100");
+  await api.assignNumber(conv, { agentIdentityId: null, expectedRevision: 1 });
+  expect(last().body).toEqual({ agent_identity_id: null, expected_revision: 1 });
+  expect(await api.getRouter()).toBeNull();
+  expect((await api.updateRouter({ expectedRouterId: conv, expectedRevision: 1, profileDisplayName: null, acceptingNewConnections: false })).acceptingNewConnections).toBe(false);
+  expect(last().body).toEqual({ expected_router_id: conv, expected_revision: 1, profile_display_name: null, accepting_new_connections: false });
+  await api.updateRouter({ expectedRouterId: conv, expectedRevision: 2 });
+  expect(last().body).toEqual({ expected_router_id: conv, expected_revision: 2 });
+  await api.listRouterThreads({ limit: 10, offset: 20 });
+  expect(last().url.pathname).toBe("/api/v1/whatsapp/router/conversations");
+  expect(last().url.searchParams.get("offset")).toBe("20");
+  await api.listRouterMessages("+15555550101", { offset: 50 });
+  expect(decodeURIComponent(last().url.pathname)).toBe("/api/v1/whatsapp/router/conversations/+15555550101/messages");
 });

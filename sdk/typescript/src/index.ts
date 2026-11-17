@@ -71,6 +71,7 @@ export {
   DedicatedIMessageNumberInventoryPendingError,
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
+  WhatsAppAwaitingInboundError,
   InkboxAPIError,
   InkboxConnectionError,
   InkboxError,

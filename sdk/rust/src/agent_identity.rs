@@ -2394,13 +2394,48 @@ impl AgentIdentity {
             .whatsapp()
             .upload_media(content, filename, content_type, Some(&self.id()))
     }
+    /// Upload media for a reply through a shared number to `recipient_number`.
+    pub fn upload_whatsapp_media_for_recipient(
+        &self,
+        content: Vec<u8>,
+        filename: &str,
+        content_type: Option<&str>,
+        recipient_number: &str,
+    ) -> Result<crate::whatsapp::WhatsAppMedia> {
+        self.inkbox.whatsapp().upload_media_for_recipient(
+            content,
+            filename,
+            content_type,
+            Some(&self.id()),
+            Some(recipient_number),
+        )
+    }
     pub fn get_whatsapp_media(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMedia> {
         self.inkbox.whatsapp().get_media(id, Some(&self.id()))
     }
-    pub fn mark_whatsapp_read(
+    /// Toggle WhatsApp reachability and refresh the cached identity.
+    pub fn set_whatsapp_enabled(&self, enabled: bool) -> Result<()> {
+        let data = self
+            .inkbox
+            .identities()
+            .set_whatsapp_enabled(&self.agent_handle(), enabled)?;
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
+        Ok(())
+    }
+
+    /// Send a typing indicator in an existing direct conversation.
+    pub fn send_whatsapp_typing(&self, conversation_id: &Uuid) -> Result<serde_json::Value> {
+        self.inkbox
+            .whatsapp()
+            .send_typing(conversation_id, Some(&self.id()))
+    }
+    pub fn mark_whatsapp_read<'a>(
         &self,
         id: &Uuid,
-        through: &Uuid,
+        through: impl Into<Option<&'a Uuid>>,
     ) -> Result<crate::whatsapp::WhatsAppMarkReadResult> {
         self.inkbox
             .whatsapp()

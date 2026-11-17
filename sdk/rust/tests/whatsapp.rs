@@ -1,4 +1,5 @@
 use httpmock::prelude::*;
+use httpmock::Method::PATCH;
 use inkbox::webhooks::WhatsAppWebhookPayload;
 use inkbox::{
     Inkbox, WhatsAppDeliveryState, WhatsAppListOptions, WhatsAppMessageStatus, WhatsAppSendOptions,
@@ -307,13 +308,14 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
             .path("/api/v1/whatsapp/reactions")
             .header("Idempotency-Key", "reaction-original")
             .json_body(json!({"message_id":id,"custom_emoji":"👨‍👩‍👧‍👦"}));
-        then.status(201).json_body(json!({"reaction":uncertain}));
+        then.status(201).json_body(uncertain);
     });
     let remove = server.mock(|when, then| {
         when.method(DELETE)
             .path(format!("/api/v1/whatsapp/reactions/{rid}"))
             .header("Idempotency-Key", "remove-original");
-        then.json_body(json!({"reaction":data["removed_reaction"]}));
+        then.status(200)
+            .json_body(json!({"reaction": data["removed_reaction"]}));
     });
     let client = Inkbox::builder("test-only")
         .base_url(server.base_url())
@@ -352,14 +354,11 @@ fn v2_threads_and_reaction_receipts_preserve_keys_and_unknown_actors() {
         .unwrap();
     assert_eq!(reaction.status, inkbox::WhatsAppReactionStatus::Uncertain);
     assert!(reaction.remote_number.is_none());
-    assert_eq!(
-        client
-            .whatsapp()
-            .remove_reaction(&rid, "remove-original", None)
-            .unwrap()
-            .status,
-        inkbox::WhatsAppReactionStatus::Removed
-    );
+    let removed = client
+        .whatsapp()
+        .remove_reaction(&rid, "remove-original", None)
+        .unwrap();
+    assert_eq!(removed.status, inkbox::WhatsAppReactionStatus::Removed);
     thread_mock.assert();
     conversation_mock.assert();
     react.assert();
@@ -701,7 +700,7 @@ fn group_metadata_and_quoted_animation_preserve_stable_ids() {
     assert!(message.remote_number.is_none() && message.recipients.is_empty());
     assert_eq!(
         message.sender_number.as_deref(),
-        Some(message.local_number.as_str())
+        message.local_number.as_deref()
     );
     assert_eq!(message.unresolved_participant_count, 0);
     let blocked: inkbox::WhatsAppMessage =
@@ -718,7 +717,7 @@ fn group_metadata_and_quoted_animation_preserve_stable_ids() {
     assert!(webhook.is_group);
     assert_eq!(
         webhook.sender_number.as_deref(),
-        Some(message.local_number.as_str())
+        message.local_number.as_deref()
     );
     let server = MockServer::start();
     let send = server.mock(|when, then| {
@@ -827,11 +826,6 @@ fn onboarding_preserves_ownership_and_availability_without_sending() {
             let server = MockServer::start();
             let mut raw = base.clone();
             raw["ready"] = json!(state == "ready");
-            if state == "disabled" {
-                raw["number"] = Value::Null;
-                raw["message_link"] = Value::Null;
-                raw["message_qr_png_data_url"] = Value::Null;
-            }
             let get = server.mock(|when, then| {
                 let when = when.method(GET).path("/api/v1/whatsapp/onboarding");
                 if let Some(id) = identity {
@@ -909,4 +903,194 @@ fn whatsapp_null_sender_access_decodes_outbound_rest_and_webhooks() {
     message["sender_access"] = json!("unrecognized");
     assert!(serde_json::from_value::<inkbox::WhatsAppMessage>(message.clone()).is_err());
     assert!(serde_json::from_value::<inkbox::webhooks::WhatsAppWebhookMessage>(message).is_err());
+}
+
+#[test]
+fn logical_history_keeps_original_message_and_current_route_ids_separate() {
+    let f: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let logical_id = Uuid::parse_str("00000000-0000-4000-8000-000000000101").unwrap();
+    let active_id = Uuid::parse_str("00000000-0000-4000-8000-000000000102").unwrap();
+    let mut payload = f["message"].clone();
+    payload["logical_conversation_id"] = json!(logical_id);
+    let message: inkbox::WhatsAppMessage = serde_json::from_value(payload).unwrap();
+    assert_eq!(message.logical_conversation_id, Some(logical_id));
+    assert_eq!(
+        message.conversation_id.to_string(),
+        f["message"]["conversation_id"].as_str().unwrap()
+    );
+    let mut payload = f["conversation"].clone();
+    payload["active_conversation_id"] = json!(active_id);
+    let conversation: inkbox::WhatsAppConversation = serde_json::from_value(payload).unwrap();
+    assert_eq!(conversation.active_conversation_id, Some(active_id));
+    assert_eq!(
+        conversation.id.to_string(),
+        f["conversation"]["id"].as_str().unwrap()
+    );
+    let legacy: inkbox::WhatsAppMessage = serde_json::from_value(f["message"].clone()).unwrap();
+    let legacy_conversation: inkbox::WhatsAppConversation =
+        serde_json::from_value(f["conversation"].clone()).unwrap();
+    assert!(legacy.logical_conversation_id.is_none());
+    assert!(legacy_conversation.active_conversation_id.is_none());
+}
+
+#[test]
+fn empty_removal_reads_factual_receipt_state() {
+    let data: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp-v2.json")).unwrap();
+    let id = Uuid::parse_str(data["reaction"]["id"].as_str().unwrap()).unwrap();
+    let server = MockServer::start();
+    let remove = server.mock(|when, then| {
+        when.method(DELETE)
+            .path(format!("/api/v1/whatsapp/reactions/{id}"))
+            .header("Idempotency-Key", "remove-original");
+        then.status(204);
+    });
+    let read = server.mock(|when, then| {
+        when.method(GET)
+            .path(format!("/api/v1/whatsapp/reactions/{id}"));
+        then.status(200)
+            .json_body(json!({"reaction": data["uncertain_reaction"]}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let receipt = client
+        .whatsapp()
+        .remove_reaction(&id, "remove-original", None)
+        .unwrap();
+    assert_eq!(receipt.status, inkbox::WhatsAppReactionStatus::Uncertain);
+    remove.assert();
+    read.assert();
+}
+
+#[test]
+fn onboarding_keeps_documented_fields_for_both_response_generations() {
+    for ready in [true, false] {
+        let raw = json!({"agent_identity_id": "11111111-1111-4111-8111-111111111111", "ready": ready,
+            "number": if ready { Some("+15555550100") } else { None }, "message_text": "Hello!",
+            "message_link": if ready { Some("https://wa.me/15555550100?text=Hello!") } else { None },
+            "message_qr_png_data_url": null});
+        let value: inkbox::WhatsAppOnboarding = serde_json::from_value(raw).unwrap();
+        assert_eq!(
+            value.number.as_deref(),
+            if ready { Some("+15555550100") } else { None }
+        );
+        assert_eq!(value.message_text, "Hello!");
+        assert_eq!(
+            value.message_link.as_deref().unwrap_or_default(),
+            if ready {
+                "https://wa.me/15555550100?text=Hello!"
+            } else {
+                ""
+            }
+        );
+        assert!(value.message_qr_png_data_url.is_none());
+        assert!(value.triage_number.is_none());
+        assert!(value.connect_command.is_none());
+    }
+    let value: inkbox::WhatsAppOnboarding = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/whatsapp-onboarding.json"
+    ))
+    .unwrap();
+    assert_eq!(value.number, value.triage_number);
+    assert_eq!(Some(value.message_text), value.connect_command);
+    assert_eq!(value.message_link, value.connect_link);
+    assert_eq!(value.message_qr_png_data_url, value.connect_qr_png_data_url);
+}
+
+#[test]
+fn management_updates_keep_router_identity_and_explicit_clear() {
+    let server = MockServer::start();
+    let id = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let router = json!({"id":id,"number":"+15555550100","revision":2,"state":"enabled","profile_display_name":null,"accepting_new_connections":false});
+    let update = server.mock(|when, then| {
+        when.method(PATCH).path("/api/v1/whatsapp/router").json_body(json!({"expected_router_id":id,"expected_revision":1,"profile_display_name":null,"accepting_new_connections":false}));
+        then.status(200).json_body(json!({"router":router}));
+    });
+    let absent = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/whatsapp/router");
+        then.status(200).json_body(json!({"router":null}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    assert!(
+        !client
+            .whatsapp()
+            .update_router(&id, 1, Some(None), Some(false))
+            .unwrap()
+            .unwrap()
+            .accepting_new_connections
+    );
+    assert!(client.whatsapp().get_router().unwrap().is_none());
+    update.assert();
+    absent.assert();
+}
+
+#[test]
+fn management_numbers_and_router_history_use_exact_wire_paths() {
+    let server = MockServer::start();
+    let id = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let number = json!({"id":id,"number":"+15555550100","revision":2,"state":"disabled","agent_identity_id":null,"binding_state":null,"assignable":false,"unavailable_reason":"Requires setup"});
+    let numbers = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/numbers")
+            .query_param("offset", "100");
+        then.status(200)
+            .json_body(json!({"numbers":[number.clone()],"has_more":true}));
+    });
+    let assign = server.mock(|when, then| {
+        when.method(PATCH)
+            .path(format!("/api/v1/whatsapp/numbers/{id}"))
+            .json_body(json!({"agent_identity_id":null,"expected_revision":1}));
+        then.status(200).json_body(number);
+    });
+    let threads = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/router/conversations")
+            .query_param("limit", "10")
+            .query_param("offset", "20");
+        then.status(200)
+            .json_body(json!({"items":[],"has_more":false}));
+    });
+    let messages = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/whatsapp/router/conversations/+15555550101/messages")
+            .query_param("limit", "50")
+            .query_param("offset", "10");
+        then.status(200)
+            .json_body(json!({"items":[],"has_more":true}));
+    });
+    let client = Inkbox::builder("test-only")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    assert!(client.whatsapp().list_numbers(100).unwrap().has_more);
+    assert!(client
+        .whatsapp()
+        .assign_number(&id, None, 1, None)
+        .unwrap()
+        .agent_identity_id
+        .is_none());
+    assert!(
+        !client
+            .whatsapp()
+            .list_router_threads(10, 20)
+            .unwrap()
+            .has_more
+    );
+    assert!(
+        client
+            .whatsapp()
+            .list_router_messages("+15555550101", 50, 10)
+            .unwrap()
+            .has_more
+    );
+    numbers.assert();
+    assign.assert();
+    threads.assert();
+    messages.assert();
 }
