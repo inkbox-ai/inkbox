@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { Chat } from "chat";
+import { Chat, Message, emoji } from "chat";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createInkboxAdapter, type InkboxRoute } from "../src/index.js";
 import { normalizeEvent } from "../src/events.js";
@@ -289,12 +289,18 @@ describe("thread routing", () => {
       isMe: false,
       createdAt: new Date(),
     };
-    const get = vi.spyOn(adapter.transport, "getMessage").mockResolvedValue(native);
+    const get = vi
+      .spyOn(adapter.transport, "getMessage")
+      .mockResolvedValue(native);
     const parsed = adapter.parseMessage({ ...native, route });
-    expect((await adapter.fetchMessage(parsed.threadId, parsed.id)).id).toBe(parsed.id);
+    expect((await adapter.fetchMessage(parsed.threadId, parsed.id)).id).toBe(
+      parsed.id,
+    );
     expect(get).toHaveBeenCalledWith(route, "native-message");
     get.mockClear();
-    await expect(adapter.fetchMessage(adapter.encodeThreadId(routes[4]), parsed.id)).rejects.toThrow("different thread");
+    await expect(
+      adapter.fetchMessage(adapter.encodeThreadId(routes[4]), parsed.id),
+    ).rejects.toThrow("different thread");
     expect(get).not.toHaveBeenCalled();
     await bot.shutdown();
   });
@@ -405,5 +411,352 @@ describe("channel event normalization", () => {
     );
     expect(message?.route.channel).toBe("voice");
     expect(message?.text).toContain("remote: Follow up tomorrow");
+  });
+});
+
+describe("media and reaction behavior", () => {
+  it("uploads iMessage file bytes and sends the returned mediaUrl", async () => {
+    const { adapter, bot } = await setup();
+    const route: InkboxRoute = {
+      identityId: identity.id,
+      channel: "imessage",
+      conversationId: "imessage-media",
+      isGroup: false,
+    };
+    const content = Buffer.from([0, 127, 255, 42]);
+    const upload = vi
+      .spyOn(adapter.transport, "uploadMedia")
+      .mockResolvedValue({
+        mediaUrl: "https://example.com/media/uploaded.png",
+        contentType: "image/png",
+        size: content.length,
+      });
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "sent-media", raw: {} });
+    await adapter.postMessage(adapter.encodeThreadId(route), {
+      raw: "See attached",
+      files: [{ filename: "photo.png", mimeType: "image/png", data: content }],
+    });
+    expect(upload).toHaveBeenCalledWith({
+      filename: "photo.png",
+      contentType: "image/png",
+      content: new Uint8Array(content),
+    });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining(route), {
+      text: "See attached",
+      idempotencyKey: expect.any(String),
+      mediaUrls: ["https://example.com/media/uploaded.png"],
+    });
+    await bot.shutdown();
+  });
+
+  it("preserves email file bytes and MIME type in base64 attachments", async () => {
+    const { adapter, bot } = await setup();
+    const route: InkboxRoute = {
+      identityId: identity.id,
+      channel: "email",
+      emailAddress: identity.emailAddress,
+      threadId: "email-files",
+    };
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "sent-email", raw: {} });
+    const content = Buffer.from([0, 1, 127, 128, 255]);
+    await adapter.postMessage(adapter.encodeThreadId(route), {
+      raw: "Documents",
+      files: [
+        { filename: "bytes.bin", data: content },
+        {
+          filename: "note.txt",
+          data: new Blob(["Hello"], { type: "text/plain" }),
+          mimeType: "text/plain",
+        },
+      ],
+    });
+    expect(send).toHaveBeenCalledWith(route, {
+      text: "Documents",
+      idempotencyKey: expect.any(String),
+      attachments: [
+        {
+          filename: "bytes.bin",
+          contentBase64: content.toString("base64"),
+          contentType: "application/octet-stream",
+        },
+        {
+          filename: "note.txt",
+          contentBase64: "SGVsbG8=",
+          contentType: "text/plain",
+        },
+      ],
+    });
+    await bot.shutdown();
+  });
+
+  it("delegates a Slack file to the SDK-backed upload transport", async () => {
+    const { adapter, bot } = await setup();
+    const route: InkboxRoute = {
+      identityId: identity.id,
+      channel: "slack",
+      connectionId: "connection-files",
+      conversationId: "CFILES",
+      threadTs: "123.456",
+    };
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "123.457", raw: {} });
+    await adapter.postMessage(adapter.encodeThreadId(route), {
+      raw: "Report",
+      files: [
+        {
+          filename: "report.txt",
+          data: Buffer.from("report"),
+          mimeType: "text/plain",
+        },
+      ],
+    });
+    expect(send).toHaveBeenCalledWith(route, {
+      text: "Report",
+      idempotencyKey: expect.any(String),
+      attachments: [
+        {
+          filename: "report.txt",
+          contentBase64: "cmVwb3J0",
+          contentType: "text/plain",
+        },
+      ],
+    });
+    await bot.shutdown();
+  });
+
+  it.each([
+    { channel: "imessage" as const, expected: "like" },
+    { channel: "slack" as const, expected: "+1" },
+  ])(
+    "maps Chat thumbs_up to $channel add/remove reaction names",
+    async ({ channel, expected }) => {
+      const { adapter, bot } = await setup();
+      const route: InkboxRoute =
+        channel === "imessage"
+          ? {
+              identityId: identity.id,
+              channel,
+              conversationId: "reaction-imessage",
+              isGroup: false,
+            }
+          : {
+              identityId: identity.id,
+              channel,
+              connectionId: "connection-reactions",
+              conversationId: "CREACTIONS",
+              threadTs: "123.456",
+            };
+      const add = vi
+        .spyOn(adapter.transport, "addReaction")
+        .mockResolvedValue(undefined);
+      const remove = vi
+        .spyOn(adapter.transport, "removeReaction")
+        .mockResolvedValue(undefined);
+      const threadId = adapter.encodeThreadId(route);
+      const message = adapter.parseMessage({
+        route,
+        id: "native-message",
+        text: "hello",
+        authorId: "sender",
+        isMe: false,
+        createdAt: new Date(),
+      });
+      await adapter.addReaction(threadId, message.id, emoji.thumbs_up);
+      await adapter.removeReaction(threadId, message.id, emoji.thumbs_up);
+      expect(add).toHaveBeenCalledWith(
+        expect.objectContaining(route),
+        "native-message",
+        expected,
+      );
+      expect(remove).toHaveBeenCalledWith(
+        expect.objectContaining(route),
+        "native-message",
+        expected,
+      );
+      await bot.shutdown();
+    },
+  );
+
+  it("serializes authenticated attachment references without credentials and rehydrates after restart", async () => {
+    const { adapter, bot } = await setup();
+    const route: InkboxRoute = {
+      identityId: identity.id,
+      channel: "email",
+      emailAddress: identity.emailAddress,
+      threadId: "attachment-thread",
+    };
+    const reference = {
+      channel: "email" as const,
+      messageId: "email-message",
+      filename: "report.pdf",
+    };
+    vi.spyOn(adapter.transport, "getMessage").mockResolvedValue({
+      id: "email-message",
+      text: "Attached",
+      authorId: "sender@example.com",
+      isMe: false,
+      createdAt: new Date(),
+      raw: {},
+      attachments: [
+        { name: "report.pdf", mimeType: "application/pdf", size: 4, reference },
+      ],
+    });
+    const message = await adapter.fetchMessage(
+      adapter.encodeThreadId(route),
+      "email-message",
+    );
+    expect(message.attachments[0].fetchData).toBeTypeOf("function");
+    const serialized = JSON.stringify(message.toJSON());
+    expect(serialized).not.toContain("test-key");
+    expect(serialized).not.toContain(secret);
+    expect(serialized).not.toContain("apiKey");
+    expect(serialized).not.toContain("signingSecret");
+    expect(serialized).not.toContain("fetchData");
+    const restarted = createInkboxAdapter({
+      apiKey: () => "replacement-key",
+      agentHandle: "assistant",
+      signingSecret: secret,
+    });
+    const download = vi
+      .spyOn(restarted.transport, "attachment")
+      .mockResolvedValue(Buffer.from("%PDF"));
+    const restored = Message.fromJSON(JSON.parse(serialized));
+    const attachment = restarted.rehydrateAttachment(restored.attachments[0]);
+    expect(await attachment.fetchData!()).toEqual(Buffer.from("%PDF"));
+    expect(download).toHaveBeenCalledWith(route, reference);
+    expect(attachment.name).toBe("report.pdf");
+    expect(attachment.mimeType).toBe("application/pdf");
+    await bot.shutdown();
+  });
+
+  it("hydrates every transcript page before dispatching an abridged call", async () => {
+    const { adapter, bot, handler } = await setup();
+    const history = vi
+      .spyOn(adapter.transport, "history")
+      .mockResolvedValueOnce({
+        messages: [
+          {
+            id: "line-1",
+            text: "First full entry",
+            authorId: "remote",
+            isMe: false,
+            createdAt: new Date(),
+            raw: {},
+          },
+        ],
+        nextCursor: "next-page",
+      })
+      .mockResolvedValueOnce({
+        messages: [
+          {
+            id: "line-2",
+            text: "Last full entry",
+            authorId: "agent",
+            isMe: true,
+            createdAt: new Date(),
+            raw: {},
+          },
+        ],
+      });
+    const response = await bot.webhooks.inkbox(
+      signed(
+        event("call.ended", {
+          call: {
+            id: "call-full",
+            remote_phone_number: "+12025550123",
+            direction: "inbound",
+            status: "completed",
+          },
+          transcript: {
+            abridged: true,
+            entries: [{ party: "remote", text: "Truncated excerpt" }],
+          },
+        }),
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(history).toHaveBeenNthCalledWith(
+      1,
+      { identityId: identity.id, channel: "voice", callId: "call-full" },
+      { limit: 100, cursor: undefined, direction: "forward" },
+    );
+    expect(history).toHaveBeenNthCalledWith(
+      2,
+      { identityId: identity.id, channel: "voice", callId: "call-full" },
+      { limit: 100, cursor: "next-page", direction: "forward" },
+    );
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][1].text).toBe(
+      "Completed call transcript\nremote: First full entry\nagent: Last full entry",
+    );
+    await bot.shutdown();
+  });
+});
+
+describe("persistent email retry routing", () => {
+  it("reuses the first reply anchor after an uncertain send and adapter restart", async () => {
+    const { adapter, bot } = await setup();
+    const route: Extract<InkboxRoute, { channel: "email" }> = {
+      identityId: identity.id,
+      channel: "email",
+      emailAddress: identity.emailAddress,
+      threadId: "email-retry-thread",
+    };
+    const firstAnchor = { ...route, anchorMessageId: "original-anchor" };
+    const laterAnchor = { ...route, anchorMessageId: "later-arrival" };
+    const prepare = vi
+      .spyOn(adapter.transport, "prepareEmailReply")
+      .mockResolvedValue(firstAnchor);
+    const failedSend = vi
+      .spyOn(adapter.transport, "send")
+      .mockRejectedValue(new Error("Connection ended before response"));
+    const threadId = adapter.encodeThreadId(route);
+    await expect(
+      adapter.send(threadId, "Reply", { idempotencyKey: "retry-operation" }),
+    ).rejects.toThrow("Connection ended before response");
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(failedSend).toHaveBeenCalledWith(firstAnchor, {
+      text: "Reply",
+      idempotencyKey: "retry-operation",
+    });
+
+    const restarted = createInkboxAdapter({
+      apiKey: "replacement-key",
+      agentHandle: "assistant",
+      signingSecret: secret,
+    });
+    vi.spyOn(restarted.transport, "identity").mockResolvedValue(
+      identity as never,
+    );
+    await restarted.initialize(bot);
+    const prepareAfterRestart = vi
+      .spyOn(restarted.transport, "prepareEmailReply")
+      .mockResolvedValue(laterAnchor);
+    const send = vi
+      .spyOn(restarted.transport, "send")
+      .mockResolvedValue({ id: "sent-email", raw: {} });
+    await restarted.send(threadId, "Reply", {
+      idempotencyKey: "retry-operation",
+    });
+    expect(prepareAfterRestart).not.toHaveBeenCalled();
+    expect(send).toHaveBeenNthCalledWith(1, firstAnchor, {
+      text: "Reply",
+      idempotencyKey: "retry-operation",
+    });
+
+    await restarted.send(threadId, "A new reply", {
+      idempotencyKey: "new-operation",
+    });
+    expect(prepareAfterRestart).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenNthCalledWith(2, laterAnchor, {
+      text: "A new reply",
+      idempotencyKey: "new-operation",
+    });
+    await bot.shutdown();
   });
 });

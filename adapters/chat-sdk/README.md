@@ -208,5 +208,6 @@ work, and failed deliveries are not universally retried automatically.
 - [Eve agent](../../examples/eve-agent/): route conversations into durable Eve
   sessions with `streaming: false` and persistent Chat state.
 
-The examples are checked in CI against the local SDK and adapter packages. They
-do not place real calls or send live messages during automated checks.
+CI builds and packs the local SDK and adapter, installs those tarballs into each
+example, and typechecks the consumer package layout. The examples do not place
+real calls or send live messages during automated checks.

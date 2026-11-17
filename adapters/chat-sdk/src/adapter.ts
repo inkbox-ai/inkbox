@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { verifyWebhook } from "@inkbox/sdk";
 import {
   Message,
+  defaultEmojiResolver,
   NotImplementedError,
   parseMarkdown,
   stringifyMarkdown,
@@ -264,6 +265,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
           const page = await this.transport.history(route, {
             limit: 100,
             cursor,
+            direction: "forward",
           });
           lines.push(...page.messages.map((m) => `${m.authorId}: ${m.text}`));
           cursor = page.nextCursor;
@@ -403,7 +405,24 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     message: AdapterPostableMessage,
     options: Pick<TransportSend, "idempotencyKey" | "a2aIntent"> = {},
   ) {
-    const route = this.decodeThreadId(threadId);
+    let route = this.decodeThreadId(threadId);
+    if (route.channel === "email" && options.idempotencyKey) {
+      if (!this.chat)
+        throw new Error(
+          "Initialize Chat before sending with a persistent email retry key",
+        );
+      const key = `inkbox:email-send:${createHash("sha256")
+        .update(JSON.stringify([threadId, options.idempotencyKey]))
+        .digest("hex")}`;
+      const state = this.chat.getState();
+      const stored = await state.get<InkboxRoute>(key);
+      if (stored) route = stored;
+      else {
+        const prepared = await this.transport.prepareEmailReply(route);
+        await state.setIfNotExists(key, prepared);
+        route = (await state.get<InkboxRoute>(key)) ?? prepared;
+      }
+    }
     const text =
       typeof message === "string"
         ? message
@@ -557,6 +576,27 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       this.transport.markRead(this.decodeThreadId(threadId)),
     );
   }
+  private reaction(route: InkboxRoute, emoji: EmojiValue | string): string {
+    const normalized =
+      typeof emoji === "string"
+        ? defaultEmojiResolver.fromSlack(
+            defaultEmojiResolver.fromGChat(emoji).name,
+          )
+        : emoji;
+    if (route.channel === "slack")
+      return defaultEmojiResolver.toSlack(normalized);
+    const names: Record<string, string> = {
+      thumbs_up: "like",
+      thumbs_down: "dislike",
+      heart: "love",
+      laughing: "laugh",
+      joy: "laugh",
+      exclamation: "emphasize",
+      question: "question",
+      eyes: "eyes",
+    };
+    return names[normalized.name] ?? normalized.name;
+  }
   async addReaction(
     threadId: string,
     messageId: string,
@@ -566,7 +606,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       this.transport.addReaction(
         this.decodeThreadId(threadId),
         this.nativeMessageId(threadId, messageId),
-        typeof emoji === "string" ? emoji : emoji.name,
+        this.reaction(this.decodeThreadId(threadId), emoji),
       ),
     );
   }
@@ -579,7 +619,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       this.transport.removeReaction(
         this.decodeThreadId(threadId),
         this.nativeMessageId(threadId, messageId),
-        typeof emoji === "string" ? emoji : emoji.name,
+        this.reaction(this.decodeThreadId(threadId), emoji),
       ),
     );
   }

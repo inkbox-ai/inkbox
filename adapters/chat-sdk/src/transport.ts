@@ -138,6 +138,38 @@ export class InkboxTransport {
     return { client, identity };
   }
 
+  async prepareEmailReply(
+    route: Extract<InkboxRoute, { channel: "email" }>,
+  ): Promise<Extract<InkboxRoute, { channel: "email" }>> {
+    const { identity } = await this.scope(route);
+    return this.emailReplyRoute(identity, route);
+  }
+
+  private async emailReplyRoute(
+    identity: AgentIdentity,
+    route: Extract<InkboxRoute, { channel: "email" }>,
+  ): Promise<Extract<InkboxRoute, { channel: "email" }>> {
+    let anchor = route.anchorMessageId;
+    if (!anchor) {
+      try {
+        anchor = (await identity.getThread(route.threadId)).messages.at(-1)?.id;
+      } catch (error) {
+        if (!(
+          error instanceof Error &&
+          "statusCode" in error &&
+          error.statusCode === 404
+        ))
+          throw error;
+        anchor = route.threadId;
+      }
+    }
+    if (!anchor) throw new Error("Email thread has no message to reply to");
+    const message = await identity.getMessage(anchor);
+    if ((message.threadId ?? message.id) !== route.threadId)
+      throw new Error("Email reply anchor does not belong to this thread");
+    return { ...route, anchorMessageId: anchor };
+  }
+
   async send(
     route: InkboxRoute,
     input: TransportSend,
@@ -169,27 +201,8 @@ export class InkboxTransport {
     const idempotencyKey = input.idempotencyKey ?? randomUUID();
     switch (route.channel) {
       case "email": {
-        let anchor = route.anchorMessageId;
-        if (!anchor) {
-          try {
-            anchor = (await identity.getThread(route.threadId)).messages.at(
-              -1,
-            )?.id;
-          } catch (error) {
-            if (!(
-              error instanceof Error &&
-              "statusCode" in error &&
-              error.statusCode === 404
-            ))
-              throw error;
-            anchor = route.threadId;
-          }
-        }
-        if (!anchor) throw new Error("Email thread has no message to reply to");
-        const message = await identity.getMessage(anchor);
-        if ((message.threadId ?? message.id) !== route.threadId)
-          throw new Error("Email reply anchor does not belong to this thread");
-        const raw = await identity.replyAllEmail(anchor, {
+        const { anchorMessageId } = await this.emailReplyRoute(identity, route);
+        const raw = await identity.replyAllEmail(anchorMessageId!, {
           bodyText: input.text,
           attachments: input.attachments,
           idempotencyKey,
@@ -206,9 +219,20 @@ export class InkboxTransport {
         return { id: raw.id, raw };
       }
       case "imessage": {
+        let replyToMessageId = route.replyToMessageId;
+        if (route.threadId && !replyToMessageId) {
+          const thread = await identity.getIMessageConversationThread(
+            route.conversationId,
+            route.threadId,
+            { limit: 1 },
+          );
+          replyToMessageId = thread.threadRootMessageId ?? undefined;
+          if (!replyToMessageId)
+            throw new Error("Cannot resolve the iMessage thread root");
+        }
         const raw = await identity.sendIMessage({
           conversationId: route.conversationId,
-          replyToMessageId: route.replyToMessageId,
+          replyToMessageId,
           text: input.text,
           mediaUrls: input.mediaUrls,
           idempotencyKey,
@@ -229,7 +253,7 @@ export class InkboxTransport {
             idempotencyKey,
           });
           assertOperation(raw);
-          return { id: raw.messageTs ?? raw.id, raw };
+          return { id: raw.messageTs ?? `inkbox-operation:${raw.id}`, raw };
         }
         const raw = await client.slack.sendMessage(route.connectionId, {
           conversationId: route.conversationId,
@@ -241,7 +265,7 @@ export class InkboxTransport {
           throw new Error(
             `Slack send ${raw.status}; action ${raw.id}. Inspect the action before retrying.`,
           );
-        return { id: raw.messageTs ?? raw.id, raw };
+        return { id: raw.messageTs ?? `inkbox-action:${raw.id}`, raw };
       }
       case "a2a": {
         const raw = await identity.a2aReply(route.taskId, {
@@ -264,6 +288,46 @@ export class InkboxTransport {
       direction?: "forward" | "backward";
     } = {},
   ): Promise<TransportPage> {
+    if (route.channel === "slack" && route.threadTs) {
+      const { client, identity } = await this.scope(route);
+      const offset = options.cursor === undefined ? 0 : Number(options.cursor);
+      if (!Number.isSafeInteger(offset) || offset < 0)
+        throw new Error("Invalid history cursor");
+      const { connections } = await client.slack.listConnections(identity.id);
+      const botId = connections.find(
+        (connection) => connection.id === route.connectionId,
+      )?.botUserId;
+      const messages: TransportMessage[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await client.slack.listMessages(
+          route.connectionId,
+          route.conversationId,
+          { threadTs: route.threadTs, limit: 100, cursor },
+        );
+        messages.push(
+          ...page.messages.map((row) =>
+            slackMessage(row, route.connectionId, botId),
+          ),
+        );
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      messages.sort(chronological);
+      const limit = Math.max(1, Math.min(100, options.limit ?? 50));
+      const start =
+        options.direction === "forward"
+          ? offset
+          : Math.max(0, messages.length - offset - limit);
+      const end =
+        options.direction === "forward"
+          ? offset + limit
+          : Math.max(0, messages.length - offset);
+      return {
+        messages: messages.slice(start, end),
+        nextCursor:
+          offset + limit < messages.length ? String(offset + limit) : undefined,
+      };
+    }
     if (options.direction === "forward") {
       const start = options.cursor === undefined ? 0 : Number(options.cursor);
       if (!Number.isSafeInteger(start) || start < 0)
@@ -423,13 +487,45 @@ export class InkboxTransport {
     }
   }
 
+  private async slackMessageId(
+    client: Inkbox,
+    route: Extract<InkboxRoute, { channel: "slack" }>,
+    id: string,
+  ): Promise<string> {
+    const pending = id.startsWith("inkbox-action:")
+      ? await client.slack.getAction(
+          route.connectionId,
+          id.slice("inkbox-action:".length),
+        )
+      : id.startsWith("inkbox-operation:")
+        ? await client.slack.getOperation(
+            route.connectionId,
+            id.slice("inkbox-operation:".length),
+          )
+        : undefined;
+    if (!pending) return id;
+    if (
+      pending.conversationId !== route.conversationId ||
+      (route.threadTs && pending.threadTs !== route.threadTs)
+    )
+      throw new Error("Slack action belongs to a different thread");
+    if (
+      (pending.status !== "sent" && pending.status !== "succeeded") ||
+      !pending.messageTs
+    )
+      throw new Error(
+        `Slack action ${pending.id} is ${pending.status}; no message timestamp is available. Inspect the action before retrying.`,
+      );
+    return pending.messageTs;
+  }
+
   async getMessage(route: InkboxRoute, id: string): Promise<TransportMessage> {
     const { client, identity } = await this.scope(route);
     if (route.channel === "slack") {
       const row = await client.slack.getMessage(
         route.connectionId,
         route.conversationId,
-        id,
+        await this.slackMessageId(client, route, id),
         { threadTs: route.threadTs },
       );
       const { connections } = await client.slack.listConnections(identity.id);
@@ -523,7 +619,7 @@ export class InkboxTransport {
         await client.slack.addReaction(
           route.connectionId,
           route.conversationId,
-          messageId,
+          await this.slackMessageId(client, route, messageId),
           reaction,
           { idempotencyKey: randomUUID() },
         ),
@@ -548,7 +644,7 @@ export class InkboxTransport {
         await client.slack.removeReaction(
           route.connectionId,
           route.conversationId,
-          messageId,
+          await this.slackMessageId(client, route, messageId),
           reaction,
           { idempotencyKey: randomUUID() },
         ),
@@ -580,7 +676,7 @@ export class InkboxTransport {
     const raw = await client.slack.updateMessage(
       route.connectionId,
       route.conversationId,
-      messageId,
+      await this.slackMessageId(client, route, messageId),
       text,
       { idempotencyKey: randomUUID() },
     );
@@ -599,7 +695,7 @@ export class InkboxTransport {
       await client.slack.deleteMessage(
         route.connectionId,
         route.conversationId,
-        messageId,
+        await this.slackMessageId(client, route, messageId),
         { idempotencyKey: randomUUID() },
       ),
     );

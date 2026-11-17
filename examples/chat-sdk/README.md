@@ -6,10 +6,10 @@ transcripts are saved to thread state without attempting to text a finished call
 
 ## Run in an application
 
-1. Use Node.js 22 or newer. Install the SDK and adapter packages before this
-   example: `npm install` in this directory links the local packages when working
-   in this repository. For a standalone application, replace both `file:`
-   dependencies with matching published versions.
+1. Use Node.js 22 or newer. For a standalone application, replace both `file:`
+   dependencies with matching published versions, then run `npm install`.
+   In a repository checkout, use the packed-package installation below after
+   building the local SDK and adapter.
 2. Configure the environment variables in `.env.example` in your application's
    environment. `INKBOX_API_KEY` must be identity-scoped and match `INKBOX_AGENT_HANDLE`;
    organization-wide keys are not accepted. Do not commit secret values.
@@ -23,6 +23,27 @@ The example does not include an HTTP server or model integration. Replace the
 fixed reply in `receive` with your agent logic. Keep the call branch separate:
 `thread.post()` cannot speak into a completed call. An explicit follow-up call or
 message should use the SDK and your application's authorization flow.
+
+## Install local packages
+
+Use packed packages instead of source-directory symlinks so the adapter shares
+its application's Chat SDK peer dependency. After building `sdk/typescript` and
+`adapters/chat-sdk`, set `INKBOX_PACKAGE_DIR` to an empty directory for artifacts
+and run these commands from the repository root:
+
+```bash
+npm pack ./sdk/typescript --ignore-scripts --pack-destination "$INKBOX_PACKAGE_DIR"
+npm pack ./adapters/chat-sdk --ignore-scripts --pack-destination "$INKBOX_PACKAGE_DIR"
+cd examples/chat-sdk
+npm ci --ignore-scripts
+npm install --ignore-scripts --no-save --package-lock=false "$INKBOX_PACKAGE_DIR"/*.tgz
+npm run typecheck
+```
+
+Use an absolute artifact directory path. The final install replaces the linked
+SDK and adapter with their packed contents without changing manifests or locks.
+CI uses this same consumer package layout; it does not bypass type incompatibilities
+between independently installed Chat SDK copies.
 
 ## Subscribe once
 

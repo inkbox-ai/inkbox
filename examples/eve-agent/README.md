@@ -7,10 +7,12 @@ conversation.
 
 ## Setup
 
-1. Use Node.js 26. Install dependencies with `npm install`. In this repository,
-   the adapter dependency links the local package, which must be built first.
-   For a standalone project, replace the `file:` dependency with a published
-   adapter version.
+1. Use Node.js 26. For a standalone project, replace the `file:` dependency with
+   a published adapter version and run `npm install`. In a repository checkout,
+   follow the [packed-package installation](../chat-sdk/#install-local-packages),
+   substituting `examples/eve-agent` for `examples/chat-sdk`. This installs the
+   local SDK and adapter tarballs into the application's dependency tree so they
+   share its Chat SDK peer dependency.
 2. Configure the variables in `.env.example` using your deployment's environment
    management. Use an identity-scoped `INKBOX_API_KEY` matching
    `INKBOX_AGENT_HANDLE`. Configure model access according to the [Eve setup

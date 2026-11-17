@@ -30,6 +30,8 @@ const mock = vi.hoisted(() => {
   const slack = {
     listConnections: vi.fn(),
     sendMessage: vi.fn(),
+    getAction: vi.fn(),
+    getOperation: vi.fn(),
     listMessages: vi.fn(),
     getMessage: vi.fn(),
     addReaction: vi.fn(),
@@ -203,6 +205,22 @@ describe("outbound routing", () => {
       idempotencyKey: "stable-send",
     });
   });
+  it("freezes a prepared email anchor across later thread updates", async () => {
+    const prepared = await transport().prepareEmailReply(email);
+    mock.identity.getThread.mockResolvedValue({
+      messages: [mail(), { ...mail("mail-2") }],
+    });
+    await transport().send(prepared, {
+      text: "reply",
+      idempotencyKey: "stable-send",
+    });
+    expect(mock.identity.replyAllEmail).toHaveBeenCalledWith("mail-1", {
+      bodyText: "reply",
+      attachments: undefined,
+      idempotencyKey: "stable-send",
+    });
+    expect(mock.identity.getThread).toHaveBeenCalledTimes(1);
+  });
   it("rejects an email anchor from another thread", async () => {
     mock.identity.getMessage.mockResolvedValue({
       ...mail(),
@@ -246,6 +264,30 @@ describe("outbound routing", () => {
       mediaUrls: undefined,
       idempotencyKey: "imessage-send",
     });
+  });
+  it("resolves the iMessage thread root instead of sending a top-level reply", async () => {
+    mock.identity.getIMessageConversationThread.mockResolvedValue({
+      threadRootMessageId: "resolved-root",
+    });
+    await transport().send(
+      { ...imessage, replyToMessageId: undefined },
+      { text: "reply" },
+    );
+    expect(mock.identity.sendIMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ replyToMessageId: "resolved-root" }),
+    );
+  });
+  it("does not silently leave an unresolved iMessage thread", async () => {
+    mock.identity.getIMessageConversationThread.mockResolvedValue({
+      threadRootMessageId: null,
+    });
+    await expect(
+      transport().send(
+        { ...imessage, replyToMessageId: undefined },
+        { text: "reply" },
+      ),
+    ).rejects.toThrow("thread root");
+    expect(mock.identity.sendIMessage).not.toHaveBeenCalled();
   });
   it("preserves Slack connection, channel, thread and stable action key", async () => {
     mock.slack.sendMessage.mockResolvedValue({
@@ -317,6 +359,97 @@ describe("outbound routing", () => {
       "unknown",
     );
     expect(mock.slack.sendMessage).toHaveBeenCalledTimes(1);
+  });
+  it("keeps pending Slack send identifiers distinct and resolves them before edits", async () => {
+    mock.slack.sendMessage.mockResolvedValue({
+      id: "action-1",
+      status: "sending",
+      messageTs: null,
+    });
+    const sent = await transport().send(slack, { text: "reply" });
+    expect(sent.id).toBe("inkbox-action:action-1");
+    mock.slack.getAction.mockResolvedValue({
+      id: "action-1",
+      status: "sent",
+      messageTs: "2.0",
+      conversationId: "channel-1",
+      threadTs: "1.0",
+    });
+    mock.slack.updateMessage.mockResolvedValue({
+      id: "edit-1",
+      status: "succeeded",
+      messageTs: "2.0",
+    });
+    await transport().editMessage(slack, sent.id, "updated");
+    expect(mock.slack.updateMessage).toHaveBeenCalledWith(
+      "connection-1",
+      "channel-1",
+      "2.0",
+      "updated",
+      { idempotencyKey: expect.any(String) },
+    );
+  });
+  it("does not mutate when a pending Slack action has no message timestamp", async () => {
+    mock.slack.getAction.mockResolvedValue({
+      id: "action-1",
+      status: "sending",
+      messageTs: null,
+      conversationId: "channel-1",
+      threadTs: "1.0",
+    });
+    await expect(
+      transport().deleteMessage(slack, "inkbox-action:action-1"),
+    ).rejects.toThrow("no message timestamp");
+    expect(mock.slack.deleteMessage).not.toHaveBeenCalled();
+    expect(mock.slack.sendMessage).not.toHaveBeenCalled();
+  });
+  it("resolves pending Slack uploads through operation status", async () => {
+    mock.slack.uploadFile.mockResolvedValue({
+      id: "upload-1",
+      status: "in_progress",
+      messageTs: null,
+    });
+    const sent = await transport().send(slack, {
+      text: "notes",
+      attachments: [
+        {
+          filename: "notes.txt",
+          contentType: "text/plain",
+          contentBase64: "aGk=",
+        },
+      ],
+    });
+    expect(sent.id).toBe("inkbox-operation:upload-1");
+    mock.slack.getOperation.mockResolvedValue({
+      id: "upload-1",
+      status: "succeeded",
+      messageTs: "2.0",
+      conversationId: "channel-1",
+      threadTs: "1.0",
+    });
+    mock.slack.getMessage.mockResolvedValue({
+      ts: "2.0",
+      user: "bot-1",
+      text: "notes",
+    });
+    expect((await transport().getMessage(slack, sent.id)).id).toBe("2.0");
+    expect(mock.slack.getOperation).toHaveBeenCalledWith(
+      "connection-1",
+      "upload-1",
+    );
+  });
+  it("rejects pending Slack identifiers from another thread", async () => {
+    mock.slack.getAction.mockResolvedValue({
+      id: "action-1",
+      status: "sent",
+      messageTs: "2.0",
+      conversationId: "channel-1",
+      threadTs: "other",
+    });
+    await expect(
+      transport().getMessage(slack, "inkbox-action:action-1"),
+    ).rejects.toThrow("different thread");
+    expect(mock.slack.getMessage).not.toHaveBeenCalled();
   });
   it("rejects Slack connections owned by another identity", async () => {
     mock.slack.listConnections.mockResolvedValue({
@@ -424,6 +557,40 @@ describe("history and authenticated attachments", () => {
       limit: 10,
       offset: 20,
     });
+  });
+  it("converts oldest-first Slack reply pages into backward Chat history", async () => {
+    mock.slack.listMessages.mockImplementation(
+      async (_connection, _conversation, options) =>
+        options.cursor === "next"
+          ? {
+              messages: [{ ts: "3.0", text: "newest", user: "user-1" }],
+              nextCursor: null,
+            }
+          : {
+              messages: [
+                { ts: "1.0", text: "oldest", user: "user-1" },
+                { ts: "2.0", text: "middle", user: "user-1" },
+              ],
+              nextCursor: "next",
+            },
+    );
+    const first = await transport().history(slack, { limit: 2 });
+    expect(first.messages.map((message) => message.id)).toEqual(["2.0", "3.0"]);
+    expect(first.nextCursor).toBe("2");
+    const second = await transport().history(slack, {
+      limit: 2,
+      cursor: first.nextCursor,
+    });
+    expect(second.messages.map((message) => message.id)).toEqual(["1.0"]);
+    expect(second.nextCursor).toBeUndefined();
+    const forward = await transport().history(slack, {
+      limit: 2,
+      direction: "forward",
+    });
+    expect(forward.messages.map((message) => message.id)).toEqual([
+      "1.0",
+      "2.0",
+    ]);
   });
   it("provides credential-free Slack file references", async () => {
     mock.slack.listMessages.mockResolvedValue({

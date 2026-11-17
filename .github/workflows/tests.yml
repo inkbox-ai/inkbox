@@ -196,10 +196,17 @@ jobs:
         working-directory: adapters/chat-sdk
         run: npm test
 
+      - name: Pack SDK and adapter for consumer verification
+        run: |
+          mkdir -p "$RUNNER_TEMP/inkbox-consumer-packages"
+          npm pack ./sdk/typescript --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
+          npm pack ./adapters/chat-sdk --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
+
       - name: Verify standalone Chat SDK example
         working-directory: examples/chat-sdk
         run: |
           npm ci --ignore-scripts
+          npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
 
       - name: Verify Eve example
@@ -207,4 +214,5 @@ jobs:
         working-directory: examples/eve-agent
         run: |
           npm ci --ignore-scripts
+          npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
