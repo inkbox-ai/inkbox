@@ -11,6 +11,7 @@
 - Python integrations can share durable managed chat and inbox receipts, including cancellation and approval fencing.
 
 ### Changed
+- Template discovery requests all supported harnesses while existing clients can continue to read the original template catalog.
 - Python remote MCP clients can supply fresh supplemental headers for each request, including continuation submissions and retries.
 - Remote MCP write continuations accept response metadata and empty input-request maps while retaining durable retry identity and rejecting nonempty or malformed interaction requests.
 - Managed chat and inbox journals support exclusive process ownership on Windows as well as POSIX systems.

@@ -100,7 +100,7 @@ def test_templates_preserve_selected_defaults_and_unavailable_harness():
     http = Mock()
     http.get.return_value = wire
     result = ComputersResource(http).templates()
-    http.get.assert_called_once_with("/computers/templates")
+    http.get.assert_called_once_with("/computers/templates", params={"include_all_harnesses": "true"})
     assert result["hosted_defaults"]["codex"]["id"] == "codex-current"
     assert result["hosted_defaults"]["hermes"] is None
     assert result["items"][0]["software"]["os"] is None

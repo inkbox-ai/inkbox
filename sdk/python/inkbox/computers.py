@@ -163,7 +163,7 @@ class ComputersResource:
 
     def templates(self) -> ComputerTemplates:
         """Read templates and current hosted defaults without reserving capacity."""
-        return cast(ComputerTemplates, self._http.get("/computers/templates"))
+        return cast(ComputerTemplates, self._http.get("/computers/templates", params={"include_all_harnesses": "true"}))
 
     def shapes(self) -> ComputerShapes:
         """Read supported allocations; availability does not reserve capacity."""

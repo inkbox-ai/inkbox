@@ -194,7 +194,10 @@ impl ComputersResource {
     /// Read current hosted defaults without reserving capacity.
     pub fn templates(&self) -> Result<ComputerTemplates> {
         Ok(serde_json::from_value(
-            self.http.get("/computers/templates", NO_QUERY)?,
+            self.http.get(
+                "/computers/templates",
+                &[("include_all_harnesses", "true".into())],
+            )?,
         )?)
     }
     /// Read supported allocations without reserving capacity.

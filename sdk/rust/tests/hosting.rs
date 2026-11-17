@@ -158,7 +158,9 @@ fn templates_preserve_selected_defaults_and_nullable_metadata() {
     use httpmock::prelude::*;
     let server = MockServer::start();
     let request = server.mock(|when, then| {
-        when.method(GET).path("/api/v1/computers/templates");
+        when.method(GET)
+            .path("/api/v1/computers/templates")
+            .query_param("include_all_harnesses", "true");
         then.status(200)
             .header("Content-Type", "application/json")
             .body(include_str!("../../../contracts/computer-templates.json"));

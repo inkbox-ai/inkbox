@@ -100,7 +100,7 @@ it("preserves selected template defaults, legacy metadata, and unavailable harne
   const wire = JSON.parse(readFileSync(new URL("../../../contracts/computer-templates.json", import.meta.url), "utf8"));
   const http = {get: vi.fn().mockResolvedValue(wire)};
   const result = await new ComputersResource(http as unknown as HttpTransport).templates();
-  expect(http.get).toHaveBeenCalledExactlyOnceWith("/computers/templates");
+  expect(http.get).toHaveBeenCalledExactlyOnceWith("/computers/templates", {include_all_harnesses: "true"});
   expect(result.hosted_defaults.codex?.id).toBe("codex-current");
   expect(result.hosted_defaults.codex?.total_disk_bytes).toBe(12000000000);
   expect(result.hosted_defaults.hermes).toBeNull();

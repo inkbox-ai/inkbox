@@ -68,7 +68,7 @@ export class ComputersResource {
   constructor(private readonly http: HttpTransport) {}
   /** Current hosted defaults, without reserving capacity. */
   templates(): Promise<ComputerTemplates> {
-    return this.http.get("/computers/templates");
+    return this.http.get("/computers/templates", {include_all_harnesses: "true"});
   }
   /** Supported allocations; availability does not reserve capacity. */
   shapes(): Promise<ComputerShapes> {
