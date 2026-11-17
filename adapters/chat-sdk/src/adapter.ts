@@ -44,6 +44,9 @@ export interface InkboxAdapterOptions extends TransportOptions {
 
 export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
   readonly name = "inkbox";
+  get userName(): string {
+    return this.options.agentHandle;
+  }
   readonly transport: InkboxTransport;
   private chat?: ChatInstance;
   private identityId?: string;
@@ -205,7 +208,11 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       !secret ||
       !verifyWebhook({
         payload: body,
-        headers: Object.fromEntries(request.headers),
+        headers: {
+          "x-inkbox-timestamp": timestamp,
+          "x-inkbox-request-id": requestId,
+          "x-inkbox-signature": signature,
+        },
         secret,
       })
     ) {
@@ -246,7 +253,11 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     }
     if (route.channel === "voice" && normalized.event) {
       const transcript = object(object(normalized.event.data).transcript ?? {});
-      if (transcript.abridged === true) {
+      if (
+        transcript.abridged === true ||
+        !Array.isArray(transcript.entries) ||
+        transcript.entries.some((entry) => object(entry).truncated === true)
+      ) {
         const lines: string[] = [];
         let cursor: string | undefined;
         do {
@@ -259,7 +270,9 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
         } while (cursor);
         normalized = {
           ...normalized,
-          text: `Completed call transcript\n${lines.join("\n")}`,
+          text: lines.length
+            ? `Completed call transcript\n${lines.join("\n")}`
+            : normalized.text,
         };
       }
     }
@@ -452,7 +465,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
                 filename: file.filename,
                 contentType: file.mimeType,
               })
-            ).url,
+            ).mediaUrl,
           );
         }
         for (const attachment of attachments) {
@@ -464,7 +477,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
                   filename: attachment.name ?? "attachment",
                   contentType: attachment.mimeType,
                 })
-              ).url,
+              ).mediaUrl,
           );
         }
       } else if (
@@ -633,7 +646,10 @@ async function attachmentBytes(attachment: Attachment): Promise<Buffer> {
   if (attachment.data instanceof Blob)
     return Buffer.from(await attachment.data.arrayBuffer());
   if (attachment.data) return Buffer.from(attachment.data);
-  if (attachment.fetchData) return Buffer.from(await attachment.fetchData());
+  if (attachment.fetchData) {
+    const data = await attachment.fetchData();
+    return data instanceof ArrayBuffer ? Buffer.from(data) : Buffer.from(data);
+  }
   if (attachment.url)
     return downloadAttachment(attachment.url, { adapter: "inkbox" });
   throw new Error("Attachment has no content");
