@@ -1314,7 +1314,7 @@ describe("persistent phone send preparation", () => {
       restarted.send(threadId, "Photo", { idempotencyKey: "media-op" }),
     ).rejects.toThrow("409 idempotency_key_reused");
     expect(retrySend).toHaveBeenLastCalledWith(
-      route,
+      { ...route, isGroup: false, threadId: undefined, replyToMessageId: undefined },
       expect.objectContaining({
         text: "Photo",
         idempotencyKey: sendKey("media-op"),
@@ -1439,7 +1439,9 @@ describe("keyed text-only phone sends", () => {
         idempotencyKey: "text-operation",
       });
       expect(send).toHaveBeenCalledWith(
-        route,
+        channel === "imessage"
+          ? { ...route, isGroup: false, threadId: undefined, replyToMessageId: undefined }
+          : route,
         expect.objectContaining({
           text: "Hello",
           idempotencyKey: sendKey("text-operation"),
