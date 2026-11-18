@@ -11,6 +11,7 @@ const mock = vi.hoisted(() => {
     sendText: vi.fn(),
     sendIMessage: vi.fn(),
     a2aReply: vi.fn(),
+    a2aTask: vi.fn(),
     getTextConversation: vi.fn(),
     listIMessages: vi.fn(),
     getIMessageConversationThread: vi.fn(),
@@ -87,6 +88,7 @@ const slack: InkboxRoute = {
 const a2a: InkboxRoute = {
   channel: "a2a",
   identityId: "identity-1",
+  contextId: "context-1",
   taskId: "task-1",
 };
 const voice: InkboxRoute = {
@@ -136,6 +138,11 @@ beforeEach(() => {
   mock.identity.getThread.mockResolvedValue({ messages: [mail()] });
   mock.identity.getMessage.mockResolvedValue(mail());
   mock.identity.replyAllEmail.mockResolvedValue({ id: "reply-1" });
+  mock.identity.a2aTask.mockResolvedValue({
+    id: "task-1",
+    contextId: "context-1",
+    target: { identityId: "identity-1" },
+  });
   mock.identity.sendText.mockResolvedValue({ id: "text-1" });
   mock.identity.sendIMessage.mockResolvedValue({ id: "imessage-1" });
 });
@@ -664,6 +671,110 @@ describe("history and authenticated attachments", () => {
   });
 });
 
+describe("A2A context routing", () => {
+  it("requires a task binding before lookup or reply", async () => {
+    await expect(
+      transport().send(
+        { channel: "a2a", identityId: "identity-1", contextId: "context-1" },
+        { text: "done", a2aIntent: "complete" },
+      ),
+    ).rejects.toThrow("explicit task ID");
+    expect(mock.identity.a2aTask).not.toHaveBeenCalled();
+    expect(mock.identity.a2aReply).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      id: "task-1",
+      contextId: "other-context",
+      target: { identityId: "identity-1" },
+    },
+    {
+      id: "task-1",
+      contextId: "context-1",
+      target: { identityId: "other-receiver" },
+    },
+    {
+      id: "other-task",
+      contextId: "context-1",
+      target: { identityId: "identity-1" },
+    },
+  ])("rejects a mismatched task before completion: %j", async (task) => {
+    mock.identity.a2aTask.mockResolvedValue(task);
+    await expect(
+      transport().send(a2a, { text: "done", a2aIntent: "complete" }),
+    ).rejects.toThrow("does not belong");
+    expect(mock.identity.a2aReply).not.toHaveBeenCalled();
+  });
+
+  it("does not reply when the receiver-side task lookup rejects a sent task", async () => {
+    mock.identity.a2aTask.mockRejectedValue(new Error("Task not found"));
+    await expect(
+      transport().send(a2a, { text: "done", a2aIntent: "complete" }),
+    ).rejects.toThrow("Task not found");
+    expect(mock.identity.a2aTask).toHaveBeenCalledWith("task-1");
+    expect(mock.identity.a2aReply).not.toHaveBeenCalled();
+  });
+
+  it("completes only the explicitly bound task in a shared context", async () => {
+    mock.identity.a2aTask.mockImplementation(async (id: string) => ({
+      id,
+      contextId: "context-1",
+      target: null,
+    }));
+    mock.identity.a2aReply.mockResolvedValue({
+      messages: [{ messageId: "completion-1", role: "agent" }],
+    });
+    await transport().send({ ...a2a, taskId: "task-2" } as InkboxRoute, {
+      text: "Done",
+      a2aIntent: "complete",
+    });
+    expect(mock.identity.a2aTask).toHaveBeenCalledWith("task-2");
+    expect(mock.identity.a2aReply).toHaveBeenCalledExactlyOnceWith("task-2", {
+      text: "Done",
+      intent: "complete",
+    });
+  });
+
+  it("reads multiple tasks in one context while retaining each message's task binding", async () => {
+    const items = ["task-1", "task-2"].flatMap((taskId) =>
+      ["caller", "agent"].map((role) => ({
+        id: `row-${taskId}-${role}`,
+        messageId: `message-${taskId}-${role}`,
+        contextId: "context-1",
+        taskId,
+        role,
+        caller: { identityId: "remote-1" },
+        parts: [{ text: `${taskId}-${role}` }],
+        createdAt: createdAt.toISOString(),
+      })),
+    );
+    mock.identity.a2aMessages.mockResolvedValue({ items, nextCursor: null });
+    const page = await transport().history(a2a);
+    expect(
+      page.messages.map((row) => [row.id, row.a2aTaskId, row.isMe]),
+    ).toEqual([
+      ["message-task-1-caller", "task-1", false],
+      ["message-task-1-agent", "task-1", true],
+      ["message-task-2-caller", "task-2", false],
+      ["message-task-2-agent", "task-2", true],
+    ]);
+    expect(page.messages.map((row) => row.raw)).toEqual(items);
+    const found = await transport().getMessage(a2a, "message-task-2-caller");
+    expect(found.a2aTaskId).toBe("task-2");
+    for (const [options] of mock.identity.a2aMessages.mock.calls) {
+      expect(options).toMatchObject({
+        contextId: "context-1",
+        direction: "inbound",
+      });
+      expect(options).not.toHaveProperty("taskId");
+    }
+    await expect(
+      transport().getMessage(a2a, "outside-context"),
+    ).rejects.toThrow("not found in this thread");
+  });
+});
+
 describe("remaining history contracts", () => {
   it("keeps receiver-side A2A task history and both participant roles", async () => {
     mock.identity.a2aMessages.mockResolvedValue({
@@ -698,7 +809,7 @@ describe("remaining history contracts", () => {
       ["identity-1", true],
     ]);
     expect(mock.identity.a2aMessages).toHaveBeenCalledWith({
-      taskId: "task-1",
+      contextId: "context-1",
       direction: "inbound",
       limit: 10,
       cursor: "previous",
@@ -830,7 +941,7 @@ describe("review regressions", () => {
       "protocol-1",
     );
     expect(mock.identity.a2aMessages).toHaveBeenCalledWith(
-      expect.objectContaining({ direction: "inbound", taskId: "task-1" }),
+      expect.objectContaining({ direction: "inbound", contextId: "context-1" }),
     );
   });
   it("never substitutes a task ID when an accepted A2A reply has no message ID", async () => {

@@ -31,7 +31,7 @@ export type InkboxRoute = { identityId: string } & (
       conversationId: string;
       threadTs?: string;
     }
-  | { channel: "a2a"; taskId: string }
+  | { channel: "a2a"; contextId: string; taskId?: string }
   | { channel: "voice"; callId: string }
 );
 export interface TransportOptions {
@@ -55,6 +55,7 @@ export interface TransportMessage {
   text: string;
   authorId: string;
   authorName?: string;
+  a2aTaskId?: string;
   isMe: boolean;
   createdAt: Date;
   attachments?: TransportAttachment[];
@@ -299,6 +300,18 @@ export class InkboxTransport {
         return { id: raw.messageTs ?? `inkbox-action:${raw.id}`, raw };
       }
       case "a2a": {
+        if (!route.taskId)
+          throw new Error("A2A replies require an explicit task ID");
+        // The receiver-side lookup excludes tasks sent by this identity.
+        const task = await identity.a2aTask(route.taskId);
+        if (
+          task.id !== route.taskId ||
+          task.contextId !== route.contextId ||
+          (task.target && task.target.identityId !== identity.id)
+        )
+          throw new Error(
+            "A2A task does not belong to this context and receiver",
+          );
         const raw = await identity.a2aReply(route.taskId, {
           text: input.text,
           intent: input.a2aIntent ?? "progress",
@@ -469,7 +482,7 @@ export class InkboxTransport {
       }
       case "a2a": {
         const page = await identity.a2aMessages({
-          taskId: route.taskId,
+          contextId: route.contextId,
           direction: "inbound",
           limit,
           cursor: options.cursor,
@@ -478,6 +491,7 @@ export class InkboxTransport {
           messages: page.items
             .map((row) => ({
               id: row.messageId,
+              a2aTaskId: row.taskId,
               text: row.parts
                 .map((part) =>
                   typeof part.text === "string"

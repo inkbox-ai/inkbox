@@ -230,7 +230,7 @@ describe("thread routing", () => {
       conversationId: "channel",
       threadTs: "123.456",
     },
-    { identityId: identity.id, channel: "a2a", taskId: "task" },
+    { identityId: identity.id, channel: "a2a", contextId: "context" },
     { identityId: identity.id, channel: "voice", callId: "call" },
   ];
   it.each(routes)(
@@ -388,6 +388,7 @@ describe("channel event normalization", () => {
   it("normalizes A2A user parts without accepting self echoes", () => {
     const data = {
       task_id: "task",
+      context_id: "context",
       message_id: "message",
       caller: { identity_id: "caller" },
       parts: [{ kind: "text", text: "work" }],
@@ -953,24 +954,85 @@ describe("explicit email reply routing", () => {
 });
 
 describe("A2A default reply intent", () => {
-  it("uses the configured final intent for ordinary posts while preserving explicit overrides", async () => {
+  it("keeps tasks in one context on one thread and preserves each message's task", async () => {
+    const { adapter, bot, handler } = await setup();
+    const deliver = (taskId: string, contextId = "shared-context") =>
+      bot.webhooks.inkbox(
+        signed(
+          event("a2a.task.created", {
+            task_id: taskId,
+            context_id: contextId,
+            message_id: `message-${taskId}`,
+            caller: { identity_id: "remote-agent" },
+            parts: [{ text: `Work for ${taskId}` }],
+          }),
+        ),
+      );
+    await deliver("first-task");
+    await deliver("second-task");
+    await deliver("third-task", "other-context");
+    const messages = handler.mock.calls.map((call) => call[1]);
+    expect(messages[0].threadId).toBe(messages[1].threadId);
+    expect(messages[2].threadId).not.toBe(messages[0].threadId);
+    expect(messages.map((message) => message.raw.route.taskId)).toEqual([
+      "first-task",
+      "second-task",
+      "third-task",
+    ]);
+    expect(adapter.decodeThreadId(messages[0].threadId)).toEqual({
+      identityId: identity.id,
+      channel: "a2a",
+      contextId: "shared-context",
+    });
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "reply", raw: {} });
+    // The earlier task remains the destination after a second task arrived.
+    await adapter.send(messages[0].threadId, "First task result", {
+      a2aTaskId: messages[0].raw.route.taskId,
+      a2aIntent: "complete",
+    });
+    expect(send).toHaveBeenCalledWith(
+      {
+        identityId: identity.id,
+        channel: "a2a",
+        contextId: "shared-context",
+        taskId: "first-task",
+      },
+      expect.objectContaining({
+        text: "First task result",
+        a2aIntent: "complete",
+      }),
+    );
+    await expect(
+      adapter.postMessage(messages[0].threadId, "Unbound reply"),
+    ).rejects.toThrow("originating a2aTaskId");
+    expect(send).toHaveBeenCalledTimes(1);
+    await bot.shutdown();
+  });
+
+  it("uses the configured intent for task-bound sends while preserving explicit overrides", async () => {
     const { adapter, bot } = await setup({ defaultA2AIntent: "complete" });
     const route: InkboxRoute = {
       identityId: identity.id,
       channel: "a2a",
+      contextId: "context-intent",
       taskId: "task-intent",
     };
     const send = vi
       .spyOn(adapter.transport, "send")
       .mockResolvedValue({ id: "reply-id", raw: {} });
     const threadId = adapter.encodeThreadId(route);
-    await adapter.postMessage(threadId, "Finished");
+    await adapter.send(threadId, "Finished", { a2aTaskId: "task-intent" });
     expect(send).toHaveBeenNthCalledWith(
       1,
       route,
       expect.objectContaining({ text: "Finished", a2aIntent: "complete" }),
     );
-    await adapter.send(threadId, "Question", { a2aIntent: "ask_caller" });
+    await adapter.send(threadId, "Question", {
+      a2aTaskId: "task-intent",
+      a2aIntent: "ask_caller",
+    });
     expect(send).toHaveBeenNthCalledWith(
       2,
       route,
@@ -1061,6 +1123,7 @@ describe("application admission policy", () => {
     expect(handler).not.toHaveBeenCalled();
     const a2a = event("a2a.task.created", {
       task_id: "task-policy",
+      context_id: "context-policy",
       message_id: "message-policy",
       caller: { identity_id: "remote-agent" },
       parts: [{ text: "Please help" }],

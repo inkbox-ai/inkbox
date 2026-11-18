@@ -41,7 +41,7 @@ import {
 
 export interface InkboxAdapterOptions extends TransportOptions {
   signingSecret: Credential;
-  /** Intent used by ordinary A2A posts. Choose complete for final-response-only agents. */
+  /** Default intent for explicitly task-bound A2A replies. */
   defaultA2AIntent?: TransportSend["a2aIntent"];
   /** Optional application admission hook. Sender access does not imply command authority. */
   onMessage?: (message: InkboxMessage) => boolean | Promise<boolean>;
@@ -104,7 +104,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
         };
         break;
       case "a2a":
-        stable = { ...base, taskId: route.taskId };
+        stable = { ...base, contextId: route.contextId };
         break;
       case "voice":
         stable = { ...base, callId: route.callId };
@@ -156,7 +156,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
           threadTs: opt("threadTs"),
         };
       case "a2a":
-        return { identityId, channel: "a2a", taskId: str("taskId") };
+        return { identityId, channel: "a2a", contextId: str("contextId") };
       case "voice":
         return { identityId, channel: "voice", callId: str("callId") };
       default:
@@ -356,7 +356,10 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
   ): InkboxMessage {
     return {
       ...message,
-      route,
+      route:
+        route.channel === "a2a"
+          ? { ...route, taskId: message.a2aTaskId }
+          : route,
       attachments: message.attachments?.map((a) => this.attachment(route, a)),
     };
   }
@@ -427,9 +430,17 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     message: AdapterPostableMessage,
     options: Pick<TransportSend, "idempotencyKey" | "a2aIntent"> & {
       replyToMessageId?: string;
+      a2aTaskId?: string;
     } = {},
   ) {
     let route = this.decodeThreadId(threadId);
+    if (route.channel === "a2a") {
+      if (!options.a2aTaskId)
+        throw new Error(
+          "A2A replies require the originating a2aTaskId; a context does not identify a reply task",
+        );
+      route = { ...route, taskId: options.a2aTaskId };
+    }
     if (route.channel === "email" && options.replyToMessageId)
       route = {
         ...route,

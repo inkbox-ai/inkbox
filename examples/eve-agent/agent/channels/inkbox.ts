@@ -2,7 +2,7 @@ import { createInkboxAdapter } from "@inkbox/chat-sdk-adapter";
 import { createRedisState } from "@chat-adapter/state-redis";
 import type { Message, Thread } from "chat";
 import { chatSdkChannel, messageContentOf } from "eve/channels/chat-sdk";
-import { inkboxChannelEvents, INKBOX_EVE_A2A_INTENT } from "../lib/inkbox-events.js";
+import { a2aInputAuth, inkboxChannelEvents, INKBOX_EVE_A2A_INTENT } from "../lib/inkbox-events.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -36,8 +36,11 @@ async function handleMessage(thread: Thread, message: Message) {
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
+  const route = (message.raw as { route?: { channel?: string; taskId?: string } }).route;
+  if (route?.channel === "a2a" && !route.taskId) throw new Error("An A2A input requires a task ID.");
   await send(messageContentOf(message), {
     thread,
+    ...(route?.channel === "a2a" ? { auth: a2aInputAuth(thread.id, route.taskId!), turnPolicy: "queue" as const } : {}),
     idempotencyKey: `${thread.id}:${message.id}`,
   });
 }

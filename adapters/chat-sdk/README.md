@@ -2,8 +2,8 @@
 
 `@inkbox/chat-sdk-adapter` connects Inkbox conversations to the TypeScript
 [Chat SDK](https://chat-sdk.dev/docs). It is a chat transport adapter: incoming
-webhooks become Chat SDK messages, and `thread.post()` sends a reply through the
-originating Inkbox channel. It does not require an MCP plugin.
+webhooks become Chat SDK messages, and replies use the originating Inkbox
+channel. A2A replies bind to the incoming task explicitly through `inkbox.send()`. It does not require an MCP plugin.
 
 Use it directly with Chat SDK or with Eve's `chatSdkChannel` bridge.
 
@@ -23,7 +23,7 @@ unless they use its other APIs.
 ```ts
 import { Chat } from "chat";
 import { createRedisState } from "@chat-adapter/state-redis";
-import { createInkboxAdapter } from "@inkbox/chat-sdk-adapter";
+import { createInkboxAdapter, type InkboxMessage } from "@inkbox/chat-sdk-adapter";
 
 const inkbox = createInkboxAdapter({
   apiKey: process.env.INKBOX_API_KEY!,
@@ -44,26 +44,28 @@ const bot = new Chat({
 
 bot.onNewMention(async (thread, message) => {
   await thread.subscribe();
-  if (inkbox.decodeThreadId(thread.id).channel === "voice") {
+  const route = (message.raw as InkboxMessage).route;
+  if (route.channel === "voice") {
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
   await inkbox.send(thread.id, "Hello from Inkbox.", {
     idempotencyKey: `reply:${message.id}`,
-    ...(inkbox.decodeThreadId(thread.id).channel === "email"
-      ? { replyToMessageId: message.id } : {}),
+    ...(route.channel === "email" ? { replyToMessageId: message.id } : {}),
+    ...(route.channel === "a2a" ? { a2aTaskId: route.taskId } : {}),
   });
 });
 
 bot.onSubscribedMessage(async (thread, message) => {
-  if (inkbox.decodeThreadId(thread.id).channel === "voice") {
+  const route = (message.raw as InkboxMessage).route;
+  if (route.channel === "voice") {
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
   await inkbox.send(thread.id, "Thanks for your message.", {
     idempotencyKey: `reply:${message.id}`,
-    ...(inkbox.decodeThreadId(thread.id).channel === "email"
-      ? { replyToMessageId: message.id } : {}),
+    ...(route.channel === "email" ? { replyToMessageId: message.id } : {}),
+    ...(route.channel === "a2a" ? { a2aTaskId: route.taskId } : {}),
   });
 });
 
@@ -94,7 +96,7 @@ needed. Admission is not permission to perform privileged actions.
 | SMS/MMS | Conversation, sender, text, media | Text and media in the same conversation |
 | iMessage | Conversation, sender, text, media, reply thread | Text and media; supported reactions and typing |
 | Slack | Workspace conversation, thread, and authenticated file attachments | Text or one file per post; message editing/deletion and reactions |
-| A2A | Incoming task and message parts | A task reply; progress is the default intent |
+| A2A | Context conversation, incoming task, and message parts | Explicit task-bound reply; progress is the default intent |
 | Voice | Completed-call transcript | No chat reply to a completed call; explicit SDK call operations |
 
 WhatsApp is not included. Tunnels, vaults, and other non-conversation SDK resources
@@ -121,15 +123,39 @@ included examples preserve the transcript in Chat state without contacting anyon
 
 ### A2A
 
-An A2A thread is an incoming task, not a phone-number conversation. An ordinary
-chat reply records progress without closing the task. To ask the caller a question,
-complete the task, or report failure, use `inkbox.send(thread.id, text,
-{ a2aIntent: "ask_caller" | "complete" | "fail" })` with the appropriate intent. Do not assume ordinary message-send
-idempotency applies to A2A task operations. Set `defaultA2AIntent: "complete"`
-only when every posted A2A reply is a final answer. Applications that emit
-intermediate posts should retain the `"progress"` default and complete explicitly.
-The Eve example instead uses public channel event handlers: completed turns
-complete tasks, failures fail them, and interaction prompts ask the caller.
+An A2A thread is scoped to `contextId`: multiple tasks in the same context share
+one conversation and its history. Each incoming message also retains its own
+`taskId` in `message.raw.route`. The decoded thread identifies the context, not
+which task should receive a reply.
+
+Always pass the originating message's task ID when sending a reply:
+
+```ts
+const route = (message.raw as InkboxMessage).route;
+if (route.channel === "a2a") {
+  await inkbox.send(thread.id, "The result is ready.", {
+    a2aTaskId: route.taskId,
+    a2aIntent: "complete",
+  });
+}
+```
+
+The adapter checks that the task belongs to this context and receiving identity
+before replying. It never chooses the newest task. `thread.post()` has no task
+binding and fails for A2A; use `inkbox.send()` with `a2aTaskId` instead. Preserve
+that task ID with any queued work so overlapping tasks cannot redirect each
+other's replies.
+
+The default intent is `"progress"`, which leaves the task open. Use
+`a2aIntent: "ask_caller"`, `"complete"`, or `"fail"` for the corresponding task
+transition. Completing one task does not close the context conversation or
+complete other tasks. Do not assume ordinary message-send idempotency applies
+to A2A task operations. Set `defaultA2AIntent: "complete"` only when every
+explicitly bound reply is a final answer. Applications emitting intermediate
+replies should keep `"progress"` and complete explicitly.
+
+The Eve example binds task IDs to individual turns: completed turns complete
+their task, failures fail it, and interaction prompts ask its caller.
 
 ## Configuration
 
@@ -139,7 +165,7 @@ complete tasks, failures fail them, and interaction prompts ask the caller.
 | `agentHandle` | Existing identity receiving and sending messages |
 | `signingSecret` | Existing webhook signing secret, or sync/async resolver returning it |
 | `onMessage` | Optional sync/async admission hook; return `false` to ignore an input |
-| `defaultA2AIntent` | Intent for ordinary A2A posts; defaults to `"progress"` |
+| `defaultA2AIntent` | Default intent for explicitly task-bound A2A replies; defaults to `"progress"` |
 
 Use an identity-scoped API key matching `agentHandle`; organization-wide keys are
 not accepted by the adapter. Credential resolvers are evaluated again for outbound

@@ -14,6 +14,7 @@ describe("channel message content", () => {
     const message = normalizeEvent(
       event("a2a.task.created", {
         task_id: "task-test",
+        context_id: "context-test",
         message_id: "message-test",
         caller: { identity_id: "caller-test" },
         parts: [{ text: "Please prioritize" }, { data: { priority: 1 } }],
@@ -23,6 +24,57 @@ describe("channel message content", () => {
     expect(message?.text).toBe('Please prioritize\n{"priority":1}');
     expect(message?.authorId).toBe("caller-test");
   });
+
+  it.each(["a2a.task.created", "a2a.task.message"])(
+    "retains context and task routing for %s",
+    (type) => {
+      const first = normalizeEvent(
+        event(type, {
+          context_id: "context-test",
+          task_id: "task-one",
+          message_id: "message-one",
+          caller: { identity_id: "caller-test" },
+          parts: [{ text: "Hello" }],
+        }),
+        identity,
+      )!;
+      const second = normalizeEvent(
+        event(type, {
+          context_id: "context-test",
+          task_id: "task-two",
+          message_id: "message-two",
+          caller: { identity_id: "caller-test" },
+          parts: [{ text: "Next" }],
+        }),
+        identity,
+      )!;
+      expect(first.route).toEqual({
+        channel: "a2a",
+        identityId: identity.id,
+        contextId: "context-test",
+        taskId: "task-one",
+      });
+      expect(second.route).toEqual({ ...first.route, taskId: "task-two" });
+      expect(first.id).toBe("message-one");
+      expect(second.id).toBe("message-two");
+    },
+  );
+
+  it.each(["context_id", "task_id"])(
+    "rejects an A2A event without %s",
+    (field) => {
+      const data: Record<string, unknown> = {
+        context_id: "context-test",
+        task_id: "task-test",
+        caller: { identity_id: "caller-test" },
+        parts: [{ text: "Hello" }],
+      };
+      delete data[field];
+      expect(() =>
+        normalizeEvent(event("a2a.task.created", data), identity),
+      ).toThrow();
+    },
+  );
 
   it("preserves authenticated Slack file references without download credentials", () => {
     const message = normalizeEvent(

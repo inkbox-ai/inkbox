@@ -39,14 +39,21 @@ receiving and replying to messages.
   success. Failed turns/sessions send `a2aIntent: "fail"`; cancelled turns leave
   the task open. A successful turn with no text result fails explicitly instead
   of reporting an empty success.
-- The default intent is `"ask_caller"` for the bridge's interaction prompts.
-  The standard prompt handlers remain enabled; they do not complete the task.
-  Ordinary channels still receive final text and concise failure notices.
+- Interaction prompts use `"ask_caller"` and plain-text numbered choices;
+  typed answers resume the pending interaction. Sign-in prompts preserve their
+  public sign-in link. Ordinary channels receive the same text prompt format,
+  final replies, and concise failure notices.
 - Handlers accept new mentions and subscribed conversations, not every
   unmentioned Slack channel post. Slack DMs/group DMs and service-authorized
   phone-message groups are accepted input; configure `onMessage` for a stricter
   application policy.
-- `concurrency: "concurrent"` lets Eve manage a new input during an active turn.
+- `concurrency: "concurrent"` lets Eve manage new input during an active turn.
+  A2A uses one session per identity/context, with `turnPolicy: "queue"` and a
+  distinct webhook-authenticated input principal per task. A later task cannot
+  answer an earlier task's pending approval. Public delivery snapshots bind each
+  turn to its originating task; replies and failure notices use that saved
+  binding, never the newest inbound message. Completing one task leaves the
+  context available for subsequent tasks.
 - Thread IDs preserve the Inkbox identity, channel, and conversation. A stable
   message-based idempotency key is passed to Eve on every inbound send. This
   deduplicates Eve admission, not outbound Inkbox sends: a retried completion

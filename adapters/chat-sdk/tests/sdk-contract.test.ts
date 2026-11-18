@@ -159,6 +159,48 @@ function wireFixture(scope = `agent_identity:${identityId}`) {
           delivery_status: "queued",
         });
       }
+      const taskMatch = url.pathname.match(
+        /^\/api\/v1\/identities\/assistant\/a2a\/tasks\/(task-first|task-second|task-other|task-wrong-receiver)(\/reply)?$/,
+      );
+      if (taskMatch) {
+        const taskId = taskMatch[1];
+        const task = {
+          id: taskId,
+          context_id:
+            taskId === "task-other" ? "context-other" : "context-shared",
+          state: "working",
+          caller: {
+            identity_id: "caller-contract",
+            organization_id: "caller-org",
+          },
+          target: {
+            identity_id:
+              taskId === "task-wrong-receiver"
+                ? "another-identity"
+                : identityId,
+            organization_id: "organization-contract",
+          },
+          messages: [],
+          created_at: timestamp,
+          updated_at: timestamp,
+        };
+        if (request.method === "GET" && !taskMatch[2])
+          return Response.json(task);
+        if (request.method === "POST" && taskMatch[2]) {
+          return Response.json({
+            ...task,
+            messages: [
+              {
+                id: `row-${taskId}`,
+                message_id: `protocol-${taskId}`,
+                role: "agent",
+                parts: body.parts,
+                created_at: timestamp,
+              },
+            ],
+          });
+        }
+      }
       throw new Error(
         `Unexpected HTTP request: ${request.method} ${url.pathname}`,
       );
@@ -290,4 +332,89 @@ describe("real SDK HTTP contracts", () => {
       await bot.shutdown();
     }
   });
+
+  it("keeps A2A context threads shared while replying through each explicitly bound task", async () => {
+    const { adapter, bot, requests } = wireFixture();
+    const route = {
+      identityId,
+      channel: "a2a" as const,
+      contextId: "context-shared",
+    };
+    const firstThread = adapter.encodeThreadId({
+      ...route,
+      taskId: "task-first",
+    });
+    const secondThread = adapter.encodeThreadId({
+      ...route,
+      taskId: "task-second",
+    });
+    expect(firstThread).toBe(secondThread);
+    await bot.initialize();
+    try {
+      const first = await adapter.send(firstThread, "First answer", {
+        a2aTaskId: "task-first",
+        a2aIntent: "complete",
+      });
+      const second = await adapter.send(secondThread, "Second answer", {
+        a2aTaskId: "task-second",
+        a2aIntent: "ask_caller",
+      });
+      const taskRequests = requests.filter((request) =>
+        request.path.includes("/a2a/"),
+      );
+      expect(
+        taskRequests.map((request) => [request.method, request.path]),
+      ).toEqual([
+        ["GET", "/api/v1/identities/assistant/a2a/tasks/task-first"],
+        ["POST", "/api/v1/identities/assistant/a2a/tasks/task-first/reply"],
+        ["GET", "/api/v1/identities/assistant/a2a/tasks/task-second"],
+        ["POST", "/api/v1/identities/assistant/a2a/tasks/task-second/reply"],
+      ]);
+      expect(
+        taskRequests
+          .filter((request) => request.method === "POST")
+          .map((request) => request.body),
+      ).toEqual([
+        { intent: "complete", parts: [{ text: "First answer" }] },
+        { intent: "ask_caller", parts: [{ text: "Second answer" }] },
+      ]);
+      expect(first.raw.id).toBe("protocol-task-first");
+      expect(second.raw.id).toBe("protocol-task-second");
+    } finally {
+      await bot.shutdown();
+    }
+  });
+
+  it.each(["task-other", "task-wrong-receiver"])(
+    "refuses A2A task %s before POST when its context or receiver differs",
+    async (taskId) => {
+      const { adapter, bot, requests } = wireFixture();
+      const threadId = adapter.encodeThreadId({
+        identityId,
+        channel: "a2a",
+        contextId: "context-shared",
+      });
+      await bot.initialize();
+      try {
+        await expect(
+          adapter.send(threadId, "Must not send", { a2aTaskId: taskId }),
+        ).rejects.toThrow(
+          "A2A task does not belong to this context and receiver",
+        );
+        expect(
+          requests.some(
+            (request) =>
+              request.method === "GET" &&
+              request.path ===
+                `/api/v1/identities/assistant/a2a/tasks/${taskId}`,
+          ),
+        ).toBe(true);
+        expect(
+          requests.filter((request) => request.method === "POST"),
+        ).toHaveLength(0);
+      } finally {
+        await bot.shutdown();
+      }
+    },
+  );
 });

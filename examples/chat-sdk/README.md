@@ -20,7 +20,7 @@ transcripts are saved to thread state without attempting to text a finished call
    acknowledgement back in that conversation.
 
 The example does not include an HTTP server or model integration. Replace the
-fixed reply in `receive` with your agent logic. Keep the call branch separate:
+fixed reply in `handleMessage` with your agent logic. Keep the call branch separate:
 `thread.post()` cannot speak into a completed call. An explicit follow-up call or
 message should use the SDK and your application's authorization flow.
 
@@ -80,8 +80,18 @@ are handled without requiring a text mention; use the adapter's `onMessage`
 hook if your application needs a narrower group policy.
 
 `concurrency: "queue"` preserves overlapping inputs while the current handler
-runs. A2A acknowledgements are progress replies in this demonstration, not final
-task results; complete actual work explicitly through `inkbox.send()`.
+runs. A2A conversations are keyed by `contextId`, so a new task in the same
+context keeps the same thread and history. Each reply uses `a2aTaskId` from the
+incoming `InkboxMessage`'s `message.raw.route`, not the decoded thread. This
+preserves the originating task even when multiple tasks share a context.
+
+A2A acknowledgements are progress replies in this demonstration, not final task
+results. Complete actual work through `inkbox.send(thread.id, result, {
+a2aTaskId: route.taskId, a2aIntent: "complete" })`, with `route` taken from that
+incoming message. Completing a task does not close its context conversation.
+`thread.post()` cannot identify the originating task and fails for A2A; retain
+the message's task binding for deferred replies instead of selecting the latest
+task. Email replies continue to pass `replyToMessageId: message.id`.
 
 ## Hosting and state
 

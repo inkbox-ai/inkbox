@@ -207,6 +207,7 @@ export function normalizeEvent(
     route = {
       ...base,
       channel: "a2a",
+      contextId: required(data.context_id, "context id"),
       taskId: required(data.task_id, "task id"),
     };
     id = optional(data.message_id) ?? required(event.id, "event id");
