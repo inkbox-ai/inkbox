@@ -987,9 +987,9 @@ describe("review regressions", () => {
       }),
     ).rejects.toThrow("does not belong");
   });
-  it("reports unsupported typing and group read receipts explicitly", async () => {
-    await expect(transport().typing(email)).rejects.toThrow("not supported");
-    await expect(transport().typing(slack)).rejects.toThrow("not supported");
+  it("keeps unsupported typing a no-op and rejects unsupported group read receipts", async () => {
+    await expect(transport().typing(email)).resolves.toBeUndefined();
+    await expect(transport().typing(slack)).resolves.toBeUndefined();
     await expect(
       transport().markRead({ ...imessage, isGroup: true }),
     ).rejects.toThrow("not supported");
