@@ -235,9 +235,9 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       return new Response("Invalid webhook payload", { status: 400 });
     }
     if (!normalized) return new Response("OK");
+    normalized = await this.hydrate(normalized);
     if (this.options.onMessage && !(await this.options.onMessage(normalized)))
       return new Response("OK");
-    normalized = await this.hydrate(normalized);
     const threadId = this.encodeThreadId(normalized.route);
     const task = this.chat.processMessage(
       this,

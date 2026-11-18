@@ -4,9 +4,11 @@ import {
   Inkbox,
   type AgentIdentity,
   type IMessage,
+  type IMessageConversationSummary,
   type MailAttachmentInput,
   type MessageDetail,
   type TextMessage,
+  type TextConversationSummary,
 } from "@inkbox/sdk";
 
 export type Credential = string | (() => string | Promise<string>);
@@ -170,14 +172,14 @@ export class InkboxTransport {
     const matches = new Set<string>();
     const limit = 100;
     for (let offset = 0; ; offset += limit) {
-      const options = {
+      const options: NonNullable<Parameters<AgentIdentity["listTextConversations"]>[0]> = {
         participants: [remote],
         includeGroups: false,
         isBlocked: false,
         limit,
         offset,
       };
-      const rows = sms
+      const rows: Array<TextConversationSummary | IMessageConversationSummary> = sms
         ? await identity.listTextConversations(options)
         : await identity.listIMessageConversations(options);
       for (const row of rows) {

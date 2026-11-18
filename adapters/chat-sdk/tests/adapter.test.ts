@@ -1107,6 +1107,46 @@ describe("durable phone attachment references", () => {
 });
 
 describe("application admission policy", () => {
+  it("applies admission once to the resolved post-call messaging destination", async () => {
+    const onMessage = vi.fn(
+      (message: { route: { channel: string } }) => message.route.channel !== "sms",
+    );
+    const { adapter, bot, handler } = await setup({ onMessage });
+    const destination: InkboxRoute = {
+      identityId: identity.id,
+      channel: "sms",
+      conversationId: "conversation-test",
+    };
+    vi.spyOn(adapter.transport, "callConversation").mockResolvedValue(destination);
+    const send = vi.spyOn(adapter.transport, "send");
+    try {
+      const response = await bot.webhooks.inkbox(signed(event("call.ended", {
+        call: {
+          id: "call-policy",
+          origin: "dedicated_number",
+          local_phone_number: "+12025550100",
+          remote_phone_number: "+12025550123",
+          direction: "inbound",
+          status: "completed",
+        },
+        transcript: {
+          entries: [{ party: "remote", text: "Please follow up." }],
+          abridged: false,
+        },
+      })));
+      expect(response.status).toBe(200);
+      expect(onMessage).toHaveBeenCalledTimes(1);
+      expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({
+        route: destination,
+        id: "call:call-policy",
+      }));
+      expect(handler).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      await bot.shutdown();
+    }
+  });
+
   it("acknowledges rejected Slack bot events without dispatching but preserves A2A inputs", async () => {
     const onMessage = vi.fn(
       (message: { route: { channel: string }; isBot?: boolean }) =>
