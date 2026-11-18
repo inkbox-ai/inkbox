@@ -318,10 +318,14 @@ describe("thread routing", () => {
   it("refuses file loss on unsupported channels", async () => {
     const { adapter, bot } = await setup();
     await expect(
-      adapter.postMessage(adapter.encodeThreadId(routes[4]), {
-        raw: "file",
-        files: [{ filename: "test.txt", data: Buffer.from("content") }],
-      }),
+      adapter.send(
+        adapter.encodeThreadId(routes[4]),
+        {
+          raw: "file",
+          files: [{ filename: "test.txt", data: Buffer.from("content") }],
+        },
+        { a2aTaskId: "task" },
+      ),
     ).rejects.toThrow("File posting");
     await bot.shutdown();
   });
