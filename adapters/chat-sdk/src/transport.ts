@@ -603,11 +603,7 @@ export class InkboxTransport {
   }
 
   async typing(route: InkboxRoute): Promise<void> {
-    if (route.channel !== "imessage" || route.isGroup)
-      throw new UnsupportedChannelOperationError(
-        "Typing indicators",
-        route.channel,
-      );
+    if (route.channel !== "imessage" || route.isGroup) return;
     const { identity } = await this.scope(route);
     try {
       await identity.sendIMessageTyping(route.conversationId);
@@ -617,10 +613,7 @@ export class InkboxTransport {
         "statusCode" in error &&
         (error.statusCode === 409 || error.statusCode === 422)
       )
-        throw new UnsupportedChannelOperationError(
-          "Typing indicators",
-          route.channel,
-        );
+        return;
       throw error;
     }
   }

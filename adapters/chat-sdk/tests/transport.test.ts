@@ -734,20 +734,18 @@ describe("channel capabilities", () => {
   it("does not send typing indicators to an iMessage group", async () => {
     await expect(
       transport().typing({ ...imessage, isGroup: true }),
-    ).rejects.toThrow("Typing indicators is not supported");
+    ).resolves.toBeUndefined();
     expect(mock.identity.sendIMessageTyping).not.toHaveBeenCalled();
     await transport().typing(imessage);
     expect(mock.identity.sendIMessageTyping).toHaveBeenCalledWith(
       "conversation-1",
     );
   });
-  it("reports unsupported typing without masking authentication failures", async () => {
+  it("treats unsupported typing as a no-op without masking authentication failures", async () => {
     mock.identity.sendIMessageTyping.mockRejectedValue(
       Object.assign(new Error("Unsupported"), { statusCode: 422 }),
     );
-    await expect(transport().typing(imessage)).rejects.toThrow(
-      "Typing indicators is not supported",
-    );
+    await expect(transport().typing(imessage)).resolves.toBeUndefined();
     mock.identity.sendIMessageTyping.mockRejectedValue(
       Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
     );

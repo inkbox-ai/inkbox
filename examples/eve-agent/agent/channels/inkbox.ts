@@ -2,6 +2,7 @@ import { createInkboxAdapter } from "@inkbox/chat-sdk-adapter";
 import { createRedisState } from "@chat-adapter/state-redis";
 import type { Message, Thread } from "chat";
 import { chatSdkChannel, messageContentOf } from "eve/channels/chat-sdk";
+import { inkboxChannelEvents, INKBOX_EVE_A2A_INTENT } from "../lib/inkbox-events.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -13,7 +14,8 @@ const inkbox = createInkboxAdapter({
   apiKey: () => required("INKBOX_API_KEY"),
   agentHandle: required("INKBOX_AGENT_HANDLE"),
   signingSecret: required("INKBOX_SIGNING_SECRET"),
-  defaultA2AIntent: "complete",
+  onMessage: (message) => !(message.route.channel === "slack" && message.isBot === true),
+  defaultA2AIntent: INKBOX_EVE_A2A_INTENT,
 });
 
 export const { bot, channel, send } = chatSdkChannel({
@@ -25,6 +27,7 @@ export const { bot, channel, send } = chatSdkChannel({
   }),
   concurrency: "concurrent",
   streaming: false,
+  events: inkboxChannelEvents(inkbox),
 });
 
 async function handleMessage(thread: Thread, message: Message) {

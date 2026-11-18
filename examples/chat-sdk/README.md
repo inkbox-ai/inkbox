@@ -115,3 +115,10 @@ webhook bodies, credentials, or message content.
 
 See the [adapter guide](../../adapters/chat-sdk/README.md) for capabilities and
 limitations and the [Eve example](../eve-agent/) for durable agent sessions.
+
+## Messages from other Slack apps
+
+The sample's `onMessage` hook ignores Slack bot-authored input so two automated
+responders do not keep replying to each other. The adapter supports those inputs;
+replace the sample check only with an explicit policy identifying which apps may
+trigger your agent. This Slack-only policy does not block A2A agent messages.

@@ -29,6 +29,7 @@ const inkbox = createInkboxAdapter({
   apiKey: process.env.INKBOX_API_KEY!,
   agentHandle: process.env.INKBOX_AGENT_HANDLE!,
   signingSecret: process.env.INKBOX_SIGNING_SECRET!,
+  onMessage: (message) => !(message.route.channel === "slack" && message.isBot === true),
 });
 
 const bot = new Chat({
@@ -78,6 +79,10 @@ mentions and subscribed conversations, not every unmentioned Slack channel post.
 Slack DMs and group DMs count as addressed input. Email, phone messages (including
 service-authorized groups), A2A, and call observations are treated as directed
 inputs; the adapter does not impose a text-mention syntax on those channels.
+The examples reject Slack bot-authored inputs to avoid automated reply loops.
+The adapter itself retains those inputs; remove or narrow that admission check
+only with an explicit policy for which other apps may trigger replies. The
+Slack-only check does not reject A2A agent identities.
 Use `onMessage` to apply your application's stricter group admission policy if
 needed. Admission is not permission to perform privileged actions.
 
@@ -96,7 +101,7 @@ WhatsApp is not included. Tunnels, vaults, and other non-conversation SDK resour
 are not chat channels; use the SDK directly when your application needs them.
 
 Email and phone messages cannot be edited or unsent through this adapter.
-Unsupported operations fail explicitly rather than claiming to have changed a
+Typing is a no-op where unsupported, following Chat SDK semantics. Other unsupported operations fail explicitly rather than claiming to have changed a
 remote message. `thread.post(stream)` buffers the stream and sends one completed
 message on non-editable channels; it does not post a placeholder or edit each
 token. Slack streams are also buffered into one final send.
@@ -121,9 +126,10 @@ chat reply records progress without closing the task. To ask the caller a questi
 complete the task, or report failure, use `inkbox.send(thread.id, text,
 { a2aIntent: "ask_caller" | "complete" | "fail" })` with the appropriate intent. Do not assume ordinary message-send
 idempotency applies to A2A task operations. Set `defaultA2AIntent: "complete"`
-when every posted A2A reply is a final answer, as in the Eve example. Applications
-that emit intermediate posts should retain the `"progress"` default and complete
-explicitly.
+only when every posted A2A reply is a final answer. Applications that emit
+intermediate posts should retain the `"progress"` default and complete explicitly.
+The Eve example instead uses public channel event handlers: completed turns
+complete tasks, failures fail them, and interaction prompts ask the caller.
 
 ## Configuration
 
@@ -198,8 +204,9 @@ await inkbox.send(thread.id, "The answer to your email.", {
 The anchor controls reply-all recipients. Save it with deferred work instead of
 assuming the newest email has the same audience. A send without an explicit
 anchor is refused when the thread's changing recipients make the choice ambiguous;
-this also applies to deferred Eve replies. Do not recover such a failure by
-silently choosing the latest message.
+this also applies to deferred work without a bound message. The Eve example
+passes its serialized thread's current message as the anchor when available.
+Do not recover an ambiguous send by silently choosing the latest message.
 
 ## Webhook setup
 

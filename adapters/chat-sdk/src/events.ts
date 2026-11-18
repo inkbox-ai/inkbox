@@ -43,17 +43,26 @@ export function required(value: unknown, name: string): string {
 function optional(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
 }
-function media(value: unknown, channel: "sms" | "imessage", messageId: string): Attachment[] {
+function media(
+  value: unknown,
+  channel: "sms" | "imessage",
+  messageId: string,
+): Attachment[] {
   if (!Array.isArray(value)) return [];
   return value.map((value, index) => {
     const item = object(value);
     const mimeType = optional(item.content_type);
     const kind = mimeType?.split("/")[0];
     return {
-      type: kind === "image" || kind === "video" || kind === "audio" ? kind : "file",
+      type:
+        kind === "image" || kind === "video" || kind === "audio"
+          ? kind
+          : "file",
       mimeType,
       size: typeof item.size === "number" ? item.size : undefined,
-      fetchMetadata: { reference: JSON.stringify({ channel, messageId, index }) },
+      fetchMetadata: {
+        reference: JSON.stringify({ channel, messageId, index }),
+      },
     };
   });
 }
@@ -122,7 +131,8 @@ export function normalizeEvent(
     if (record.direction !== "inbound") return null;
     id = required(record.id, "message id");
     const rootMessageId = optional(record.thread_root_message_id);
-    const isReply = Boolean(optional(record.reply_to_message_id)) ||
+    const isReply =
+      Boolean(optional(record.reply_to_message_id)) ||
       Boolean(rootMessageId && rootMessageId !== id);
     route = {
       ...base,
@@ -139,7 +149,9 @@ export function normalizeEvent(
     if (required(data.identity_id, "identity id") !== identity.id)
       throw new Error("Webhook identity mismatch");
     record = object(data.event);
-    isBot = Boolean(record.bot_id) || object(data.actor_profile ?? {}).is_bot === true;
+    isBot =
+      Boolean(record.bot_id) ||
+      object(data.actor_profile ?? {}).is_bot === true;
     id = required(data.message_ts, "message timestamp");
     const conversationId = required(data.conversation_id, "conversation id");
     const parentTs = optional(data.thread_ts);
@@ -149,10 +161,14 @@ export function normalizeEvent(
       channel: "slack",
       connectionId: required(data.connection_id, "connection id"),
       conversationId,
-      threadTs: isDirectMessage ? (parentTs !== id ? parentTs : undefined) : parentTs ?? id,
+      threadTs: isDirectMessage
+        ? parentTs !== id
+          ? parentTs
+          : undefined
+        : (parentTs ?? id),
     };
     text = optional(record.text) ?? "";
-    authorId = required(data.actor_id, "actor id");
+    authorId = optional(data.actor_id) ?? optional(record.bot_id) ?? "unknown";
     const files = Array.isArray(record.files) ? record.files.map(object) : [];
     attachments = files
       .filter((file) => typeof file.id === "string")
@@ -177,9 +193,15 @@ export function normalizeEvent(
         };
       });
     const kinds = Array.isArray(data.message_kinds) ? data.message_kinds : [];
-    isMention = kinds.length > 0
-      ? kinds.some(kind => kind === "mention" || kind === "dm" || kind === "group_dm")
-      : type === "slack.mention_received" || type === "slack.dm_received" || type === "slack.group_dm_received";
+    isMention =
+      kinds.length > 0
+        ? kinds.some(
+            (kind) =>
+              kind === "mention" || kind === "dm" || kind === "group_dm",
+          )
+        : type === "slack.mention_received" ||
+          type === "slack.dm_received" ||
+          type === "slack.group_dm_received";
   } else if (type.startsWith("a2a.")) {
     record = data;
     route = {

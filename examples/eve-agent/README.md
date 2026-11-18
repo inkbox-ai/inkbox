@@ -34,9 +34,14 @@ receiving and replying to messages.
 
 - `streaming: false` sends completed text replies, because email and phone-message
   transports cannot edit an already-sent reply for every streamed token.
-- `defaultA2AIntent: "complete"` makes each final A2A answer complete its task.
-  This sample sends no intermediate A2A progress posts. If you add them, retain
-  the adapter's `"progress"` default and complete the task explicitly.
+- The custom public channel event handlers in `agent/lib/inkbox-events.ts`
+  buffer A2A reply text and complete the task only after `turn.settled` reports
+  success. Failed turns/sessions send `a2aIntent: "fail"`; cancelled turns leave
+  the task open. A successful turn with no text result fails explicitly instead
+  of reporting an empty success.
+- The default intent is `"ask_caller"` for the bridge's interaction prompts.
+  The standard prompt handlers remain enabled; they do not complete the task.
+  Ordinary channels still receive final text and concise failure notices.
 - Handlers accept new mentions and subscribed conversations, not every
   unmentioned Slack channel post. Slack DMs/group DMs and service-authorized
   phone-message groups are accepted input; configure `onMessage` for a stricter
@@ -58,11 +63,11 @@ receiving and replying to messages.
   do **not** start a new replying agent turn in this example. Add a deliberate
   post-call workflow if you want follow-up actions. This is not a live voice
   streaming adapter, and `thread.post()` cannot answer a finished call.
-- Deferred email replies do not automatically carry the original inbound
-  message as a reply-all anchor. If the thread's recipients change, an ambiguous
-  send is refused rather than choosing another audience. For workflows that need
-  precise deferred replies, persist the triggering message ID and pass it as
-  `replyToMessageId` to `inkbox.send()` with the operation's stable key.
+- Deferred email replies and failure notices use the bound message from the
+  thread's public serialized snapshot as `replyToMessageId`, preserving that
+  message's reply-all audience. If no bound message is available and the thread's
+  recipients changed, the ambiguous send is refused rather than choosing another
+  audience. Preserve the triggering message ID with custom deferred workflows.
 - After reconciling external effects, a deliberate webhook recovery may use Chat
   SDK's `deduplicate: false`. Never make that the default: it bypasses suppression
   and does not make external sends exactly once.
@@ -72,3 +77,10 @@ receiving and replying to messages.
 
 The [adapter documentation](../../adapters/chat-sdk/README.md) describes transport
 capabilities. See [Eve channels](https://eve.dev/docs/channels) for host behavior.
+
+## Messages from other Slack apps
+
+The sample's `onMessage` hook ignores Slack bot-authored input so two automated
+responders do not keep replying to each other. The adapter supports those inputs;
+replace the sample check only with an explicit policy identifying which apps may
+trigger your agent. This Slack-only policy does not block A2A agent messages.

@@ -7,6 +7,7 @@ export const inkbox = createInkboxAdapter({
   apiKey: () => required("INKBOX_API_KEY"),
   agentHandle: required("INKBOX_AGENT_HANDLE"),
   signingSecret: required("INKBOX_SIGNING_SECRET"),
+  onMessage: (message) => !(message.route.channel === "slack" && message.isBot === true),
 });
 
 export const bot = new Chat({

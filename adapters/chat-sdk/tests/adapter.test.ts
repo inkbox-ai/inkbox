@@ -1039,3 +1039,124 @@ describe("durable phone attachment references", () => {
     },
   );
 });
+
+describe("application admission policy", () => {
+  it("acknowledges rejected Slack bot events without dispatching but preserves A2A inputs", async () => {
+    const onMessage = vi.fn(
+      (message: { route: { channel: string }; isBot?: boolean }) =>
+        !(message.route.channel === "slack" && message.isBot === true),
+    );
+    const { bot, handler } = await setup({ onMessage });
+    const slack = event("slack.mention_received", {
+      identity_id: identity.id,
+      connection_id: "connection-test",
+      conversation_id: "CBOTS",
+      message_ts: "123.456",
+      event: { bot_id: "BOTHER", text: "Update" },
+    });
+    expect((await bot.webhooks.inkbox(signed(slack))).status).toBe(200);
+    expect(onMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ authorId: "BOTHER", isBot: true }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+    const a2a = event("a2a.task.created", {
+      task_id: "task-policy",
+      message_id: "message-policy",
+      caller: { identity_id: "remote-agent" },
+      parts: [{ text: "Please help" }],
+    });
+    expect((await bot.webhooks.inkbox(signed(a2a))).status).toBe(200);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][1].author.isBot).toBe(true);
+    expect(handler.mock.calls[0][1].text).toBe("Please help");
+    await bot.shutdown();
+  });
+});
+
+describe("forwarding refreshable SMS attachments", () => {
+  it("resolves the original message reference to a fresh URL before sending", async () => {
+    const { adapter, bot } = await setup();
+    const normalized = normalizeEvent(
+      event("text.received", {
+        text_message: {
+          id: "original-mms",
+          direction: "inbound",
+          conversation_id: "original-conversation",
+          sender_phone_number: "+12025550123",
+          text: "Photo",
+          media: [
+            {
+              url: "https://example.com/expired-photo",
+              content_type: "image/png",
+            },
+          ],
+        },
+      }),
+      identity,
+    )!;
+    const message = adapter.parseMessage(normalized);
+    expect(message.attachments[0].url).toBeUndefined();
+    const refresh = vi
+      .spyOn(adapter.transport, "attachment")
+      .mockResolvedValue("https://example.com/fresh-photo");
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "forwarded-mms", raw: {} });
+    const target: InkboxRoute = {
+      identityId: identity.id,
+      channel: "sms",
+      conversationId: "destination-conversation",
+    };
+    await adapter.postMessage(adapter.encodeThreadId(target), {
+      raw: "Forwarded",
+      attachments: message.attachments,
+    });
+    expect(refresh).toHaveBeenCalledWith(normalized.route, {
+      channel: "sms",
+      messageId: "original-mms",
+      index: 0,
+    });
+    expect(send).toHaveBeenCalledWith(
+      target,
+      expect.objectContaining({
+        text: "Forwarded",
+        mediaUrls: ["https://example.com/fresh-photo"],
+      }),
+    );
+    await bot.shutdown();
+  });
+
+  it("rejects byte-only references instead of silently dropping SMS attachments", async () => {
+    const { adapter, bot } = await setup();
+    const route: InkboxRoute = {
+      identityId: identity.id,
+      channel: "sms",
+      conversationId: "byte-conversation",
+    };
+    const threadId = adapter.encodeThreadId(route);
+    vi.spyOn(adapter.transport, "attachment").mockResolvedValue(
+      Buffer.from("bytes"),
+    );
+    const send = vi.spyOn(adapter.transport, "send");
+    await expect(
+      adapter.postMessage(threadId, {
+        raw: "Forwarded",
+        attachments: [
+          {
+            type: "file",
+            fetchMetadata: {
+              route: threadId,
+              reference: JSON.stringify({
+                channel: "sms",
+                messageId: "byte-message",
+                index: 0,
+              }),
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow("SMS forwarding requires a downloadable media URL");
+    expect(send).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
+});

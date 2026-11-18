@@ -216,3 +216,4 @@ jobs:
           npm ci --ignore-scripts
           npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
+          npm test

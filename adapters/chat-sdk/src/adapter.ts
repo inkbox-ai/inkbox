@@ -536,9 +536,27 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       } else if (
         route.channel === "sms" &&
         !files.length &&
-        attachments.every((a) => a.url && !a.data)
+        attachments.every(
+          (a) => (a.url || a.fetchMetadata?.reference) && !a.data,
+        )
       ) {
-        input.mediaUrls = attachments.map((a) => a.url!);
+        input.mediaUrls = [];
+        for (const attachment of attachments) {
+          if (attachment.url) {
+            input.mediaUrls.push(attachment.url);
+            continue;
+          }
+          const metadata = attachment.fetchMetadata!;
+          const url = await this.transport.attachment(
+            this.decodeThreadId(metadata.route),
+            JSON.parse(metadata.reference),
+          );
+          if (typeof url !== "string")
+            throw new NotImplementedError(
+              "SMS forwarding requires a downloadable media URL",
+            );
+          input.mediaUrls.push(url);
+        }
       } else {
         throw new NotImplementedError(
           `File posting is not supported for ${route.channel}`,
