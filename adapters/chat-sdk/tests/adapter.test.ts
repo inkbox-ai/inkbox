@@ -1160,3 +1160,220 @@ describe("forwarding refreshable SMS attachments", () => {
     await bot.shutdown();
   });
 });
+
+describe("text-only card rendering", () => {
+  it("preserves explicit approval choices on posts and edits", async () => {
+    const { adapter, bot } = await setup();
+    const threadId = adapter.encodeThreadId({
+      identityId: identity.id,
+      channel: "slack",
+      connectionId: "connection",
+      conversationId: "C1",
+    });
+    const card = {
+      type: "card" as const,
+      children: [],
+      title: "Allow this action?",
+    };
+    const message = {
+      card,
+      fallbackText: "Allow this action?\n1. Approve\n2. Reject",
+    };
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "1.1", raw: {} });
+    const edit = vi
+      .spyOn(adapter.transport, "editMessage")
+      .mockResolvedValue({ id: "1.1", raw: {} });
+    const posted = await adapter.postMessage(threadId, message);
+    expect(send).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ text: message.fallbackText }),
+    );
+    await adapter.editMessage(threadId, posted.id, message);
+    expect(edit).toHaveBeenCalledWith(
+      expect.anything(),
+      "1.1",
+      message.fallbackText,
+    );
+    await bot.shutdown();
+  });
+});
+
+describe("persistent phone send preparation", () => {
+  const route: InkboxRoute = {
+    identityId: identity.id,
+    channel: "imessage",
+    conversationId: "media-conversation",
+  };
+  const fileMessage = () => ({
+    raw: "Photo",
+    files: [
+      {
+        filename: "photo.png",
+        mimeType: "image/png",
+        data: Buffer.from([1, 2, 3]),
+      },
+    ],
+  });
+
+  it("reuses uploaded media after an uncertain send and adapter restart", async () => {
+    const { adapter, bot } = await setup();
+    const threadId = adapter.encodeThreadId(route);
+    const upload = vi
+      .spyOn(adapter.transport, "uploadMedia")
+      .mockResolvedValue({
+        mediaUrl: "https://example.com/first-upload",
+      } as never);
+    const initialSend = vi
+      .spyOn(adapter.transport, "send")
+      .mockRejectedValue(new Error("response lost"));
+    await expect(
+      adapter.send(threadId, fileMessage(), { idempotencyKey: "media-op" }),
+    ).rejects.toThrow("response lost");
+    const restarted = createInkboxAdapter({
+      apiKey: "test-key",
+      agentHandle: "assistant",
+      signingSecret: secret,
+    });
+    await restarted.initialize(bot);
+    const state = bot.getState();
+    const get = state.get.bind(state);
+    vi.spyOn(state, "get").mockImplementation(async (key) => {
+      const record = await get(key);
+      return record === null || record === undefined
+        ? record
+        : JSON.parse(JSON.stringify(record));
+    });
+    const retryUpload = vi.spyOn(restarted.transport, "uploadMedia");
+    const retrySend = vi
+      .spyOn(restarted.transport, "send")
+      .mockResolvedValue({ id: "sent", raw: {} });
+    await restarted.send(threadId, fileMessage(), {
+      idempotencyKey: "media-op",
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(retryUpload).not.toHaveBeenCalled();
+    expect(retrySend.mock.calls[0]).toEqual(initialSend.mock.calls[0]);
+    await expect(
+      restarted.send(
+        threadId,
+        { ...fileMessage(), raw: "Changed" },
+        { idempotencyKey: "media-op" },
+      ),
+    ).rejects.toThrow("different message content");
+    await expect(
+      restarted.send(
+        threadId,
+        {
+          raw: "Photo",
+          files: [
+            {
+              filename: "photo.png",
+              mimeType: "image/png",
+              data: Buffer.from([9]),
+            },
+          ],
+        },
+        { idempotencyKey: "media-op" },
+      ),
+    ).rejects.toThrow("different message content");
+    await expect(
+      restarted.send(threadId, "Photo", { idempotencyKey: "media-op" }),
+    ).rejects.toThrow("different message content");
+    expect(retrySend).toHaveBeenCalledTimes(1);
+    await bot.shutdown();
+  });
+
+  it("does not refresh an SMS forwarding URL on application retry", async () => {
+    const { adapter, bot } = await setup();
+    const sms: InkboxRoute = {
+      identityId: identity.id,
+      channel: "sms",
+      conversationId: "sms-conversation",
+    };
+    const threadId = adapter.encodeThreadId(sms);
+    const message = {
+      raw: "Photo",
+      attachments: [
+        {
+          type: "image" as const,
+          fetchMetadata: {
+            route: threadId,
+            reference: JSON.stringify({
+              channel: "sms",
+              messageId: "original",
+              index: 0,
+            }),
+          },
+        },
+      ],
+    };
+    const refresh = vi
+      .spyOn(adapter.transport, "attachment")
+      .mockResolvedValueOnce("https://example.com/first-url")
+      .mockResolvedValue("https://example.com/changed-url");
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "sent", raw: {} });
+    await adapter.send(threadId, message, { idempotencyKey: "forward" });
+    await adapter.send(threadId, message, { idempotencyKey: "forward" });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]).toEqual(send.mock.calls[1]);
+    await bot.shutdown();
+  });
+
+  it("rejects concurrent preparation and allows the same-key retry after preparation", async () => {
+    const { adapter, bot } = await setup();
+    const threadId = adapter.encodeThreadId(route);
+    let finish!: (value: never) => void;
+    let started!: () => void;
+    const uploading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const upload = vi
+      .spyOn(adapter.transport, "uploadMedia")
+      .mockImplementation(async () => {
+        started();
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      });
+    const send = vi
+      .spyOn(adapter.transport, "send")
+      .mockResolvedValue({ id: "sent", raw: {} });
+    const first = adapter.send(threadId, fileMessage(), {
+      idempotencyKey: "concurrent",
+    });
+    await uploading;
+    await expect(
+      adapter.send(threadId, fileMessage(), { idempotencyKey: "concurrent" }),
+    ).rejects.toThrow("preparation is in progress");
+    finish({ mediaUrl: "https://example.com/upload" } as never);
+    await first;
+    await adapter.send(threadId, fileMessage(), {
+      idempotencyKey: "concurrent",
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]).toEqual(send.mock.calls[1]);
+    await bot.shutdown();
+  });
+
+  it("never sends when durable preparation cannot be saved", async () => {
+    const { adapter, bot } = await setup();
+    vi.spyOn(adapter.transport, "uploadMedia").mockResolvedValue({
+      mediaUrl: "https://example.com/upload",
+    } as never);
+    vi.spyOn(bot.getState(), "setIfNotExists").mockRejectedValue(
+      new Error("state unavailable"),
+    );
+    const send = vi.spyOn(adapter.transport, "send");
+    await expect(
+      adapter.send(adapter.encodeThreadId(route), fileMessage(), {
+        idempotencyKey: "state-failure",
+      }),
+    ).rejects.toThrow("state unavailable");
+    expect(send).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
+});

@@ -267,3 +267,23 @@ work, and failed deliveries are not universally retried automatically.
 CI builds and packs the local SDK and adapter, installs those tarballs into each
 example, and typechecks the consumer package layout. The examples do not place
 real calls or send live messages during automated checks.
+
+### Retrying phone messages with media
+
+For SMS/MMS and iMessage sends with an explicit `idempotencyKey`, the adapter
+persists the prepared message in Chat state before sending it. Retries reuse the
+same payload and media URLs, including after an adapter restart. Reusing a key
+with changed text or attachment input is rejected. Concurrent preparation asks
+the caller to retry with the same key instead of sending another payload.
+
+Use persistent Chat state in production and retain these operation records for
+as long as the application may retry. Records have no automatic expiry; they
+contain prepared URLs and input fingerprints, not uploaded file bytes. Memory
+state does not provide recovery across process restarts. A crash during upload
+before preparation is saved can leave an unused upload; no send occurs before
+preparation is saved. An expired preparation lock can also permit another upload,
+but all senders use the single immutable saved payload.
+
+An expired media URL is never refreshed under an existing operation key. Reconcile
+the original send before creating a new operation. This preserves the backend's
+idempotency protection; it is not an exactly-once delivery guarantee.

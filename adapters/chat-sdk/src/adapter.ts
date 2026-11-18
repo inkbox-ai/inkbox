@@ -464,105 +464,123 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             ? message.markdown
             : "ast" in message
               ? this.renderFormatted(message.ast)
-              : cardToFallbackText(extractCard(message)!);
+              : "fallbackText" in message &&
+                  typeof message.fallbackText === "string"
+                ? message.fallbackText
+                : cardToFallbackText(extractCard(message)!);
     const files =
       typeof message !== "string" && "files" in message
-        ? (message.files ?? [])
+        ? (message.files ?? []).map((file) => ({ ...file }))
         : [];
     const attachments =
       typeof message !== "string" && "attachments" in message
-        ? (message.attachments ?? [])
+        ? (message.attachments ?? []).map((attachment) => ({ ...attachment }))
         : [];
-    const input: TransportSend = {
-      text,
-      a2aIntent: options.a2aIntent ?? this.options.defaultA2AIntent,
-      idempotencyKey: options.idempotencyKey
-        ? createHash("sha256").update(options.idempotencyKey).digest("hex")
-        : randomUUID(),
-    };
-    if (files.length || attachments.length) {
-      if (route.channel === "email" || route.channel === "slack") {
-        input.attachments = [];
-        for (const file of files) {
-          const bytes =
-            file.data instanceof Blob
-              ? Buffer.from(await file.data.arrayBuffer())
-              : Buffer.from(file.data as ArrayBuffer);
-          input.attachments.push({
-            filename: file.filename,
-            contentBase64: bytes.toString("base64"),
-            contentType: file.mimeType ?? "application/octet-stream",
-          });
-        }
-        for (const attachment of attachments) {
-          const bytes = await attachmentBytes(attachment);
-          input.attachments.push({
-            filename: attachment.name ?? "attachment",
-            contentBase64: bytes.toString("base64"),
-            contentType: attachment.mimeType ?? "application/octet-stream",
-          });
-        }
-      } else if (route.channel === "imessage") {
-        if (files.length + attachments.length > 1)
-          throw new Error("iMessage supports one attachment per message");
-        input.mediaUrls = [];
-        for (const file of files) {
-          const content =
-            file.data instanceof Blob
-              ? file.data
-              : new Uint8Array(file.data as ArrayBuffer);
-          input.mediaUrls.push(
-            (
-              await this.transport.uploadMedia({
-                content,
-                filename: file.filename,
-                contentType: file.mimeType,
-              })
-            ).mediaUrl,
-          );
-        }
-        for (const attachment of attachments) {
-          input.mediaUrls.push(
-            attachment.url ??
+    const prepare = async (): Promise<TransportSend> => {
+      const input: TransportSend = {
+        text,
+        a2aIntent: options.a2aIntent ?? this.options.defaultA2AIntent,
+        idempotencyKey: options.idempotencyKey
+          ? createHash("sha256").update(options.idempotencyKey).digest("hex")
+          : randomUUID(),
+      };
+      if (files.length || attachments.length) {
+        if (route.channel === "email" || route.channel === "slack") {
+          input.attachments = [];
+          for (const file of files) {
+            const bytes =
+              file.data instanceof Blob
+                ? Buffer.from(await file.data.arrayBuffer())
+                : Buffer.from(file.data as ArrayBuffer);
+            input.attachments.push({
+              filename: file.filename,
+              contentBase64: bytes.toString("base64"),
+              contentType: file.mimeType ?? "application/octet-stream",
+            });
+          }
+          for (const attachment of attachments) {
+            const bytes = await attachmentBytes(attachment);
+            input.attachments.push({
+              filename: attachment.name ?? "attachment",
+              contentBase64: bytes.toString("base64"),
+              contentType: attachment.mimeType ?? "application/octet-stream",
+            });
+          }
+        } else if (route.channel === "imessage") {
+          if (files.length + attachments.length > 1)
+            throw new Error("iMessage supports one attachment per message");
+          input.mediaUrls = [];
+          for (const file of files) {
+            const content =
+              file.data instanceof Blob
+                ? file.data
+                : new Uint8Array(file.data as ArrayBuffer);
+            input.mediaUrls.push(
               (
                 await this.transport.uploadMedia({
-                  content: await attachmentBytes(attachment),
-                  filename: attachment.name ?? "attachment",
-                  contentType: attachment.mimeType,
+                  content,
+                  filename: file.filename,
+                  contentType: file.mimeType,
                 })
               ).mediaUrl,
-          );
-        }
-      } else if (
-        route.channel === "sms" &&
-        !files.length &&
-        attachments.every(
-          (a) => (a.url || a.fetchMetadata?.reference) && !a.data,
-        )
-      ) {
-        input.mediaUrls = [];
-        for (const attachment of attachments) {
-          if (attachment.url) {
-            input.mediaUrls.push(attachment.url);
-            continue;
-          }
-          const metadata = attachment.fetchMetadata!;
-          const url = await this.transport.attachment(
-            this.decodeThreadId(metadata.route),
-            JSON.parse(metadata.reference),
-          );
-          if (typeof url !== "string")
-            throw new NotImplementedError(
-              "SMS forwarding requires a downloadable media URL",
             );
-          input.mediaUrls.push(url);
+          }
+          for (const attachment of attachments) {
+            input.mediaUrls.push(
+              attachment.url ??
+                (
+                  await this.transport.uploadMedia({
+                    content: await attachmentBytes(attachment),
+                    filename: attachment.name ?? "attachment",
+                    contentType: attachment.mimeType,
+                  })
+                ).mediaUrl,
+            );
+          }
+        } else if (
+          route.channel === "sms" &&
+          !files.length &&
+          attachments.every(
+            (a) => (a.url || a.fetchMetadata?.reference) && !a.data,
+          )
+        ) {
+          input.mediaUrls = [];
+          for (const attachment of attachments) {
+            if (attachment.url) {
+              input.mediaUrls.push(attachment.url);
+              continue;
+            }
+            const metadata = attachment.fetchMetadata!;
+            const url = await this.transport.attachment(
+              this.decodeThreadId(metadata.route),
+              JSON.parse(metadata.reference),
+            );
+            if (typeof url !== "string")
+              throw new NotImplementedError(
+                "SMS forwarding requires a downloadable media URL",
+              );
+            input.mediaUrls.push(url);
+          }
+        } else {
+          throw new NotImplementedError(
+            `File posting is not supported for ${route.channel}`,
+          );
         }
-      } else {
-        throw new NotImplementedError(
-          `File posting is not supported for ${route.channel}`,
-        );
       }
-    }
+      return input;
+    };
+    const input =
+      options.idempotencyKey &&
+      (route.channel === "sms" || route.channel === "imessage")
+        ? await this.preparePhoneSend(
+            threadId,
+            options.idempotencyKey,
+            text,
+            files,
+            attachments,
+            prepare,
+          )
+        : await prepare();
     const result = await this.supported(() =>
       this.transport.send(route, input),
     );
@@ -580,6 +598,96 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       threadId,
       raw: sanitizeMessageRaw(raw),
     };
+  }
+
+  private async preparePhoneSend(
+    threadId: string,
+    operationKey: string,
+    text: string,
+    files: Array<{
+      data: Blob | ArrayBuffer | Buffer;
+      filename: string;
+      mimeType?: string;
+    }>,
+    attachments: Attachment[],
+    prepare: () => Promise<TransportSend>,
+  ): Promise<TransportSend> {
+    if (!this.chat)
+      throw new Error(
+        "Initialize Chat before sending with a persistent phone retry key",
+      );
+    const digest = (value: string | Uint8Array) =>
+      createHash("sha256").update(value).digest("hex");
+    const fileInputs = [];
+    for (const file of files) {
+      const bytes =
+        file.data instanceof Blob
+          ? Buffer.from(await file.data.arrayBuffer())
+          : Buffer.isBuffer(file.data)
+            ? Buffer.from(file.data)
+            : Buffer.from(file.data);
+      file.data = bytes;
+      fileInputs.push([file.filename, file.mimeType ?? null, digest(bytes)]);
+    }
+    const attachmentInputs = [];
+    for (const attachment of attachments) {
+      let source: unknown;
+      if (attachment.url) source = ["url", attachment.url];
+      else if (attachment.data) {
+        const bytes = await attachmentBytes(attachment);
+        attachment.data = bytes;
+        source = ["bytes", digest(bytes)];
+      } else if (attachment.fetchMetadata?.reference)
+        source = [
+          "reference",
+          attachment.fetchMetadata.route,
+          attachment.fetchMetadata.reference,
+        ];
+      else {
+        // Snapshot callback-only content once for both fingerprinting and upload.
+        const bytes = await attachmentBytes(attachment);
+        attachment.data = bytes;
+        source = ["bytes", digest(bytes)];
+      }
+      attachmentInputs.push([
+        attachment.name ?? null,
+        attachment.mimeType ?? null,
+        source,
+      ]);
+    }
+    const fingerprint = digest(
+      JSON.stringify([text, fileInputs, attachmentInputs]),
+    );
+    const key = `inkbox:phone-send:${digest(JSON.stringify([threadId, operationKey]))}`;
+    const state = this.chat.getState();
+    type Prepared = { fingerprint: string; input: TransportSend };
+    const validate = (record: Prepared) => {
+      if (record.fingerprint !== fingerprint)
+        throw new Error(
+          "Idempotency key already used with different message content",
+        );
+      return record.input;
+    };
+    const existing = await state.get<Prepared>(key);
+    if (existing) return validate(existing);
+    const lock = await state.acquireLock(key, 60_000);
+    if (!lock)
+      throw new Error(
+        "Message preparation is in progress; retry with the same idempotency key",
+      );
+    try {
+      const current = await state.get<Prepared>(key);
+      if (current) return validate(current);
+      const prepared = { fingerprint, input: await prepare() };
+      // An expired lease can admit another worker. Only the immutable winner is sent.
+      await state.setIfNotExists(key, prepared);
+      const winner = await state.get<Prepared>(key);
+      if (!winner)
+        throw new Error("Prepared message was not retained; no message sent");
+      return validate(winner);
+    } finally {
+      await state.releaseLock(lock);
+    }
   }
 
   async fetchMessages(threadId: string, options?: FetchOptions) {
@@ -700,7 +808,10 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             ? message.markdown
             : "ast" in message
               ? this.renderFormatted(message.ast)
-              : cardToFallbackText(extractCard(message)!);
+              : "fallbackText" in message &&
+                  typeof message.fallbackText === "string"
+                ? message.fallbackText
+                : cardToFallbackText(extractCard(message)!);
     const result = await this.supported(() =>
       this.transport.editMessage(
         route,
