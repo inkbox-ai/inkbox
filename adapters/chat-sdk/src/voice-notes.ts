@@ -131,7 +131,7 @@ export async function resolveVoiceNotes(
       const result = await Promise.race([
         lookup(message.route, message.id),
         new Promise<undefined>((resolve) => {
-          timer = setTimeout(resolve, 10_000);
+          timer = setTimeout(() => resolve(undefined), 10_000);
         }),
       ]);
       if (result?.id === message.id) notes = result.voiceNotes ?? [];
