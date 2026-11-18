@@ -16,7 +16,10 @@ function npm(args, cwd) {
     {
       cwd,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+      // npm may request browser or OTP authentication during publication.
+      stdio: args[0] === "publish" && !args.includes("--dry-run")
+        ? "inherit"
+        : ["ignore", "pipe", "pipe"],
     },
   );
   if (result.error) throw result.error;
@@ -39,7 +42,7 @@ export function publishChatAdapter({
     const result = run(args, cwd);
     if (result.status !== 0)
       throw new Error(
-        `npm ${args[0]} failed: ${result.stderr || result.stdout}`,
+        `npm ${args[0]} failed: ${result.stderr || result.stdout || `exit status ${result.status}`}`,
       );
     return result.stdout;
   };
@@ -116,7 +119,7 @@ export function publishChatAdapter({
       }
       if (error?.code !== "E404") {
         throw new Error(
-          `Cannot verify ${pkg.name}@${version}: ${result.stderr || result.stdout}`,
+          `Cannot verify ${pkg.name}@${version}: ${result.stderr || result.stdout || `exit status ${result.status}`}`,
         );
       }
     }
