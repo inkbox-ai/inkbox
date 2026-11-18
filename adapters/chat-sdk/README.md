@@ -271,14 +271,16 @@ real calls or send live messages during automated checks.
 ### Retrying phone messages with media
 
 For SMS/MMS and iMessage sends containing media with an explicit `idempotencyKey`,
-the adapter persists the prepared message in Chat state before sending it. Retries reuse the
-same payload and media URLs, including after an adapter restart. Reusing a key
-with changed text or attachment input is rejected. Concurrent preparation asks
+the adapter reserves the input fingerprint in Chat state before uploading, then
+saves the prepared message before sending it. Retries reuse the same payload and
+media URLs, including after an adapter restart. Reusing a key with changed text
+or attachment input is rejected even while the first upload is in progress. Concurrent preparation asks
 the caller to retry with the same key instead of sending another payload.
 
-Use persistent Chat state in production. Prepared records expire seven days after
-creation and contain message text, prepared media URLs, the send key, and input
-fingerprints, not uploaded file bytes. Text-only phone sends do not create these
+Use persistent Chat state in production. Each operation uses two records: an
+input-fingerprint reservation and a prepared payload containing message text,
+media URLs, the send key, and the fingerprint. Each record expires seven days
+after its creation. Neither record contains uploaded file bytes. Text-only phone sends do not create these
 records or require Chat initialization. Memory state does not provide recovery
 across process restarts. A crash during upload
 before preparation is saved can leave an unused upload; no send occurs before

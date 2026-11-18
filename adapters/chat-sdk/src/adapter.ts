@@ -672,6 +672,21 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     };
     const existing = await state.get<Prepared>(key);
     if (existing) return validate(existing);
+    const reservationKey = `${key}:fingerprint`;
+    await state.setIfNotExists(
+      reservationKey,
+      fingerprint,
+      7 * 24 * 60 * 60 * 1000,
+    );
+    const reserved = await state.get<string>(reservationKey);
+    if (!reserved)
+      throw new Error(
+        "Message input reservation was not retained; no upload started",
+      );
+    if (reserved !== fingerprint)
+      throw new Error(
+        "Idempotency key already used with different message content",
+      );
     const lock = await state.acquireLock(key, 60_000);
     if (!lock)
       throw new Error(

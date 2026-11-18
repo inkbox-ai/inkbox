@@ -1314,7 +1314,12 @@ describe("persistent phone send preparation", () => {
       restarted.send(threadId, "Photo", { idempotencyKey: "media-op" }),
     ).rejects.toThrow("409 idempotency_key_reused");
     expect(retrySend).toHaveBeenLastCalledWith(
-      { ...route, isGroup: false, threadId: undefined, replyToMessageId: undefined },
+      {
+        ...route,
+        isGroup: false,
+        threadId: undefined,
+        replyToMessageId: undefined,
+      },
       expect.objectContaining({
         text: "Photo",
         idempotencyKey: sendKey("media-op"),
@@ -1398,6 +1403,94 @@ describe("persistent phone send preparation", () => {
     await bot.shutdown();
   });
 
+  it.each([true, false])(
+    "fences input across an expired preparation lock (changed=%s)",
+    async (changed) => {
+      const { adapter, bot } = await setup();
+      const threadId = adapter.encodeThreadId(route);
+      let finish!: (value: never) => void;
+      let started!: () => void;
+      const uploading = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const upload = vi
+        .spyOn(adapter.transport, "uploadMedia")
+        .mockImplementationOnce(async () => {
+          started();
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        })
+        .mockResolvedValue({
+          mediaUrl: "https://example.com/second-upload",
+        } as never);
+      const send = vi
+        .spyOn(adapter.transport, "send")
+        .mockResolvedValue({ id: "sent", raw: {} });
+      const acquire = vi.spyOn(bot.getState(), "acquireLock");
+      const first = adapter.send(threadId, fileMessage(), {
+        idempotencyKey: "expired-lock",
+      });
+      await uploading;
+      await bot.getState().forceReleaseLock(acquire.mock.calls[0][0]);
+      const second = adapter.send(
+        threadId,
+        changed ? { ...fileMessage(), raw: "Changed" } : fileMessage(),
+        { idempotencyKey: "expired-lock" },
+      );
+      if (changed) {
+        await expect(second).rejects.toThrow("different message content");
+        expect(upload).toHaveBeenCalledTimes(1);
+        expect(send).not.toHaveBeenCalled();
+      } else {
+        await second;
+        expect(upload).toHaveBeenCalledTimes(2);
+      }
+      finish({ mediaUrl: "https://example.com/first-upload" } as never);
+      await first;
+      if (changed) {
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledWith(
+          expect.objectContaining(route),
+          expect.objectContaining({
+            mediaUrls: ["https://example.com/first-upload"],
+          }),
+        );
+      } else {
+        expect(send).toHaveBeenCalledTimes(2);
+        expect(send.mock.calls[0]).toEqual(send.mock.calls[1]);
+        expect(send.mock.calls[0][1].mediaUrls).toEqual([
+          "https://example.com/second-upload",
+        ]);
+      }
+      await bot.shutdown();
+    },
+  );
+
+  it("never sends when saving the prepared payload fails after upload", async () => {
+    const { adapter, bot } = await setup();
+    const upload = vi
+      .spyOn(adapter.transport, "uploadMedia")
+      .mockResolvedValue({ mediaUrl: "https://example.com/upload" } as never);
+    const state = bot.getState();
+    const save = state.setIfNotExists.bind(state);
+    vi.spyOn(state, "setIfNotExists").mockImplementation(
+      async (key, value, ttl) => {
+        if (key.endsWith(":fingerprint")) return save(key, value, ttl);
+        throw new Error("payload save unavailable");
+      },
+    );
+    const send = vi.spyOn(adapter.transport, "send");
+    await expect(
+      adapter.send(adapter.encodeThreadId(route), fileMessage(), {
+        idempotencyKey: "payload-state-failure",
+      }),
+    ).rejects.toThrow("payload save unavailable");
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
+
   it("never sends when durable preparation cannot be saved", async () => {
     const { adapter, bot } = await setup();
     vi.spyOn(adapter.transport, "uploadMedia").mockResolvedValue({
@@ -1440,7 +1533,12 @@ describe("keyed text-only phone sends", () => {
       });
       expect(send).toHaveBeenCalledWith(
         channel === "imessage"
-          ? { ...route, isGroup: false, threadId: undefined, replyToMessageId: undefined }
+          ? {
+              ...route,
+              isGroup: false,
+              threadId: undefined,
+              replyToMessageId: undefined,
+            }
           : route,
         expect.objectContaining({
           text: "Hello",
