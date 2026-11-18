@@ -56,14 +56,15 @@ export function publishChatPackages({
   const packed = [];
   for (const pkg of adapterOnly ? packages.slice(1) : packages) {
     const cwd = join(root, pkg.directory);
-    checked(["ci", "--ignore-scripts"], cwd);
     if (adapterOnly) {
-      // Replace the development link with the exact published dependency.
+      // Bypass the development lockfile's SDK link, including its prepare hook.
       rmSync(join(cwd, "node_modules", "@inkbox", "sdk"), { recursive: true, force: true });
       checked([
         "install", "--ignore-scripts", "--no-save", "--package-lock=false",
         `@inkbox/sdk@${version}`,
       ], cwd);
+    } else {
+      checked(["ci", "--ignore-scripts"], cwd);
     }
     rmSync(join(cwd, "dist"), { recursive: true, force: true });
     checked(["run", "build"], cwd);

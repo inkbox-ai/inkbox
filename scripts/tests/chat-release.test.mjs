@@ -238,14 +238,15 @@ test("adapter-only dry run builds against the exact published SDK without prepar
   const { calls, run } = runner(root);
   publish(root, run, false, true);
   assert.deepEqual(calls.map(({ args }) => args[0]), [
-    "view", "ci", "install", "run", "pack", "view", "publish",
+    "view", "install", "run", "pack", "view", "publish",
   ]);
   assert.deepEqual(calls[0].args, ["view", `@inkbox/sdk@${version}`, "version", "--json"]);
-  assert.deepEqual(calls[2].args, [
+  assert.deepEqual(calls[1].args, [
     "install", "--ignore-scripts", "--no-save", "--package-lock=false", `@inkbox/sdk@${version}`,
   ]);
   assert.ok(calls.filter(({ args }) => ["ci", "install", "run", "pack"].includes(args[0]))
     .every(({ cwd }) => cwd === join(root, "adapters/chat-sdk")));
+  assert.ok(!calls.some(({ args }) => args[0] === "ci"));
   const publishes = calls.filter(({ args }) => args[0] === "publish");
   assert.equal(publishes.length, 1);
   assert.equal(publishes[0].args[1], join(root, "adapter.tgz"));

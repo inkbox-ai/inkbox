@@ -224,16 +224,20 @@ jobs:
 
       - name: Verify standalone Chat SDK example
         working-directory: examples/chat-sdk
+        env:
+          ADAPTER_ONLY: ${{ inputs.adapter_only || false }}
         run: |
-          npm ci --ignore-scripts
+          if [ "$ADAPTER_ONLY" != "true" ]; then npm ci --ignore-scripts; fi
           npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
 
       - name: Verify Eve example
         if: matrix.node == 26
         working-directory: examples/eve-agent
+        env:
+          ADAPTER_ONLY: ${{ inputs.adapter_only || false }}
         run: |
-          npm ci --ignore-scripts
+          if [ "$ADAPTER_ONLY" != "true" ]; then npm ci --ignore-scripts; fi
           npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
           npm test
