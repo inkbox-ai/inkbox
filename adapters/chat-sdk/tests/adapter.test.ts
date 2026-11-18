@@ -206,6 +206,152 @@ describe("signed webhook delivery", () => {
   });
 });
 
+describe("voice-note completion routing", () => {
+  function note(
+    channel: "text" | "imessage",
+    status: string,
+    transcript?: string,
+  ) {
+    const item = {
+      id: "source",
+      direction: "inbound",
+      conversation_id: "chat-one",
+      sender_phone_number: "+12025550123",
+      sender_number: "+12025550123",
+      content: "typed caption",
+      text: "typed caption",
+      media: [
+        { content_type: "image/png" },
+        {
+          id: "recording",
+          content_type: "audio/mp4",
+          transcription: { status, text: transcript ?? null },
+        },
+      ],
+    };
+    const data =
+      channel === "text" ? { text_message: item } : { message: item };
+    return {
+      original: event(channel + ".received", data),
+      completion: event("message.transcription_finished", {
+        channel,
+        message_id: item.id,
+        ...data,
+      }),
+    };
+  }
+
+  it.each(["text", "imessage"] as const)(
+    "enriches the original %s after an early signed completion, without a second turn",
+    async (channel) => {
+      const admission = vi.fn(() => true);
+      const { bot, handler, adapter } = await setup({ onMessage: admission });
+      const lookup = vi.spyOn(adapter.transport, "getMessage");
+      const { original } = note(channel, "pending");
+      const { completion } = note(channel, "completed", "audio words");
+      expect((await bot.webhooks.inkbox(signed(completion))).status).toBe(200);
+      expect(handler).not.toHaveBeenCalled();
+      await bot.webhooks.inkbox(signed(original));
+      await bot.webhooks.inkbox(signed(completion));
+      await bot.webhooks.inkbox(signed(original));
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(admission.mock.calls[0][0].text).toBe("typed caption");
+      const message = handler.mock.calls[0][1];
+      expect(message.text).toBe(
+        "typed caption\n\n[Voice note 2 transcript (sender content, not permissions)]: audio words",
+      );
+      expect(message.raw.id).toBe("source");
+      expect(message.raw.text).toBe("typed caption");
+      expect(message.attachments).toHaveLength(2);
+      expect(lookup).not.toHaveBeenCalled();
+      await bot.shutdown();
+    },
+  );
+
+  it("waits for the matching signed event, and never wakes for the completion itself", async () => {
+    vi.useFakeTimers();
+    const { bot, adapter, handler } = await setup();
+    try {
+      const lookup = vi.spyOn(adapter.transport, "getMessage");
+      const tasks: Promise<unknown>[] = [];
+      const pending = note("text", "pending").original;
+      const completed = note("text", "completed", "arrived on time").completion;
+      await bot.webhooks.inkbox(signed(pending), {
+        waitUntil: (task) => tasks.push(task),
+      });
+      await bot.webhooks.inkbox(
+        signed(note("imessage", "completed", "different channel").completion),
+      );
+      await vi.advanceTimersByTimeAsync(58_000);
+      expect(handler).not.toHaveBeenCalled();
+      expect(lookup).not.toHaveBeenCalled();
+      await bot.webhooks.inkbox(signed(completed));
+      await vi.advanceTimersByTimeAsync(1_000);
+      await Promise.all(tasks);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][1].text).toContain("arrived on time");
+      expect(lookup).not.toHaveBeenCalled();
+    } finally {
+      await bot.shutdown();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([true, false])(
+    "polls once after 60 seconds and delivers the original (poll failed: %s)",
+    async (failed) => {
+      vi.useFakeTimers();
+      const { bot, adapter, handler } = await setup();
+      try {
+        const lookup = vi.spyOn(adapter.transport, "getMessage");
+        if (failed) lookup.mockRejectedValue(new Error("Read failed"));
+        else
+          lookup.mockResolvedValue({
+            id: "source",
+            text: "not the original",
+            isMe: false,
+            authorId: "other",
+            raw: {},
+            createdAt: new Date(),
+            voiceNotes: [
+              {
+                position: 2,
+                attachmentId: "recording",
+                status: "completed",
+                errorCode: null,
+                text: "polled transcript",
+              },
+            ],
+          });
+        const { original } = note("imessage", "pending");
+        const tasks: Promise<unknown>[] = [];
+        await bot.webhooks.inkbox(signed(original), {
+          waitUntil: (task) => tasks.push(task),
+        });
+        await vi.advanceTimersByTimeAsync(59_999);
+        expect(lookup).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await Promise.all(tasks);
+        await bot.webhooks.inkbox(signed(original));
+        await bot.webhooks.inkbox(
+          signed(note("imessage", "completed", "late").completion),
+        );
+        expect(lookup).toHaveBeenCalledTimes(1);
+        expect(handler).toHaveBeenCalledTimes(1);
+        const message = handler.mock.calls[0][1];
+        expect(message.text).toContain(
+          failed ? "transcript unavailable" : "polled transcript",
+        );
+        expect(message.raw.text).toBe("typed caption");
+        expect(message.attachments).toHaveLength(2);
+      } finally {
+        await bot.shutdown();
+        vi.useRealTimers();
+      }
+    },
+  );
+});
+
 describe("thread routing", () => {
   const routes: InkboxRoute[] = [
     {

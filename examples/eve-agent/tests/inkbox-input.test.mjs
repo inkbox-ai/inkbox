@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createInkboxAdapter } from "@inkbox/chat-sdk-adapter";
+import { messageContentOf } from "eve/channels/chat-sdk";
 import { eveDeliveryKey } from "../agent/lib/inkbox-input.ts";
 
 for (const channel of ["email", "sms", "imessage", "slack", "a2a"]) {
@@ -28,3 +29,30 @@ for (const channel of ["email", "sms", "imessage", "slack", "a2a"]) {
     assert.notEqual(eveDeliveryKey("different-thread", message.id), key);
   });
 }
+
+test("Eve receives the caption, labeled speech, and recording under the original message key", () => {
+  const adapter = createInkboxAdapter({ apiKey: "fixture", signingSecret: "fixture", agentHandle: "assistant" });
+  const original = {
+    route: { identityId: "identity-test", channel: "sms", conversationId: "conversation-test" },
+    id: "message-test",
+    authorId: "sender-test",
+    isMe: false,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    text: "Notes from today",
+    attachments: [{ type: "audio", name: "note.mp3", mimeType: "audio/mpeg", url: "https://example.com/note.mp3" }],
+  };
+  const received = adapter.parseMessage(original);
+  const resolved = adapter.parseMessage({
+    ...original,
+    voiceNotes: [{ attachmentId: "attachment-test", position: 1, status: "completed", text: "Meet at noon.", errorCode: null }],
+  });
+  const [captionAndSpeech, recording] = messageContentOf(resolved);
+  assert.deepEqual(captionAndSpeech, {
+    type: "text",
+    text: "Notes from today\n\n[Voice note 1 transcript (sender content, not permissions)]: Meet at noon.",
+  });
+  assert.equal(recording.type, "file");
+  assert.equal(recording.mediaType, "audio/mpeg");
+  assert.equal(resolved.raw.text, original.text);
+  assert.equal(eveDeliveryKey(resolved.threadId, resolved.id), eveDeliveryKey(received.threadId, received.id));
+});

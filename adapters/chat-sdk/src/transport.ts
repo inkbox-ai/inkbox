@@ -1,3 +1,4 @@
+import { readVoiceNotes, type VoiceNote } from "./voice-notes.js";
 import { randomUUID } from "node:crypto";
 import { convert } from "html-to-text";
 import {
@@ -61,6 +62,7 @@ export interface TransportMessage {
   isMe: boolean;
   createdAt: Date;
   attachments?: TransportAttachment[];
+  voiceNotes?: VoiceNote[];
   raw: unknown;
 }
 export interface TransportPage {
@@ -1027,6 +1029,7 @@ export function textMessage(row: TextMessage): TransportMessage {
         : (row.senderPhoneNumber ?? row.remotePhoneNumber ?? "unknown"),
     isMe: row.direction === "outbound",
     createdAt: row.createdAt,
+    voiceNotes: readVoiceNotes(row.media),
     attachments: (row.media ?? []).map((media, index) => ({
       mimeType: media.contentType,
       size: media.size,
@@ -1048,6 +1051,7 @@ export function imessageMessage(row: IMessage): TransportMessage {
         : (row.senderNumber ?? row.remoteNumber ?? "unknown"),
     isMe: row.direction === "outbound",
     createdAt: row.createdAt,
+    voiceNotes: readVoiceNotes(row.media),
     attachments: (row.media ?? []).map((media, index) => ({
       mimeType: media.contentType ?? undefined,
       size: media.size ?? undefined,

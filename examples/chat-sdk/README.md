@@ -74,7 +74,7 @@ before accepting deliveries. The secret is never printed.
 If a signing key already exists, supply its existing value as
 `INKBOX_SIGNING_SECRET`; setup does not rotate it. The empty reserved file is
 removed when no new secret is returned. An existing matching subscription is
-preserved. If its event list differs, setup stops and asks you to update that
+preserved. Setup adds `message.transcription_finished` to the previous default event set. For other custom event lists, setup asks you to update that
 subscription explicitly rather than silently changing other consumers.
 
 The setup command subscribes to message receipts, completed calls, and incoming

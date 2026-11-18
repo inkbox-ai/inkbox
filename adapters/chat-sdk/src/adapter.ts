@@ -24,6 +24,7 @@ import {
 } from "@chat-adapter/shared";
 import {
   normalizeEvent,
+  normalizeCompletion,
   object,
   required,
   type InkboxMessage,
@@ -38,6 +39,12 @@ import {
   type TransportOptions,
   type TransportSend,
 } from "./transport.js";
+
+import {
+  recordVoiceNoteCompletion,
+  resolveVoiceNotes,
+  withVoiceNoteLabels,
+} from "./voice-notes.js";
 
 export interface InkboxAdapterOptions extends TransportOptions {
   signingSecret: Credential;
@@ -229,21 +236,30 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       );
     this.identityId = identity.id;
     let normalized: InkboxMessage | null;
+    let completion: InkboxMessage | null = null;
     try {
-      normalized = normalizeEvent(JSON.parse(body.toString("utf8")), identity);
+      const event = object(JSON.parse(body.toString("utf8")));
+      normalized = normalizeEvent(event, identity);
+      if (event.event_type === "message.transcription_finished")
+        completion = normalizeCompletion(event, identity);
     } catch {
       return new Response("Invalid webhook payload", { status: 400 });
     }
+    if (completion)
+      await recordVoiceNoteCompletion(this.chat.getState(), completion);
     if (!normalized) return new Response("OK");
     normalized = await this.hydrate(normalized);
     if (this.options.onMessage && !(await this.options.onMessage(normalized)))
       return new Response("OK");
     const threadId = this.encodeThreadId(normalized.route);
-    const task = this.chat.processMessage(
-      this,
-      threadId,
-      this.parseMessage(normalized),
-      { ...options, waitUntil: undefined },
+    const chat = this.chat;
+    const task = resolveVoiceNotes(chat.getState(), normalized, (route, id) =>
+      this.transport.getMessage(route, id),
+    ).then((message) =>
+      chat.processMessage(this, threadId, this.parseMessage(message), {
+        ...options,
+        waitUntil: undefined,
+      }),
     );
     const tracked = task.catch(() => {
       this.chat!.getLogger("inkbox").error(
@@ -322,11 +338,12 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     const date = new Date(raw.createdAt);
     if (!Number.isFinite(date.getTime()))
       throw new Error("Invalid message date");
+    const text = withVoiceNoteLabels(raw);
     return new Message({
       id: this.messageId(raw.route, raw.id),
       threadId: this.encodeThreadId(raw.route),
-      text: raw.text,
-      formatted: parseMarkdown(raw.text),
+      text,
+      formatted: parseMarkdown(text),
       raw: sanitizeMessageRaw(raw),
       isMention: raw.isMention ?? false,
       author: {

@@ -83,6 +83,12 @@ receiving and replying to messages.
   deferred handlers must initialize Chat before using state-backed adapter sends.
 - Redis stores Chat SDK state; Eve owns durable agent execution and session
   history. Configure both according to your hosting requirements.
+- MMS and iMessage voice notes stay in their original conversation. Eve receives
+  the caption and recording, with any transcript labeled as the sender’s speech.
+  If transcription is pending, the adapter waits up to 60 seconds for
+  `message.transcription_finished`, then checks the original message once. If no
+  transcript is available, Eve still receives the original message. A late
+  completion does not start another turn.
 - Completed-call transcripts enter the caller’s existing SMS or iMessage
   conversation when the adapter resolves one unambiguous direct destination on
   the call’s originating channel. They trigger an Eve turn; any reply is a text

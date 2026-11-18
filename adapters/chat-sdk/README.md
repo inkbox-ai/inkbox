@@ -7,6 +7,14 @@ channel. A2A replies bind to the incoming task explicitly through `inkbox.send()
 
 Use it directly with Chat SDK or with Eve's `chatSdkChannel` bridge.
 
+For MMS and iMessage voice notes, the adapter waits up to 60 seconds for the signed
+`message.transcription_finished` webhook. If it does not arrive, the adapter
+reads the original message once. Eve and Chat receive a single original message
+with labeled voice-note text and its original attachments, or the attachments and
+an unavailable label if transcription failed. `message.raw.text` preserves the
+typed caption; `message.raw.voiceNotes` holds per-attachment results. Transcribed
+speech is sender content, not approval to perform privileged actions.
+
 ## Install
 
 ```bash
