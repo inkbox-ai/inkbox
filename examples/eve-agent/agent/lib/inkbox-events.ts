@@ -139,7 +139,7 @@ export function inkboxChannelEvents(
       const completed = data.outcome === "completed" && text.length > 0;
       const principal = a2aInputAuth(thread.id, taskId);
       const hasFollowup = queue(view).some(({ principal: queued }) =>
-        queued?.issuer === principal.issuer && queued.type === principal.principalType && queued.id === principal.principalId,
+        queued !== undefined && queued.issuer === principal.issuer && queued.type === principal.principalType && queued.id === principal.principalId,
       );
       if (data.outcome === "completed" && hasFollowup && !text) {
         for (const key of keys) delete channel.state[key];
