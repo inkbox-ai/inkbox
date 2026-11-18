@@ -14,6 +14,8 @@ import {
   type FetchOptions,
   type FormattedContent,
   type WebhookOptions,
+  type StreamChunk,
+  type StreamOptions,
 } from "chat";
 import {
   cardToFallbackText,
@@ -39,6 +41,8 @@ import {
 
 export interface InkboxAdapterOptions extends TransportOptions {
   signingSecret: Credential;
+  /** Intent used by ordinary A2A posts. Choose complete for final-response-only agents. */
+  defaultA2AIntent?: TransportSend["a2aIntent"];
   /** Optional application admission hook. Sender access does not imply command authority. */
   onMessage?: (message: InkboxMessage) => boolean | Promise<boolean>;
 }
@@ -63,7 +67,6 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
 
   async initialize(chat: ChatInstance): Promise<void> {
     this.chat = chat;
-    this.identityId = (await this.transport.identity()).id;
   }
   getConcurrencyScope(): string {
     return `inkbox:${this.options.agentHandle}`;
@@ -220,10 +223,11 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       return new Response("Invalid webhook signature", { status: 401 });
     }
     const identity = await this.transport.identity();
-    if (identity.id !== this.identityId)
+    if (this.identityId && identity.id !== this.identityId)
       throw new Error(
         "Configured Inkbox identity changed; initialize a new adapter",
       );
+    this.identityId = identity.id;
     let normalized: InkboxMessage | null;
     try {
       normalized = normalizeEvent(JSON.parse(body.toString("utf8")), identity);
@@ -233,19 +237,27 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     if (!normalized) return new Response("OK");
     if (this.options.onMessage && !(await this.options.onMessage(normalized)))
       return new Response("OK");
-    const task = this.dispatch(normalized, {
-      ...options,
-      waitUntil: undefined,
+    normalized = await this.hydrate(normalized);
+    const threadId = this.encodeThreadId(normalized.route);
+    const task = this.chat.processMessage(
+      this,
+      threadId,
+      this.parseMessage(normalized),
+      { ...options, waitUntil: undefined },
+    );
+    const tracked = task.catch(() => {
+      this.chat!.getLogger("inkbox").error(
+        "Incoming message processing failed",
+        { threadId },
+      );
     });
-    if (options?.waitUntil) options.waitUntil(task);
+    if (options?.waitUntil)
+      options.waitUntil(options.propagateHandlerErrors ? task : tracked);
     else await task;
     return new Response("OK");
   }
 
-  private async dispatch(
-    normalized: InkboxMessage,
-    options: WebhookOptions,
-  ): Promise<void> {
+  private async hydrate(normalized: InkboxMessage): Promise<InkboxMessage> {
     const route = normalized.route;
     // Complete mail bodies and authenticated attachment references come from the SDK.
     if (route.channel === "email") {
@@ -278,13 +290,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
         };
       }
     }
-    const threadId = this.encodeThreadId(route);
-    await this.chat!.processMessage(
-      this,
-      threadId,
-      this.parseMessage(normalized),
-      options,
-    );
+    return normalized;
   }
 
   parseMessage(raw: InkboxMessage): Message<InkboxMessage> {
@@ -296,14 +302,14 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       threadId: this.encodeThreadId(raw.route),
       text: raw.text,
       formatted: parseMarkdown(raw.text),
-      raw,
+      raw: sanitizeMessageRaw(raw),
       isMention: raw.isMention ?? false,
       author: {
         userId: raw.authorId,
         userName: raw.authorId,
         fullName: raw.authorName ?? raw.authorId,
         isMe: raw.isMe,
-        isBot: raw.route.channel === "a2a" ? true : "unknown",
+        isBot: raw.isBot ?? (raw.route.channel === "a2a" ? true : "unknown"),
       },
       metadata: { dateSent: date, edited: false },
       attachments: (raw.attachments ?? []).map((a) =>
@@ -399,13 +405,39 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     return this.send(threadId, message);
   }
 
+  /** Consume a stream completely before sending on transports without editable messages. */
+  async stream(
+    threadId: string,
+    chunks: AsyncIterable<string | StreamChunk>,
+    options?: StreamOptions,
+  ) {
+    let text = "";
+    for await (const chunk of chunks) {
+      options?.signal?.throwIfAborted();
+      if (typeof chunk === "string") text += chunk;
+      else if (chunk.type === "markdown_text") text += chunk.text;
+    }
+    options?.signal?.throwIfAborted();
+    return this.postMessage(threadId, { markdown: text });
+  }
+
   /** Supply a stable key when the application may retry an outbound operation. */
   async send(
     threadId: string,
     message: AdapterPostableMessage,
-    options: Pick<TransportSend, "idempotencyKey" | "a2aIntent"> = {},
+    options: Pick<TransportSend, "idempotencyKey" | "a2aIntent"> & {
+      replyToMessageId?: string;
+    } = {},
   ) {
     let route = this.decodeThreadId(threadId);
+    if (route.channel === "email" && options.replyToMessageId)
+      route = {
+        ...route,
+        anchorMessageId: this.nativeMessageId(
+          threadId,
+          options.replyToMessageId,
+        ),
+      };
     if (route.channel === "email" && options.idempotencyKey) {
       if (!this.chat)
         throw new Error(
@@ -443,8 +475,10 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
         : [];
     const input: TransportSend = {
       text,
-      ...options,
-      idempotencyKey: options.idempotencyKey ?? randomUUID(),
+      a2aIntent: options.a2aIntent ?? this.options.defaultA2AIntent,
+      idempotencyKey: options.idempotencyKey
+        ? createHash("sha256").update(options.idempotencyKey).digest("hex")
+        : randomUUID(),
     };
     if (files.length || attachments.length) {
       if (route.channel === "email" || route.channel === "slack") {
@@ -523,7 +557,11 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       createdAt: new Date(),
       raw: result.raw,
     };
-    return { id: this.messageId(route, result.id), threadId, raw };
+    return {
+      id: this.messageId(route, result.id),
+      threadId,
+      raw: sanitizeMessageRaw(raw),
+    };
   }
 
   async fetchMessages(threadId: string, options?: FetchOptions) {
@@ -661,7 +699,11 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       createdAt: new Date(),
       raw: result.raw,
     };
-    return { id: this.messageId(route, result.id), threadId, raw };
+    return {
+      id: this.messageId(route, result.id),
+      threadId,
+      raw: sanitizeMessageRaw(raw),
+    };
   }
   async deleteMessage(threadId: string, messageId: string): Promise<void> {
     await this.supported(() =>
@@ -680,6 +722,29 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       throw error;
     }
   }
+}
+
+function sanitizeMessageRaw(raw: InkboxMessage): InkboxMessage {
+  // Message.raw is serialized too; refreshable media URLs must not be retained there.
+  function clean(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(clean);
+    if (!value || typeof value !== "object" || value instanceof Date)
+      return value;
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(record)
+        .filter(
+          ([key, item]) =>
+            key !== "fetchData" &&
+            !(
+              key === "url" &&
+              (raw.route.channel === "sms" || raw.route.channel === "imessage")
+            ),
+        )
+        .map(([key, item]) => [key, clean(item)]),
+    );
+  }
+  return clean(raw) as InkboxMessage;
 }
 
 async function attachmentBytes(attachment: Attachment): Promise<Buffer> {

@@ -22,6 +22,7 @@ export interface InkboxMessage {
   authorId: string;
   authorName?: string;
   isMe: boolean;
+  isBot?: boolean;
   createdAt: Date | string;
   attachments?: Attachment[];
   event?: Record<string, unknown>;
@@ -42,24 +43,19 @@ export function required(value: unknown, name: string): string {
 function optional(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
 }
-function media(value: unknown): Attachment[] {
+function media(value: unknown, channel: "sms" | "imessage", messageId: string): Attachment[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map(object)
-    .filter((m) => typeof m.url === "string")
-    .map((m) => {
-      const mimeType = optional(m.content_type);
-      const kind = mimeType?.split("/")[0];
-      return {
-        type:
-          kind === "image" || kind === "video" || kind === "audio"
-            ? kind
-            : "file",
-        url: required(m.url, "media URL"),
-        mimeType,
-        size: typeof m.size === "number" ? m.size : undefined,
-      };
-    });
+  return value.map((value, index) => {
+    const item = object(value);
+    const mimeType = optional(item.content_type);
+    const kind = mimeType?.split("/")[0];
+    return {
+      type: kind === "image" || kind === "video" || kind === "audio" ? kind : "file",
+      mimeType,
+      size: typeof item.size === "number" ? item.size : undefined,
+      fetchMetadata: { reference: JSON.stringify({ channel, messageId, index }) },
+    };
+  });
 }
 
 /** Normalize only conversation inputs; delivery receipts never become new turns. */
@@ -83,6 +79,7 @@ export function normalizeEvent(
   let id: string;
   let attachments: Attachment[] = [];
   let isMention = true;
+  let isBot: boolean | undefined;
   if (type === "message.received") {
     record = object(data.message);
     if (record.direction !== "inbound") return null;
@@ -119,35 +116,40 @@ export function normalizeEvent(
       record.sender_phone_number ?? record.remote_phone_number,
       "sender",
     );
-    attachments = media(record.media);
+    attachments = media(record.media, "sms", id);
   } else if (type === "imessage.received") {
     record = object(data.message);
     if (record.direction !== "inbound") return null;
     id = required(record.id, "message id");
+    const rootMessageId = optional(record.thread_root_message_id);
+    const isReply = Boolean(optional(record.reply_to_message_id)) ||
+      Boolean(rootMessageId && rootMessageId !== id);
     route = {
       ...base,
       channel: "imessage",
       conversationId: required(record.conversation_id, "conversation id"),
-      threadId: optional(record.thread_id),
-      replyToMessageId: optional(record.thread_root_message_id),
+      threadId: isReply ? optional(record.thread_id) : undefined,
+      replyToMessageId: isReply ? rootMessageId : undefined,
       isGroup: record.is_group === true,
     };
     text = optional(record.content) ?? "";
     authorId = required(record.sender_number ?? record.remote_number, "sender");
-    attachments = media(record.media);
+    attachments = media(record.media, "imessage", id);
   } else if (type.startsWith("slack.")) {
     if (required(data.identity_id, "identity id") !== identity.id)
       throw new Error("Webhook identity mismatch");
     record = object(data.event);
-    if (record.bot_id || object(data.actor_profile ?? {}).is_bot === true)
-      return null;
+    isBot = Boolean(record.bot_id) || object(data.actor_profile ?? {}).is_bot === true;
     id = required(data.message_ts, "message timestamp");
+    const conversationId = required(data.conversation_id, "conversation id");
+    const parentTs = optional(data.thread_ts);
+    const isDirectMessage = conversationId.startsWith("D");
     route = {
       ...base,
       channel: "slack",
       connectionId: required(data.connection_id, "connection id"),
-      conversationId: required(data.conversation_id, "conversation id"),
-      threadTs: optional(data.thread_ts) ?? id,
+      conversationId,
+      threadTs: isDirectMessage ? (parentTs !== id ? parentTs : undefined) : parentTs ?? id,
     };
     text = optional(record.text) ?? "";
     authorId = required(data.actor_id, "actor id");
@@ -174,10 +176,10 @@ export function normalizeEvent(
           },
         };
       });
-    isMention =
-      type === "slack.mention_received" ||
-      type === "slack.dm_received" ||
-      type === "slack.group_dm_received";
+    const kinds = Array.isArray(data.message_kinds) ? data.message_kinds : [];
+    isMention = kinds.length > 0
+      ? kinds.some(kind => kind === "mention" || kind === "dm" || kind === "group_dm")
+      : type === "slack.mention_received" || type === "slack.dm_received" || type === "slack.group_dm_received";
   } else if (type.startsWith("a2a.")) {
     record = data;
     route = {
@@ -235,6 +237,7 @@ export function normalizeEvent(
     text,
     authorId,
     isMe: false,
+    isBot,
     createdAt: optional(record.created_at) ?? timestamp,
     attachments,
     event,

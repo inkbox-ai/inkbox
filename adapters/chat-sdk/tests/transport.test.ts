@@ -463,7 +463,7 @@ describe("outbound routing", () => {
   it("does not finish an A2A task on every message", async () => {
     mock.identity.a2aReply.mockResolvedValue({
       id: "task-1",
-      messages: [{ id: "reply-1", role: "agent" }],
+      messages: [{ id: "reply-row-1", messageId: "reply-1", role: "agent" }],
     });
     await transport().send(a2a, { text: "working" });
     expect(mock.identity.a2aReply).toHaveBeenCalledWith("task-1", {
@@ -669,14 +669,16 @@ describe("remaining history contracts", () => {
     mock.identity.a2aMessages.mockResolvedValue({
       items: [
         {
-          id: "caller-1",
+          id: "caller-row-1",
+          messageId: "caller-1",
           role: "caller",
           caller: { identityId: "remote-1" },
           parts: [{ text: "task" }],
           createdAt: createdAt.toISOString(),
         },
         {
-          id: "agent-1",
+          id: "agent-row-1",
+          messageId: "agent-1",
           role: "agent",
           caller: { identityId: "remote-1" },
           parts: [{ text: "working" }],
@@ -730,18 +732,22 @@ describe("remaining history contracts", () => {
 
 describe("channel capabilities", () => {
   it("does not send typing indicators to an iMessage group", async () => {
-    await transport().typing({ ...imessage, isGroup: true });
+    await expect(
+      transport().typing({ ...imessage, isGroup: true }),
+    ).rejects.toThrow("Typing indicators is not supported");
     expect(mock.identity.sendIMessageTyping).not.toHaveBeenCalled();
     await transport().typing(imessage);
     expect(mock.identity.sendIMessageTyping).toHaveBeenCalledWith(
       "conversation-1",
     );
   });
-  it("degrades unsupported typing without masking authentication failures", async () => {
+  it("reports unsupported typing without masking authentication failures", async () => {
     mock.identity.sendIMessageTyping.mockRejectedValue(
       Object.assign(new Error("Unsupported"), { statusCode: 422 }),
     );
-    await expect(transport().typing(imessage)).resolves.toBeUndefined();
+    await expect(transport().typing(imessage)).rejects.toThrow(
+      "Typing indicators is not supported",
+    );
     mock.identity.sendIMessageTyping.mockRejectedValue(
       Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
     );
@@ -796,5 +802,253 @@ describe("channel capabilities", () => {
     await expect(
       transport().editMessage(sms, "text-1", "updated"),
     ).rejects.toThrow("not supported");
+  });
+});
+
+describe("review regressions", () => {
+  it("uses A2A protocol message IDs for sends, history, and message lookup", async () => {
+    mock.identity.a2aReply.mockResolvedValue({
+      id: "task-1",
+      messages: [
+        { id: "ledger-row-1", messageId: "protocol-1", role: "agent" },
+      ],
+    });
+    const result = await transport().send(a2a, { text: "reply" });
+    expect(result.id).toBe("protocol-1");
+    mock.identity.a2aMessages.mockResolvedValue({
+      items: [
+        {
+          id: "ledger-row-1",
+          messageId: "protocol-1",
+          role: "agent",
+          caller: { identityId: "caller-1" },
+          parts: [{ text: "reply" }],
+          createdAt: createdAt.toISOString(),
+        },
+      ],
+      nextCursor: null,
+    });
+    expect((await transport().getMessage(a2a, "protocol-1")).id).toBe(
+      "protocol-1",
+    );
+    expect(mock.identity.a2aMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ direction: "inbound", taskId: "task-1" }),
+    );
+  });
+  it("never substitutes a task ID when an accepted A2A reply has no message ID", async () => {
+    mock.identity.a2aReply.mockResolvedValue({ id: "task-1", messages: [] });
+    await expect(transport().send(a2a, { text: "reply" })).rejects.toThrow(
+      "accepted but its message ID is unavailable",
+    );
+    expect(mock.identity.a2aReply).toHaveBeenCalledTimes(1);
+  });
+  it("marks a threadless email read by its actual message ID", async () => {
+    mock.identity.getThread.mockRejectedValue(
+      Object.assign(new Error("Not found"), { statusCode: 404 }),
+    );
+    mock.identity.getMessage.mockResolvedValue({
+      ...mail(),
+      id: "mail-1",
+      threadId: null,
+    });
+    await transport().markRead({ ...email, threadId: "mail-1" });
+    expect(mock.identity.markEmailsRead).toHaveBeenCalledWith(["mail-1"]);
+  });
+  it("does not treat arbitrary email history failures as threadless messages", async () => {
+    mock.identity.getThread.mockRejectedValue(
+      Object.assign(new Error("Unavailable"), { statusCode: 503 }),
+    );
+    await expect(transport().markRead(email)).rejects.toThrow("Unavailable");
+    expect(mock.identity.markEmailsRead).not.toHaveBeenCalled();
+  });
+  it("preserves the complete HTML-only email and its subject", async () => {
+    mock.identity.getMessage.mockResolvedValue({
+      ...mail(),
+      subject: "Meeting & notes",
+      bodyText: null,
+      bodyHtml:
+        "<p>Hello &amp; welcome</p><script>doNotShow()</script><style>doNotShow {}</style><p>Final paragraph beyond the preview</p>",
+      snippet: "Hello",
+    });
+    const message = await transport().getMessage(email, "mail-1");
+    expect(message.text).toContain("Subject: Meeting & notes");
+    expect(message.text).toContain("Hello & welcome");
+    expect(message.text).toContain("Final paragraph beyond the preview");
+    expect(message.text).not.toContain("doNotShow");
+  });
+  it("keeps SMS attachment state credential-free and refreshes expired URLs", async () => {
+    mock.identity.getTextConversation.mockResolvedValue([
+      {
+        ...text("text-1", 1),
+        media: [
+          {
+            url: "https://example.com/expired?signature=old",
+            contentType: "image/png",
+            size: 42,
+          },
+        ],
+      },
+    ]);
+    const page = await transport().history(sms);
+    const serialized = JSON.stringify(page.messages[0]);
+    expect(serialized).not.toContain("signature");
+    expect(serialized).not.toContain("expired");
+    const reference = JSON.parse(serialized).attachments[0].reference;
+    expect(reference).toEqual({
+      channel: "sms",
+      messageId: "text-1",
+      index: 0,
+    });
+    mock.identity.getText.mockResolvedValue({
+      ...text("text-1", 1),
+      media: [
+        {
+          url: "https://example.com/fresh",
+          contentType: "image/png",
+          size: 42,
+        },
+      ],
+    });
+    expect(await transport().attachment(sms, reference)).toBe(
+      "https://example.com/fresh",
+    );
+  });
+  it("keeps iMessage attachment state credential-free and refreshes expired URLs", async () => {
+    const row = {
+      id: "message-1",
+      conversationId: "conversation-1",
+      threadId: "root-1",
+      content: "photo",
+      direction: "inbound",
+      remoteNumber: "+15550100001",
+      createdAt,
+      media: [
+        {
+          url: "https://example.com/expired?signature=old",
+          contentType: "image/png",
+          size: 42,
+        },
+      ],
+    };
+    mock.identity.listIMessages.mockResolvedValue([row]);
+    const page = await transport().history(imessage);
+    const serialized = JSON.stringify(page.messages[0]);
+    expect(serialized).not.toContain("signature");
+    expect(serialized).not.toContain("expired");
+    const reference = JSON.parse(serialized).attachments[0].reference;
+    expect(reference).toEqual({
+      channel: "imessage",
+      messageId: "message-1",
+      index: 0,
+    });
+    mock.identity.getIMessage.mockResolvedValue({
+      ...row,
+      media: [
+        {
+          url: "https://example.com/fresh",
+          contentType: "image/png",
+          size: 42,
+        },
+      ],
+    });
+    expect(await transport().attachment(imessage, reference)).toBe(
+      "https://example.com/fresh",
+    );
+  });
+  it("checks refreshed media membership and attachment indexes", async () => {
+    mock.identity.getText.mockResolvedValue({
+      ...text("text-1", 1),
+      conversationId: "other",
+      media: [{ url: "https://example.com/private" }],
+    });
+    await expect(
+      transport().attachment(sms, {
+        channel: "sms",
+        messageId: "text-1",
+        index: 0,
+      }),
+    ).rejects.toThrow("does not belong");
+    await expect(
+      transport().attachment(sms, {
+        channel: "sms",
+        messageId: "text-1",
+        index: -1,
+      }),
+    ).rejects.toThrow("Invalid media");
+    mock.identity.getIMessage.mockResolvedValue({
+      id: "message-1",
+      conversationId: "conversation-1",
+      threadId: "other-thread",
+      media: [{ url: "https://example.com/private" }],
+    });
+    await expect(
+      transport().attachment(imessage, {
+        channel: "imessage",
+        messageId: "message-1",
+        index: 0,
+      }),
+    ).rejects.toThrow("does not belong");
+  });
+  it("reports unsupported typing and group read receipts explicitly", async () => {
+    await expect(transport().typing(email)).rejects.toThrow("not supported");
+    await expect(transport().typing(slack)).rejects.toThrow("not supported");
+    await expect(
+      transport().markRead({ ...imessage, isGroup: true }),
+    ).rejects.toThrow("not supported");
+    expect(mock.identity.markIMessageConversationRead).not.toHaveBeenCalled();
+  });
+  it("refuses an implicit email reply when the thread's recipient audience changed", async () => {
+    mock.identity.getThread.mockResolvedValue({
+      messages: [{ id: "private" }, { id: "group" }],
+    });
+    mock.identity.getMessage.mockImplementation(async (id) => ({
+      ...mail(id),
+      replyAllRecipients: {
+        to: ["sender@example.com"],
+        cc: id === "group" ? ["other@example.com"] : [],
+      },
+    }));
+    await expect(
+      transport().send(email, { text: "private response" }),
+    ).rejects.toThrow("replyToMessageId");
+    expect(mock.identity.replyAllEmail).not.toHaveBeenCalled();
+    await transport().send(
+      { ...email, anchorMessageId: "private" },
+      { text: "private response" },
+    );
+    expect(mock.identity.replyAllEmail).toHaveBeenCalledWith(
+      "private",
+      expect.objectContaining({ bodyText: "private response" }),
+    );
+  });
+  it("allows an implicit email reply when authoritative recipient sets are equal", async () => {
+    mock.identity.getThread.mockResolvedValue({
+      messages: [{ id: "first" }, { id: "last" }],
+    });
+    mock.identity.getMessage.mockImplementation(async (id) => ({
+      ...mail(id),
+      replyAllRecipients:
+        id === "first"
+          ? { to: ["sender@example.com"], cc: ["other@example.com"] }
+          : { to: ["OTHER@example.com"], cc: ["sender@example.com"] },
+    }));
+    await transport().send(email, { text: "group response" });
+    expect(mock.identity.replyAllEmail).toHaveBeenCalledWith(
+      "last",
+      expect.objectContaining({ bodyText: "group response" }),
+    );
+  });
+  it("does not guess recipients when multi-message thread suggestions are missing", async () => {
+    mock.identity.getThread.mockResolvedValue({
+      messages: [{ id: "first" }, { id: "last" }],
+    });
+    mock.identity.getMessage.mockResolvedValue({
+      ...mail(),
+      replyAllRecipients: null,
+    });
+    await expect(transport().send(email, { text: "response" })).rejects.toThrow(
+      "replyToMessageId",
+    );
+    expect(mock.identity.replyAllEmail).not.toHaveBeenCalled();
   });
 });

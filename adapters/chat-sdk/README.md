@@ -34,6 +34,7 @@ const inkbox = createInkboxAdapter({
 const bot = new Chat({
   userName: "assistant",
   adapters: { inkbox },
+  concurrency: "queue",
   state: createRedisState({
     url: process.env.REDIS_URL!,
     keyPrefix: `inkbox:${process.env.INKBOX_AGENT_HANDLE!}`,
@@ -46,7 +47,11 @@ bot.onNewMention(async (thread, message) => {
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
-  await thread.post("Hello from Inkbox.");
+  await inkbox.send(thread.id, "Hello from Inkbox.", {
+    idempotencyKey: `reply:${message.id}`,
+    ...(inkbox.decodeThreadId(thread.id).channel === "email"
+      ? { replyToMessageId: message.id } : {}),
+  });
 });
 
 bot.onSubscribedMessage(async (thread, message) => {
@@ -54,7 +59,11 @@ bot.onSubscribedMessage(async (thread, message) => {
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
-  await thread.post("Thanks for your message.");
+  await inkbox.send(thread.id, "Thanks for your message.", {
+    idempotencyKey: `reply:${message.id}`,
+    ...(inkbox.decodeThreadId(thread.id).channel === "email"
+      ? { replyToMessageId: message.id } : {}),
+  });
 });
 
 // Mount at a public HTTPS endpoint using your framework's Fetch API support.
@@ -63,9 +72,14 @@ export function POST(request: Request) {
 }
 ```
 
-The examples include environment validation and handling for unmentioned incoming
-messages. Choose which events should wake your agent rather than automatically
-answering every message in a shared conversation.
+The standalone example uses `concurrency: "queue"` so overlapping inputs wait
+rather than being dropped while a handler is busy. The examples handle new
+mentions and subscribed conversations, not every unmentioned Slack channel post.
+Slack DMs and group DMs count as addressed input. Email, phone messages (including
+service-authorized groups), A2A, and call observations are treated as directed
+inputs; the adapter does not impose a text-mention syntax on those channels.
+Use `onMessage` to apply your application's stricter group admission policy if
+needed. Admission is not permission to perform privileged actions.
 
 ## Channels
 
@@ -83,8 +97,12 @@ are not chat channels; use the SDK directly when your application needs them.
 
 Email and phone messages cannot be edited or unsent through this adapter.
 Unsupported operations fail explicitly rather than claiming to have changed a
-remote message. Do not use token-by-token edit streaming for these channels.
-An accepted or queued send is not proof of delivery.
+remote message. `thread.post(stream)` buffers the stream and sends one completed
+message on non-editable channels; it does not post a placeholder or edit each
+token. Slack streams are also buffered into one final send.
+An accepted or queued send is not proof of delivery. Phone attachment downloads
+use message references and fetch a fresh media URL when needed; delivery URLs
+are not used as durable attachment references.
 
 ### Voice
 
@@ -102,7 +120,10 @@ An A2A thread is an incoming task, not a phone-number conversation. An ordinary
 chat reply records progress without closing the task. To ask the caller a question,
 complete the task, or report failure, use `inkbox.send(thread.id, text,
 { a2aIntent: "ask_caller" | "complete" | "fail" })` with the appropriate intent. Do not assume ordinary message-send
-idempotency applies to A2A task operations.
+idempotency applies to A2A task operations. Set `defaultA2AIntent: "complete"`
+when every posted A2A reply is a final answer, as in the Eve example. Applications
+that emit intermediate posts should retain the `"progress"` default and complete
+explicitly.
 
 ## Configuration
 
@@ -112,6 +133,7 @@ idempotency applies to A2A task operations.
 | `agentHandle` | Existing identity receiving and sending messages |
 | `signingSecret` | Existing webhook signing secret, or sync/async resolver returning it |
 | `onMessage` | Optional sync/async admission hook; return `false` to ignore an input |
+| `defaultA2AIntent` | Intent for ordinary A2A posts; defaults to `"progress"` |
 
 Use an identity-scoped API key matching `agentHandle`; organization-wide keys are
 not accepted by the adapter. Credential resolvers are evaluated again for outbound
@@ -156,6 +178,29 @@ durable job store, monitor handler failures, and recover the failed operation
 explicitly using the original outbound key. Do not rely on webhook replay as a
 universal recovery mechanism or clear deduplication state indiscriminately.
 
+After reconciling any external effects from the earlier attempt, an application
+can deliberately replay a delivery with the Chat SDK option `deduplicate: false`.
+That bypasses duplicate suppression; it is not safe to enable globally and does
+not make sends exactly once. Keep the original operation key for a retry. Give
+different intended replies different keys, even when they answer the same input.
+
+### Email reply recipients
+
+For an email reply, pass the triggering Chat message ID explicitly:
+
+```ts
+await inkbox.send(thread.id, "The answer to your email.", {
+  replyToMessageId: message.id,
+  idempotencyKey: operationId,
+});
+```
+
+The anchor controls reply-all recipients. Save it with deferred work instead of
+assuming the newest email has the same audience. A send without an explicit
+anchor is refused when the thread's changing recipients make the choice ambiguous;
+this also applies to deferred Eve replies. Do not recover such a failure by
+silently choosing the latest message.
+
 ## Webhook setup
 
 Create an identity-owned subscription with its URL set to your public webhook
@@ -193,7 +238,11 @@ first. If your host provides `waitUntil`, pass it through:
 return bot.webhooks.inkbox(request, { waitUntil });
 ```
 
-Otherwise the handler waits for processing. Do not launch an untracked background
+Identity resolution and required message enrichment complete before the webhook
+is acknowledged. Transient lookup or enrichment failures can fail that delivery
+without permanently poisoning adapter initialization. When `waitUntil` is supplied,
+only the subsequent Chat handler work runs in the host's background lifecycle.
+Without it, the handler waits for processing. Do not launch an untracked background
 promise that can be terminated after returning a response. Monitor delivery
 outcomes and application-handler failures separately. Webhook replay can recover
 some delivery failures, but a message already admitted by Chat SDK may remain

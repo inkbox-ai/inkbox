@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { convert } from "html-to-text";
 import {
   Inkbox,
   type AgentIdentity,
@@ -46,7 +47,8 @@ export interface TransportAttachment {
   /** Serializable reference for authenticated downloads. */
   reference?:
     | { channel: "email"; messageId: string; filename: string }
-    | { channel: "slack"; connectionId: string; fileId: string };
+    | { channel: "slack"; connectionId: string; fileId: string }
+    | { channel: "sms" | "imessage"; messageId: string; index: number };
 }
 export interface TransportMessage {
   id: string;
@@ -150,9 +152,11 @@ export class InkboxTransport {
     route: Extract<InkboxRoute, { channel: "email" }>,
   ): Promise<Extract<InkboxRoute, { channel: "email" }>> {
     let anchor = route.anchorMessageId;
+    let message: MessageDetail | undefined;
     if (!anchor) {
+      let rows: { id: string }[];
       try {
-        anchor = (await identity.getThread(route.threadId)).messages.at(-1)?.id;
+        rows = (await identity.getThread(route.threadId)).messages;
       } catch (error) {
         if (!(
           error instanceof Error &&
@@ -160,11 +164,38 @@ export class InkboxTransport {
           error.statusCode === 404
         ))
           throw error;
-        anchor = route.threadId;
+        rows = [{ id: route.threadId }];
+      }
+      anchor = rows.at(-1)?.id;
+      if (rows.length > 1) {
+        let audience: string | undefined;
+        for (const row of rows) {
+          const detail = await identity.getMessage(row.id);
+          if (!detail.replyAllRecipients)
+            throw new Error(
+              "Cannot determine this email thread's reply recipients; use adapter.send with replyToMessageId",
+            );
+          const recipients = JSON.stringify(
+            [
+              ...new Set(
+                [
+                  ...detail.replyAllRecipients.to,
+                  ...detail.replyAllRecipients.cc,
+                ].map((address) => address.toLowerCase()),
+              ),
+            ].sort(),
+          );
+          if (audience !== undefined && recipients !== audience)
+            throw new Error(
+              "Email thread has different reply recipients; use adapter.send with replyToMessageId to select the message being answered",
+            );
+          audience = recipients;
+          if (detail.id === anchor) message = detail;
+        }
       }
     }
     if (!anchor) throw new Error("Email thread has no message to reply to");
-    const message = await identity.getMessage(anchor);
+    message ??= await identity.getMessage(anchor);
     if ((message.threadId ?? message.id) !== route.threadId)
       throw new Error("Email reply anchor does not belong to this thread");
     return { ...route, anchorMessageId: anchor };
@@ -275,7 +306,11 @@ export class InkboxTransport {
         const reply = raw.messages
           .filter((message) => message.role === "agent")
           .at(-1);
-        return { id: reply?.id ?? raw.id, raw };
+        if (!reply?.messageId)
+          throw new Error(
+            "A2A reply was accepted but its message ID is unavailable; inspect the task before retrying",
+          );
+        return { id: reply.messageId, raw };
       }
     }
   }
@@ -442,7 +477,7 @@ export class InkboxTransport {
         return {
           messages: page.items
             .map((row) => ({
-              id: row.id,
+              id: row.messageId,
               text: row.parts
                 .map((part) =>
                   typeof part.text === "string"
@@ -568,7 +603,11 @@ export class InkboxTransport {
   }
 
   async typing(route: InkboxRoute): Promise<void> {
-    if (route.channel !== "imessage" || route.isGroup) return;
+    if (route.channel !== "imessage" || route.isGroup)
+      throw new UnsupportedChannelOperationError(
+        "Typing indicators",
+        route.channel,
+      );
     const { identity } = await this.scope(route);
     try {
       await identity.sendIMessageTyping(route.conversationId);
@@ -578,7 +617,10 @@ export class InkboxTransport {
         "statusCode" in error &&
         (error.statusCode === 409 || error.statusCode === 422)
       )
-        return;
+        throw new UnsupportedChannelOperationError(
+          "Typing indicators",
+          route.channel,
+        );
       throw error;
     }
   }
@@ -586,19 +628,49 @@ export class InkboxTransport {
   async markRead(route: InkboxRoute): Promise<void> {
     const { identity } = await this.scope(route);
     switch (route.channel) {
-      case "email":
-        await identity.markEmailsRead(
-          (await identity.getThread(route.threadId)).messages.map(
+      case "email": {
+        let messageIds: string[];
+        try {
+          messageIds = (await identity.getThread(route.threadId)).messages.map(
             (message) => message.id,
-          ),
-        );
+          );
+        } catch (error) {
+          if (!(
+            error instanceof Error &&
+            "statusCode" in error &&
+            error.statusCode === 404
+          ))
+            throw error;
+          const message = await identity.getMessage(route.threadId);
+          if (message.threadId !== null) throw error;
+          messageIds = [message.id];
+        }
+        await identity.markEmailsRead(messageIds);
         return;
+      }
       case "sms":
         await identity.markTextConversationRead(route.conversationId);
         return;
       case "imessage":
-        if (!route.isGroup)
+        if (route.isGroup)
+          throw new UnsupportedChannelOperationError(
+            "Read receipts",
+            route.channel,
+          );
+        try {
           await identity.markIMessageConversationRead(route.conversationId);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            "statusCode" in error &&
+            (error.statusCode === 409 || error.statusCode === 422)
+          )
+            throw new UnsupportedChannelOperationError(
+              "Read receipts",
+              route.channel,
+            );
+          throw error;
+        }
         return;
       default:
         throw new UnsupportedChannelOperationError(
@@ -718,7 +790,7 @@ export class InkboxTransport {
     if (
       !reference ||
       typeof reference !== "object" ||
-      (reference.channel !== "email" && reference.channel !== "slack")
+      !["email", "slack", "sms", "imessage"].includes(reference.channel)
     )
       throw new Error("Invalid attachment reference");
     if (
@@ -737,7 +809,34 @@ export class InkboxTransport {
         !reference.fileId)
     )
       throw new Error("Invalid Slack attachment reference");
+    if (
+      (reference.channel === "sms" || reference.channel === "imessage") &&
+      (typeof reference.messageId !== "string" ||
+        !reference.messageId ||
+        !Number.isSafeInteger(reference.index) ||
+        reference.index < 0)
+    )
+      throw new Error("Invalid media attachment reference");
     const { client, identity } = await this.scope(route);
+    if (reference.channel === "sms" && route.channel === "sms") {
+      const message = await identity.getText(reference.messageId);
+      if (message.conversationId !== route.conversationId)
+        throw new Error("Attachment does not belong to this conversation");
+      const url = message.media?.[reference.index]?.url;
+      if (!url) throw new Error("Attachment no longer available");
+      return url;
+    }
+    if (reference.channel === "imessage" && route.channel === "imessage") {
+      const message = await identity.getIMessage(reference.messageId);
+      if (
+        message.conversationId !== route.conversationId ||
+        (route.threadId && message.threadId !== route.threadId)
+      )
+        throw new Error("Attachment does not belong to this thread");
+      const url = message.media?.[reference.index]?.url;
+      if (!url) throw new Error("Attachment no longer available");
+      return url;
+    }
     if (reference.channel === "email" && route.channel === "email") {
       const row = await identity.getMessage(reference.messageId);
       if ((row.threadId ?? row.id) !== route.threadId)
@@ -770,7 +869,22 @@ function chronological(a: TransportMessage, b: TransportMessage) {
 export function emailMessage(row: MessageDetail): TransportMessage {
   return {
     id: row.id,
-    text: row.bodyText ?? row.snippet ?? "",
+    text: [
+      row.subject ? `Subject: ${row.subject}` : "",
+      row.bodyText ||
+        (row.bodyHtml
+          ? convert(row.bodyHtml, {
+              wordwrap: false,
+              limits: { maxInputLength: Infinity },
+              selectors: [
+                { selector: "script", format: "skip" },
+                { selector: "style", format: "skip" },
+              ],
+            })
+          : (row.snippet ?? "")),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     authorId: row.fromAddress,
     authorName: row.fromDisplayName ?? undefined,
     isMe: row.direction === "outbound",
@@ -810,12 +924,15 @@ export function textMessage(row: TextMessage): TransportMessage {
         : (row.senderPhoneNumber ?? row.remotePhoneNumber ?? "unknown"),
     isMe: row.direction === "outbound",
     createdAt: row.createdAt,
-    attachments: (row.media ?? []).map((media) => ({
-      url: media.url,
+    attachments: (row.media ?? []).map((media, index) => ({
       mimeType: media.contentType,
       size: media.size,
+      reference: { channel: "sms" as const, messageId: row.id, index },
     })),
-    raw: row,
+    raw: {
+      ...row,
+      media: row.media?.map(({ url: _url, ...metadata }) => metadata) ?? null,
+    },
   };
 }
 export function imessageMessage(row: IMessage): TransportMessage {
@@ -828,12 +945,15 @@ export function imessageMessage(row: IMessage): TransportMessage {
         : (row.senderNumber ?? row.remoteNumber ?? "unknown"),
     isMe: row.direction === "outbound",
     createdAt: row.createdAt,
-    attachments: (row.media ?? []).map((media) => ({
-      url: media.url,
+    attachments: (row.media ?? []).map((media, index) => ({
       mimeType: media.contentType ?? undefined,
       size: media.size ?? undefined,
+      reference: { channel: "imessage" as const, messageId: row.id, index },
     })),
-    raw: row,
+    raw: {
+      ...row,
+      media: row.media?.map(({ url: _url, ...metadata }) => metadata) ?? null,
+    },
   };
 }
 

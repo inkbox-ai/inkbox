@@ -12,6 +12,7 @@ export const inkbox = createInkboxAdapter({
 export const bot = new Chat({
   userName: "inkbox-assistant",
   adapters: { inkbox },
+  concurrency: "queue",
   state: createRedisState({
     url: required("REDIS_URL"),
     keyPrefix: `inkbox-example:${required("INKBOX_AGENT_HANDLE")}`,
@@ -20,12 +21,16 @@ export const bot = new Chat({
 
 async function handleMessage(thread: Thread, message: Message) {
   await thread.subscribe();
-  if (inkbox.decodeThreadId(thread.id).channel === "voice") {
+  const route = inkbox.decodeThreadId(thread.id);
+  if (route.channel === "voice") {
     // A completed call cannot receive a chat reply. Save its transcript for follow-up.
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }
-  await thread.post("Thanks! Your message reached the Inkbox Chat SDK example.");
+  await inkbox.send(thread.id, "Thanks! Your message reached the Inkbox Chat SDK example.", {
+    idempotencyKey: `reply:${message.id}`,
+    ...(route.channel === "email" ? { replyToMessageId: message.id } : {}),
+  });
 }
 
 async function receive(thread: Thread, message: Message) {
@@ -39,7 +44,7 @@ async function receive(thread: Thread, message: Message) {
 
 bot.onNewMention(receive);
 bot.onSubscribedMessage(receive);
-bot.onNewMessage(receive);
+
 
 // Forward your host's request-scoped waitUntil when background execution is supported.
 export function handleWebhook(request: Request, options?: WebhookOptions): Promise<Response> {

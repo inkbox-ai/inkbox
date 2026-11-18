@@ -13,6 +13,7 @@ const inkbox = createInkboxAdapter({
   apiKey: () => required("INKBOX_API_KEY"),
   agentHandle: required("INKBOX_AGENT_HANDLE"),
   signingSecret: required("INKBOX_SIGNING_SECRET"),
+  defaultA2AIntent: "complete",
 });
 
 export const { bot, channel, send } = chatSdkChannel({
@@ -49,6 +50,6 @@ async function receive(thread: Thread, message: Message) {
 
 bot.onNewMention(receive);
 bot.onSubscribedMessage(receive);
-bot.onNewMessage(receive);
+
 
 export default channel;

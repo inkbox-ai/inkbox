@@ -1,7 +1,7 @@
 # Inkbox + Chat SDK
 
 A framework-neutral Fetch API webhook handler using persistent Redis state. It
-replies to email, SMS/MMS, iMessage, Slack, and A2A messages. Completed-call
+replies to email, SMS/MMS, iMessage, addressed Slack input, and A2A messages. Completed-call
 transcripts are saved to thread state without attempting to text a finished call.
 
 ## Run in an application
@@ -71,6 +71,18 @@ The setup command subscribes to message receipts, completed calls, and incoming
 A2A tasks; it does not enable or provision channels. Configure each channel on the
 identity separately. No call is placed by setup.
 
+## Conversation policy
+
+The example handles new mentions and subscribed conversations. It does not
+answer an unmentioned post in an unsubscribed Slack channel thread. Slack DMs
+and group DMs are addressed input. Service-authorized SMS/iMessage group messages
+are handled without requiring a text mention; use the adapter's `onMessage`
+hook if your application needs a narrower group policy.
+
+`concurrency: "queue"` preserves overlapping inputs while the current handler
+runs. A2A acknowledgements are progress replies in this demonstration, not final
+task results; complete actual work explicitly through `inkbox.send()`.
+
 ## Hosting and state
 
 Use a durable Redis deployment with persistence enabled. Memory-only state loses
@@ -93,6 +105,10 @@ Monitor webhook delivery outcomes **and application operations**. Chat SDK may
 mark an input as seen before its handler fails, so replaying that webhook can be
 suppressed. In a production application, persist the operation and its status,
 recover it explicitly, and reuse a stable outbound key with `inkbox.send()`.
+The example uses one stable key per acknowledgement and supplies the triggering
+email as its reply anchor. After reconciling an earlier attempt's external effects,
+a recovery handler may use `deduplicate: false` for that replay; do not enable it
+for all deliveries or treat it as an exactly-once guarantee.
 Do not assume every webhook failure is retried automatically or that webhook
 replay re-executes a failed handler. Avoid logging raw
 webhook bodies, credentials, or message content.

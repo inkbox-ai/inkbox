@@ -88,3 +88,90 @@ describe("channel message content", () => {
     expect(message?.text).not.toContain("speaker:");
   });
 });
+
+describe("conversation continuity", () => {
+  function imessage(id: string, extra: Record<string, unknown> = {}) {
+    return normalizeEvent(event("imessage.received", { message: {
+      id, direction: "inbound", conversation_id: "conversation-test", sender_number: "+12025550123",
+      thread_id: `native-${id}`, thread_root_message_id: id, content: "Hello", ...extra,
+    } }), identity)!;
+  }
+  function slack(id: string, extra: Record<string, unknown> = {}) {
+    return normalizeEvent(event("slack.thread_reply_received", {
+      identity_id: identity.id, connection_id: "connection-test", conversation_id: "D-test",
+      message_ts: id, actor_id: "user-test", event: { text: "Hello" }, message_kinds: ["dm"], ...extra,
+    }), identity)!;
+  }
+
+  it.each([false, true])("keeps consecutive standalone iMessages on one conversation (group=%s)", isGroup => {
+    const first = imessage("message-one", { is_group: isGroup });
+    const second = imessage("message-two", { is_group: isGroup });
+    expect(first.route).toEqual(second.route);
+    expect(first.route).toMatchObject({ channel: "imessage", conversationId: "conversation-test", isGroup });
+    expect("threadId" in first.route && first.route.threadId).toBeUndefined();
+    expect("replyToMessageId" in first.route && first.route.replyToMessageId).toBeUndefined();
+  });
+
+  it("keeps genuine iMessage replies on their native thread", () => {
+    const first = imessage("reply-one", { thread_id: "native-root", thread_root_message_id: "root", reply_to_message_id: "root" });
+    const second = imessage("reply-two", { thread_id: "native-root", thread_root_message_id: "root", reply_to_message_id: "reply-one" });
+    expect(first.route).toEqual(second.route);
+    expect(first.route).toMatchObject({ threadId: "native-root", replyToMessageId: "root" });
+  });
+
+  it("recognizes an explicit reply when its root metadata is absent", () => {
+    expect(imessage("reply", { reply_to_message_id: "parent", thread_root_message_id: null }).route)
+      .toMatchObject({ threadId: "native-reply" });
+  });
+
+  it("keeps Slack DM timeline posts together, including self-root metadata", () => {
+    const first = slack("1.0");
+    expect(slack("2.0").route).toEqual(first.route);
+    expect(slack("3.0", { thread_ts: "3.0" }).route).toEqual(first.route);
+    expect(first.route).toMatchObject({ threadTs: undefined });
+    expect(slack("4.0", { thread_ts: "1.0" }).route).toMatchObject({ threadTs: "1.0" });
+  });
+
+  it("keeps top-level Slack channel posts distinct", () => {
+    expect(slack("1.0", { conversation_id: "C-test", message_kinds: ["channel"] }).route)
+      .toMatchObject({ threadTs: "1.0" });
+    expect(slack("2.0", { conversation_id: "C-test", message_kinds: ["channel"] }).route)
+      .toMatchObject({ threadTs: "2.0" });
+  });
+
+  it.each([
+    { kinds: ["mention", "thread"] },
+    { kinds: ["group_dm", "thread"] },
+    { kinds: ["dm"] },
+  ])("uses message kinds even when the delivered event is a thread reply ($kinds)", ({ kinds }) => {
+    expect(slack("2.0", { message_kinds: kinds }).isMention).toBe(true);
+  });
+
+  it("does not mark an unmentioned Slack channel message as a mention", () => {
+    expect(slack("2.0", { conversation_id: "C-test", message_kinds: ["channel", "thread"] }).isMention).toBe(false);
+  });
+
+  it("preserves other Slack apps' incoming messages and bot metadata", () => {
+    const message = slack("2.0", { actor_profile: { is_bot: true }, event: { bot_id: "other-app", text: "An update" } });
+    expect(message.text).toBe("An update");
+    expect(message.isBot).toBe(true);
+    expect(message.isMe).toBe(false);
+  });
+});
+
+describe("phone media references", () => {
+  it.each(["sms", "imessage"] as const)("keeps %s attachment indices without retaining delivery URLs", channel => {
+    const record = { id: "message-test", direction: "inbound", conversation_id: "conversation-test",
+      sender_phone_number: "+12025550123", sender_number: "+12025550123", text: "Files", content: "Files",
+      media: [{ url: "https://example.com/expiring?signature=one", content_type: "image/png" },
+        { url: "https://example.com/expiring?signature=two", content_type: "application/pdf", size: 12 }],
+    };
+    const message = normalizeEvent(event(channel === "sms" ? "text.received" : "imessage.received",
+      channel === "sms" ? { text_message: record } : { message: record }), identity)!;
+    expect(message.attachments).toHaveLength(2);
+    expect(JSON.stringify(message.attachments)).not.toContain("https://");
+    for (const [index, attachment] of message.attachments!.entries()) {
+      expect(JSON.parse(attachment.fetchMetadata!.reference)).toEqual({ channel, messageId: "message-test", index });
+    }
+  });
+});

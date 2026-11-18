@@ -34,9 +34,19 @@ receiving and replying to messages.
 
 - `streaming: false` sends completed text replies, because email and phone-message
   transports cannot edit an already-sent reply for every streamed token.
+- `defaultA2AIntent: "complete"` makes each final A2A answer complete its task.
+  This sample sends no intermediate A2A progress posts. If you add them, retain
+  the adapter's `"progress"` default and complete the task explicitly.
+- Handlers accept new mentions and subscribed conversations, not every
+  unmentioned Slack channel post. Slack DMs/group DMs and service-authorized
+  phone-message groups are accepted input; configure `onMessage` for a stricter
+  application policy.
 - `concurrency: "concurrent"` lets Eve manage a new input during an active turn.
 - Thread IDs preserve the Inkbox identity, channel, and conversation. A stable
-  message-based idempotency key is passed to Eve on every inbound send.
+  message-based idempotency key is passed to Eve on every inbound send. This
+  deduplicates Eve admission, not outbound Inkbox sends: a retried completion
+  may still send twice. Persist and recover outbound operations explicitly when
+  your workflow requires that guarantee; A2A replies have their own task semantics.
 - Eve manages the webhook's `waitUntil` lifecycle. Input-handler failures are
   reported and rethrown. Monitor both webhook delivery and Eve handoff failures:
   Chat SDK can deduplicate a replay after the original handler failed. Recover a
@@ -48,6 +58,14 @@ receiving and replying to messages.
   do **not** start a new replying agent turn in this example. Add a deliberate
   post-call workflow if you want follow-up actions. This is not a live voice
   streaming adapter, and `thread.post()` cannot answer a finished call.
+- Deferred email replies do not automatically carry the original inbound
+  message as a reply-all anchor. If the thread's recipients change, an ambiguous
+  send is refused rather than choosing another audience. For workflows that need
+  precise deferred replies, persist the triggering message ID and pass it as
+  `replyToMessageId` to `inkbox.send()` with the operation's stable key.
+- After reconciling external effects, a deliberate webhook recovery may use Chat
+  SDK's `deduplicate: false`. Never make that the default: it bypasses suppression
+  and does not make external sends exactly once.
 - The sample provides no privileged tools. Add only the tools your application
   needs, with explicit authorization for external actions. A remote sender is
   not automatically the owner of the agent.

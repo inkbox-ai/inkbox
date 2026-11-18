@@ -11,19 +11,37 @@ const packages = [
 ];
 
 function npm(args, cwd) {
-  const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", args, {
-    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
-  });
+  const result = spawnSync(
+    process.platform === "win32" ? "npm.cmd" : "npm",
+    args,
+    {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   if (result.error) throw result.error;
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 /** Build both packages before publishing either; rerun to finish a partial release. */
-export function publishChatPackages({ root, destination, production = false, run = npm }) {
+export function publishChatPackages({
+  root,
+  destination,
+  production = false,
+  run = npm,
+}) {
   const version = checkReleaseVersions(root);
   const checked = (args, cwd) => {
     const result = run(args, cwd);
-    if (result.status !== 0) throw new Error(`npm ${args[0]} failed: ${result.stderr || result.stdout}`);
+    if (result.status !== 0)
+      throw new Error(
+        `npm ${args[0]} failed: ${result.stderr || result.stdout}`,
+      );
     return result.stdout;
   };
   const packed = [];
@@ -32,8 +50,24 @@ export function publishChatPackages({ root, destination, production = false, run
     checked(["ci", "--ignore-scripts"], cwd);
     rmSync(join(cwd, "dist"), { recursive: true, force: true });
     checked(["run", "build"], cwd);
-    const [artifact] = JSON.parse(checked(["pack", "--ignore-scripts", "--json", "--pack-destination", destination], cwd));
-    if (artifact.name !== pkg.name || artifact.version !== version || !artifact.integrity || !artifact.filename) {
+    const [artifact] = JSON.parse(
+      checked(
+        [
+          "pack",
+          "--ignore-scripts",
+          "--json",
+          "--pack-destination",
+          destination,
+        ],
+        cwd,
+      ),
+    );
+    if (
+      artifact.name !== pkg.name ||
+      artifact.version !== version ||
+      !artifact.integrity ||
+      !artifact.filename
+    ) {
       throw new Error(`Unexpected package artifact for ${pkg.name}`);
     }
     packed.push({ ...pkg, ...artifact, cwd });
@@ -41,35 +75,68 @@ export function publishChatPackages({ root, destination, production = false, run
 
   // Check both immutable versions before the first registry mutation.
   for (const pkg of packed) {
-    if (!production) continue;
-    const result = run(["view", `${pkg.name}@${version}`, "dist.integrity", "--json"], root);
+    const result = run(
+      ["view", `${pkg.name}@${version}`, "dist.integrity", "--json"],
+      root,
+    );
     if (result.status === 0) {
-      if (JSON.parse(result.stdout) !== pkg.integrity) {
-        throw new Error(`${pkg.name}@${version} is already published with different contents; choose a new release version.`);
+      if (production && JSON.parse(result.stdout) !== pkg.integrity) {
+        throw new Error(
+          `${pkg.name}@${version} is already published with different contents; choose a new release version.`,
+        );
       }
       pkg.published = true;
     } else {
       let error;
-      try { error = JSON.parse(result.stdout).error; } catch { /* npm may write JSON errors to stderr. */ }
+      try {
+        error = JSON.parse(result.stdout).error;
+      } catch {
+        /* npm may write JSON errors to stderr. */
+      }
       if (!error) {
-        try { error = JSON.parse(result.stderr).error; } catch { /* Preserve failure below. */ }
+        try {
+          error = JSON.parse(result.stderr).error;
+        } catch {
+          /* Preserve failure below. */
+        }
       }
       if (error?.code !== "E404") {
-        throw new Error(`Cannot verify ${pkg.name}@${version}: ${result.stderr || result.stdout}`);
+        throw new Error(
+          `Cannot verify ${pkg.name}@${version}: ${result.stderr || result.stdout}`,
+        );
       }
     }
   }
   for (const pkg of packed) {
     if (pkg.published) {
-      console.log(`Already published with matching contents: ${pkg.name}@${version}`);
+      console.log(
+        production
+          ? `Already published with matching contents: ${pkg.name}@${version}`
+          : `Build and pack verified: ${pkg.name}@${version}; skipping publish dry run for an existing version.`,
+      );
       continue;
     }
-    checked(["publish", join(destination, pkg.filename), "--ignore-scripts", "--access", "public", ...(!production ? ["--dry-run"] : [])], root);
-    console.log(`${production ? "Published" : "Dry run complete"}: ${pkg.name}@${version}`);
+    checked(
+      [
+        "publish",
+        join(destination, pkg.filename),
+        "--ignore-scripts",
+        "--access",
+        "public",
+        ...(!production ? ["--dry-run"] : []),
+      ],
+      root,
+    );
+    console.log(
+      `${production ? "Published" : "Dry run complete"}: ${pkg.name}@${version}`,
+    );
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const args = process.argv.slice(2);
   if (args.some((arg) => arg !== "--prod") || args.length > 1) {
     throw new Error("Usage: node scripts/publish-chat-packages.mjs [--prod]");
@@ -77,7 +144,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const destination = mkdtempSync(join(tmpdir(), "inkbox-release-"));
   try {
     publishChatPackages({
-      root: fileURLToPath(new URL("../", import.meta.url)), destination,
+      root: fileURLToPath(new URL("../", import.meta.url)),
+      destination,
       production: args.includes("--prod"),
     });
   } finally {
