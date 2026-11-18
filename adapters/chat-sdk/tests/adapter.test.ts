@@ -1172,7 +1172,15 @@ describe("text-only card rendering", () => {
     });
     const card = {
       type: "card" as const,
-      children: [],
+      children: [
+        {
+          type: "actions" as const,
+          children: [
+            { type: "button" as const, id: "approve", label: "Approve" },
+            { type: "button" as const, id: "reject", label: "Reject" },
+          ],
+        },
+      ],
       title: "Allow this action?",
     };
     const message = {
@@ -1195,6 +1203,18 @@ describe("text-only card rendering", () => {
       expect.anything(),
       "1.1",
       message.fallbackText,
+    );
+    const emptyFallback = { card, fallbackText: "" };
+    await adapter.postMessage(threadId, emptyFallback);
+    await adapter.editMessage(threadId, posted.id, emptyFallback);
+    expect(send).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ text: "*Allow this action?*" }),
+    );
+    expect(edit).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "1.1",
+      "*Allow this action?*",
     );
     await bot.shutdown();
   });
@@ -1220,6 +1240,7 @@ describe("persistent phone send preparation", () => {
   it("reuses uploaded media after an uncertain send and adapter restart", async () => {
     const { adapter, bot } = await setup();
     const threadId = adapter.encodeThreadId(route);
+    const save = vi.spyOn(bot.getState(), "setIfNotExists");
     const upload = vi
       .spyOn(adapter.transport, "uploadMedia")
       .mockResolvedValue({
@@ -1253,6 +1274,14 @@ describe("persistent phone send preparation", () => {
       idempotencyKey: "media-op",
     });
     expect(upload).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(
+      expect.stringContaining("inkbox:phone-send:"),
+      expect.objectContaining({
+        fingerprint: expect.any(String),
+        input: expect.objectContaining({ text: "Photo" }),
+      }),
+      604800000,
+    );
     expect(retryUpload).not.toHaveBeenCalled();
     expect(retrySend.mock.calls[0]).toEqual(initialSend.mock.calls[0]);
     await expect(
@@ -1278,10 +1307,20 @@ describe("persistent phone send preparation", () => {
         { idempotencyKey: "media-op" },
       ),
     ).rejects.toThrow("different message content");
+    expect(retrySend).toHaveBeenCalledTimes(1);
+    // Removing all media uses the ordinary text path; the SDK retains key validation.
+    retrySend.mockRejectedValueOnce(new Error("409 idempotency_key_reused"));
     await expect(
       restarted.send(threadId, "Photo", { idempotencyKey: "media-op" }),
-    ).rejects.toThrow("different message content");
-    expect(retrySend).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow("409 idempotency_key_reused");
+    expect(retrySend).toHaveBeenLastCalledWith(
+      route,
+      expect.objectContaining({
+        text: "Photo",
+        idempotencyKey: sendKey("media-op"),
+      }),
+    );
+    expect(retryUpload).not.toHaveBeenCalled();
     await bot.shutdown();
   });
 
@@ -1376,4 +1415,46 @@ describe("persistent phone send preparation", () => {
     expect(send).not.toHaveBeenCalled();
     await bot.shutdown();
   });
+});
+
+describe("keyed text-only phone sends", () => {
+  it.each(["sms", "imessage"] as const)(
+    "sends %s text without initialization or state access",
+    async (channel) => {
+      const adapter = createInkboxAdapter({
+        apiKey: "test-key",
+        agentHandle: "assistant",
+        signingSecret: secret,
+      });
+      const route: InkboxRoute = {
+        identityId: identity.id,
+        channel,
+        conversationId: "text-only",
+      };
+      const send = vi
+        .spyOn(adapter.transport, "send")
+        .mockResolvedValue({ id: "sent", raw: {} });
+      const threadId = adapter.encodeThreadId(route);
+      await adapter.send(threadId, "Hello", {
+        idempotencyKey: "text-operation",
+      });
+      expect(send).toHaveBeenCalledWith(
+        route,
+        expect.objectContaining({
+          text: "Hello",
+          idempotencyKey: sendKey("text-operation"),
+        }),
+      );
+      const { bot } = await setup();
+      await adapter.initialize(bot);
+      const save = vi.spyOn(bot.getState(), "setIfNotExists");
+      const lock = vi.spyOn(bot.getState(), "acquireLock");
+      await adapter.send(threadId, "Hello", {
+        idempotencyKey: "text-operation",
+      });
+      expect(save).not.toHaveBeenCalled();
+      expect(lock).not.toHaveBeenCalled();
+      await bot.shutdown();
+    },
+  );
 });

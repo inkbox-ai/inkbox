@@ -57,6 +57,9 @@ receiving and replying to messages.
   Chat SDK can deduplicate a replay after the original handler failed. Recover a
   failed handoff explicitly using its original Eve idempotency key; do not assume
   a webhook replay will re-execute it.
+- Event handlers await `channel.bot.initialize()` before outbound sends so a
+  resumed turn works in a fresh worker that has not handled a webhook. Custom
+  deferred handlers must initialize Chat before using state-backed adapter sends.
 - Redis stores Chat SDK state; Eve owns durable agent execution and session
   history. Configure both according to your hosting requirements.
 - Completed calls save their transcript in Chat thread state as `lastCall`. They

@@ -16,6 +16,7 @@ export function inkboxChannelEvents(
         channel.state[`inkbox:reply:${session.turn.id}:${data.partId}`] = data.value;
         return;
       }
+      await channel.bot.initialize();
       await inkbox.send(thread.id, { markdown: data.value }, {
         idempotencyKey: `eve-reply:${session.turn.id}:${data.partId}`,
         ...(inkbox.decodeThreadId(thread.id).channel === "email"
@@ -28,6 +29,7 @@ export function inkboxChannelEvents(
       const isA2A = inkbox.decodeThreadId(thread.id).channel === "a2a";
       if (!isA2A) {
         if (data.outcome === "failed") {
+          await channel.bot.initialize();
           await inkbox.send(thread.id, "I could not complete that request. Please try again.", {
             idempotencyKey: `eve-failure:${data.turnId}`,
             ...(inkbox.decodeThreadId(thread.id).channel === "email"
@@ -46,6 +48,7 @@ export function inkboxChannelEvents(
       const replyKeys = data.reply ? data.reply.map(partId => `${prefix}${partId}`) : keys;
       const text = replyKeys.map(key => channel.state[key]).filter((value): value is string => typeof value === "string").join("\n\n");
       const completed = data.outcome === "completed" && text.length > 0;
+      await channel.bot.initialize();
       await inkbox.send(thread.id,
         completed ? text : "The agent could not complete this task.",
         { a2aIntent: completed ? "complete" : "fail", idempotencyKey: `eve-task:${data.turnId}` },
@@ -57,6 +60,7 @@ export function inkboxChannelEvents(
       if (data.outcome !== "failed" || !channel.thread) return;
       const isA2A = inkbox.decodeThreadId(channel.thread.id).channel === "a2a";
       if (isA2A && channel.state.inkboxA2ATerminal === true) return;
+      await channel.bot.initialize();
       await inkbox.send(channel.thread.id, "This session could not recover. Please start a new request.", {
         ...(isA2A ? { a2aIntent: "fail" as const } : {}),
         idempotencyKey: `eve-session-failure:${session.id}`,

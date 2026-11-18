@@ -270,16 +270,17 @@ real calls or send live messages during automated checks.
 
 ### Retrying phone messages with media
 
-For SMS/MMS and iMessage sends with an explicit `idempotencyKey`, the adapter
-persists the prepared message in Chat state before sending it. Retries reuse the
+For SMS/MMS and iMessage sends containing media with an explicit `idempotencyKey`,
+the adapter persists the prepared message in Chat state before sending it. Retries reuse the
 same payload and media URLs, including after an adapter restart. Reusing a key
 with changed text or attachment input is rejected. Concurrent preparation asks
 the caller to retry with the same key instead of sending another payload.
 
-Use persistent Chat state in production and retain these operation records for
-as long as the application may retry. Records have no automatic expiry; they
-contain prepared URLs and input fingerprints, not uploaded file bytes. Memory
-state does not provide recovery across process restarts. A crash during upload
+Use persistent Chat state in production. Prepared records expire seven days after
+creation and contain message text, prepared media URLs, the send key, and input
+fingerprints, not uploaded file bytes. Text-only phone sends do not create these
+records or require Chat initialization. Memory state does not provide recovery
+across process restarts. A crash during upload
 before preparation is saved can leave an unused upload; no send occurs before
 preparation is saved. An expired preparation lock can also permit another upload,
 but all senders use the single immutable saved payload.
@@ -287,3 +288,9 @@ but all senders use the single immutable saved payload.
 An expired media URL is never refreshed under an existing operation key. Reconcile
 the original send before creating a new operation. This preserves the backend's
 idempotency protection; it is not an exactly-once delivery guarantee.
+
+Callback-only attachments (`fetchData` without a stable reference, URL, or supplied
+bytes) must remain readable on each retry so the adapter can fingerprint their
+content and reject changed input. A saved prepared URL does not bypass this
+check. After a prepared record expires, reconcile the original send before
+attempting recovery; do not assume a new upload will replay the original result.

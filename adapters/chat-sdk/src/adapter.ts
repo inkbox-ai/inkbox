@@ -465,7 +465,8 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             : "ast" in message
               ? this.renderFormatted(message.ast)
               : "fallbackText" in message &&
-                  typeof message.fallbackText === "string"
+                  typeof message.fallbackText === "string" &&
+                  message.fallbackText.length > 0
                 ? message.fallbackText
                 : cardToFallbackText(extractCard(message)!);
     const files =
@@ -571,6 +572,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     };
     const input =
       options.idempotencyKey &&
+      (files.length > 0 || attachments.length > 0) &&
       (route.channel === "sms" || route.channel === "imessage")
         ? await this.preparePhoneSend(
             threadId,
@@ -680,7 +682,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       if (current) return validate(current);
       const prepared = { fingerprint, input: await prepare() };
       // An expired lease can admit another worker. Only the immutable winner is sent.
-      await state.setIfNotExists(key, prepared);
+      await state.setIfNotExists(key, prepared, 7 * 24 * 60 * 60 * 1000);
       const winner = await state.get<Prepared>(key);
       if (!winner)
         throw new Error("Prepared message was not retained; no message sent");
@@ -809,7 +811,8 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             : "ast" in message
               ? this.renderFormatted(message.ast)
               : "fallbackText" in message &&
-                  typeof message.fallbackText === "string"
+                  typeof message.fallbackText === "string" &&
+                  message.fallbackText.length > 0
                 ? message.fallbackText
                 : cardToFallbackText(extractCard(message)!);
     const result = await this.supported(() =>
