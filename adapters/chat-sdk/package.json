@@ -1,0 +1,47 @@
+{
+  "name": "@inkbox/chat-sdk-adapter",
+  "version": "0.7.39",
+  "description": "Inkbox communication channels for Chat SDK",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@inkbox/sdk": "^0.7.39",
+    "@chat-adapter/shared": "^4.45.0",
+    "html-to-text": "^9.0.5"
+  },
+  "peerDependencies": {
+    "chat": "^4.45.0"
+  },
+  "devDependencies": {
+    "chat": "4.45.0",
+    "@chat-adapter/state-memory": "4.45.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0",
+    "@types/html-to-text": "^9.0.4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inkbox-ai/inkbox",
+    "directory": "adapters/chat-sdk"
+  }
+}
