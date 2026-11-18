@@ -10,6 +10,15 @@ pip install inkbox
 
 Requires Python ≥ 3.11.
 
+## Remote MCP request headers
+
+Integrations using `inkbox.remote_mcp.RemoteMcp` can override
+`async request_headers(self, method: str) -> dict[str, str]` to provide
+request-scoped headers. The hook runs before every HTTP request, including
+continuation submissions and retries. Its default returns no extra headers.
+An exception stops that request. Supplemental headers cannot replace the API
+key, authorization, routing, or MCP protocol headers.
+
 ## Companion mode
 
 Companion mode is off by default, separate from whitelist/blacklist settings.

@@ -5,6 +5,76 @@ use inkbox::{
 };
 use serde_json::{json, Value};
 #[test]
+fn resize_keeps_machine_version_and_optional_disk_capacity() {
+    for bytes in [None, Some(16 * 1024 * 1024 * 1024)] {
+        let server = MockServer::start();
+        let mut body = json!({"shape_id":"v1-cpu2-ram8gb","expected_version":4});
+        if let Some(bytes) = bytes {
+            body["disk_bytes"] = bytes.into();
+        }
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/identities/example/hosting/workspace/resize")
+                .header("Idempotency-Key", "resize-once")
+                .json_body(body);
+            then.status(202)
+                .json_body(json!({"operation_id":"operation","version":5,"snapshot_id":null}));
+        });
+        let client = Inkbox::builder("synthetic-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let result = client
+            .identities()
+            .workspace("example")
+            .resize("v1-cpu2-ram8gb", 4, "resize-once", bytes)
+            .unwrap();
+        assert_eq!(result["version"], 5);
+        request.assert_hits(1);
+    }
+}
+#[test]
+fn continuation_actions_preserve_idempotency_without_cold_fallback() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let workspace = client.identities().workspace("example-agent");
+    let start = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/example-agent/hosting/workspace/actions/start");
+        then.status(202)
+            .json_body(json!({"operation_id":"unexpected"}));
+    });
+    for action in ["pause", "resume"] {
+        let expected = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!(
+                    "/api/v1/identities/example-agent/hosting/workspace/actions/{action}"
+                ))
+                .header("Idempotency-Key", "continuation-once")
+                .json_body(json!({}));
+            then.status(409)
+                .json_body(json!({"detail":{"code":"checkpoint_incompatible"}}));
+        });
+        let result = if action == "pause" {
+            workspace.pause("continuation-once")
+        } else {
+            workspace.resume("continuation-once")
+        };
+        assert!(matches!(
+            result,
+            Err(inkbox::InkboxError::Api {
+                status_code: 409,
+                ..
+            })
+        ));
+        expected.assert_hits(1);
+    }
+    start.assert_hits(0);
+}
+#[test]
 fn rename_preserves_title_and_idempotency_key() {
     let server = MockServer::start();
     let renamed = server.mock(|when, then| {

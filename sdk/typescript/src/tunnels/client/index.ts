@@ -20,7 +20,7 @@ import {
   TunnelStateConflict,
 } from "../exceptions.js";
 import { validateTunnelName } from "../_validation.js";
-import { TLSMode, Tunnel } from "../types.js";
+import { TLSMode, Tunnel, TunnelStatus } from "../types.js";
 import {
   ForwardTargetRefused,
   validateEnvelopePath,
@@ -220,23 +220,32 @@ export async function connect(
 
   const stateDirPath = options.stateDir ?? defaultStateDir(options.name);
   ensurePrivateStateDir(stateDirPath);
-  const state = loadState(stateDirPath);
+  let state = loadState(stateDirPath);
+  if (state?.name !== options.name) state = null;
 
   let tunnel: Tunnel | null = null;
+  let removed: TunnelRemoved | null = null;
 
   if (state?.tunnelId) {
+    const savedId = state.tunnelId;
     try {
-      tunnel = await inkbox.tunnels.get(state.tunnelId);
+      tunnel = await inkbox.tunnels.get(savedId);
+      if (tunnel.tunnelName !== options.name) {
+        tunnel = null;
+        state = null;
+      }
     } catch (err: unknown) {
       const apiErr = err as { statusCode?: number; agentSupport?: unknown };
       if (apiErr?.statusCode === 404) {
-        throw new TunnelRemoved(
-          `tunnel ${options.name} (id=${state.tunnelId}) has been removed; ` +
-            `clear ${stateDirPath} and call inkbox.createIdentity(${JSON.stringify(options.name)}) to start fresh`,
+        removed = new TunnelRemoved(
+          `tunnel ${options.name} (id=${savedId}) has been removed; ` +
+            `call inkbox.createIdentity(${JSON.stringify(options.name)}) to start fresh`,
           typeof apiErr.agentSupport === "string" ? apiErr.agentSupport : null,
         );
+        state = null;
+      } else {
+        throw err;
       }
-      throw err;
     }
   }
   if (!tunnel) {
@@ -244,11 +253,16 @@ export async function connect(
     tunnel = list.find((t) => t.tunnelName === options.name) ?? null;
   }
   if (!tunnel) {
+    if (removed) throw removed;
     throw new TunnelNotProvisioned(
       `no tunnel named ${JSON.stringify(options.name)} exists in this org. ` +
         "Tunnels are provisioned atomically by inkbox.createIdentity(<handle>); " +
         `call inkbox.createIdentity(${JSON.stringify(options.name)}) first.`,
     );
+  }
+  if (state?.tunnelId !== tunnel.id) state = null;
+  if (tunnel.tlsMode === TLSMode.EDGE && tunnel.status !== TunnelStatus.ACTIVE) {
+    throw new TunnelStateConflict(409, "tunnel is not active");
   }
 
   // For passthrough, lazy-load _cert.ts so the edge-mode bundle stays
@@ -257,16 +271,27 @@ export async function connect(
   // the forcing function.
   let tlsTerminator: import("./_tls.js").TlsTerminator | null = null;
   if (tunnel.tlsMode === TLSMode.PASSTHROUGH) {
+    if (tunnel.status !== TunnelStatus.ACTIVE && tunnel.status !== TunnelStatus.AWAITING_CERT) {
+      throw new TunnelStateConflict(409, "tunnel is not ready for certificate setup");
+    }
     // Passthrough accepts either ``forwardTo`` (URL) or ``handler``
     // (Fetch-style callable). The runtime constructs UpstreamUrlDispatch
     // or CallableDispatch accordingly.
     const cert = await import("./_cert.js");
     const tls = await import("./_tls.js");
     const keypair = await cert.loadOrCreateKeypair(stateDirPath);
-    if (await cert.certNeedsSign(stateDirPath, keypair)) {
+    if (tunnel.status === TunnelStatus.AWAITING_CERT
+      || (!state && !tunnel.certFingerprintSha256)
+      || await cert.certNeedsSign(stateDirPath, keypair, {
+        publicHost: tunnel.publicHost, fingerprintSha256: tunnel.certFingerprintSha256,
+      })) {
       const csrPem = await cert.buildCsr(keypair, tunnel.publicHost);
       const signed = await inkbox.tunnels.signCsr(tunnel.id, { csrPem });
       cert.writeCertChain(stateDirPath, signed.certPem, signed.chainPem);
+      tunnel = await inkbox.tunnels.get(tunnel.id);
+    }
+    if (tunnel.status !== TunnelStatus.ACTIVE) {
+      throw new TunnelStateConflict(409, "tunnel is not active after certificate setup");
     }
     const certPath = `${stateDirPath}/cert_chain.pem`;
     const certChainPem = await import("node:fs").then((fs) =>
@@ -334,5 +359,3 @@ export async function connect(
     listenerOpts,
   });
 }
-
-void TunnelStateConflict; // retained for re-export breadth on the surviving surface

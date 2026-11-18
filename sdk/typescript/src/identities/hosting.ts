@@ -1,4 +1,5 @@
-export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra";
+export type HostingHarness = "codex" | "hermes" | "claude_code" | "opencode" | "deepseek" | "openclaw";
+export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt-6-astra" | "claude-haiku-5-5" | "claude-sonnet-5-5" | "claude-opus-5-5" | "claude-fable-5-2" | "deepseek-flash" | "deepseek-v4-pro";
 
 /** Generation-checked partial command: omitted settings stay unchanged.
  * enabled defaults to true (activate/retry); false removes hosting.
@@ -8,10 +9,12 @@ export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt
 export interface HostingUpdate {
   expectedGeneration: number;
   enabled?: boolean;
-  harness?: "codex" | "hermes";
+  harness?: HostingHarness;
   /** Default for turns and scheduled work that do not override the model. */
   defaultModel?: HostingModel;
   tier?: "medium";
+  /** Initial allocation; resize existing computers through the workspace. */
+  shapeId?: string;
   instructions?: string;
   triggerEvents?: string[];
   followDefaults?: boolean;
@@ -30,6 +33,7 @@ export interface HostingConfiguration {
   harness: string | null;
   defaultModel: HostingModel;
   tier: string | null;
+  shapeId: string | null;
   state: string;
   generation: number;
   appliedGeneration: number;
@@ -50,6 +54,7 @@ interface RawHostingConfiguration {
   harness?: string | null;
   default_model?: HostingModel;
   tier?: string | null;
+  shape_id?: string | null;
   state: string;
   generation: number;
   applied_generation: number;
@@ -67,6 +72,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
   return {
     mode: data.mode, identityId: data.identity_id, machineId: data.machine_id ?? null,
     harness: data.harness ?? null, tier: data.tier ?? null, state: data.state,
+    shapeId: data.shape_id ?? null,
     defaultModel: data.default_model ?? "gpt-6.1-terra",
     generation: data.generation, appliedGeneration: data.applied_generation,
     instructions: data.instructions ?? "", triggerEvents: data.trigger_events ?? [],
@@ -81,6 +87,7 @@ export function hostingUpdateBody(options: HostingUpdate): Record<string, unknow
     idle_stop_enabled: options.idleStopEnabled, reset_instructions: options.resetInstructions,
     expected_generation: options.expectedGeneration, enabled: options.enabled,
     harness: options.harness, tier: options.tier, instructions: options.instructions,
+    shape_id: options.shapeId,
     default_model: options.defaultModel,
     trigger_events: options.triggerEvents, follow_defaults: options.followDefaults,
     credential_binding_id: options.credentialBindingId, idle_timeout_seconds: options.idleTimeoutSeconds,

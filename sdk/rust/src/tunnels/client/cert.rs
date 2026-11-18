@@ -197,6 +197,39 @@ fn cert_spki_der(cert_path: &Path) -> Option<Vec<u8>> {
     spki.to_der().ok()
 }
 
+/// Check the cached leaf against the tunnel's current hostname and certificate.
+pub fn cert_matches_tunnel(
+    state_dir: &Path,
+    public_host: &str,
+    fingerprint_sha256: Option<&str>,
+) -> bool {
+    use der::Encode;
+    use sha2::{Digest, Sha256};
+    let check =
+        || -> Option<bool> {
+            let pem = std::fs::read(state_dir.join(CERT_FILE)).ok()?;
+            let cert = Certificate::load_pem_chain(&pem).ok()?.into_iter().next()?;
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
+            if cert.tbs_certificate.validity.not_before.to_unix_duration() > now {
+                return Some(false);
+            }
+            let (_, names) = cert.tbs_certificate.get::<SubjectAltName>().ok()??;
+            if !names.0.iter().any(|name| matches!(
+            name, GeneralName::DnsName(dns) if dns.as_str().eq_ignore_ascii_case(public_host)
+        )) {
+            return Some(false);
+        }
+            if let Some(expected) = fingerprint_sha256 {
+                let actual = hex::encode(Sha256::digest(cert.to_der().ok()?));
+                if !actual.eq_ignore_ascii_case(expected) {
+                    return Some(false);
+                }
+            }
+            Some(true)
+        };
+    check().unwrap_or(false)
+}
+
 /// Persist the signed cert + chain (mode 0o600); return the bytes.
 ///
 /// Matches the Python / TS layout: leaf cert first, then the chain, written to
@@ -266,5 +299,52 @@ mod tests {
         let k = load_or_create_keypair(&dir).unwrap();
         assert!(cert_needs_sign(&dir, &k));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cached_certificate_matches_current_tunnel() {
+        use der::{Decode, Encode};
+        use sha2::{Digest, Sha256};
+        use x509_cert::builder::{CertificateBuilder, Profile};
+        use x509_cert::{serial_number::SerialNumber, time::Validity};
+        let dir = unique_dir("identity");
+        let key = load_or_create_keypair(&dir).unwrap();
+        let public = key.verifying_key().to_public_key_der().unwrap();
+        let subject = Name::from_str("CN=my-agent.example.test").unwrap();
+        let validity = Validity::from_now(std::time::Duration::from_secs(90 * 86400)).unwrap();
+        let mut builder = CertificateBuilder::new(
+            Profile::Root,
+            SerialNumber::from(1u32),
+            validity,
+            subject,
+            SubjectPublicKeyInfoOwned::from_der(public.as_bytes()).unwrap(),
+            &key,
+        )
+        .unwrap();
+        builder
+            .add_extension(&SubjectAltName(vec![GeneralName::DnsName(
+                der::asn1::Ia5String::new("my-agent.example.test").unwrap(),
+            )]))
+            .unwrap();
+        let cert = builder.build::<DerSignature>().unwrap();
+        write_cert_chain(&dir, &cert.to_pem(LineEnding::LF).unwrap(), "").unwrap();
+        let fingerprint = hex::encode(Sha256::digest(cert.to_der().unwrap()));
+        assert!(!cert_needs_sign(&dir, &key));
+        assert!(cert_matches_tunnel(
+            &dir,
+            "my-agent.example.test",
+            Some(&fingerprint)
+        ));
+        assert!(!cert_matches_tunnel(
+            &dir,
+            "other-agent.example.test",
+            Some(&fingerprint)
+        ));
+        assert!(!cert_matches_tunnel(
+            &dir,
+            "my-agent.example.test",
+            Some(&"00".repeat(32))
+        ));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

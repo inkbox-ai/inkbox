@@ -10,6 +10,18 @@ import { fileURLToPath } from "node:url";
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2, default_model: "gpt-6-luna"};
 
+test("provider harness configuration retains the saved key and rejects funded provider models", async () => {
+  await withApi(async (run, requests) => {
+    for (const [harness, model] of [["claude_code","claude-sonnet-5-5"],["deepseek","deepseek-v4-pro"],["opencode","claude-fable-5-2"],["openclaw","deepseek-flash"]]) {
+      const result = await run(["configure","example","--expected-generation","0","--harness",harness,"--default-model",model,"--model-key","saved-key"]);
+      assert.ifError(result.error);
+      assert.deepEqual(requests.at(-1).body, {expected_generation:0,harness,default_model:model,credential_binding_id:"saved-key"});
+    }
+    assert.ok((await run(["configure","example","--expected-generation","0","--default-model","claude-sonnet-5-5","--credits"])).error);
+    assert.equal(requests.length,4);
+  });
+});
+
 async function withApi(action, response = () => config) {
   const requests = [];
   const server = http.createServer(async (req, res) => {
@@ -44,6 +56,40 @@ test("chat rename patches the selected conversation", async () => {
     const result = await run(["chat", "rename", "example", "conversation", "--title", "Inbox review", "--idempotency-key", "rename-once"]);
     assert.ifError(result.error);
     assert.deepEqual(requests, [{method: "PATCH", path: "/api/v1/identities/example/hosting/chat/conversations/conversation", body: {title: "Inbox review"}}]);
+  });
+});
+
+test("manual pause and resume require an intent key and call the matching action once", async () => {
+  const keys = [];
+  await withApi(async (run, requests) => {
+    for (const action of ["pause", "resume"]) {
+      assert.ok((await run(["workspace", action, "example"])).error);
+      assert.ifError((await run(["workspace", action, "example", "--idempotency-key", `${action}-once`])).error);
+    }
+    assert.deepEqual(keys, ["pause-once", "resume-once"]);
+    assert.deepEqual(requests, ["pause", "resume"].map(action => ({
+      method: "POST", path: `/api/v1/identities/example/hosting/workspace/actions/${action}`, body: {},
+    })));
+  }, req => { keys.push(req.headers["idempotency-key"]); return { operation_id: "operation" }; });
+});
+
+test("workspace resize forwards version and size without implicitly starting or stopping", async () => {
+  await withApi(async (run, requests) => {
+    const args = ["workspace", "resize", "example", "--shape", "v1-cpu2-ram8gb", "--expected-version", "4", "--idempotency-key", "resize-once"];
+    assert.ifError((await run(args)).error);
+    assert.deepEqual(requests, [{method:"POST",path:"/api/v1/identities/example/hosting/workspace/resize",body:{shape_id:"v1-cpu2-ram8gb",expected_version:4}}]);
+    assert.ok((await run([...args, "--disk-bytes", "-1"])).error);
+    assert.equal(requests.length, 1);
+  }, () => ({operation_id:"operation",version:5,snapshot_id:null}));
+});
+
+test("initial hosting shape is sent without the legacy size alias", async () => {
+  await withApi(async (run, requests) => {
+    const args = ["configure", "example", "--expected-generation", "0", "--shape", "v1-cpu2-ram8gb"];
+    assert.ifError((await run(args)).error);
+    assert.deepEqual(requests[0].body, {expected_generation:0,shape_id:"v1-cpu2-ram8gb"});
+    assert.ok((await run([...args,"--size","medium"])).error);
+    assert.equal(requests.length,1);
   });
 });
 

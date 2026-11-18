@@ -60,6 +60,27 @@ describe("buildCsr", () => {
 });
 
 describe("certNeedsSign", () => {
+  it("requires the current hostname and fingerprint before reusing a certificate", async () => {
+    const x509 = await import("@peculiar/x509");
+    const { writeCertChain } = await import("../../src/tunnels/client/_cert.js");
+    const key = await loadOrCreateKeypair(tmpDir);
+    const host = "my-agent.example.test";
+    const cert = await x509.X509CertificateGenerator.createSelfSigned({
+      serialNumber: "01", name: `CN=${host}`,
+      notBefore: new Date(Date.now() - 60_000),
+      notAfter: new Date(Date.now() + 90 * 86400_000),
+      keys: { privateKey: key.privateKey, publicKey: key.publicKey },
+      signingAlgorithm: { name: "ECDSA", hash: "SHA-256" },
+      extensions: [new x509.SubjectAlternativeNameExtension([{ type: "dns", value: host }])],
+    });
+    const pem = cert.toString("pem");
+    writeCertChain(tmpDir, pem, "");
+    const fingerprintSha256 = new crypto.X509Certificate(pem).fingerprint256.replaceAll(":", "").toLowerCase();
+    expect(await certNeedsSign(tmpDir, key, { publicHost: host, fingerprintSha256 })).toBe(false);
+    expect(await certNeedsSign(tmpDir, key, { publicHost: "another-agent.example.test", fingerprintSha256 })).toBe(true);
+    expect(await certNeedsSign(tmpDir, key, { publicHost: host, fingerprintSha256: "00".repeat(32) })).toBe(true);
+  });
+
   it("returns true when no cert is on disk", async () => {
     const key = await loadOrCreateKeypair(tmpDir);
     expect(await certNeedsSign(tmpDir, key)).toBe(true);

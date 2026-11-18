@@ -88,25 +88,18 @@ impl TunnelsResource {
     }
 
     #[cfg(feature = "tunnels-runtime")]
-    fn get_persisted_tunnel(
-        &self,
-        name: &str,
-        tunnel_id: &str,
-        state_dir: &std::path::Path,
-    ) -> Result<Tunnel> {
+    fn get_persisted_tunnel(&self, name: &str, tunnel_id: &str) -> Result<Tunnel> {
         match self.get(tunnel_id) {
             Ok(tunnel) => Ok(tunnel),
             Err(InkboxError::Api {
                 status_code: 404,
                 agent_support,
                 ..
-            }) => Err(InkboxError::TunnelRemoved {
-                message: format!(
-                    "tunnel {name:?} (id={tunnel_id}) has been removed; clear {} and call \
-                     create_identity({name:?}) to start fresh",
-                    state_dir.display()
-                ),
-                agent_support,
+            }) => self.list()?.into_iter().find(|t| t.tunnel_name == name).ok_or_else(|| {
+                InkboxError::TunnelRemoved {
+                    message: format!("tunnel {name:?} has been removed; call create_identity({name:?}) to start fresh"),
+                    agent_support,
+                }
             }),
             Err(error) => Err(error),
         }
@@ -233,7 +226,8 @@ impl TunnelsResource {
             resolve_zone_and_host, validate_pool_size, TunnelBundle,
         };
         use crate::tunnels::client::cert::{
-            build_csr, cert_needs_sign, key_pem_bytes, load_or_create_keypair, write_cert_chain,
+            build_csr, cert_matches_tunnel, cert_needs_sign, key_pem_bytes, load_or_create_keypair,
+            write_cert_chain,
         };
         use crate::tunnels::client::runtime::{ForwardTo, TunnelRuntime, TunnelRuntimeConfig};
         use crate::tunnels::client::state::{
@@ -263,12 +257,12 @@ impl TunnelsResource {
             .ok_or_else(|| InkboxError::Tunnel("HOME not set; cannot resolve state dir".into()))?;
         let state_dir = home.join(".inkbox").join("tunnels").join(name);
         ensure_private_state_dir(&state_dir).map_err(|e| InkboxError::Tunnel(e.to_string()))?;
-        let state = load_state(&state_dir);
+        let mut state = load_state(&state_dir).filter(|s| s.name == name);
 
         // Resolve the tunnel: prefer the state's tunnel_id (a `get`), else look
         // it up by name (the server lists only live tunnels). Mirrors `bootstrap`.
         let mut tunnel = match state.as_ref().map(|s| s.tunnel_id.clone()) {
-            Some(id) if !id.is_empty() => self.get_persisted_tunnel(name, &id, &state_dir)?,
+            Some(id) if !id.is_empty() => self.get_persisted_tunnel(name, &id)?,
             _ => self
                 .list()?
                 .into_iter()
@@ -280,6 +274,24 @@ impl TunnelsResource {
                     ))
                 })?,
         };
+
+        if tunnel.tunnel_name != name {
+            tunnel = self
+                .list()?
+                .into_iter()
+                .find(|t| t.tunnel_name == name)
+                .ok_or_else(|| {
+                    InkboxError::Tunnel(
+                        "TunnelNotProvisioned: requested tunnel does not exist".into(),
+                    )
+                })?;
+        }
+        if state
+            .as_ref()
+            .is_some_and(|s| s.tunnel_id != tunnel.id.to_string())
+        {
+            state = None;
+        }
 
         let is_active = |t: &crate::tunnels::types::Tunnel| {
             matches!(&t.status, TunnelStatusValue::Known(TunnelStatus::Active))
@@ -302,6 +314,18 @@ impl TunnelsResource {
         // assemble the TLS material the runtime terminates with.
         let mut tls_material: Option<(Vec<u8>, Vec<u8>)> = None;
         if tunnel.tls_mode == TLSMode::Passthrough {
+            if !matches!(
+                &tunnel.status,
+                TunnelStatusValue::Known(TunnelStatus::Active | TunnelStatus::AwaitingCert)
+            ) {
+                return Err(InkboxError::Api {
+                    status_code: 409,
+                    detail: crate::error::ApiErrorDetail::Message(
+                        "tunnel is not ready for certificate setup".into(),
+                    ),
+                    agent_support: None,
+                });
+            }
             let (_zone, public_host) = resolve_zone_and_host(
                 name,
                 Some(&tunnel.zone),
@@ -314,7 +338,14 @@ impl TunnelsResource {
                 &tunnel.status,
                 TunnelStatusValue::Known(TunnelStatus::AwaitingCert)
             );
-            let chain_bytes = if awaiting || cert_needs_sign(&state_dir, &key) {
+            let chain_bytes = if awaiting
+                || (state.is_none() && tunnel.cert_fingerprint_sha256.is_none())
+                || cert_needs_sign(&state_dir, &key)
+                || !cert_matches_tunnel(
+                    &state_dir,
+                    &public_host,
+                    tunnel.cert_fingerprint_sha256.as_deref(),
+                ) {
                 let csr_pem = build_csr(&key, &public_host)?;
                 let signed = self.sign_csr(&tunnel.id.to_string(), &csr_pem)?;
                 let chain = write_cert_chain(&state_dir, &signed.cert_pem, &signed.chain_pem)?;
@@ -425,6 +456,10 @@ mod tests {
     #[test]
     fn persisted_tunnel_404_preserves_agent_support() {
         let server = MockServer::start();
+        let list = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/tunnels/");
+            then.status(200).json_body(serde_json::json!([]));
+        });
         let tunnel_id = "11111111-1111-1111-1111-111111111111";
         let support = "Contact the Support Agent using its Agent Card.";
         let response = server.mock(|when, then| {
@@ -442,14 +477,11 @@ mod tests {
 
         let error = client
             .tunnels()
-            .get_persisted_tunnel(
-                "my-agent",
-                tunnel_id,
-                std::path::Path::new("/tmp/inkbox-test-state"),
-            )
+            .get_persisted_tunnel("my-agent", tunnel_id)
             .unwrap_err();
 
         response.assert();
+        list.assert();
         assert!(matches!(
             error,
             crate::error::InkboxError::TunnelRemoved { .. }

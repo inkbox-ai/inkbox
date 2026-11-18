@@ -11,6 +11,26 @@ from inkbox.exceptions import InkboxAPIError
 FIXTURES = Path(__file__).resolve().parents[3] / "contracts"
 
 
+@pytest.mark.parametrize("action", ["pause", "resume"])
+def test_continuation_actions_preserve_idempotency_and_do_not_fallback(action):
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(409, json={"detail": {"code": "checkpoint_incompatible"}})
+
+    with HttpTransport("synthetic-key", "https://example.test") as transport:
+        transport._client.close()
+        transport._client = httpx.Client(base_url="https://example.test", transport=httpx.MockTransport(respond))
+        workspace = HostedWorkspace(transport, "example-agent")
+        with pytest.raises(InkboxAPIError):
+            getattr(workspace, action)(idempotency_key="continuation-once")
+    assert len(requests) == 1
+    assert requests[0].url.path.endswith(f"/hosting/workspace/actions/{action}")
+    assert requests[0].headers["Idempotency-Key"] == "continuation-once"
+    assert json.loads(requests[0].content) == {}
+
+
 def test_rename_forwards_title_and_idempotency_key():
     http = MagicMock()
     HostedWorkspace(http, "example-agent").rename_conversation(
@@ -20,6 +40,19 @@ def test_rename_forwards_title_and_idempotency_key():
         "/example-agent/hosting/chat/conversations/conversation",
         json={"title": "Inbox review"}, headers={"Idempotency-Key": "rename-once"},
     )
+
+
+@pytest.mark.parametrize('disk_bytes', [None, 16 * 1024 ** 3])
+def test_resize_preserves_machine_version_and_omitted_disk_size(disk_bytes):
+    http = MagicMock()
+    HostedWorkspace(http, 'example').resize(
+        'v1-cpu2-ram8gb', expected_version=4, idempotency_key='resize-once', disk_bytes=disk_bytes,
+    )
+    body = {'shape_id': 'v1-cpu2-ram8gb', 'expected_version': 4}
+    if disk_bytes is not None:
+        body['disk_bytes'] = disk_bytes
+    http.post.assert_called_once_with('/example/hosting/workspace/resize', json=body,
+                                      headers={'Idempotency-Key': 'resize-once'})
 
 
 def test_versioned_response_and_cursor_are_forwarded_without_replay():
