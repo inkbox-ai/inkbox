@@ -1,5 +1,5 @@
 import type { InkboxAdapter } from "@inkbox/chat-sdk-adapter";
-import type { ChatSdkChannelEvents, ChatSdkSendOptions } from "eve/channels/chat-sdk";
+import { isNotImplemented, type ChatSdkChannelEvents, type ChatSdkSendOptions } from "eve/channels/chat-sdk";
 import { delivery, interaction, nextPrompt, type Principal } from "eve/events";
 
 // Interaction prompts keep a task open while its caller supplies input.
@@ -38,7 +38,13 @@ export function inkboxChannelEvents(
       channel.state[key] = taskId;
     },
     async "turn.started"({ data }, { channel, view }) {
-      if (!channel.thread || inkbox.decodeThreadId(channel.thread.id).channel !== "a2a") return;
+      if (!channel.thread) return;
+      if (inkbox.decodeThreadId(channel.thread.id).channel !== "a2a") {
+        await channel.bot.initialize();
+        try { await channel.thread.startTyping("Working..."); }
+        catch (error) { if (!isNotImplemented(error)) throw error; }
+        return;
+      }
       if (!("deliveryId" in data.cause)) throw new Error("An A2A turn requires an originating delivery.");
       const taskId = taskFromPrincipal(delivery(view, data.cause.deliveryId)?.principal, channel.thread.id);
       const key = `inkbox:task:${data.turnId}`;
@@ -70,10 +76,13 @@ export function inkboxChannelEvents(
       const request = interaction(view, data.interactionId);
       if (!request || request.request.signIn?.waitsOn) return;
       const signIn = request.request.signIn;
-      const text = [request.request.title, request.request.prompt, signIn?.instructions,
-        signIn?.url ?? request.request.link?.url, signIn?.userCode,
-      ].filter(Boolean).join("\n\n");
-      const taskId = inkbox.decodeThreadId(channel.thread.id).channel === "a2a"
+      const isA2A = inkbox.decodeThreadId(channel.thread.id).channel === "a2a";
+      const text = isA2A || channel.thread.isDM === true
+        ? [request.request.title, request.request.prompt, signIn?.instructions,
+          signIn?.url ?? request.request.link?.url, signIn?.userCode,
+        ].filter(Boolean).join("\n\n")
+        : "Sign-in requires a private conversation. Continue in a direct message.";
+      const taskId = isA2A
         ? boundTask(channel.state, request.turnId) : undefined;
       if (taskId && channel.state[`inkbox:terminal:${taskId}`] === true) return;
       await channel.bot.initialize();

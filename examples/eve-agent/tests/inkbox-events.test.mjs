@@ -210,7 +210,7 @@ test("sign-in prompts retain their task without exposing callback URLs", async (
   await bindTask(events, ctx, "task-first", "turn-first");
   const prompt = { type: "interaction.opened", scope: { turnId: "turn-first" }, data: {
     interactionId: "signin-first", subject: { turnId: "turn-first" },
-    request: { kind: "sign-in", prompt: "Sign in to continue", signIn: { name: "example", url: "https://example.com/login", callbackUrl: "https://example.com/private-callback" } },
+    request: { kind: "sign-in", prompt: "Sign in to continue", signIn: { name: "example", url: "https://example.com/login", callbackUrl: "https://example.com/private-callback", userCode: "A2A-CODE", instructions: "Continue with this code" } },
   } };
   ctx.view = viewOf([...taskFacts("task-first", "turn-first"), prompt]);
   await events["interaction.opened"](prompt, ctx);
@@ -218,6 +218,8 @@ test("sign-in prompts retain their task without exposing callback URLs", async (
   assert.equal(sends[0][2].a2aIntent, "ask_caller");
   assert.match(sends[0][1], /https:\/\/example.com\/login/);
   assert.doesNotMatch(sends[0][1], /private-callback/);
+  assert.match(sends[0][1], /A2A-CODE/);
+  assert.match(sends[0][1], /Continue with this code/);
 });
 
 
@@ -237,4 +239,60 @@ test("email interaction prompts retain their bound reply audience", async () => 
   await events["interaction.opened"](signIn, ctx);
   assert.equal(sends.length, 2);
   for (const send of sends) assert.equal(send[2].replyToMessageId, "bound-message-test");
+});
+
+test("shared sign-in notices contain no challenge URL, code, or instructions", async () => {
+  for (const channel of ["email", "sms", "imessage", "slack"]) {
+    for (const isDM of [false, undefined]) {
+      const { events, ctx, sends } = fixture(channel);
+      ctx.channel.thread.isDM = isDM;
+      const prompt = { type: "interaction.opened", scope: { turnId: "turn-test" }, data: {
+        interactionId: "shared-signin", subject: { turnId: "turn-test" }, request: {
+          kind: "sign-in", title: "Sensitive title", prompt: "Sensitive prompt",
+          link: { url: "https://example.com/fallback-challenge" },
+          signIn: { name: "example", url: "https://example.com/challenge", userCode: "EXAMPLE-CODE", instructions: "Sensitive instructions" },
+        },
+      } };
+      ctx.view = viewOf([...taskFacts("task-test", "turn-test"), prompt]);
+      await events["interaction.opened"](prompt, ctx);
+      assert.equal(sends.length, 1);
+      assert.equal(sends[0][1], "Sign-in requires a private conversation. Continue in a direct message.");
+    }
+  }
+});
+
+test("confirmed direct messages retain sign-in challenges", async () => {
+  const { events, ctx, sends } = fixture("slack");
+  ctx.channel.thread.isDM = true;
+  const prompt = { type: "interaction.opened", scope: { turnId: "turn-test" }, data: {
+    interactionId: "dm-signin", subject: { turnId: "turn-test" }, request: {
+      kind: "sign-in", prompt: "Sign in", signIn: {
+        name: "example", url: "https://example.com/challenge", userCode: "EXAMPLE-CODE", instructions: "Enter this code privately",
+      },
+    },
+  } };
+  ctx.view = viewOf([...taskFacts("task-test", "turn-test"), prompt]);
+  await events["interaction.opened"](prompt, ctx);
+  assert.match(sends[0][1], /https:\/\/example.com\/challenge/);
+  assert.match(sends[0][1], /EXAMPLE-CODE/);
+  assert.match(sends[0][1], /Enter this code privately/);
+});
+
+test("ordinary turns initialize Chat and restore the typing indicator", async () => {
+  const { events, ctx } = fixture("imessage");
+  const calls = [];
+  ctx.channel.bot.initialize = async () => { await Promise.resolve(); calls.push("initialized"); };
+  ctx.channel.thread.startTyping = async status => { calls.push(status); };
+  await events["turn.started"]({ data: { turnId: "turn-test" } }, ctx);
+  assert.deepEqual(calls, ["initialized", "Working..."]);
+});
+
+test("typing ignores only unsupported-capability errors", async () => {
+  const { events, ctx } = fixture("email");
+  const unsupported = new Error("Typing is unsupported");
+  unsupported.name = "NotImplementedError";
+  ctx.channel.thread.startTyping = async () => { throw unsupported; };
+  await events["turn.started"]({ data: { turnId: "turn-test" } }, ctx);
+  ctx.channel.thread.startTyping = async () => { throw new Error("connection unavailable"); };
+  await assert.rejects(events["turn.started"]({ data: { turnId: "turn-test" } }, ctx), /connection unavailable/);
 });

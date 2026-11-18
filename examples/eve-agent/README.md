@@ -40,8 +40,9 @@ receiving and replying to messages.
   the task open. A successful turn with no text result fails explicitly instead
   of reporting an empty success.
 - Interaction prompts use `"ask_caller"` and plain-text numbered choices;
-  typed answers resume the pending interaction. Sign-in prompts preserve their
-  public sign-in link. Ordinary channels receive the same text prompt format,
+  typed answers resume the pending interaction. Sign-in challenges appear only
+  in A2A conversations or confirmed direct messages. Shared conversations receive
+  a link-free notice to continue privately; this example does not send a separate DM. Ordinary channels receive the same text prompt format,
   final replies, and concise failure notices.
 - Handlers accept new mentions and subscribed conversations, not every
   unmentioned Slack channel post. Slack DMs/group DMs and service-authorized
