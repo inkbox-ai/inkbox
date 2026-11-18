@@ -19,7 +19,10 @@ conversation.
    guide](https://eve.dev/docs/getting-started), and set `EVE_MODEL` to your chosen
    model ID.
 3. Configure a persistent Redis service at `REDIS_URL`.
-4. Start with `npm run dev`. For deployment, use Eve's supported build/start or
+4. Start with `npm run dev`, which uses `eve dev --resume` so local restarts
+   attempt to recover retained conversation workflows. Keep both Redis state and
+   Eve's local `.eve` workflow data; Redis alone cannot restore an Eve run.
+   For deployment, use Eve's supported build/start or
    deployment workflow. The channel mounts at `POST /eve/v1/inkbox`.
 5. Create an identity webhook subscription targeting your deployment's public
    HTTPS `/eve/v1/inkbox` URL. The [Chat SDK setup example](../chat-sdk/#subscribe-once)
