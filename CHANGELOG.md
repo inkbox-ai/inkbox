@@ -11,7 +11,7 @@
 
 ### Releasing
 
-- Publish only the new `@inkbox/chat-sdk-adapter@0.7.39` against the existing `@inkbox/sdk@0.7.39`; existing SDKs and CLI are unchanged. Future TypeScript SDK releases continue publishing the adapter alongside the SDK, with paired-release recovery.
+- Publish only the new `@inkbox/chat-sdk-adapter@0.7.39` against the existing `@inkbox/sdk@0.7.39`; existing SDKs and CLI are unchanged. The adapter has its own publishing script; TypeScript SDK publication remains separate.
 
 ## 0.7.39
 

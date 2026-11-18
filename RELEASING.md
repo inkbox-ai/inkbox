@@ -10,7 +10,7 @@ This repo ships five packages whose versions move **in lockstep**:
 | `@inkbox/cli` | `cli/` | npm | `npm install -g @inkbox/cli` |
 | `inkbox` (Rust) | `sdk/rust/` | crates.io | `cargo add inkbox` |
 
-The TypeScript SDK and Chat SDK adapter share one publishing command, `sdk/typescript/publish.sh`. The remaining packages have their own `publish.sh`. All default to a **dry run**; `--prod` publishes for real.
+Each package has its own `publish.sh`. The TypeScript script publishes only the SDK; `adapters/chat-sdk/publish.sh` publishes only the adapter. All default to a **dry run**; `--prod` publishes for real.
 
 ## Initial adapter-only release: 0.7.39
 
@@ -22,11 +22,11 @@ From the repository root:
 
 ```bash
 node scripts/check-release-versions.mjs
-(cd sdk/typescript && ./publish.sh --adapter-only)          # dry run
-(cd sdk/typescript && ./publish.sh --adapter-only --prod)   # publish only the adapter
+(cd adapters/chat-sdk && ./publish.sh)          # dry run
+(cd adapters/chat-sdk && ./publish.sh --prod)   # publish only the adapter
 ```
 
-Adapter-only mode verifies that the matching SDK version exists in npm, installs
+The adapter publisher verifies that the matching SDK version exists in npm, installs
 that published SDK, then builds and packs only the adapter. It never rebuilds or
 publishes the SDK. If the adapter version already exists, production mode skips it
 only when the packed contents match; a conflicting immutable version stops the
@@ -37,8 +37,8 @@ For GitHub validation of this mode, dispatch `Lint & Tests` with the
 against the published SDK rather than a locally rebuilt SDK.
 
 Do not create another `v0.7.39` tag for the existing SDK release. The sections
-below describe future coordinated releases; ordinary SDK publication still
-publishes the adapter too.
+below describe future coordinated releases; each package must be published with
+its own command.
 
 ## 1. Bump versions (all five, same number)
 
@@ -57,7 +57,7 @@ in backticks, followed by a colon and space: `` `0.0.0`: PR title ``.
 | `.claude-plugin/plugin.json` | `version` |
 | `examples/chat-sdk/package-lock.json`, `examples/eve-agent/package-lock.json` | Linked adapter/SDK versions and the adapter's SDK dependency |
 
-CI and the coupled publisher run `node scripts/check-release-versions.mjs` to reject version drift across all five packages, lockfiles, User-Agent constants, and the bundled plugin. Update the linked SDK version in both the CLI and adapter lockfiles.
+CI and the adapter publisher run `node scripts/check-release-versions.mjs` to reject version drift across all five packages, lockfiles, User-Agent constants, and the bundled plugin. Update the linked SDK version in both the CLI and adapter lockfiles.
 
 The CLI declares `@inkbox/sdk: ^<version>` and `cli/publish.sh` refuses to publish unless that matches `sdk/typescript`'s version — so bump it too.
 
@@ -101,18 +101,23 @@ of maintaining duplicate feature lists.
 
 ## 3. Publish — order matters
 
-Publish the **TypeScript SDK and Chat SDK adapter together before the CLI**. The coupled publisher builds and packs both packages before publishing either, then publishes the SDK followed by the adapter. Both the adapter and CLI depend on the matching SDK version. Python and Rust have no cross-dependencies and can go anytime.
+Publish the **TypeScript SDK first**, then publish the adapter and CLI using their
+own scripts after the SDK is available in npm. Publishing the SDK does not
+publish the adapter or CLI. Python and Rust have no cross-dependencies.
 
-The coupled command is also the recovery command for a partial npm release: rerun it from the same reviewed commit. It skips an already-published package only when its registry integrity matches the freshly packed artifact. An authentication/network failure or a version already published with different contents stops the release. Publishing is not atomic across registries; do not tag a release until every package is available. Do not publish the SDK directly with `npm publish`, because that bypasses the paired release.
-
-Run these four commands from the repo root to publish all five packages, in this order:
+For a coordinated release, run these five commands from the repo root:
 
 ```bash
-(cd sdk/typescript && ./publish.sh --prod)   # npm        — @inkbox/sdk, then @inkbox/chat-sdk-adapter
-(cd cli            && ./publish.sh --prod)   # npm        — @inkbox/cli
-(cd sdk/python     && ./publish.sh --prod)   # PyPI       — inkbox
-(cd sdk/rust       && ./publish.sh --prod)   # crates.io  — inkbox
+(cd sdk/typescript    && ./publish.sh --prod)   # @inkbox/sdk
+(cd adapters/chat-sdk && ./publish.sh --prod)   # @inkbox/chat-sdk-adapter
+(cd cli               && ./publish.sh --prod)   # @inkbox/cli
+(cd sdk/python        && ./publish.sh --prod)   # Python inkbox
+(cd sdk/rust          && ./publish.sh --prod)   # Rust inkbox
 ```
+
+For the initial adapter-only 0.7.39 release, run only the adapter command described
+above. The adapter publisher checks existing artifact integrity on retries;
+conflicting contents or registry failures stop the release.
 
 (Each script also runs as a dry run without `--prod`, if you want to preview first.)
 

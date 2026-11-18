@@ -200,9 +200,10 @@ jobs:
           ADAPTER_ONLY: ${{ inputs.adapter_only || false }}
         run: |
           if [ "$ADAPTER_ONLY" = "true" ]; then
-            sdk/typescript/publish.sh --adapter-only
+            adapters/chat-sdk/publish.sh
           else
-            sdk/typescript/publish.sh
+            (cd sdk/typescript && ./publish.sh)
+            (cd adapters/chat-sdk && npm ci --ignore-scripts && npm run build)
           fi
 
       - name: Run adapter tests

@@ -3,10 +3,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { checkReleaseVersions } from "./check-release-versions.mjs";
+import { checkReleaseVersions } from "../../scripts/check-release-versions.mjs";
 
 const packages = [
-  { name: "@inkbox/sdk", directory: "sdk/typescript" },
   { name: "@inkbox/chat-sdk-adapter", directory: "adapters/chat-sdk" },
 ];
 
@@ -28,12 +27,11 @@ function npm(args, cwd) {
   };
 }
 
-/** Publish the pair, or bootstrap only the adapter against an existing SDK release. */
-export function publishChatPackages({
+/** Publish only the adapter against an existing SDK release. */
+export function publishChatAdapter({
   root,
   destination,
   production = false,
-  adapterOnly = false,
   run = npm,
 }) {
   const version = checkReleaseVersions(root);
@@ -45,7 +43,7 @@ export function publishChatPackages({
       );
     return result.stdout;
   };
-  if (adapterOnly) {
+  {
     const publishedVersion = JSON.parse(
       checked(["view", `@inkbox/sdk@${version}`, "version", "--json"], root),
     );
@@ -54,17 +52,15 @@ export function publishChatPackages({
     }
   }
   const packed = [];
-  for (const pkg of adapterOnly ? packages.slice(1) : packages) {
+  for (const pkg of packages) {
     const cwd = join(root, pkg.directory);
-    if (adapterOnly) {
+    {
       // Bypass the development lockfile's SDK link, including its prepare hook.
       rmSync(join(cwd, "node_modules", "@inkbox", "sdk"), { recursive: true, force: true });
       checked([
         "install", "--ignore-scripts", "--no-save", "--package-lock=false",
         `@inkbox/sdk@${version}`,
       ], cwd);
-    } else {
-      checked(["ci", "--ignore-scripts"], cwd);
     }
     rmSync(join(cwd, "dist"), { recursive: true, force: true });
     checked(["run", "build"], cwd);
@@ -156,17 +152,16 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const args = process.argv.slice(2);
-  if (args.some((arg) => !["--prod", "--adapter-only"].includes(arg)) ||
+  if (args.some((arg) => !["--prod"].includes(arg)) ||
       new Set(args).size !== args.length) {
-    throw new Error("Usage: node scripts/publish-chat-packages.mjs [--adapter-only] [--prod]");
+    throw new Error("Usage: ./publish.sh [--prod]");
   }
   const destination = mkdtempSync(join(tmpdir(), "inkbox-release-"));
   try {
-    publishChatPackages({
-      root: fileURLToPath(new URL("../", import.meta.url)),
+    publishChatAdapter({
+      root: fileURLToPath(new URL("../../", import.meta.url)),
       destination,
       production: args.includes("--prod"),
-      adapterOnly: args.includes("--adapter-only"),
     });
   } finally {
     rmSync(destination, { recursive: true, force: true });
