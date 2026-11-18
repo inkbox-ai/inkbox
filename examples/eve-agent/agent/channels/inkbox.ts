@@ -3,6 +3,7 @@ import { createRedisState } from "@chat-adapter/state-redis";
 import type { Message, Thread } from "chat";
 import { chatSdkChannel, messageContentOf } from "eve/channels/chat-sdk";
 import { a2aInputAuth, inkboxChannelEvents, INKBOX_EVE_A2A_INTENT } from "../lib/inkbox-events.js";
+import { eveDeliveryKey } from "../lib/inkbox-input.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -41,7 +42,7 @@ async function handleMessage(thread: Thread, message: Message) {
   await send(messageContentOf(message), {
     thread,
     ...(route?.channel === "a2a" ? { auth: a2aInputAuth(thread.id, route.taskId!) } : {}),
-    idempotencyKey: `${thread.id}:${message.id}`,
+    idempotencyKey: eveDeliveryKey(thread.id, message.id),
   });
 }
 
