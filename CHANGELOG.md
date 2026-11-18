@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.40
+
+- Expose audio attachment transcription status, text, errors and attachment IDs in Python, TypeScript and Rust.
+- Expose one `message.transcription_finished` webhook for MMS, iMessage and WhatsApp while preserving older payloads without transcription metadata.
+
 ## Chat SDK adapter 0.7.39 (initial release)
 
 ### Added

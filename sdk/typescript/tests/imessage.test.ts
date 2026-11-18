@@ -589,6 +589,8 @@ describe("parseIMessage", () => {
     expect(msg.wasDowngraded).toBe(false);
     expect(msg.isBlocked).toBe(false);
     expect(msg.media?.[0]).toEqual({
+      id: null,
+      transcription: null,
       url: "https://media.example/a.png",
       contentType: "image/png",
       size: 10,

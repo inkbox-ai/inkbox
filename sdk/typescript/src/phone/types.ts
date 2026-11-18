@@ -1,3 +1,4 @@
+import { parseMediaTranscription, type MediaTranscription, type RawMediaTranscription } from "../media.js";
 import { parseContact, type Contact, type RawContact } from "../contacts/types.js";
 
 /**
@@ -524,6 +525,8 @@ export interface PostCallActionItem {
 }
 
 export interface TextMediaItem {
+  id?: string | null;
+  transcription?: MediaTranscription | null;
   contentType: string;
   size: number;
   url: string;
@@ -712,6 +715,8 @@ export interface RawPhoneCallWithRateLimit extends RawPhoneCall {
 }
 
 export interface RawTextMediaItem {
+  id?: string | null;
+  transcription?: RawMediaTranscription | null;
   content_type: string;
   size: number;
   url: string;
@@ -1146,6 +1151,8 @@ export function parsePostCallActionItem(r: RawPostCallActionItem): PostCallActio
 
 export function parseTextMediaItem(r: RawTextMediaItem): TextMediaItem {
   return {
+    id: r.id ?? null,
+    transcription: r.transcription ? parseMediaTranscription(r.transcription) : null,
     contentType: r.content_type,
     size: r.size,
     url: r.url,

@@ -1,3 +1,4 @@
+import { parseMediaTranscription, type MediaTranscription, type RawMediaTranscription } from "../media.js";
 import { parseContact, type Contact, type RawContact } from "../contacts/types.js";
 
 /**
@@ -128,6 +129,8 @@ export enum IMessageRuleMatchType {
 
 /** Media attachment on an iMessage. */
 export interface IMessageMediaItem {
+  id?: string | null;
+  transcription?: MediaTranscription | null;
   url: string;
   contentType: string | null;
   size: number | null;
@@ -338,6 +341,8 @@ export interface IMessageContactRule {
 // ---- internal raw API shapes (snake_case from JSON) ----
 
 export interface RawIMessageMediaItem {
+  id?: string | null;
+  transcription?: RawMediaTranscription | null;
   url: string;
   content_type?: string | null;
   size?: number | null;
@@ -487,6 +492,8 @@ export interface RawIMessageContactRule {
 
 export function parseIMessageMediaItem(r: RawIMessageMediaItem): IMessageMediaItem {
   return {
+    id: r.id ?? null,
+    transcription: r.transcription ? parseMediaTranscription(r.transcription) : null,
     url: r.url,
     contentType: r.content_type ?? null,
     size: r.size ?? null,

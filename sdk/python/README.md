@@ -818,7 +818,7 @@ reused with a different request.
 
 Inbound messages, tapbacks, and outbound delivery status arrive via
 identity-owned webhook subscriptions — see [Webhooks](#webhooks) for
-the five `imessage.*` event types.
+the six `imessage.*` event types.
 
 ---
 
@@ -1463,8 +1463,10 @@ Available event types:
 | Channel | `event_type` values |
 |---|---|
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
+| Incoming audio (MMS, iMessage, WhatsApp) | `message.transcription_finished` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
 | iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
+| WhatsApp | `whatsapp.received`, `whatsapp.sent`, `whatsapp.delivered`, `whatsapp.delivery_failed`, `whatsapp.delivery_unconfirmed`, `whatsapp.reaction_received` |
 | Call lifecycle | `call.ended` |
 | A2A | `a2a.task.created`, `a2a.task.message`, `a2a.task.canceled`, `a2a.sent_task.updated` |
 

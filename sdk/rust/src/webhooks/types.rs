@@ -116,6 +116,10 @@ pub enum CallOriginWire {
 /// MMS media attachment (snake_case wire shape).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextMediaItemWire {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
+    #[serde(default)]
+    pub id: Option<String>,
     pub content_type: String,
     pub size: i64,
     pub url: String,
@@ -683,6 +687,10 @@ pub enum IMessageSendStyleWire {
 /// iMessage media attachment (snake_case wire shape).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageMediaItemWire {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
+    #[serde(default)]
+    pub id: Option<String>,
     pub content_type: Option<String>,
     pub size: Option<i64>,
     pub url: String,
@@ -1717,6 +1725,8 @@ pub enum WhatsAppWebhookEventType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppWebhookMedia {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
     pub id: String,
     pub filename: String,
     pub content_type: String,
@@ -1801,4 +1811,42 @@ pub struct WhatsAppWebhookPayload {
     pub event_type: WhatsAppWebhookEventType,
     pub timestamp: String,
     pub data: WhatsAppWebhookData,
+}
+
+/// Terminal attachment results for one original incoming message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageTranscriptionFinishedWebhookPayload {
+    pub id: String,
+    pub event_type: MessageTranscriptionFinishedWebhookEventType,
+    pub timestamp: String,
+    pub data: MessageTranscriptionFinishedWebhookData,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MessageTranscriptionFinishedWebhookEventType {
+    #[serde(rename = "message.transcription_finished")]
+    TranscriptionFinished,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageTranscriptionFinishedWebhookData {
+    pub message_id: String,
+    pub contacts: Vec<WebhookContact>,
+    pub agent_identities: Vec<WebhookAgentIdentity>,
+    #[serde(flatten)]
+    pub source: TranscriptionFinishedSource,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "channel")]
+pub enum TranscriptionFinishedSource {
+    #[serde(rename = "text")]
+    Text {
+        text_message: TextWebhookMessage,
+        recipient_phone_number: Option<String>,
+    },
+    #[serde(rename = "imessage")]
+    IMessage { message: IMessageWebhookMessage },
+    #[serde(rename = "whatsapp")]
+    WhatsApp { message: WhatsAppWebhookMessage },
 }

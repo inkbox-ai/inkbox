@@ -10,6 +10,8 @@ separately by ``IMessageNumber``.
 """
 
 from __future__ import annotations
+
+from inkbox.media import MediaTranscription
 from inkbox.contact_rules import ContactRuleDirection
 
 from dataclasses import dataclass
@@ -176,12 +178,19 @@ class IMessageMediaItem:
     content_type: str | None = None
     size: int | None = None
 
+    id: UUID | None = None
+    transcription: MediaTranscription | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageMediaItem:
         return cls(
             url=d["url"],
             content_type=d.get("content_type"),
             size=d.get("size"),
+            id=UUID(d["id"]) if d.get("id") else None,
+            transcription=MediaTranscription._from_dict(d["transcription"])
+            if d.get("transcription")
+            else None,
         )
 
 

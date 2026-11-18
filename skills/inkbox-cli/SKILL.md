@@ -846,9 +846,21 @@ The `--context-email` / `--context-texts` / `--context-calls` flags each take `c
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 
+For an agent that handles incoming voice notes, include `message.transcription_finished`
+once alongside the channels' `received` events when registering
+notifications. Check `media[].transcription` in the original message: if any
+attachment is pending, wait up to 60 seconds for its completion notification, then
+read the original message once. If the transcript failed, remains pending, or
+cannot be retrieved, process the original message and attachments normally.
+Label generated speech as a voice-note transcript, not a typed message or permission answer.
+Preserve the original caption. Received and completion notifications concern the
+same message: match `data.channel` and `data.message_id` within the receiving identity and respond at most once; never
+wake a second response just because a late completion arrives.
+
 `inkbox webhook verify` is event-type-agnostic — it operates on raw
-bytes and only checks the `X-Inkbox-Signature` HMAC. The body can be
-any of:
+bytes and only checks the `X-Inkbox-Signature` HMAC.
+
+The body can be any of:
 
 - **Mail** (envelope): `message.received`, `message.sent`,
   `message.forwarded`, `message.delivered`, `message.bounced`,
@@ -857,6 +869,9 @@ any of:
   plain-text `body` (whole under a size cap, else a prefix with
   `body_truncated: true`); when truncated, fetch the full message by its
   `id` (via the API/SDK) — not `message_id` (the RFC 5322 header).
+- **Incoming audio** (envelope): `message.transcription_finished` is not email. Read
+  `data.text_message` when `data.channel` is `text`, or `data.message` for
+  `imessage` and `whatsapp`. The nested message carries its conversation and media.
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
   `inkbox webhook subscription create --agent-identity-id ...`.
@@ -865,6 +880,10 @@ any of:
   `imessage.delivery_failed`. Subscribe via `inkbox webhook
   subscription create --agent-identity-id ...` — owned by the agent
   identity, since shared iMessage pool numbers are not org resources.
+- **WhatsApp** (envelope): `whatsapp.received`,
+  `whatsapp.sent`, `whatsapp.delivered`, `whatsapp.delivery_failed`,
+  `whatsapp.delivery_unconfirmed`, `whatsapp.reaction_received`. Subscribe via
+  `inkbox webhook subscription create --agent-identity-id ...`.
 - **Call lifecycle** (envelope, fire-and-forget + replayable):
   `call.ended`. Subscribe via `inkbox webhook subscription create
   --agent-identity-id ...` — owned by the agent identity, like iMessage.

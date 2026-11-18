@@ -5,6 +5,8 @@ Dataclasses mirroring the Inkbox Phone API response models.
 """
 
 from __future__ import annotations
+
+from inkbox.media import MediaTranscription
 from inkbox.contact_rules import ContactRuleDirection
 from inkbox._call_connections import (
     CallConnectionKind as CallConnectionKind,
@@ -447,12 +449,19 @@ class TextMediaItem:
     size: int
     url: str
 
+    id: UUID | None = None
+    transcription: MediaTranscription | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMediaItem:
         return cls(
             content_type=d["content_type"],
             size=d["size"],
             url=d["url"],
+            id=UUID(d["id"]) if d.get("id") else None,
+            transcription=MediaTranscription._from_dict(d["transcription"])
+            if d.get("transcription")
+            else None,
         )
 
 

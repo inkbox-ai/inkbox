@@ -29,6 +29,8 @@
 mod config;
 mod cookies;
 pub mod error;
+pub mod media;
+pub use media::{MediaTranscription, TranscriptionStatus};
 pub mod filters;
 pub mod http;
 pub mod response_metadata;

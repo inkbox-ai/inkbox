@@ -1,3 +1,4 @@
+export type { MediaTranscription, RawMediaTranscription, TranscriptionStatus } from "./media.js";
 export { Inkbox } from "./inkbox.js";
 export { VERSION } from "./version.js";
 export { AgentIdentity } from "./agent_identity.js";
@@ -110,6 +111,8 @@ export type {
   MailWebhookMessage,
   MessageStatus,
   MessageDirectionWire,
+  MessageTranscriptionFinishedWebhookData,
+  MessageTranscriptionFinishedWebhookPayload,
   TextWebhookPayload,
   TextWebhookEventType,
   TextWebhookMessage,
