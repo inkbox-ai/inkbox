@@ -265,13 +265,22 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
       normalized = { ...normalized, ...this.fromTransport(route, hydrated) };
     }
     if (route.channel === "voice" && normalized.event) {
-      const transcript = object(object(normalized.event.data).transcript ?? {});
+      const data = object(normalized.event.data);
+      const transcript = object(data.transcript ?? {});
+      let hasTranscript =
+        Array.isArray(transcript.entries) &&
+        transcript.entries.some(
+          (entry) =>
+            typeof object(entry).text === "string" &&
+            String(object(entry).text).trim().length > 0,
+        );
       if (
         transcript.abridged === true ||
         !Array.isArray(transcript.entries) ||
         transcript.entries.some((entry) => object(entry).truncated === true)
       ) {
         const lines: string[] = [];
+        hasTranscript = false;
         let cursor: string | undefined;
         do {
           const page = await this.transport.history(route, {
@@ -279,6 +288,9 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             cursor,
             direction: "forward",
           });
+          hasTranscript ||= page.messages.some(
+            (message) => message.text.trim().length > 0,
+          );
           lines.push(...page.messages.map((m) => `${m.authorId}: ${m.text}`));
           cursor = page.nextCursor;
         } while (cursor);
@@ -288,6 +300,19 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
             ? `Completed call transcript\n${lines.join("\n")}`
             : normalized.text,
         };
+      }
+      if (hasTranscript) {
+        const destination = await this.transport.callConversation(
+          route,
+          object(data.call),
+        );
+        if (destination)
+          normalized = {
+            ...normalized,
+            route: destination,
+            id: `call:${route.callId}`,
+            text: `Post-call transcript. Any reply will be sent by ${destination.channel === "sms" ? "SMS" : "iMessage"} in this conversation, not spoken on the call.\n${normalized.text}`,
+          };
       }
     }
     return normalized;

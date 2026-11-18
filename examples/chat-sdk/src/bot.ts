@@ -28,7 +28,7 @@ async function handleMessage(thread: Thread, message: Message) {
   await thread.subscribe();
   const route = (message.raw as InkboxMessage).route;
   if (route.channel === "voice") {
-    // A completed call cannot receive a chat reply. Save its transcript for follow-up.
+    // No unambiguous messaging destination was resolved for this call.
     await thread.setState({ lastCall: { id: message.id, text: message.text } });
     return;
   }

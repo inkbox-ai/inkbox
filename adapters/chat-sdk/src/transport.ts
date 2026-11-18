@@ -114,6 +114,100 @@ export class InkboxTransport {
     return (await this.session()).identity;
   }
 
+  /** Resolve a completed call to one existing, same-channel direct conversation. */
+  async callConversation(
+    route: Extract<InkboxRoute, { channel: "voice" }>,
+    call: Record<string, unknown>,
+  ): Promise<InkboxRoute | null> {
+    const origin = call.origin;
+    if (
+      ![
+        "dedicated_number",
+        "shared_imessage_number",
+        "dedicated_imessage_number",
+      ].includes(String(origin))
+    )
+      return null;
+    const remote = call.remote_phone_number;
+    if (typeof remote !== "string" || !/^\+[1-9]\d{1,14}$/.test(remote))
+      return null;
+    // A connected third party can change the transcript's audience.
+    for (const entries of [call.connections, call.forwardings]) {
+      if (
+        Array.isArray(entries) &&
+        entries.some(
+          (entry) =>
+            entry &&
+            typeof entry === "object" &&
+            (entry.connected_at ||
+              entry.forwarded_at ||
+              ["connected", "forwarded"].includes(entry.status)),
+        )
+      )
+        return null;
+    }
+    const { identity } = await this.scope(route);
+    const sms = origin === "dedicated_number";
+    if (sms) {
+      if (
+        !identity.phoneNumber ||
+        identity.phoneNumber.status !== "active" ||
+        identity.phoneNumber.smsStatus !== "ready" ||
+        call.local_phone_number !== identity.phoneNumber.number
+      )
+        return null;
+    } else {
+      if (!identity.imessageEnabled) return null;
+      if (
+        origin === "dedicated_imessage_number" &&
+        (!identity.imessageNumber ||
+          call.local_phone_number !== identity.imessageNumber.number)
+      )
+        return null;
+      if (origin === "shared_imessage_number" && identity.imessageNumber)
+        return null;
+    }
+    const matches = new Set<string>();
+    const limit = 100;
+    for (let offset = 0; ; offset += limit) {
+      const options = {
+        participants: [remote],
+        includeGroups: false,
+        isBlocked: false,
+        limit,
+        offset,
+      };
+      const rows = sms
+        ? await identity.listTextConversations(options)
+        : await identity.listIMessageConversations(options);
+      for (const row of rows) {
+        const address =
+          "remotePhoneNumber" in row ? row.remotePhoneNumber : row.remoteNumber;
+        if (
+          !row.id ||
+          row.isGroup ||
+          address !== remote ||
+          (row.participants != null &&
+            (row.participants.length !== 1 || row.participants[0] !== remote))
+        )
+          continue;
+        if ("assignmentStatus" in row && row.assignmentStatus !== "active")
+          continue;
+        matches.add(row.id);
+      }
+      if (matches.size > 1) return null;
+      if (rows.length < limit) break;
+    }
+    const [conversationId] = matches;
+    return conversationId
+      ? {
+          identityId: route.identityId,
+          channel: sms ? "sms" : "imessage",
+          conversationId,
+        }
+      : null;
+  }
+
   private async scope(route: InkboxRoute) {
     const { client, identity } = await this.session();
     if (route.identityId !== identity.id)

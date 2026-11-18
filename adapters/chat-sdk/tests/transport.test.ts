@@ -1161,3 +1161,86 @@ describe("review regressions", () => {
     expect(mock.identity.replyAllEmail).not.toHaveBeenCalled();
   });
 });
+
+describe("post-call conversation resolution", () => {
+  const remote = "+12025550123";
+  const call = {
+    origin: "dedicated_number",
+    local_phone_number: "+12025550100",
+    remote_phone_number: remote,
+  };
+  const row = {
+    id: "conversation-1",
+    remotePhoneNumber: remote,
+    participants: [remote],
+    isGroup: false,
+  };
+  function setupCalls() {
+    const listTextConversations = vi.fn();
+    const listIMessageConversations = vi.fn();
+    mock.client.getIdentity.mockResolvedValue({
+      ...mock.identity,
+      phoneNumber: {
+        number: call.local_phone_number,
+        status: "active",
+        smsStatus: "ready",
+      },
+      imessageEnabled: true,
+      imessageNumber: null,
+      listTextConversations,
+      listIMessageConversations,
+    });
+    return { listTextConversations, listIMessageConversations };
+  }
+  it("checks later pages before accepting a unique destination", async () => {
+    const { listTextConversations } = setupCalls();
+    listTextConversations
+      .mockResolvedValueOnce(Array.from({ length: 100 }, () => row))
+      .mockResolvedValueOnce([{ ...row, id: "another-conversation" }]);
+    expect(await transport().callConversation(voice, call)).toBeNull();
+    expect(listTextConversations).toHaveBeenNthCalledWith(2, {
+      participants: [remote],
+      includeGroups: false,
+      isBlocked: false,
+      limit: 100,
+      offset: 100,
+    });
+  });
+  it("propagates lookup failures instead of acknowledging an unresolved delivery", async () => {
+    const { listTextConversations } = setupCalls();
+    listTextConversations.mockRejectedValue(
+      new Error("temporary lookup failure"),
+    );
+    await expect(transport().callConversation(voice, call)).rejects.toThrow(
+      "temporary lookup failure",
+    );
+  });
+  it("rejects a different identity before conversation lookup", async () => {
+    const { listTextConversations } = setupCalls();
+    await expect(
+      transport().callConversation({ ...voice, identityId: "other" }, call),
+    ).rejects.toThrow("different Inkbox identity");
+    expect(listTextConversations).not.toHaveBeenCalled();
+  });
+  it.each([
+    { connections: [{ kind: "conference", status: "connected" }] },
+    { connections: [{ kind: "handoff", status: "connected" }] },
+    { forwardings: [{ status: "forwarded" }] },
+    { remote_phone_number: "unknown" },
+  ])("does not route calls with an uncertain audience: %j", async (extra) => {
+    const { listTextConversations } = setupCalls();
+    expect(
+      await transport().callConversation(voice, { ...call, ...extra }),
+    ).toBeNull();
+    expect(listTextConversations).not.toHaveBeenCalled();
+  });
+  it("does not use a group containing the caller or a different participant", async () => {
+    const { listTextConversations } = setupCalls();
+    listTextConversations.mockResolvedValue([
+      { ...row, isGroup: true },
+      { ...row, participants: [remote, "+12025550124"] },
+      { ...row, remotePhoneNumber: "+12025550124" },
+    ]);
+    expect(await transport().callConversation(voice, call)).toBeNull();
+  });
+});

@@ -80,10 +80,18 @@ receiving and replying to messages.
   deferred handlers must initialize Chat before using state-backed adapter sends.
 - Redis stores Chat SDK state; Eve owns durable agent execution and session
   history. Configure both according to your hosting requirements.
-- Completed calls save their transcript in Chat thread state as `lastCall`. They
-  do **not** start a new replying agent turn in this example. Add a deliberate
-  post-call workflow if you want follow-up actions. This is not a live voice
-  streaming adapter, and `thread.post()` cannot answer a finished call.
+- Completed-call transcripts enter the caller’s existing SMS or iMessage
+  conversation when the adapter resolves one unambiguous direct destination on
+  the call’s originating channel. They trigger an Eve turn; any reply is a text
+  in that conversation, not speech on the finished call. The instructions ask
+  Eve to follow up only when useful, rather than acknowledge every call.
+- **Exchange a message first on the channel you intend to call.** A call without
+  existing message history has no discoverable messaging destination. Calls with
+  missing or ambiguous destinations, inactive iMessage assignments, unsupported
+  origins, additional connected parties, or no transcript remain separate voice
+  observations. This example saves them as `lastCall` without starting an Eve
+  turn. It never silently falls back from iMessage to SMS or starts a conversation.
+  This is not a live voice streaming adapter.
 - Deferred email replies and failure notices use the bound message from the
   thread's public serialized snapshot as `replyToMessageId`, preserving that
   message's reply-all audience. If no bound message is available and the thread's

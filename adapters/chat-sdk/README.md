@@ -97,7 +97,7 @@ needed. Admission is not permission to perform privileged actions.
 | iMessage | Conversation, sender, text, media, reply thread | Text and media; supported reactions and typing |
 | Slack | Workspace conversation, thread, and authenticated file attachments | Text or one file per post; message editing/deletion and reactions |
 | A2A | Context conversation, incoming task, and message parts | Explicit task-bound reply; progress is the default intent |
-| Voice | Completed-call transcript | No chat reply to a completed call; explicit SDK call operations |
+| Voice | Completed-call transcript routed to a matching direct messaging conversation | SMS or iMessage follow-up on the call’s originating channel; unresolved calls remain observations |
 
 WhatsApp is not included. Tunnels, vaults, and other non-conversation SDK resources
 are not chat channels; use the SDK directly when your application needs them.
@@ -113,13 +113,31 @@ are not used as durable attachment references.
 
 ### Voice
 
-`call.ended` provides post-call context, not realtime audio. A voice thread is
-bound to the completed call. `thread.post()` is intentionally unsupported for
-voice: it must not silently start a new call or send an unrelated text.
+`call.ended` provides post-call context, not realtime audio. When a call has a
+transcript and one matching direct messaging conversation, the adapter delivers
+that transcript as a normal incoming message in the existing conversation:
+
+- Calls on a dedicated phone number route to SMS on that same number.
+- Calls on a shared or dedicated iMessage number route to an active iMessage
+  conversation with the caller.
+
+The call’s recorded origin selects the channel; the adapter never chooses a
+channel merely because the caller has the same phone number there. Dedicated
+lines must match the identity’s current line. Replies use the resolved
+conversation, so the Eve example can process the transcript and send a useful
+follow-up by text. This does not make Eve speak during the call.
+
+**Exchange a message on the intended channel before testing a call.** Conversation
+lookup currently requires existing message history; a call alone does not create
+a discoverable messaging destination. Missing or ambiguous conversations,
+inactive iMessage assignments, unsupported origins, and calls involving
+additional connected parties remain call-ID-scoped `voice` observations. Calls
+without a transcript also remain observations. The examples save those inputs as
+`lastCall` without triggering a reply. `thread.post()` remains unsupported on an
+unresolved voice thread; no different-channel fallback or initial message is sent.
 
 Use the Inkbox SDK to configure incoming call behavior or explicitly place a
-follow-up call. Decide who may authorize that action in your application. The
-included examples preserve the transcript in Chat state without contacting anyone.
+follow-up call. Decide who may authorize that action in your application.
 
 ### A2A
 
@@ -286,7 +304,8 @@ work, and failed deliveries are not universally retried automatically.
 ## Examples
 
 - [Framework-neutral Chat SDK handler](../../examples/chat-sdk/): receive, reply,
-  preserve completed-call context, and configure an identity subscription.
+  route post-call transcripts to matching messaging conversations, preserve
+  unresolved call observations, and configure an identity subscription.
 - [Eve agent](../../examples/eve-agent/): route conversations into durable Eve
   sessions with `streaming: false` and persistent Chat state.
 

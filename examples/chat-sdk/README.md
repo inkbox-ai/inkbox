@@ -1,8 +1,9 @@
 # Inkbox + Chat SDK
 
 A framework-neutral Fetch API webhook handler using persistent Redis state. It
-replies to email, SMS/MMS, iMessage, addressed Slack input, and A2A messages. Completed-call
-transcripts are saved to thread state without attempting to text a finished call.
+replies to email, SMS/MMS, iMessage, addressed Slack input, and A2A messages.
+Completed-call transcripts enter a matching SMS or iMessage conversation for a
+text acknowledgement; unresolved calls are saved to thread state.
 
 ## Run in an application
 
@@ -20,9 +21,18 @@ transcripts are saved to thread state without attempting to text a finished call
    acknowledgement back in that conversation.
 
 The example does not include an HTTP server or model integration. Replace the
-fixed reply in `handleMessage` with your agent logic. Keep the call branch separate:
-`thread.post()` cannot speak into a completed call. An explicit follow-up call or
-message should use the SDK and your application's authorization flow.
+fixed reply in `handleMessage` with your agent logic. For resolved post-call
+transcripts, the fixed reply is a text in the matching conversation, not speech.
+Keep the unresolved `voice` branch separate: `thread.post()` cannot speak into a
+completed call or choose a different messaging destination. An explicit follow-up
+call should use the SDK and your application's authorization flow.
+
+For post-call testing, **exchange a message on the intended channel first**.
+Dedicated phone calls resolve to SMS; shared or dedicated iMessage calls resolve
+to an active iMessage conversation. The adapter requires one exact direct
+conversation with existing message history and never falls back between channels.
+Calls with no transcript, no unique destination, or additional connected parties
+remain observations in `lastCall`. See the [voice routing details](../../adapters/chat-sdk/README.md#voice).
 
 ## Install local packages
 

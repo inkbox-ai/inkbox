@@ -7,6 +7,7 @@
 - `@inkbox/chat-sdk-adapter`: email, SMS/MMS, iMessage, Slack, A2A, and completed-call transcript channels for Chat SDK, with standalone and Eve examples.
 - Signed webhook ingestion, identity-scoped reply routing, conversation history, media, and channel-specific reactions.
 - A2A conversations share a context across tasks, with explicit originating-task binding for replies and lifecycle transitions.
+- Completed-call transcripts can trigger follow-up in the caller’s existing SMS or active iMessage conversation on the same channel; unresolved calls remain observations without an automatic send.
 
 ### Releasing
 
