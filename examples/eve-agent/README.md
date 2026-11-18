@@ -59,6 +59,12 @@ receiving and replying to messages.
   context available for subsequent tasks. If a same-task follow-up is already
   admitted when a successful turn settles, its text is sent as progress and the task stays
   open until that follow-up is handled.
+- The follow-up check sees committed delivery facts, not Eve's runtime inbox.
+  A message arriving while the final answer is being produced may not appear in
+  the settlement snapshot. If the task completes first, that late same-task
+  message may go unanswered; the example does not provide an atomic completion
+  barrier against concurrent input. After completion, start a new task in the
+  same context to continue the conversation.
 - Thread IDs preserve the Inkbox identity, channel, and conversation. A stable
   message-based idempotency key is passed to Eve on every inbound send. This
   deduplicates Eve admission, not outbound Inkbox sends: a retried completion
