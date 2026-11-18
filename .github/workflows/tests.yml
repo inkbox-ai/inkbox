@@ -217,3 +217,12 @@ jobs:
           npm install --ignore-scripts --no-save --package-lock=false "$RUNNER_TEMP"/inkbox-consumer-packages/*.tgz
           npm run typecheck
           npm test
+
+      - name: Retain verified SDK and adapter packages
+        if: matrix.node == 26
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-sdk-packages-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/inkbox-consumer-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 7
