@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.40
+## Chat SDK adapter 0.7.39 (initial release)
 
 ### Added
 
@@ -11,7 +11,7 @@
 
 ### Releasing
 
-- Publish the Chat SDK adapter with each TypeScript SDK release, using the same version. Prepare both packages before publication and support resuming an interrupted paired release.
+- Publish only the new `@inkbox/chat-sdk-adapter@0.7.39` against the existing `@inkbox/sdk@0.7.39`; existing SDKs and CLI are unchanged. Future TypeScript SDK releases continue publishing the adapter alongside the SDK, with paired-release recovery.
 
 ## 0.7.39
 

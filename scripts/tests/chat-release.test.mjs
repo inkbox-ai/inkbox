@@ -47,6 +47,9 @@ function runner(root, override = () => undefined) {
     calls.push({ args, cwd });
     const custom = override(args, cwd);
     if (custom) return custom;
+    if (args[0] === "view" && args[2] === "version") {
+      return { status: 0, stdout: JSON.stringify(version), stderr: "" };
+    }
     if (args[0] === "pack") {
       const adapter = cwd.endsWith("chat-sdk");
       return {
@@ -72,8 +75,8 @@ function runner(root, override = () => undefined) {
   };
   return { calls, run };
 }
-function publish(root, run, production = false) {
-  publishChatPackages({ root, destination: root, production, run });
+function publish(root, run, production = false, adapterOnly = false) {
+  publishChatPackages({ root, destination: root, production, adapterOnly, run });
 }
 
 test("all package versions and local SDK links move together", () => {
@@ -227,4 +230,83 @@ test("SDK publish failure does not publish adapter", (t) => {
   );
   assert.throws(() => publish(root, run, true), /publish failed/);
   assert.equal(calls.filter(({ args }) => args[0] === "publish").length, 1);
+});
+
+test("adapter-only dry run builds against the exact published SDK without preparing the SDK", (t) => {
+  const root = fixture(t);
+  const version = checkReleaseVersions(root);
+  const { calls, run } = runner(root);
+  publish(root, run, false, true);
+  assert.deepEqual(calls.map(({ args }) => args[0]), [
+    "view", "ci", "install", "run", "pack", "view", "publish",
+  ]);
+  assert.deepEqual(calls[0].args, ["view", `@inkbox/sdk@${version}`, "version", "--json"]);
+  assert.deepEqual(calls[2].args, [
+    "install", "--ignore-scripts", "--no-save", "--package-lock=false", `@inkbox/sdk@${version}`,
+  ]);
+  assert.ok(calls.filter(({ args }) => ["ci", "install", "run", "pack"].includes(args[0]))
+    .every(({ cwd }) => cwd === join(root, "adapters/chat-sdk")));
+  const publishes = calls.filter(({ args }) => args[0] === "publish");
+  assert.equal(publishes.length, 1);
+  assert.equal(publishes[0].args[1], join(root, "adapter.tgz"));
+  assert.ok(publishes[0].args.includes("--dry-run"));
+  assert.ok(!calls.some(({ args }) => args[0] === "view" && args[1].startsWith("@inkbox/sdk@") && args[2] === "dist.integrity"));
+});
+
+for (const code of ["E404", "E503"]) {
+  test(`adapter-only release stops before preparation when the SDK registry check returns ${code}`, (t) => {
+    const root = fixture(t);
+    const { calls, run } = runner(root, (args) => args[0] === "view"
+      ? { status: 1, stdout: JSON.stringify({ error: { code } }), stderr: "" }
+      : undefined);
+    assert.throws(() => publish(root, run, true, true), /npm view failed/);
+    assert.deepEqual(calls.map(({ args }) => args[0]), ["view"]);
+  });
+}
+
+test("adapter-only release rejects an unexpected published SDK version", (t) => {
+  const root = fixture(t);
+  const { calls, run } = runner(root, (args) => args[0] === "view"
+    ? { status: 0, stdout: JSON.stringify("0.0.0") }
+    : undefined);
+  assert.throws(() => publish(root, run, true, true), /requires published @inkbox\/sdk@/);
+  assert.deepEqual(calls.map(({ args }) => args[0]), ["view"]);
+});
+
+test("adapter-only SDK installation failure prevents build and publication", (t) => {
+  const root = fixture(t);
+  const { calls, run } = runner(root, (args) => args[0] === "install"
+    ? { status: 1, stderr: "dependency unavailable" }
+    : undefined);
+  assert.throws(() => publish(root, run, true, true), /dependency unavailable/);
+  assert.ok(!calls.some(({ args }) => ["run", "pack", "publish"].includes(args[0])));
+});
+
+test("adapter-only production publishes only the adapter", (t) => {
+  const root = fixture(t);
+  const { calls, run } = runner(root);
+  publish(root, run, true, true);
+  const publishes = calls.filter(({ args }) => args[0] === "publish");
+  assert.equal(publishes.length, 1);
+  assert.equal(publishes[0].args[1], join(root, "adapter.tgz"));
+  assert.ok(!publishes[0].args.includes("--dry-run"));
+});
+
+test("adapter-only retry skips an identical published adapter", (t) => {
+  const root = fixture(t);
+  const { calls, run } = runner(root, (args) => args[0] === "view" && args[2] === "dist.integrity"
+    ? { status: 0, stdout: JSON.stringify("sha512-adapter") }
+    : undefined);
+  publish(root, run, true, true);
+  assert.ok(!calls.some(({ args }) => args[0] === "publish"));
+});
+
+test("adapter-only release rejects a conflicting adapter without touching the SDK", (t) => {
+  const root = fixture(t);
+  const { calls, run } = runner(root, (args) => args[0] === "view" && args[2] === "dist.integrity"
+    ? { status: 0, stdout: JSON.stringify("sha512-other") }
+    : undefined);
+  assert.throws(() => publish(root, run, true, true), /different contents/);
+  assert.ok(!calls.some(({ args }) => args[0] === "publish"));
+  assert.ok(!calls.some(({ cwd }) => cwd === join(root, "sdk/typescript")));
 });

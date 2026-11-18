@@ -12,6 +12,34 @@ This repo ships five packages whose versions move **in lockstep**:
 
 The TypeScript SDK and Chat SDK adapter share one publishing command, `sdk/typescript/publish.sh`. The remaining packages have their own `publish.sh`. All default to a **dry run**; `--prod` publishes for real.
 
+## Initial adapter-only release: 0.7.39
+
+The new `@inkbox/chat-sdk-adapter@0.7.39` uses the already-published
+`@inkbox/sdk@0.7.39`. Existing SDK, CLI, and bundled plugin versions remain
+unchanged. **Do not republish those packages for this initial adapter release.**
+
+From the repository root:
+
+```bash
+node scripts/check-release-versions.mjs
+(cd sdk/typescript && ./publish.sh --adapter-only)          # dry run
+(cd sdk/typescript && ./publish.sh --adapter-only --prod)   # publish only the adapter
+```
+
+Adapter-only mode verifies that the matching SDK version exists in npm, installs
+that published SDK, then builds and packs only the adapter. It never rebuilds or
+publishes the SDK. If the adapter version already exists, production mode skips it
+only when the packed contents match; a conflicting immutable version stops the
+release. The dry run does not publish anything.
+
+For GitHub validation of this mode, dispatch `Lint & Tests` with the
+`adapter_only` input enabled. This runs the adapter and packed-example checks
+against the published SDK rather than a locally rebuilt SDK.
+
+Do not create another `v0.7.39` tag for the existing SDK release. The sections
+below describe future coordinated releases; ordinary SDK publication still
+publishes the adapter too.
+
 ## 1. Bump versions (all five, same number)
 
 When a PR bumps a package version, prefix its title with the new semantic version

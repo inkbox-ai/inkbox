@@ -28,11 +28,12 @@ function npm(args, cwd) {
   };
 }
 
-/** Build both packages before publishing either; rerun to finish a partial release. */
+/** Publish the pair, or bootstrap only the adapter against an existing SDK release. */
 export function publishChatPackages({
   root,
   destination,
   production = false,
+  adapterOnly = false,
   run = npm,
 }) {
   const version = checkReleaseVersions(root);
@@ -44,10 +45,26 @@ export function publishChatPackages({
       );
     return result.stdout;
   };
+  if (adapterOnly) {
+    const publishedVersion = JSON.parse(
+      checked(["view", `@inkbox/sdk@${version}`, "version", "--json"], root),
+    );
+    if (publishedVersion !== version) {
+      throw new Error(`Adapter-only release requires published @inkbox/sdk@${version}`);
+    }
+  }
   const packed = [];
-  for (const pkg of packages) {
+  for (const pkg of adapterOnly ? packages.slice(1) : packages) {
     const cwd = join(root, pkg.directory);
     checked(["ci", "--ignore-scripts"], cwd);
+    if (adapterOnly) {
+      // Replace the development link with the exact published dependency.
+      rmSync(join(cwd, "node_modules", "@inkbox", "sdk"), { recursive: true, force: true });
+      checked([
+        "install", "--ignore-scripts", "--no-save", "--package-lock=false",
+        `@inkbox/sdk@${version}`,
+      ], cwd);
+    }
     rmSync(join(cwd, "dist"), { recursive: true, force: true });
     checked(["run", "build"], cwd);
     const [artifact] = JSON.parse(
@@ -73,7 +90,7 @@ export function publishChatPackages({
     packed.push({ ...pkg, ...artifact, cwd });
   }
 
-  // Check both immutable versions before the first registry mutation.
+  // Check every selected immutable version before the first registry mutation.
   for (const pkg of packed) {
     const result = run(
       ["view", `${pkg.name}@${version}`, "dist.integrity", "--json"],
@@ -138,8 +155,9 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const args = process.argv.slice(2);
-  if (args.some((arg) => arg !== "--prod") || args.length > 1) {
-    throw new Error("Usage: node scripts/publish-chat-packages.mjs [--prod]");
+  if (args.some((arg) => !["--prod", "--adapter-only"].includes(arg)) ||
+      new Set(args).size !== args.length) {
+    throw new Error("Usage: node scripts/publish-chat-packages.mjs [--adapter-only] [--prod]");
   }
   const destination = mkdtempSync(join(tmpdir(), "inkbox-release-"));
   try {
@@ -147,6 +165,7 @@ if (
       root: fileURLToPath(new URL("../", import.meta.url)),
       destination,
       production: args.includes("--prod"),
+      adapterOnly: args.includes("--adapter-only"),
     });
   } finally {
     rmSync(destination, { recursive: true, force: true });

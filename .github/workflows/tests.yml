@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      adapter_only:
+        description: Validate adapter-only publication against the published SDK
+        type: boolean
+        default: false
 
 jobs:
   plugin-validation:
@@ -190,17 +195,31 @@ jobs:
           node scripts/check-release-versions.mjs
           node --test scripts/tests/*.test.mjs
 
-      - name: Validate coupled SDK and adapter publish dry run
-        run: sdk/typescript/publish.sh
+      - name: Validate selected publish dry run
+        env:
+          ADAPTER_ONLY: ${{ inputs.adapter_only || false }}
+        run: |
+          if [ "$ADAPTER_ONLY" = "true" ]; then
+            sdk/typescript/publish.sh --adapter-only
+          else
+            sdk/typescript/publish.sh
+          fi
 
       - name: Run adapter tests
         working-directory: adapters/chat-sdk
         run: npm test
 
       - name: Pack SDK and adapter for consumer verification
+        env:
+          ADAPTER_ONLY: ${{ inputs.adapter_only || false }}
         run: |
           mkdir -p "$RUNNER_TEMP/inkbox-consumer-packages"
-          npm pack ./sdk/typescript --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
+          if [ "$ADAPTER_ONLY" = "true" ]; then
+            SDK_VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+            npm pack "@inkbox/sdk@$SDK_VERSION" --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
+          else
+            npm pack ./sdk/typescript --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
+          fi
           npm pack ./adapters/chat-sdk --ignore-scripts --pack-destination "$RUNNER_TEMP/inkbox-consumer-packages"
 
       - name: Verify standalone Chat SDK example
