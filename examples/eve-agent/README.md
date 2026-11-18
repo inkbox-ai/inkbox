@@ -36,9 +36,10 @@ receiving and replying to messages.
   transports cannot edit an already-sent reply for every streamed token.
 - The custom public channel event handlers in `agent/lib/inkbox-events.ts`
   buffer A2A reply text and complete the task only after `turn.settled` reports
-  success. Failed turns/sessions send `a2aIntent: "fail"`; cancelled turns leave
+  success with no already-admitted same-task follow-up. Failed turns/sessions send `a2aIntent: "fail"`; cancelled turns leave
   the task open. A successful turn with no text result fails explicitly instead
-  of reporting an empty success.
+  of reporting an empty success, unless an admitted same-task follow-up can
+  supply the result; in that case completion waits for the follow-up.
 - Interaction prompts use `"ask_caller"` and plain-text numbered choices;
   typed answers resume the pending interaction. Sign-in challenges appear only
   in A2A conversations or confirmed direct messages. Shared conversations receive
@@ -49,12 +50,15 @@ receiving and replying to messages.
   phone-message groups are accepted input; configure `onMessage` for a stricter
   application policy.
 - `concurrency: "concurrent"` lets Eve manage new input during an active turn.
-  A2A uses one session per identity/context, with `turnPolicy: "queue"` and a
-  distinct webhook-authenticated input principal per task. A later task cannot
+  A2A uses one session per identity/context and a distinct webhook-authenticated
+  input principal per task. Same-task follow-ups steer the active turn; different
+  tasks wait for their own turn. A later task cannot
   answer an earlier task's pending approval. Public delivery snapshots bind each
   turn to its originating task; replies and failure notices use that saved
   binding, never the newest inbound message. Completing one task leaves the
-  context available for subsequent tasks.
+  context available for subsequent tasks. If a same-task follow-up is already
+  admitted when a successful turn settles, its text is sent as progress and the task stays
+  open until that follow-up is handled.
 - Thread IDs preserve the Inkbox identity, channel, and conversation. A stable
   message-based idempotency key is passed to Eve on every inbound send. This
   deduplicates Eve admission, not outbound Inkbox sends: a retried completion

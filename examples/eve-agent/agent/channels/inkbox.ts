@@ -40,7 +40,7 @@ async function handleMessage(thread: Thread, message: Message) {
   if (route?.channel === "a2a" && !route.taskId) throw new Error("An A2A input requires a task ID.");
   await send(messageContentOf(message), {
     thread,
-    ...(route?.channel === "a2a" ? { auth: a2aInputAuth(thread.id, route.taskId!), turnPolicy: "queue" as const } : {}),
+    ...(route?.channel === "a2a" ? { auth: a2aInputAuth(thread.id, route.taskId!) } : {}),
     idempotencyKey: `${thread.id}:${message.id}`,
   });
 }

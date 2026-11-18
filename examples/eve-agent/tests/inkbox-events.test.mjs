@@ -13,7 +13,7 @@ function fixture(channel = "a2a") {
     decodeThreadId: () => ({ channel }),
     send: async (...args) => { assert.equal(initialized, true, "initialize must finish before sending"); sends.push(args); },
   };
-  const ctx = { channel: { bot, thread: { id: "thread-test", toJSON: () => ({ currentMessage: { id: "bound-message-test" } }) }, state: channel === "a2a" ? { "inkbox:task:turn-test": "task-test" } : {} }, session: { id: "session-test", turn: { id: "turn-test" } } };
+  const ctx = { view: emptySessionView(), channel: { bot, thread: { id: "thread-test", toJSON: () => ({ currentMessage: { id: "bound-message-test" } }) }, state: channel === "a2a" ? { "inkbox:task:turn-test": "task-test" } : {} }, session: { id: "session-test", turn: { id: "turn-test" } } };
   return { events: inkboxChannelEvents(adapter), sends, ctx };
 }
 const reply = (text = "Task result", turnId = "turn-test") => ({ scope: { turnId }, data: { kind: "text", phase: "reply", value: text, partId: "part-test" } });
@@ -295,4 +295,72 @@ test("typing ignores only unsupported-capability errors", async () => {
   await events["turn.started"]({ data: { turnId: "turn-test" } }, ctx);
   ctx.channel.thread.startTyping = async () => { throw new Error("connection unavailable"); };
   await assert.rejects(events["turn.started"]({ data: { turnId: "turn-test" } }, ctx), /connection unavailable/);
+});
+
+test("same-task queued follow-ups keep the task open until their answer settles", async () => {
+  {
+    const outcome = "completed";
+    const { events, ctx, sends } = fixture();
+    await bindTask(events, ctx, "task-first", "turn-first");
+    const followup = taskFacts("task-first", "turn-followup", "delivery-followup");
+    ctx.view = viewOf([...taskFacts("task-first", "turn-first"), followup[0]]);
+    await events["content.completed"](reply("First answer", "turn-first"), ctx);
+    await events["turn.settled"]({ data: { turnId: "turn-first", outcome, reply: ["part-test"] } }, ctx);
+    assert.equal(sends[0][2].a2aIntent, "progress");
+    assert.equal(sends[0][2].a2aTaskId, "task-first");
+    assert.equal(ctx.channel.state["inkbox:terminal:task-first"], undefined);
+    assert.equal(ctx.channel.state["inkbox:reply:turn-first:part-test"], undefined);
+
+    ctx.view = viewOf([...taskFacts("task-first", "turn-first"), ...followup]);
+    await events["turn.started"](followup[1], ctx);
+    await events["delivery.consumed"](followup[2], ctx);
+    await events["content.completed"](reply("Follow-up answer", "turn-followup"), ctx);
+    await events["turn.settled"]({ data: { turnId: "turn-followup", outcome: "completed", reply: ["part-test"] } }, ctx);
+    assert.equal(sends.length, 2);
+    assert.equal(sends[1][1], "Follow-up answer");
+    assert.equal(sends[1][2].a2aIntent, "complete");
+    assert.equal(sends[1][2].a2aTaskId, "task-first");
+    assert.equal(ctx.channel.state["inkbox:terminal:task-first"], true);
+  }
+});
+
+test("a different task waiting in the context does not prevent completion", async () => {
+  const { events, ctx, sends } = fixture();
+  await bindTask(events, ctx, "task-first", "turn-first");
+  ctx.view = viewOf([...taskFacts("task-first", "turn-first"), taskFacts("task-second", "turn-second")[0]]);
+  await events["content.completed"](reply("First answer", "turn-first"), ctx);
+  await events["turn.settled"]({ data: { turnId: "turn-first", outcome: "completed", reply: ["part-test"] } }, ctx);
+  assert.equal(sends[0][2].a2aIntent, "complete");
+  assert.equal(sends[0][2].a2aTaskId, "task-first");
+  assert.equal(ctx.channel.state["inkbox:terminal:task-first"], true);
+  assert.equal(ctx.channel.state["inkbox:terminal:task-second"], undefined);
+});
+
+
+test("empty successful turns defer completion to an admitted same-task follow-up", async () => {
+  const { events, ctx, sends } = fixture();
+  await bindTask(events, ctx, "task-first", "turn-first");
+  const followup = taskFacts("task-first", "turn-followup", "delivery-followup");
+  ctx.view = viewOf([...taskFacts("task-first", "turn-first"), followup[0]]);
+  await events["turn.settled"]({ data: { turnId: "turn-first", outcome: "completed", reply: [] } }, ctx);
+  assert.equal(sends.length, 0);
+  assert.equal(ctx.channel.state["inkbox:terminal:task-first"], undefined);
+  ctx.view = viewOf([...taskFacts("task-first", "turn-first"), ...followup]);
+  await events["turn.started"](followup[1], ctx);
+  await events["delivery.consumed"](followup[2], ctx);
+  await events["content.completed"](reply("Follow-up answer", "turn-followup"), ctx);
+  await events["turn.settled"]({ data: { turnId: "turn-followup", outcome: "completed", reply: ["part-test"] } }, ctx);
+  assert.equal(sends[0][2].a2aIntent, "complete");
+  assert.equal(ctx.channel.state["inkbox:terminal:task-first"], true);
+});
+
+test("failed turns fail the task explicitly even with admitted follow-ups", async () => {
+  const { events, ctx, sends } = fixture();
+  await bindTask(events, ctx, "task-first", "turn-first");
+  ctx.view = viewOf([...taskFacts("task-first", "turn-first"), taskFacts("task-first", "turn-followup", "delivery-followup")[0]]);
+  await events["content.completed"](reply("Partial answer", "turn-first"), ctx);
+  await events["turn.settled"]({ data: { turnId: "turn-first", outcome: "failed", reply: ["part-test"] } }, ctx);
+  assert.equal(sends[0][2].a2aIntent, "fail");
+  assert.equal(ctx.channel.state["inkbox:terminal:task-first"], true);
+  assert.equal(ctx.channel.state["inkbox:reply:turn-first:part-test"], undefined);
 });

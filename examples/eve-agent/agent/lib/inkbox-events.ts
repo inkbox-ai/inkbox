@@ -1,6 +1,6 @@
 import type { InkboxAdapter } from "@inkbox/chat-sdk-adapter";
 import { isNotImplemented, type ChatSdkChannelEvents, type ChatSdkSendOptions } from "eve/channels/chat-sdk";
-import { delivery, interaction, nextPrompt, type Principal } from "eve/events";
+import { delivery, interaction, nextPrompt, queue, type Principal } from "eve/events";
 
 // Interaction prompts keep a task open while its caller supplies input.
 export const INKBOX_EVE_A2A_INTENT = "ask_caller" as const;
@@ -99,7 +99,8 @@ export function inkboxChannelEvents(
       if (!thread) return;
       if (inkbox.decodeThreadId(thread.id).channel === "a2a") {
         if (!scope?.turnId) throw new Error("An A2A reply requires its originating turn.");
-        boundTask(channel.state, scope.turnId);
+        const taskId = boundTask(channel.state, scope.turnId);
+        if (channel.state[`inkbox:terminal:${taskId}`] === true) return;
         channel.state[`inkbox:reply:${scope.turnId}:${data.partId}`] = data.value;
         return;
       }
@@ -110,7 +111,7 @@ export function inkboxChannelEvents(
           ? { replyToMessageId: thread.toJSON().currentMessage?.id } : {}),
       });
     },
-    async "turn.settled"({ data }, { channel, session }) {
+    async "turn.settled"({ data }, { channel, session, view }) {
       const thread = channel.thread;
       if (!thread) return;
       const isA2A = inkbox.decodeThreadId(thread.id).channel === "a2a";
@@ -136,12 +137,21 @@ export function inkboxChannelEvents(
       const replyKeys = data.reply ? data.reply.map(partId => `${prefix}${partId}`) : keys;
       const text = replyKeys.map(key => channel.state[key]).filter((value): value is string => typeof value === "string").join("\n\n");
       const completed = data.outcome === "completed" && text.length > 0;
+      const principal = a2aInputAuth(thread.id, taskId);
+      const hasFollowup = queue(view).some(({ principal: queued }) =>
+        queued?.issuer === principal.issuer && queued.type === principal.principalType && queued.id === principal.principalId,
+      );
+      if (data.outcome === "completed" && hasFollowup && !text) {
+        for (const key of keys) delete channel.state[key];
+        return;
+      }
+      const continuing = completed && hasFollowup;
       await channel.bot.initialize();
       await inkbox.send(thread.id,
         completed ? text : "The agent could not complete this task.",
-        { a2aTaskId: taskId, a2aIntent: completed ? "complete" : "fail", idempotencyKey: `eve-task:${session.id}:${data.turnId}` },
+        { a2aTaskId: taskId, a2aIntent: continuing ? "progress" : completed ? "complete" : "fail", idempotencyKey: `eve-task:${session.id}:${data.turnId}` },
       );
-      channel.state[`inkbox:terminal:${taskId}`] = true;
+      if (!continuing) channel.state[`inkbox:terminal:${taskId}`] = true;
       for (const key of keys) delete channel.state[key];
     },
     async "session.ended"({ data }, { channel, session }) {
