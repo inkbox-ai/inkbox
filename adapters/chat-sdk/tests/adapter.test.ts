@@ -278,11 +278,7 @@ describe("voice-note completion routing", () => {
       try {
         const first = await setup({}, "concurrent", state);
         const original = note("imessage", "pending").original;
-        const { completion } = note(
-          "imessage",
-          "completed",
-          "spoken",
-        ).completion;
+        const { completion } = note("imessage", "completed", "spoken");
         // No time advances and no request-scoped background callback is supplied.
         const now = Date.now();
         expect((await first.bot.webhooks.inkbox(signed(original))).status).toBe(
@@ -304,7 +300,8 @@ describe("voice-note completion routing", () => {
             ),
           );
         if (wake === "completion") {
-          await fresh.bot.webhooks.inkbox(signed(completion));
+          expect((await fresh.bot.webhooks.inkbox(signed(completion))).status).toBe(200);
+          expect(fresh.handler).toHaveBeenCalledTimes(1);
           expect(lookup).not.toHaveBeenCalled();
         } else {
           await vi.advanceTimersByTimeAsync(55_000);
