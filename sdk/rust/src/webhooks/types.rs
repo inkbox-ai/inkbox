@@ -1692,8 +1692,8 @@ pub struct SlackWebhookData {
     pub actor_profile: Option<SlackActorProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contact_id: Option<uuid::Uuid>,
-    /// Retained Slack message ID on received-message events; matches
-    /// `message.transcription_finished` `data.message_id`.
+    /// Retained Slack message ID when the referenced message is retained; on a
+    /// received message it matches `message.transcription_finished` `data.message_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
     #[serde(default)]
