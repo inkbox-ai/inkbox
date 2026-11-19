@@ -8,7 +8,7 @@
 pub mod resources;
 pub mod types;
 
-pub use resources::{IMessageContactRulesResource, IMessagesResource};
+pub use resources::{IMessageContactRulesResource, IMessageRecipients, IMessagesResource};
 pub use types::{
     ContactRuleStatus, IMessage, IMessageAssignment, IMessageAssignmentStatus, IMessageContactRule,
     IMessageConversation, IMessageConversationSummary, IMessageDeliveryStatus,

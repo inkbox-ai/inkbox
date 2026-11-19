@@ -1234,6 +1234,10 @@ identity.send_imessage_voice_note(
 )?;
 ```
 
+Pass `Some(IMessageRecipients::One(..))` for one iMessage recipient or
+`Some(IMessageRecipients::Group(&recipients))` to start or reuse a group by its 2–8
+recipients, as `send_imessage_group` does.
+
 Fallback defaults to on: when the voice note can't be produced, including text over 600
 characters, the text is sent as an ordinary message. Pass `false` for the
 `fallback_to_text` argument (or `fallback_to_text: Some(false)` on WhatsApp) to fail

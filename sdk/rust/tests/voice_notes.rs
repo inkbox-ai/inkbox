@@ -2,8 +2,8 @@
 
 use httpmock::prelude::*;
 use inkbox::{
-    phone::resources::texts::TextRecipients, Inkbox, SlackSendMessageOptions, TranscriptionStatus,
-    WhatsAppSendOptions,
+    imessage::IMessageRecipients, phone::resources::texts::TextRecipients, Inkbox,
+    SlackSendMessageOptions, TranscriptionStatus, WhatsAppSendOptions,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -73,6 +73,51 @@ fn imessage_voice_note_sends_flags_and_parses_audio_reply() {
     let transcription = media[0].transcription.as_ref().unwrap();
     assert_eq!(transcription.status, TranscriptionStatus::Completed);
     assert_eq!(transcription.text.as_deref(), Some("Hello there"));
+}
+
+#[test]
+fn imessage_group_voice_note_sends_recipient_list() {
+    let server = MockServer::start();
+    let identity = Uuid::new_v4();
+    let recipients = vec!["+15550001111".to_string(), "+15550002222".to_string()];
+    let send = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/imessage/messages")
+            .query_param("agent_identity_id", identity.to_string())
+            .json_body(json!({
+                "to": ["+15550001111", "+15550002222"],
+                "text": "Hello there",
+                "send_as_voice_note": true
+            }));
+        then.status(200).json_body(json!({"message": {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "conversation_id": "33333333-3333-3333-3333-333333333333",
+            "assignment_id": null,
+            "direction": "outbound",
+            "remote_number": null,
+            "content": null,
+            "media": [audio("https://media.example/voice.caf")],
+            "message_type": "message",
+            "service": "imessage",
+            "is_read": false,
+            "created_at": "2026-07-22T00:00:00Z",
+            "updated_at": "2026-07-22T00:00:00Z"
+        }}));
+    });
+    let message = client(&server)
+        .imessages()
+        .send_voice_note(
+            Some(IMessageRecipients::Group(&recipients)),
+            None,
+            "Hello there",
+            Some(&identity),
+            None,
+            true,
+        )
+        .unwrap();
+    send.assert();
+    assert!(message.content.is_none());
+    assert_eq!(message.media.unwrap().len(), 1);
 }
 
 #[test]

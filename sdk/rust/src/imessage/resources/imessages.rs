@@ -21,13 +21,81 @@ use crate::imessage::types::{
     IMessageTriageNumber, ThreadedIMessage,
 };
 
+/// The `to` argument of [`IMessagesResource::send_voice_note`]: one E.164
+/// recipient, or 2–8 distinct recipients for a group send as in
+/// [`IMessagesResource::send_group`].
+#[derive(Debug, Clone, Copy)]
+pub enum IMessageRecipients<'a> {
+    /// A single E.164 recipient.
+    One(&'a str),
+    /// 2–8 distinct E.164 recipients (group send from a dedicated line).
+    Group(&'a [String]),
+}
+
 pub struct IMessagesResource {
     http: Arc<HttpTransport>,
+}
+
+/// Body for `POST /messages`, inserting only the fields that were supplied.
+fn send_body(
+    to: Option<IMessageRecipients<'_>>,
+    conversation_id: Option<&Uuid>,
+    text: Option<&str>,
+    media_urls: Option<&[String]>,
+    send_style: Option<IMessageSendStyle>,
+) -> serde_json::Map<String, serde_json::Value> {
+    let mut body = serde_json::Map::new();
+    match to {
+        Some(IMessageRecipients::One(t)) => {
+            body.insert("to".to_string(), json!(t));
+        }
+        Some(IMessageRecipients::Group(to)) => {
+            body.insert("to".to_string(), json!(to));
+        }
+        None => {}
+    }
+    if let Some(cid) = conversation_id {
+        body.insert("conversation_id".to_string(), json!(cid.to_string()));
+    }
+    if let Some(t) = text {
+        body.insert("text".to_string(), json!(t));
+    }
+    if let Some(urls) = media_urls {
+        body.insert("media_urls".to_string(), json!(urls));
+    }
+    if let Some(style) = send_style {
+        body.insert("send_style".to_string(), json!(style.as_str()));
+    }
+    body
 }
 
 impl IMessagesResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+
+    /// POST a send body and decode the row the server wraps under `"message"`.
+    /// `agent_identity_id` rides as a query param when present.
+    fn post_send<T: serde::de::DeserializeOwned>(
+        &self,
+        body: serde_json::Map<String, serde_json::Value>,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: Option<&str>,
+    ) -> Result<T> {
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        let data = self.http.post_message(
+            "/messages",
+            &serde_json::Value::Object(body),
+            &params,
+            idempotency_key,
+        )?;
+        Ok(serde_json::from_value(
+            data.get("message")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        )?)
     }
 
     /// Read one message including nullable thread metadata.
@@ -170,33 +238,10 @@ impl IMessagesResource {
         idempotency_key: Option<&str>,
         plain_reply_fallback: bool,
     ) -> Result<ThreadedIMessage> {
-        let mut body = serde_json::Map::new();
-        body.insert("conversation_id".into(), json!(conversation_id));
+        let mut body = send_body(None, Some(conversation_id), text, media_urls, send_style);
         body.insert("reply_to_message_id".into(), json!(reply_to_message_id));
         body.insert("plain_reply_fallback".into(), json!(plain_reply_fallback));
-        if let Some(text) = text {
-            body.insert("text".into(), json!(text));
-        }
-        if let Some(urls) = media_urls {
-            body.insert("media_urls".into(), json!(urls));
-        }
-        if let Some(style) = send_style {
-            body.insert("send_style".into(), json!(style.as_str()));
-        }
-        let params = agent_identity_id
-            .map(|id| vec![("agent_identity_id", id.to_string())])
-            .unwrap_or_default();
-        let data = self.http.post_message(
-            "/messages",
-            &serde_json::Value::Object(body),
-            &params,
-            idempotency_key,
-        )?;
-        Ok(serde_json::from_value(
-            data.get("message")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null),
-        )?)
+        self.post_send(body, agent_identity_id, idempotency_key)
     }
 
     /// Read a visible message and its current delivery status.
@@ -304,81 +349,37 @@ impl IMessagesResource {
         agent_identity_id: Option<&Uuid>,
         idempotency_key: &str,
     ) -> Result<IMessage> {
-        // Build the body inserting only the fields that were supplied.
-        let mut body = serde_json::Map::new();
-        if let Some(t) = to {
-            body.insert("to".to_string(), json!(t));
-        }
-        if let Some(cid) = conversation_id {
-            body.insert("conversation_id".to_string(), json!(cid.to_string()));
-        }
-        if let Some(t) = text {
-            body.insert("text".to_string(), json!(t));
-        }
-        if let Some(urls) = media_urls {
-            body.insert("media_urls".to_string(), json!(urls));
-        }
-        if let Some(style) = send_style {
-            body.insert("send_style".to_string(), json!(style.as_str()));
-        }
-        let body = serde_json::Value::Object(body);
-
-        // `agent_identity_id` rides as a query param when present.
-        let mut params: Vec<(&str, String)> = Vec::new();
-        if let Some(id) = agent_identity_id {
-            params.push(("agent_identity_id", id.to_string()));
-        }
-
-        let data = self
-            .http
-            .post_message("/messages", &body, &params, Some(idempotency_key))?;
-        // The server wraps the row under a "message" key.
-        let message = data
-            .get("message")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
-        Ok(serde_json::from_value(message)?)
+        let body = send_body(
+            to.map(IMessageRecipients::One),
+            conversation_id,
+            text,
+            media_urls,
+            send_style,
+        );
+        self.post_send(body, agent_identity_id, Some(idempotency_key))
     }
 
     /// Speak `text` (at most 600 characters) in the agent's voice and send it
     /// as a native voice note. With `fallback_to_text`, the text is sent as an
     /// ordinary message when a voice note can't be produced; false makes the
     /// send fail. A generated key is used when `idempotency_key` is `None`.
+    /// Pass [`IMessageRecipients::Group`] to start or reuse a group by its
+    /// recipient list, as [`Self::send_group`] does.
     pub fn send_voice_note(
         &self,
-        to: Option<&str>,
+        to: Option<IMessageRecipients<'_>>,
         conversation_id: Option<&Uuid>,
         text: &str,
         agent_identity_id: Option<&Uuid>,
         idempotency_key: Option<&str>,
         fallback_to_text: bool,
     ) -> Result<IMessage> {
-        let mut body = serde_json::Map::new();
-        if let Some(t) = to {
-            body.insert("to".to_string(), json!(t));
-        }
-        if let Some(cid) = conversation_id {
-            body.insert("conversation_id".to_string(), json!(cid.to_string()));
-        }
-        body.insert("text".to_string(), json!(text));
+        let mut body = send_body(to, conversation_id, Some(text), None, None);
         body.insert("send_as_voice_note".to_string(), json!(true));
         if !fallback_to_text {
             body.insert("fallback_to_text".to_string(), json!(false));
         }
-        let params = agent_identity_id
-            .map(|id| vec![("agent_identity_id", id.to_string())])
-            .unwrap_or_default();
-        let data = self.http.post_message(
-            "/messages",
-            &serde_json::Value::Object(body),
-            &params,
-            idempotency_key,
-        )?;
-        Ok(serde_json::from_value(
-            data.get("message")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null),
-        )?)
+        self.post_send(body, agent_identity_id, idempotency_key)
     }
 
     /// Send to 2–8 distinct recipients from a dedicated iMessage line.
@@ -418,31 +419,14 @@ impl IMessagesResource {
         agent_identity_id: Option<&Uuid>,
         idempotency_key: &str,
     ) -> Result<IMessage> {
-        let mut body = serde_json::Map::new();
-        body.insert("to".to_string(), json!(to));
-        if let Some(t) = text {
-            body.insert("text".to_string(), json!(t));
-        }
-        if let Some(urls) = media_urls {
-            body.insert("media_urls".to_string(), json!(urls));
-        }
-        if let Some(style) = send_style {
-            body.insert("send_style".to_string(), json!(style.as_str()));
-        }
-        let body = serde_json::Value::Object(body);
-
-        let mut params: Vec<(&str, String)> = Vec::new();
-        if let Some(id) = agent_identity_id {
-            params.push(("agent_identity_id", id.to_string()));
-        }
-        let data = self
-            .http
-            .post_message("/messages", &body, &params, Some(idempotency_key))?;
-        let message = data
-            .get("message")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
-        Ok(serde_json::from_value(message)?)
+        let body = send_body(
+            Some(IMessageRecipients::Group(to)),
+            None,
+            text,
+            media_urls,
+            send_style,
+        );
+        self.post_send(body, agent_identity_id, Some(idempotency_key))
     }
 
     /// List iMessages visible to the caller, newest first.
