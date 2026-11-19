@@ -35,4 +35,7 @@ test("parseInlineImageSpec rejects malformed specs", () => {
   assert.throws(() => parseInlineImageSpec("no-equals"));
   assert.throws(() => parseInlineImageSpec("=/path/only"));
   assert.throws(() => parseInlineImageSpec("cid-only="));
+  assert.throws(() => parseInlineImageSpec("   =/path/only"));
+  assert.throws(() => parseInlineImageSpec("cid-only=   "));
+  assert.throws(() => parseInlineImageSpec("   =   "));
 });
