@@ -60,10 +60,13 @@ export function readVoiceNotes(media: unknown): VoiceNote[] {
 export function withVoiceNoteLabels(message: InkboxMessage): string {
   const labels = (message.voiceNotes ?? []).flatMap((note) => {
     if (note.errorCode === "not_audio") return [];
-    if (note.status === "completed" && note.text?.trim())
+    if (note.status === "completed") {
+      if (!note.text?.trim())
+        return [`[Voice note ${note.position}: no speech detected]`];
       return [
         `[Voice note ${note.position} — automatically transcribed]\n${note.text}`,
       ];
+    }
     return [
       `[Voice note ${note.position}: transcript unavailable; process the original attachment normally.]`,
     ];

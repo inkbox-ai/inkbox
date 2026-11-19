@@ -270,6 +270,19 @@ describe("voice-note completion routing", () => {
     },
   );
 
+  it.each([undefined, "", "  "])(
+    "labels a completed silent recording as no speech, preserving caption and attachments",
+    async (text) => {
+      const { bot, handler } = await setup();
+      const { original } = note("imessage", "completed", text);
+      await bot.webhooks.inkbox(signed(original));
+      const message = handler.mock.calls[0][1];
+      expect(message.text).toBe("typed caption\n\n[Voice note 2: no speech detected]");
+      expect(message.attachments).toHaveLength(2);
+      await bot.shutdown();
+    },
+  );
+
   it.each(["completion", "deadline"])(
     "accepts before ACK without waitUntil and recovers on %s in a fresh Chat",
     async (wake) => {
