@@ -214,7 +214,7 @@ export async function deliverVoiceNote(
   state: State,
   key: string,
   identityId: string,
-  wait: boolean,
+  mode: "ready" | "due" | "wait",
   lookup: (route: InkboxRoute, id: string) => Promise<TransportMessage>,
   deliver: (message: InkboxMessage) => Promise<void>,
 ): Promise<void> {
@@ -234,8 +234,9 @@ export async function deliverVoiceNote(
       return merged;
   }
   let ready = await completed();
+  if (!ready && mode === "ready") return;
   while (!ready && Date.now() < deadline) {
-    if (!wait) return;
+    if (mode !== "wait") return;
     await sleep(Math.min(1000, deadline - Date.now()));
     if (await state.get(key + ":done")) return;
     ready = await completed();

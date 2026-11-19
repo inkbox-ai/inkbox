@@ -254,6 +254,7 @@ describe("voice-note completion routing", () => {
       expect((await bot.webhooks.inkbox(signed(completion))).status).toBe(200);
       expect(handler).not.toHaveBeenCalled();
       await bot.webhooks.inkbox(signed(original));
+      expect(handler).toHaveBeenCalledTimes(1);
       await bot.webhooks.inkbox(signed(completion));
       await bot.webhooks.inkbox(signed(original));
       expect(handler).toHaveBeenCalledTimes(1);

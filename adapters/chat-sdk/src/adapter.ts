@@ -253,12 +253,12 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     }
     const chat = this.chat;
     const state = chat.getState();
-    const deliver = (key: string, wait = false) =>
+    const deliver = (key: string, mode: "ready" | "due" | "wait" = "due") =>
       deliverVoiceNote(
         state,
         key,
         identity.id,
-        wait,
+        mode,
         (route, id) => this.transport.getMessage(route, id),
         async (message) => {
           // Our inbox owns the receipt. Chat's pre-handler dedupe would suppress
@@ -274,7 +274,7 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     if (recovery) {
       const keys = await pendingVoiceNotes(state, identity.id);
       const outcomes = await Promise.allSettled(
-        keys.map((key) => deliver(key, true)),
+        keys.map((key) => deliver(key, "wait")),
       );
       if (outcomes.some((result) => result.status === "rejected")) {
         throw new Error("Some pending voice notes could not be delivered");
@@ -293,8 +293,9 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     let task: Promise<unknown>;
     if (normalized.voiceNotes?.some((note) => note.status === "pending")) {
       await acceptVoiceNote(state, sanitizeMessageRaw(normalized));
-      if (!options?.waitUntil) return new Response("OK");
-      task = deliver(sourceKey(normalized), true);
+      // Without a background lifetime, consume an already-arrived completion
+      // now, but never hold the request open waiting for one.
+      task = deliver(sourceKey(normalized), options?.waitUntil ? "wait" : "ready");
     } else {
       task = Promise.resolve(
         chat.processMessage(this, threadId, this.parseMessage(normalized), {
