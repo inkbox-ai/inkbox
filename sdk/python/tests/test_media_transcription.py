@@ -1,9 +1,9 @@
-from typing import get_args, get_type_hints
+from typing import NotRequired, get_args, get_origin, get_type_hints
 from uuid import UUID
 
 import pytest
 
-from inkbox import MediaTranscription, MessageTranscriptionFinishedWebhookPayload
+from inkbox import MediaTranscription, MessageTranscriptionFinishedWebhookPayload, SlackWebhookData
 from inkbox.phone.types import TextMediaItem
 from inkbox.imessage.types import IMessageMediaItem
 from inkbox.whatsapp import WhatsAppMedia
@@ -65,7 +65,18 @@ def test_completion_envelope_discriminates_by_channel():
     assert get_args(hints["event_type"]) == ("message.transcription_finished",)
     fields_by_variant = [get_type_hints(variant) for variant in get_args(hints["data"])]
     sources = {get_args(fields["channel"])[0]: fields for fields in fields_by_variant}
-    assert sources.keys() == {"text", "imessage", "whatsapp"}
+    assert sources.keys() == {"text", "imessage", "whatsapp", "slack"}
+    projection = {"text": "text_message", "imessage": "message", "whatsapp": "message", "slack": "event"}
     for channel, fields in sources.items():
         assert fields["message_id"] is str
-        assert ("text_message" if channel == "text" else "message") in fields
+        assert projection[channel] in fields
+    slack = sources["slack"]
+    for key in ("connection_id", "conversation_id", "message_ts", "thread_ts"):
+        assert key in slack
+    assert "contacts" not in slack
+
+
+def test_slack_received_event_carries_the_completion_key():
+    hints = get_type_hints(SlackWebhookData, include_extras=True)
+    assert get_origin(hints["message_id"]) is NotRequired
+    assert get_args(hints["message_id"]) == (str,)

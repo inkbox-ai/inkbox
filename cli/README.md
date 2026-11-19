@@ -1186,6 +1186,8 @@ inkbox slack file preview F0123456789 --connection-id CONNECTION_UUID --output p
 Byte downloads require a new output path and never overwrite an existing file.
 Follow returned cursors explicitly. `--include` and `--roots-only` apply to archive
 message listing, not ranked search. Omit `--roots-only` when selecting a thread.
+`--message-id` returns only one retained message, such as a received event's
+`data.message_id`; its audio files carry `transcription`.
 
 Cached context is optional and may be incomplete or temporarily stale. Unknown
 reaction and thread counts are not zero; a known count does not imply a complete
@@ -1388,10 +1390,11 @@ characters, the text is sent as an ordinary message. Add `--no-fallback-to-text`
 to fail instead (`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
 `409 whatsapp_capability_not_ready`).
 
-On iMessage, SMS/MMS, and WhatsApp, the send response shows a voice note with no text
-and one audio attachment. The spoken text appears shortly after as a completed
-`transcription` on later reads of the message; recording it never fails the send. A
-fallback comes back as an ordinary text message.
+A voice note has no message text. The spoken text is stored with the message as the
+audio attachment's completed `transcription`. iMessage and WhatsApp send responses
+include it; on SMS/MMS it appears on the next read of the message. On Slack, the
+uploaded audio file carries it in archived message reads. A fallback comes back as an
+ordinary text message.
 
 Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is
 sent as text, or without fallback fails with

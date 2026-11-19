@@ -924,7 +924,7 @@ class SlackActorProfile(TypedDict):
     profile: NotRequired[SlackUserProfile | None]
 
 
-class SlackWebhookData(TypedDict):
+class _SlackEventData(TypedDict):
     sender_access: NotRequired[SenderAccess | None]
     identity_id: str
     connection_id: str
@@ -937,6 +937,14 @@ class SlackWebhookData(TypedDict):
     contact_id: NotRequired[str | None]
     message_kinds: list[SlackMessageKind]
     event: dict[str, object]
+
+
+class SlackWebhookData(_SlackEventData):
+    """Received-message events carry ``message_id``, the retained Slack message ID that
+    ``message.transcription_finished`` reports. Enrolled audio files in
+    ``event["files"]`` carry ``transcription``; other files omit it."""
+
+    message_id: NotRequired[str]
 
 
 class SlackWebhookPayload(TypedDict):
@@ -1073,8 +1081,19 @@ class WhatsAppTranscriptionFinishedData(_TranscriptionFinishedData):
     reaction: NotRequired[None]
 
 
+class SlackTranscriptionFinishedData(_SlackEventData):
+    """The original Slack message; each audio file in ``event["files"]`` carries its
+    ``transcription``. Correlate it with the received event's ``message_id``."""
+
+    channel: Literal["slack"]
+    message_id: str
+
+
 MessageTranscriptionFinishedWebhookData = (
-    TextTranscriptionFinishedData | IMessageTranscriptionFinishedData | WhatsAppTranscriptionFinishedData
+    TextTranscriptionFinishedData
+    | IMessageTranscriptionFinishedData
+    | WhatsAppTranscriptionFinishedData
+    | SlackTranscriptionFinishedData
 )
 
 

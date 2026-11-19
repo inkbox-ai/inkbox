@@ -2,6 +2,7 @@
 import type { HttpTransport } from "./_http.js";
 import type { SlackPageOptions } from "./slack.js";
 import type { SenderAccess } from "./sender_access.js";
+import type { RawMediaTranscription } from "./media.js";
 import { archiveIncluded, cachedEmoji, cachedReaction } from "./slack-cache.js";
 import type { CachedWire, RawArchiveIncluded, SlackArchiveInclude, SlackArchiveIncluded,
   SlackCachedEmoji, SlackCachedEmojiOptions, SlackCachedEmojiPage, SlackCachedMediaKind, SlackCachedReaction } from "./slack-cache.js";
@@ -105,7 +106,8 @@ export interface SlackArchivedMessage {
   threadTs: string | null;
   userId: string | null;
   text: string;
-  files: Record<string, unknown>[];
+  /** Retained file metadata. Audio files carry `transcription` (`status`, `text`, `error_code`). */
+  files: (Record<string, unknown> & { transcription?: RawMediaTranscription })[];
   mentioned: boolean;
   source: "event" | "backfill" | "action";
   capturedAt: Date;
@@ -154,6 +156,8 @@ export interface SlackArchiveMessagesOptions extends SlackPageOptions {
   /** Page roots, broadcasts, and retained replies whose root is unavailable. */
   rootsOnly?: boolean;
   include?: SlackArchiveInclude[];
+  /** Return only this retained message, such as a received event's `data.message_id`. */
+  messageId?: string;
   conversationId?: string;
   threadTs?: string | null;
   beforeTs?: string | null;
@@ -161,7 +165,7 @@ export interface SlackArchiveMessagesOptions extends SlackPageOptions {
 }
 export interface SlackArchiveSearchOptions extends Omit<
   SlackArchiveMessagesOptions,
-  "threadTs" | "latestPerConversation" | "rootsOnly" | "include"
+  "threadTs" | "latestPerConversation" | "rootsOnly" | "include" | "messageId"
 > {
   userId?: string;
 }
@@ -636,6 +640,7 @@ export class SlackOperationsResource {
       latest_per_conversation: options.latestPerConversation,
       roots_only: options.rootsOnly,
       include: options.include?.join(","),
+      message_id: options.messageId,
     });
   }
   async listCachedEmoji(connectionId: string, options: SlackCachedEmojiOptions = {}): Promise<SlackCachedEmojiPage> {

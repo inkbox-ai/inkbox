@@ -74,9 +74,64 @@ mod tests {
                 TranscriptionFinishedSource::Text { text_message, .. } => ("text", text_message.id),
                 TranscriptionFinishedSource::IMessage { message } => ("imessage", message.id),
                 TranscriptionFinishedSource::WhatsApp { message } => ("whatsapp", message.id),
+                TranscriptionFinishedSource::Slack(_) => unreachable!("not a Slack fixture"),
             };
             assert_eq!(parsed_channel, channel);
             assert_eq!(original_id, parsed.data.message_id);
         }
+    }
+    #[test]
+    fn slack_terminal_event_carries_message_coordinates_and_file_results() {
+        use crate::webhooks::{
+            MessageTranscriptionFinishedWebhookPayload, SlackWebhookPayload,
+            TranscriptionFinishedSource,
+        };
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+        let fixtures: Vec<Value> = serde_json::from_str(
+            &std::fs::read_to_string(root.join("slack_webhook_events.json")).unwrap(),
+        )
+        .unwrap();
+        let message_id = "33333333-3333-4333-8333-333333333333";
+        let mut received = fixtures[0].clone();
+        received["data"]["message_id"] = json!(message_id);
+        received["data"]["event"]["files"] =
+            json!([{"id": "F123", "name": "clip.m4a", "transcription": {"status": "pending"}}]);
+        let parsed: SlackWebhookPayload = serde_json::from_value(received.clone()).unwrap();
+        assert_eq!(parsed.data.message_id.as_deref(), Some(message_id));
+        assert_eq!(serde_json::to_value(&parsed).unwrap(), received);
+
+        let mut event = received.clone();
+        event["id"] = json!("evt_complete");
+        event["event_type"] = json!("message.transcription_finished");
+        event["data"]["channel"] = json!("slack");
+        event["data"]["event"]["files"][0]["transcription"] =
+            json!({"status": "completed", "text": "See you at noon", "error_code": null});
+        let parsed: MessageTranscriptionFinishedWebhookPayload =
+            serde_json::from_value(event.clone()).unwrap();
+        assert_eq!(parsed.data.message_id, message_id);
+        assert!(parsed.data.contacts.is_empty() && parsed.data.agent_identities.is_empty());
+        let TranscriptionFinishedSource::Slack(data) = &parsed.data.source else {
+            panic!("expected the Slack projection");
+        };
+        assert_eq!(data.connection_id, received["data"]["connection_id"]);
+        assert_eq!(
+            data.message_ts,
+            received["data"]["message_ts"].as_str().map(String::from)
+        );
+        assert!(data.thread_ts.is_none() && data.message_id.is_none());
+        assert_eq!(
+            data.event["files"][0]["transcription"]["text"],
+            json!("See you at noon")
+        );
+        let mut round_trip = serde_json::to_value(&parsed).unwrap();
+        round_trip["data"]
+            .as_object_mut()
+            .unwrap()
+            .remove("contacts");
+        round_trip["data"]
+            .as_object_mut()
+            .unwrap()
+            .remove("agent_identities");
+        assert_eq!(round_trip, event);
     }
 }

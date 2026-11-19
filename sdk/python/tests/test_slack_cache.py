@@ -67,6 +67,19 @@ def test_older_response_does_not_invent_reaction_or_thread_counts(wire):
     assert dict(requests[0].url.params) == {"limit": "50"}
 
 
+def test_archive_message_id_filter_reads_file_transcription(wire):
+    client, requests, replies = wire
+    raw = copy.deepcopy(DATA["page"])
+    raw.pop("included")
+    message_id = raw["messages"][0]["id"]
+    transcription = {"status": "completed", "text": "See you at noon", "error_code": None}
+    raw["messages"][0]["files"] = [{"id": "F123", "name": "clip.m4a", "transcription": transcription}]
+    replies.append(raw)
+    result = client.slack.list_archived_messages(C, message_id=message_id)
+    assert dict(requests[0].url.params) == {"message_id": message_id, "limit": "50"}
+    assert result.messages[0].files[0]["transcription"] == transcription
+
+
 def test_cached_emoji_does_not_auto_paginate_or_confuse_aliases(wire):
     client, requests, replies = wire
     replies.append(copy.deepcopy(DATA["emoji_page"]))
