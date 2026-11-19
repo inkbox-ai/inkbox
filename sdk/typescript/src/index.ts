@@ -113,6 +113,9 @@ export type {
   MessageDirectionWire,
   MessageTranscriptionFinishedWebhookData,
   MessageTranscriptionFinishedWebhookPayload,
+  InboundReceivedWebhookData,
+  InboundReceivedWebhookPayload,
+  InboundWebhookRequest,
   TextWebhookPayload,
   TextWebhookEventType,
   TextWebhookMessage,
@@ -178,6 +181,17 @@ export type {
   ListWebhookDeliveriesOptions,
 } from "./webhooks/deliveries.js";
 export type { WebhookDeliveriesResource } from "./webhooks/deliveries.js";
+export { InboundResource } from "./inbound.js";
+export type {
+  InboundEvent,
+  InboundEventPage,
+  InboundEventStatus,
+  InboundHandler,
+  InboundSignature,
+  InboundSignatureInput,
+  InboundSignatureScheme,
+  InboundSource,
+} from "./inbound.js";
 // Snake_case wire shapes referenced by the webhook payload types above.
 // Re-exported from the root entry because package.json#exports only
 // publishes `"."` and `"./tunnels/connect"` — deep imports of
@@ -565,7 +579,7 @@ export type { IdentityPackStatus, IdentityPackOffer, IdentityPackAgreement, Iden
 export * from "./whatsapp.js";
 export type {WhatsAppWebhookEventType,WhatsAppWebhookReaction,WhatsAppWebhookMessage,WhatsAppWebhookRecipient,WhatsAppWebhookMedia,WhatsAppWebhookData,WhatsAppWebhookPayload} from "./webhooks/types.js";
 
-export type { HostingConfiguration, HostingUpdate, HostingDelivery, HostingModel, HostingHarness } from "./identities/hosting.js";
+export type { HostingConfiguration, HostingUpdate, HostingDelivery, HostingModel, HostingHarness, HostingPort, HostingPortSetting, HostingPorts, HostingPortsUpdate } from "./identities/hosting.js";
 
 export { ComputersResource } from "./computers.js";
 export type { ComputerShape, ComputerShapes } from "./computers.js";

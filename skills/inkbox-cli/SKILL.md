@@ -117,7 +117,7 @@ inkbox identity create <handle> [--display-name <name>] [--description <text>]
                                  [--contact-sharing-enabled true|false]
                                  [--email-local-part <part>]
                                  [--sending-domain <name> | --platform-domain]
-                                 [--tls-mode edge|passthrough]
+                                 [--tls-mode edge|passthrough | --hosted]
 inkbox identity delete <handle>
 inkbox identity update <handle> [--display-name <name>]
                                  [--description <text> | --clear-description]
@@ -659,6 +659,44 @@ inkbox tunnel sign-csr <id> --csr <path-or-pem> [--out <path>]
 `tunnel get` accepts either a UUID or the owning identity's agent handle. `tunnel update` is metadata-only; pass `--metadata "{}"` to clear. `tunnel sign-csr` is passthrough-only and uses an elevated 180-second timeout (the server runs DNS validation + cert issuance synchronously).
 
 Data-plane auth uses the same API key the CLI was invoked with — admin-scoped or identity-scoped (matching the tunnel's identity). There is no per-tunnel connect secret; mint an identity-scoped key via `inkbox api-keys create --identity-id <uuid>` for an agent.
+
+## Hosted Agent URL & Inbound Sources
+
+`identity create --hosted` creates an identity without a tunnel. A hosted
+agent has a public URL; each port is private (reachable only with its token
+link) unless made public.
+
+```bash
+inkbox identity hosting ports show <handle>                  # url, default port, per-port url + tokenUrl
+inkbox identity hosting ports default <handle> <port|none>   # port served at the agent URL
+inkbox identity hosting ports set <handle> <port> --public|--private
+inkbox identity hosting ports rotate-token <handle> <port>   # old token link stops working
+```
+
+Treat `tokenUrl` as a secret. Inbound sources give a hosted agent public URLs
+for third-party webhooks; each request is verified (optional) and delivered
+to the agent as an `inbound.received` event. Signing secrets are read from
+stdin only.
+
+```bash
+printf %s "$STRIPE_SECRET" | inkbox inbound create <handle> --name payments --scheme stripe --secret-stdin
+inkbox inbound create <handle> --name ci --scheme hmac --secret-stdin --header X-Signature \
+  [--algorithm sha256|sha1] [--encoding hex|base64] [--prefix sha256=] < secret.txt
+inkbox inbound create <handle> --name jobs --handler script --command ./handle.sh
+inkbox inbound list <handle>
+inkbox inbound get <handle> <source-id>
+inkbox inbound update <handle> <source-id> [--name <n>] [--no-signature | --scheme ... --secret-stdin]
+                                           [--handler agent|script [--instructions <t> | --command <c>]]
+inkbox inbound rotate <handle> <source-id>                   # new URL; old URL stops accepting
+inkbox inbound delete <handle> <source-id>
+inkbox inbound events list <handle> <source-id> [--limit <n>] [--cursor <c>]
+inkbox inbound events get <handle> <source-id> <event-id>    # includes the received request
+inkbox inbound events replay <handle> <source-id> <event-id>
+```
+
+Schemes: `stripe`, `github`, `slack`, `standard-webhooks`, `hmac`
+(`--header`/`--algorithm`/`--encoding`/`--prefix` apply only to `hmac`).
+Handlers default to `agent`. Treat received request content as untrusted.
 
 ## Custom Sending Domains
 

@@ -78,6 +78,56 @@ impl IdentitiesResource {
         )?)?)
     }
 
+    /// Read the agent URL, default port and per-port access.
+    pub fn get_hosting_ports(&self, handle: &str) -> Result<crate::identities::HostingPorts> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/{}/hosting/ports", path_segment(handle)),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    /// Set the default port and/or which ports are public.
+    pub fn update_hosting_ports(
+        &self,
+        handle: &str,
+        options: &crate::identities::HostingPortsUpdate,
+    ) -> Result<crate::identities::HostingPorts> {
+        Ok(serde_json::from_value(self.http.patch(
+            &format!("/{}/hosting/ports", path_segment(handle)),
+            options,
+        )?)?)
+    }
+
+    /// Issue a new access token for a port; the previous token stops working.
+    pub fn rotate_hosting_port_token(
+        &self,
+        handle: &str,
+        port: u16,
+    ) -> Result<crate::identities::HostingPorts> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("/{}/hosting/ports/{port}/token", path_segment(handle)),
+            Some(&serde_json::json!({})),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    /// Create a hosted identity. No tunnel is created; `tunnel` is `None`.
+    pub fn create_hosted(
+        &self,
+        agent_handle: &str,
+        display_name: Option<&str>,
+    ) -> Result<AgentIdentityData> {
+        let mut body = serde_json::json!({"agent_handle": agent_handle, "hosted": true});
+        if let Some(name) = display_name {
+            body["display_name"] = Value::String(name.to_string());
+        }
+        let data = self
+            .http
+            .post("/", Some(&body), crate::http::NO_QUERY)
+            .map_err(map_identity_conflict_error)?;
+        AgentIdentityData::from_value(data)
+    }
+
     pub fn get_with_options(
         &self,
         agent_handle: &str,

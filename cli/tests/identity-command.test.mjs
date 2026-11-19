@@ -41,3 +41,29 @@ test("identity update rejects rename flags before HTTP and still updates profile
   assert.equal(calls[1].path, "/api/v1/identities/sales-agent");
   assert.deepEqual(calls[1].body, { display_name: "Sales assistant" });
 });
+
+test("identity create --hosted sends hosted and rejects a tunnel TLS mode", async (t) => {
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    calls.push({ method: request.method, path: request.url, body: raw ? JSON.parse(raw) : null });
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({
+      id: "11111111-1111-1111-1111-111111111111", organization_id: "org_example", agent_handle: "hosted-agent",
+      created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", tunnel: null,
+    }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const env = { ...process.env, INKBOX_API_KEY: "test-key", INKBOX_BASE_URL: `http://127.0.0.1:${server.address().port}`, NODE_USE_ENV_PROXY: "0" };
+  const run = (...args) => exec(process.execPath, [cli, "--json", "identity", "create", ...args], { env });
+
+  await assert.rejects(run("hosted-agent", "--hosted", "--tls-mode", "edge"), /mutually exclusive/);
+  assert.deepEqual(calls, []);
+  const result = await run("hosted-agent", "--hosted");
+  assert.equal(JSON.parse(result.stdout).tunnel, null);
+  assert.equal(calls[0].path, "/api/v1/identities/");
+  assert.equal(calls[0].body.hosted, true);
+  assert.equal(calls[0].body.tunnel, undefined);
+});

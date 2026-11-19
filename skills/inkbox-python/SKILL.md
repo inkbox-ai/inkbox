@@ -1420,6 +1420,39 @@ inkbox.webhooks.subscriptions.update(created.id, scope="identity", context_confi
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `TextMessageRecipientWire`, the conversation-context shapes (`WebhookContextWire`, `WebhookContextBlockWire`, `WebhookTranscriptEntryWire`, and item wire types), plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
 
+## Hosted Agent URL & Inbound Sources
+
+```python
+identity = inkbox.create_identity("my-agent", hosted=True)   # no tunnel; identity.tunnel is None
+ids = inkbox.identities
+ids.get_hosting("my-agent").url                               # agent's public URL
+
+ports = ids.get_hosting_ports("my-agent")                     # url, default_port, ports[{port, public, url, token_url}]
+ids.update_hosting_ports("my-agent", {"default_port": 3000, "ports": [{"port": 8080, "public": True}]})
+ids.rotate_hosting_port_token("my-agent", 3000)               # old token_url stops working
+```
+
+Private ports are reachable only through `token_url`; treat it as a secret.
+Inbound sources give a hosted identity public URLs for third-party webhooks.
+Each request is optionally signature-checked, then delivered to the agent as
+an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).
+
+```python
+src = inkbox.inbound.create_source(
+    "my-agent", name="payments",
+    signature={"scheme": "stripe", "secret": stripe_secret},  # stripe | github | slack | standard-webhooks | hmac
+    handler={"type": "agent", "instructions": "Reconcile the payment."},  # or {"type": "script", "command": "./handle.sh"}
+)
+print(src.url)                                                # give this to the sender
+inkbox.inbound.update_source("my-agent", src.id, signature=None)  # omit = unchanged, None = remove check
+inkbox.inbound.rotate_source("my-agent", src.id)              # new URL; old URL stops accepting
+page = inkbox.inbound.list_events("my-agent", src.id, limit=20)    # page.events, page.next_cursor
+event = inkbox.inbound.get_event("my-agent", src.id, page.events[0].id)  # includes event.request
+inkbox.inbound.replay_event("my-agent", src.id, event.id)
+```
+
+`hmac` also accepts `header`, `algorithm` (`sha256`/`sha1`), `encoding` (`hex`/`base64`) and `prefix`. Secrets are never returned.
+
 ## Error Handling
 
 ```python

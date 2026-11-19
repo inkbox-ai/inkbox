@@ -24,6 +24,49 @@ pub struct HostingConfiguration {
     pub idle_stop_enabled: bool,
     pub last_error: Option<String>,
     pub updated_at: Option<String>,
+    /// The agent's public URL.
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+/// Agent URL, default port and per-port access.
+#[derive(Clone, Debug, Deserialize)]
+pub struct HostingPorts {
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub default_port: Option<u16>,
+    #[serde(default)]
+    pub ports: Vec<HostingPort>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HostingPort {
+    pub port: u16,
+    pub public: bool,
+    #[serde(default)]
+    pub url: Option<String>,
+    /// `url` with a `?_token=` access token; keep private.
+    #[serde(default)]
+    pub token_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct HostingPortSetting {
+    pub port: u16,
+    pub public: bool,
+}
+
+/// Partial update; omitted fields are unchanged. `Unset::Value(None)` clears the default port.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct HostingPortsUpdate {
+    #[serde(
+        skip_serializing_if = "Unset::is_omit",
+        serialize_with = "serialize_port"
+    )]
+    pub default_port: Unset<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Vec<HostingPortSetting>>,
 }
 
 /// Generation-checked partial command. Omitted settings are preserved;
@@ -65,6 +108,16 @@ pub struct HostingUpdate {
     pub idle_stop_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reset_instructions: Option<bool>,
+}
+
+fn serialize_port<S: serde::Serializer>(
+    value: &Unset<u16>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match value {
+        Unset::Omit | Unset::Value(None) => serializer.serialize_none(),
+        Unset::Value(Some(port)) => serializer.serialize_u16(*port),
+    }
 }
 
 fn serialize_binding<S: serde::Serializer>(

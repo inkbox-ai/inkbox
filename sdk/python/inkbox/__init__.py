@@ -549,6 +549,28 @@ from .whatsapp import WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppConnectR
 
 from inkbox.hosted_workspace import HostedWorkspace, ChatConversation, ChatTurn, ChatEvent, ChatEventPage, ChatCapabilities, ChatText, ChatFileReference
 
+from inkbox.inbound import (
+    InboundResource,
+    InboundSource,
+    InboundEvent,
+    InboundEventPage,
+    InboundEventStatus,
+    InboundSignature,
+    InboundSignatureInput,
+    InboundSignatureScheme,
+    InboundHandler,
+    InboundAgentHandlerInput,
+    InboundScriptHandlerInput,
+)
+from inkbox.webhooks import (
+    InboundReceivedWebhookPayload,
+    InboundReceivedWebhookData,
+    InboundWebhookRequest,
+    InboundWebhookSource,
+    InboundAgentHandler,
+    InboundScriptHandler,
+)
+
 __all__ = [
     "MediaTranscription",
     "MediaTranscriptionWire",
@@ -1051,6 +1073,24 @@ __all__ = [
     "WebhookSubscriptionCreateResponse",
     "WebhookSubscriptionsResource",
     "WebhookSubscriptionStatus",
+    # Inbound
+    "InboundResource",
+    "InboundSource",
+    "InboundEvent",
+    "InboundEventPage",
+    "InboundEventStatus",
+    "InboundSignature",
+    "InboundSignatureInput",
+    "InboundSignatureScheme",
+    "InboundHandler",
+    "InboundAgentHandlerInput",
+    "InboundScriptHandlerInput",
+    "InboundReceivedWebhookPayload",
+    "InboundReceivedWebhookData",
+    "InboundWebhookRequest",
+    "InboundWebhookSource",
+    "InboundAgentHandler",
+    "InboundScriptHandler",
     # Webhook deliveries
     "WebhookDelivery",
     "WebhookDeliveriesResource",

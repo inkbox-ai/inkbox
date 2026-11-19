@@ -51,6 +51,18 @@ os._exit(0)
         inbox.close()
 
 
+def test_inbox_accepts_deliveries_up_to_two_mebibytes(tmp_path):
+    activation = str(uuid4())
+    inbox = ManagedInbox(tmp_path / "inbox.sqlite", activation)
+    try:
+        large = event(activation) | {"data": {"body": "x" * (1024 * 1024)}}
+        assert inbox.accept(large)["state"] == "accepted"
+        with pytest.raises(InboxError, match="size limit"):
+            inbox.accept(event(activation, 2) | {"data": {"body": "x" * (2 * 1024 * 1024)}})
+    finally:
+        inbox.close()
+
+
 def test_inbox_uncertain_execution_requires_owner_replacement_before_quarantine(tmp_path, monkeypatch):
     activation, path = str(uuid4()), tmp_path / "events" / "inbox.sqlite"
     monkeypatch.setenv("INKBOX_MANAGED_OWNER_ID", "owner-one")

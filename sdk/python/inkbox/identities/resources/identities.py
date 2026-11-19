@@ -15,7 +15,7 @@ from uuid import UUID
 
 from inkbox.whatsapp import WhatsAppChannelStatus
 from inkbox.exceptions import InkboxAPIError
-from inkbox.identities.hosting import HostingConfiguration, HostingUpdate, HostingDelivery
+from inkbox.identities.hosting import HostingConfiguration, HostingUpdate, HostingDelivery, HostingPorts, HostingPortsUpdate
 from inkbox.identities.exceptions import map_identity_conflict_error
 from inkbox.identities.types import (
     _UNSET,
@@ -46,6 +46,18 @@ class IdentitiesResource:
     def update_hosting(self, agent_handle: str, options: HostingUpdate) -> HostingConfiguration:
         """Enable, edit or remove hosting using the last read generation."""
         return HostingConfiguration.from_dict(self._http.put(f"/{quote(agent_handle, safe='')}/hosting", json=dict(options)))
+
+    def get_hosting_ports(self, agent_handle: str) -> HostingPorts:
+        """Read the agent URL, default port and per-port access."""
+        return HostingPorts.from_dict(self._http.get(f"/{quote(agent_handle, safe='')}/hosting/ports"))
+
+    def update_hosting_ports(self, agent_handle: str, options: HostingPortsUpdate) -> HostingPorts:
+        """Set the default port and/or which ports are public; omitted fields are unchanged."""
+        return HostingPorts.from_dict(self._http.patch(f"/{quote(agent_handle, safe='')}/hosting/ports", json=dict(options)))
+
+    def rotate_hosting_port_token(self, agent_handle: str, port: int) -> HostingPorts:
+        """Issue a new access token for a port; the previous token stops working."""
+        return HostingPorts.from_dict(self._http.post(f"/{quote(agent_handle, safe='')}/hosting/ports/{int(port)}/token", json={}))
 
     def list_hosting_deliveries(self, agent_handle: str, *, before: str | None = None) -> list[HostingDelivery]:
         """Read up to 100 handoffs; accepted does not mean the agent has replied."""
@@ -89,6 +101,7 @@ class IdentitiesResource:
         claim_imessage_number: Literal[True] | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
         tunnel: IdentityTunnelCreateOptions | None = None,
+        hosted: bool | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
         vault_secret_ids: UUID | str | list[UUID | str] | None = None,
     ) -> _AgentIdentityData:
@@ -115,6 +128,7 @@ class IdentitiesResource:
                 ``imessage_enabled=True``.
             mailbox: Optional nested mailbox spec.
             tunnel: Optional nested tunnel spec (tls_mode only).
+            hosted: Create a hosted identity; no tunnel is created.
             phone_number: Optional phone-number provisioning payload.
             vault_secret_ids: Optional vault secret selection to attach.
 
@@ -146,6 +160,8 @@ class IdentitiesResource:
             body["mailbox"] = mailbox.to_wire()
         if tunnel is not None:
             body["tunnel"] = tunnel.to_wire()
+        if hosted is not None:
+            body["hosted"] = hosted
         if phone_number is not None:
             body["phone_number"] = phone_number.to_wire()
         if vault_secret_ids is not None:

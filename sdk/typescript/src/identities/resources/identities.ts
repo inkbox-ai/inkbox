@@ -30,7 +30,7 @@ import {
   vaultSecretIdsToWire,
 } from "../types.js";
 
-import { parseHosting, parseHostingDelivery, hostingUpdateBody, type HostingDelivery, type HostingConfiguration, type HostingUpdate } from "../hosting.js";
+import { parseHosting, parseHostingDelivery, hostingUpdateBody, parseHostingPorts, hostingPortsUpdateBody, type HostingDelivery, type HostingConfiguration, type HostingUpdate, type HostingPorts, type HostingPortsUpdate, type RawHostingPorts } from "../hosting.js";
 
 export class IdentitiesResource {
   workspace(handle:string):HostedWorkspace {return new HostedWorkspace(this.http,handle);}
@@ -50,6 +50,21 @@ export class IdentitiesResource {
 
   async updateHosting(handle: string, options: HostingUpdate): Promise<HostingConfiguration> {
     return parseHosting(await this.http.put(`/${encodeURIComponent(handle)}/hosting`, hostingUpdateBody(options)));
+  }
+
+  /** Read the agent URL, default port and per-port access. */
+  async getHostingPorts(handle: string): Promise<HostingPorts> {
+    return parseHostingPorts(await this.http.get<RawHostingPorts>(`/${encodeURIComponent(handle)}/hosting/ports`));
+  }
+
+  /** Set the default port and/or which ports are public. */
+  async updateHostingPorts(handle: string, options: HostingPortsUpdate): Promise<HostingPorts> {
+    return parseHostingPorts(await this.http.patch<RawHostingPorts>(`/${encodeURIComponent(handle)}/hosting/ports`, hostingPortsUpdateBody(options)));
+  }
+
+  /** Issue a new access token for a port; the previous token stops working. */
+  async rotateHostingPortToken(handle: string, port: number): Promise<HostingPorts> {
+    return parseHostingPorts(await this.http.post<RawHostingPorts>(`/${encodeURIComponent(handle)}/hosting/ports/${encodeURIComponent(String(port))}/token`, {}));
   }
 
   async getWhatsAppStatus(handle:string):Promise<WhatsAppChannelStatus|null> {
@@ -107,6 +122,8 @@ export class IdentitiesResource {
     claimIMessageNumber?: true;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
+    /** Create a hosted identity; no tunnel is created. */
+    hosted?: boolean;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
     vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<_AgentIdentityData> {
@@ -127,6 +144,7 @@ export class IdentitiesResource {
     }
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.tunnel !== undefined) body["tunnel"] = identityTunnelCreateOptionsToWire(options.tunnel);
+    if (options.hosted !== undefined) body["hosted"] = options.hosted;
     if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
     if (options.vaultSecretIds !== undefined) body["vault_secret_ids"] = vaultSecretIdsToWire(options.vaultSecretIds);
     try {

@@ -1435,6 +1435,39 @@ await inkbox.webhooks.subscriptions.update(created.id, { scope: "identity", cont
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, the conversation-context shapes (`WebhookContext`, `WebhookContextBlock`, `WebhookTranscriptEntry`, and item types), plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
 
+## Hosted Agent URL & Inbound Sources
+
+```typescript
+const identity = await inkbox.createIdentity("my-agent", { hosted: true }); // no tunnel; identity.tunnel is null
+const ids = inkbox.identities;
+(await ids.getHosting("my-agent")).url;                        // agent's public URL
+
+const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, ports[{ port, public, url, tokenUrl }]
+await ids.updateHostingPorts("my-agent", { defaultPort: 3000, ports: [{ port: 8080, public: true }] });
+await ids.rotateHostingPortToken("my-agent", 3000);            // old tokenUrl stops working
+```
+
+Private ports are reachable only through `tokenUrl`; treat it as a secret.
+Inbound sources give a hosted identity public URLs for third-party webhooks.
+Each request is optionally signature-checked, then delivered to the agent as
+an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).
+
+```typescript
+const src = await inkbox.inbound.createSource("my-agent", {
+  name: "payments",
+  signature: { scheme: "stripe", secret: stripeSecret },     // stripe | github | slack | standard-webhooks | hmac
+  handler: { type: "agent", instructions: "Reconcile the payment." }, // or { type: "script", command: "./handle.sh" }
+});
+console.log(src.url);                                         // give this to the sender
+await inkbox.inbound.updateSource("my-agent", src.id, { signature: null }); // omit = unchanged, null = remove check
+await inkbox.inbound.rotateSource("my-agent", src.id);        // new URL; old URL stops accepting
+const page = await inkbox.inbound.listEvents("my-agent", src.id, { limit: 20 }); // page.events, page.nextCursor
+const event = await inkbox.inbound.getEvent("my-agent", src.id, page.events[0].id); // includes event.request
+await inkbox.inbound.replayEvent("my-agent", src.id, event.id);
+```
+
+`hmac` also accepts `header`, `algorithm` (`sha256`/`sha1`), `encoding` (`hex`/`base64`) and `prefix`. Secrets are never returned.
+
 ## Error Handling
 
 ```typescript

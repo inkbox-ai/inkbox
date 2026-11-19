@@ -45,6 +45,8 @@ export interface HostingConfiguration {
   idleStopEnabled: boolean;
   lastError: string | null;
   updatedAt: string | null;
+  /** The agent's public URL. */
+  url: string | null;
 }
 
 interface RawHostingConfiguration {
@@ -66,6 +68,7 @@ interface RawHostingConfiguration {
   idle_stop_enabled?: boolean;
   last_error?: string | null;
   updated_at?: string | null;
+  url?: string | null;
 }
 
 export function parseHosting(data: RawHostingConfiguration): HostingConfiguration {
@@ -79,6 +82,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
     followDefaults: data.follow_defaults ?? true, credentialBindingId: data.credential_binding_id ?? null,
     idleStopEnabled: data.idle_stop_enabled ?? true, idleTimeoutSeconds: data.idle_timeout_seconds ?? 60, lastError: data.last_error ?? null,
     updatedAt: data.updated_at ?? null,
+    url: data.url ?? null,
   };
 }
 
@@ -111,4 +115,48 @@ export function parseHostingDelivery(data: {
 }): HostingDelivery {
   return {id: data.id, event: data.event, state: data.state, attempts: data.attempts,
     receivedAt: data.received_at, lastError: data.last_error, retryable: data.retryable};
+}
+
+export interface HostingPortSetting {
+  port: number;
+  public: boolean;
+}
+
+export interface HostingPort extends HostingPortSetting {
+  url: string | null;
+  /** `url` with a `?_token=` access token; keep private. */
+  tokenUrl: string | null;
+}
+
+/** Omitted fields stay unchanged; `defaultPort: null` clears it. */
+export interface HostingPortsUpdate {
+  defaultPort?: number | null;
+  ports?: HostingPortSetting[];
+}
+
+export interface HostingPorts {
+  /** The agent's public URL. */
+  url: string | null;
+  defaultPort: number | null;
+  ports: HostingPort[];
+}
+
+export interface RawHostingPorts {
+  url?: string | null;
+  default_port?: number | null;
+  ports?: { port: number; public: boolean; url?: string | null; token_url?: string | null }[];
+}
+
+export function parseHostingPorts(data: RawHostingPorts): HostingPorts {
+  return {
+    url: data.url ?? null, defaultPort: data.default_port ?? null,
+    ports: (data.ports ?? []).map((p) => ({ port: p.port, public: p.public, url: p.url ?? null, tokenUrl: p.token_url ?? null })),
+  };
+}
+
+export function hostingPortsUpdateBody(options: HostingPortsUpdate): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options.defaultPort !== undefined) body.default_port = options.defaultPort;
+  if (options.ports !== undefined) body.ports = options.ports.map((p) => ({ port: p.port, public: p.public }));
+  return body;
 }

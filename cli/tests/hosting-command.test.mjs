@@ -244,3 +244,44 @@ test("published chat file schema advertises the decoded 5 MB limit", async () =>
     maximum: 5_000_000, minimum: 0, title: "Size Bytes", type: "integer",
   });
 });
+
+const portsView = {url: "https://agent.example.test", default_port: 3000, ports: [
+  {port: 3000, public: false, url: "https://agent.example.test", token_url: "https://agent.example.test?_token=t"},
+  {port: 8080, public: true, url: null, token_url: null},
+]};
+
+test("ports show, default, set and rotate-token use the ports subresource", async () => {
+  await withApi(async (run, requests) => {
+    const shown = await run(["ports", "show", "example"]);
+    assert.ifError(shown.error);
+    assert.equal(JSON.parse(shown.stdout).ports[0].tokenUrl, "https://agent.example.test?_token=t");
+    assert.ifError((await run(["ports", "default", "example", "8080"])).error);
+    assert.ifError((await run(["ports", "default", "example", "none"])).error);
+    assert.ifError((await run(["ports", "set", "example", "3000", "--public"])).error);
+    assert.ifError((await run(["ports", "rotate-token", "example", "3000"])).error);
+    assert.deepEqual(requests, [
+      {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: 8080}},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: null}},
+      {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {ports: [{port: 8080, public: true}, {port: 3000, public: true}]}},
+      {method: "POST", path: "/api/v1/identities/example/hosting/ports/3000/token", body: {}},
+    ]);
+    const human = await run(["ports", "show", "example"], false);
+    assert.ifError(human.error);
+    assert.match(human.stdout, /tokenUrl/);
+  }, () => portsView);
+});
+
+test("invalid port settings fail before a request", async () => {
+  await withApi(async (run, requests) => {
+    for (const args of [
+      ["ports", "default", "example", "0"],
+      ["ports", "default", "example", "65536"],
+      ["ports", "set", "example", "3000"],
+      ["ports", "set", "example", "3000", "--public", "--private"],
+      ["ports", "rotate-token", "example", "abc"],
+    ]) assert.ok((await run(args)).error, args.join(" "));
+    assert.equal(requests.length, 0);
+  }, () => portsView);
+});

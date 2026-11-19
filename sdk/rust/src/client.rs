@@ -181,6 +181,7 @@ pub struct Inkbox {
     contacts: ContactsResource,
     companion: CompanionResource,
     computers: ComputersResource,
+    inbound: crate::inbound::InboundResource,
     notes: NotesResource,
     billing: BillingResource,
 
@@ -333,6 +334,7 @@ impl Inkbox {
             webhook_deliveries: WebhookDeliveriesResource::new(api_http.clone()),
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
+            inbound: crate::inbound::InboundResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
             organization_domains: OrganizationDomainsResource::new(api_http.clone()),
             slack: SlackResource::new(api_http.clone()),
@@ -501,6 +503,10 @@ impl Inkbox {
     pub fn identities(&self) -> &IdentitiesResource {
         &self.identities
     }
+    /// Inbound sources and events for hosted identities.
+    pub fn inbound(&self) -> &crate::inbound::InboundResource {
+        &self.inbound
+    }
     pub fn tunnels(&self) -> &TunnelsResource {
         &self.tunnels
     }
@@ -655,6 +661,12 @@ impl Inkbox {
             None,
             Some(enabled),
         )?;
+        Ok(AgentIdentity::new(data, self.clone()))
+    }
+
+    /// Create a hosted identity. No tunnel is created.
+    pub fn create_hosted_identity(self: &Arc<Self>, agent_handle: &str) -> Result<AgentIdentity> {
+        let data = self.identities.create_hosted(agent_handle, None)?;
         Ok(AgentIdentity::new(data, self.clone()))
     }
 

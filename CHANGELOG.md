@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.41
+
+### Added
+
+- Inbound sources for hosted identities in Python, TypeScript and Rust (`inbound` on the client): create, list, get, update, delete and rotate sources; list, get and replay received events; and report a failed event with `report_inbound_event_result` / `reportInboundEventResult`. Each source has a public URL, an optional sender signature check (`stripe`, `github`, `slack`, `standard-webhooks` or `hmac`) and an `agent` or `script` handler.
+- Typed `inbound.received` webhook payloads. `data.delivery_id` is the same across retries of one delivery and new for each replay; dedupe on it.
+- Hosted identities: create with `hosted` (`hosted=True` / `{ hosted: true }` / Rust `create_hosted_identity`); no tunnel is created and `tunnel` is null.
+- Hosting configuration returns the agent's public `url`.
+- Agent ports: `get_hosting_ports` / `getHostingPorts`, `update_hosting_ports` / `updateHostingPorts` (default port, public or private per port) and `rotate_hosting_port_token` / `rotateHostingPortToken`. Each port has a `url` and a private `token_url` access link.
+- CLI: `identity create --hosted`; `identity hosting ports show|default|set|rotate-token`; `inbound create|list|get|update|delete|rotate` and `inbound events list|get|replay`. Signing secrets are read from stdin.
+
+### Changed
+
+- The Python managed inbox accepts deliveries up to 2 MiB (was 512 KiB).
+- **Rust:** `HostingConfiguration` gains a public `url` field. Code that builds `HostingConfiguration` with a struct literal must add it.
+
 ## 0.7.40
 
 - Expose audio attachment transcription status, text, errors and attachment IDs in Python, TypeScript and Rust.
