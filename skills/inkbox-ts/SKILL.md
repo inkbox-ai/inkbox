@@ -1732,9 +1732,18 @@ text over 600 characters, the text is sent as an ordinary message. Pass
 `fallbackToText: false` to fail instead (`422 voice_note_text_too_long`,
 `502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
 
-On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
-attachment whose `transcription` is completed with the spoken text. A fallback comes
-back as an ordinary text message.
+On iMessage, SMS/MMS, and WhatsApp, the send response shows a voice note with no text
+and one audio attachment. The spoken text appears shortly after as a completed
+`transcription` on later reads of the message; recording it never fails the send. A
+fallback comes back as an ordinary text message.
+
+Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is
+sent as text, or without fallback fails with
+`422 imessage_reply_required_for_links_or_media`. On WhatsApp, a voice note to a
+recipient who hasn't replied yet is also sent as text, or without fallback fails with
+`422 whatsapp_reply_required_for_media`. On Slack, a failure without fallback is
+recorded on the send action (`status: failed` with the `error_code`); repeating the
+same idempotency key returns that failed action, so use a new key to try again.
 
 ## Threaded iMessage replies
 
