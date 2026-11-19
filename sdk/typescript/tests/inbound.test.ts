@@ -75,11 +75,11 @@ describe("InboundResource", () => {
 
 describe("hosting agent URL and ports", () => {
   it("reads url from hosting", async () => {
-    const http = { get: vi.fn().mockResolvedValue({ mode: "inkbox", identity_id: "identity", url: "https://agent.example.test" }) };
+    const http = { get: vi.fn().mockResolvedValue({ mode: "inkbox", identity_id: "identity", url: "https://agent.example.test", delivery: "internal" }) };
     const resource = new IdentitiesResource(http as unknown as HttpTransport);
-    expect((await resource.getHosting("agent")).url).toBe("https://agent.example.test");
+    expect(await resource.getHosting("agent")).toMatchObject({ url: "https://agent.example.test", delivery: "internal" });
     http.get.mockResolvedValueOnce({ mode: "external", identity_id: "identity" });
-    expect((await resource.getHosting("agent")).url).toBeNull();
+    expect(await resource.getHosting("agent")).toMatchObject({ url: null, delivery: "tunnel" });
   });
 
   it("gets, updates and rotates ports", async () => {
@@ -102,10 +102,25 @@ describe("hosting agent URL and ports", () => {
     expect(http.get).toHaveBeenCalledWith("/%40agent/hosting/ports");
     await resource.updateHostingPorts("agent", { version: 4, defaultPort: null, ports: [{ port: 8080, public: true }] });
     expect(http.patch).toHaveBeenCalledWith("/agent/hosting/ports", { version: 4, default_port: null, ports: [{ port: 8080, public: true }] });
-    await resource.updateHostingPorts("agent", { defaultPort: 8080 });
-    expect(http.patch.mock.calls[1][1]).toEqual({ default_port: 8080 });
+    await resource.updateHostingPorts("agent", { version: 4, defaultPort: 8080 });
+    expect(http.patch.mock.calls[1][1]).toEqual({ version: 4, default_port: 8080 });
     await resource.rotateHostingPortToken("agent", 3000);
     expect(http.post).toHaveBeenCalledWith("/agent/hosting/ports/3000/token", {});
+  });
+
+  it("creates a tunnel for an existing identity", async () => {
+    const http = { post: vi.fn().mockResolvedValue({
+      id: "00000000-0000-0000-0000-000000000001", organization_id: "org_example", tunnel_name: "agent",
+      agent_identity_id: "00000000-0000-0000-0000-000000000000", tls_mode: "edge", cert_pem: null,
+      cert_fingerprint_sha256: null, cert_expires_at: null, status: "active", last_connected_at: null,
+      last_connected_ip_addr: null, last_disconnected_at: null, currently_connected: false,
+      public_host: "agent.example.test", zone: "example.test", metadata: {},
+      created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+    }) };
+    const resource = new IdentitiesResource(http as unknown as HttpTransport);
+    const tunnel = await resource.createTunnel("@agent");
+    expect(http.post).toHaveBeenCalledWith("/%40agent/tunnel", {});
+    expect([tunnel.tunnelName, tunnel.publicHost]).toEqual(["agent", "agent.example.test"]);
   });
 
   it("sends hosted on identity create", async () => {

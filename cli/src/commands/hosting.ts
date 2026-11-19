@@ -1,8 +1,8 @@
 import { registerWorkspaceCommands } from "./workspace.js";
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
-import { InkboxAPIError } from "@inkbox/sdk";
-import type { HostingHarness, HostingModel, HostingPorts, HostingUpdate } from "@inkbox/sdk";
+import { InkboxAPIError, type Inkbox } from "@inkbox/sdk";
+import type { HostingHarness, HostingModel, HostingPorts, HostingPortsUpdate, HostingUpdate } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -97,9 +97,16 @@ function registerPortCommands(hosting: Command): void {
   ports.command("default <handle> <port>")
     .description("Set the port served at the agent URL; 'none' clears it")
     .action(withErrorHandler(async function (this: Command, handle: string, port: string) {
-      const global = getGlobalOpts(this);
       const defaultPort = port === "none" ? null : portNumber(port);
-      show(await createClient(global).identities.updateHostingPorts(handle, { defaultPort }), !!global.json);
+      const global = getGlobalOpts(this);
+      show(await updatePorts(createClient(global), handle, (current) => {
+        const update: HostingPortsUpdate = { version: current.version, defaultPort };
+        // A new default port is added as private in the same update.
+        if (defaultPort !== null && !current.ports.some(p => p.port === defaultPort)) {
+          update.ports = [...current.ports.map(p => ({ port: p.port, public: p.public })), { port: defaultPort, public: false }];
+        }
+        return update;
+      }), !!global.json);
     }));
   ports.command("set <handle> <port>")
     .description("Make a port public (no token needed) or private (token required)")
@@ -109,21 +116,11 @@ function registerPortCommands(hosting: Command): void {
       if (!!opts.public === !!opts.private) throw new Error("Choose exactly one of --public or --private");
       const number = portNumber(port);
       const global = getGlobalOpts(this);
-      const client = createClient(global);
-      const update = async () => {
-        const current = await client.identities.getHostingPorts(handle);
+      show(await updatePorts(createClient(global), handle, (current) => {
         const settings = current.ports.filter(p => p.port !== number).map(p => ({ port: p.port, public: p.public }));
         settings.push({ port: number, public: !!opts.public });
-        return client.identities.updateHostingPorts(handle, { version: current.version, ports: settings });
-      };
-      let result: HostingPorts;
-      try {
-        result = await update();
-      } catch (err) {
-        if (!staleVersion(err)) throw err;
-        result = await update();
-      }
-      show(result, !!global.json);
+        return { version: current.version, ports: settings };
+      }), !!global.json);
     }));
   ports.command("rotate-token <handle> <port>")
     .description("Issue a new access token for a port; the previous token stops working")
@@ -131,6 +128,16 @@ function registerPortCommands(hosting: Command): void {
       const global = getGlobalOpts(this);
       show(await createClient(global).identities.rotateHostingPortToken(handle, portNumber(port)), !!global.json);
     }));
+}
+
+async function updatePorts(client: Inkbox, handle: string, build: (current: HostingPorts) => HostingPortsUpdate): Promise<HostingPorts> {
+  const attempt = async () => client.identities.updateHostingPorts(handle, build(await client.identities.getHostingPorts(handle)));
+  try {
+    return await attempt();
+  } catch (err) {
+    if (!staleVersion(err)) throw err;
+    return attempt();
+  }
 }
 
 function staleVersion(err: unknown): boolean {

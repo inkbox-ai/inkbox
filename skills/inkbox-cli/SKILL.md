@@ -647,9 +647,10 @@ Constraints that bite:
 
 ## Tunnels
 
-Tunnels are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade). The `inkbox tunnel` subcommand is read + update + sign-csr only.
+Tunnels are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade). `inkbox tunnel create <handle>` adds an edge tunnel to an identity that has none (for example, one created with `--hosted`); it returns `409 tunnel_exists` otherwise.
 
 ```bash
+inkbox tunnel create <handle>
 inkbox tunnel list
 inkbox tunnel get <id-or-handle>
 inkbox tunnel update <id> [--metadata <json>]
@@ -672,12 +673,13 @@ inkbox identity create <handle> --hosted
 inkbox identity hosting configure <handle> --expected-generation 0 --harness codex
 inkbox identity hosting get <handle> --json                  # repeat until state is "ready"
 inkbox identity hosting ports show <handle>                  # url, default port, per-port url + tokenUrl
-inkbox identity hosting ports default <handle> <port|none>   # port served at the agent URL
+inkbox identity hosting ports default <handle> <port|none>   # port served at the agent URL; adds it as private if unlisted
 inkbox identity hosting ports set <handle> <port> --public|--private   # sends the version it read; retries once on a concurrent edit
 inkbox identity hosting ports rotate-token <handle> <port>   # old token link stops working
 ```
 
-Treat `tokenUrl` as a secret. Inbound sources give a hosted agent public URLs
+Treat `tokenUrl` as a secret. An Inkbox API key with access to the agent
+reaches any port, listed or not. Inbound sources give a hosted agent public URLs
 for third-party webhooks; each request is verified (optional) and delivered
 to the agent as an `inbound.received` event. Signing secrets are read from
 stdin only.

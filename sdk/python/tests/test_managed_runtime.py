@@ -63,6 +63,19 @@ def test_inbox_accepts_deliveries_up_to_two_mebibytes(tmp_path):
         inbox.close()
 
 
+def test_inbox_measures_non_ascii_deliveries_in_utf8_bytes(tmp_path):
+    activation = str(uuid4())
+    inbox = ManagedInbox(tmp_path / "inbox.sqlite", activation)
+    try:
+        body = "\u00e9" * (800 * 1024)
+        large = event(activation) | {"data": {"body": body}}
+        assert inbox.accept(large)["state"] == "accepted"
+        assert inbox.accept(event(activation) | {"data": {"body": body + "\u00e9"}})["state"] == "accepted"
+        assert inbox.claim()[1]["data"]["body"] == body + "\u00e9"
+    finally:
+        inbox.close()
+
+
 def test_inbox_uncertain_execution_requires_owner_replacement_before_quarantine(tmp_path, monkeypatch):
     activation, path = str(uuid4()), tmp_path / "events" / "inbox.sqlite"
     monkeypatch.setenv("INKBOX_MANAGED_OWNER_ID", "owner-one")

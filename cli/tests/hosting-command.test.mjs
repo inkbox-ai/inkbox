@@ -262,8 +262,10 @@ test("ports show, default, set and rotate-token use the ports subresource", asyn
     assert.ifError((await run(["ports", "rotate-token", "example", "3000"])).error);
     assert.deepEqual(requests, [
       {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
-      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: 8080}},
-      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: null}},
+      {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {version: 4, default_port: 8080}},
+      {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {version: 4, default_port: null}},
       {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
       {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {version: 4, ports: [{port: 8080, public: true}, {port: 3000, public: true}]}},
       {method: "POST", path: "/api/v1/identities/example/hosting/ports/3000/token", body: {}},
@@ -284,6 +286,21 @@ test("ports set re-reads and retries once on a stale version", async () => {
   }, req => {
     if (req.method === "GET") return {...portsView, version: 4 + (gets++ % 2)};
     return ++patches === 2 ? portsView : {status: 409, body: {detail: {error: "stale_version"}}};
+  });
+});
+
+test("ports default adds an unlisted port and retries once on a stale version", async () => {
+  let gets = 0, patches = 0;
+  await withApi(async (run, requests) => {
+    assert.ifError((await run(["ports", "default", "example", "9000"])).error);
+    const listed = [{port: 3000, public: false}, {port: 8080, public: true}, {port: 9000, public: false}];
+    assert.deepEqual(requests.filter(r => r.method === "PATCH").map(r => r.body), [
+      {version: 4, default_port: 9000, ports: listed},
+      {version: 5, default_port: 9000, ports: listed},
+    ]);
+  }, req => {
+    if (req.method === "GET") return {...portsView, version: 4 + gets++};
+    return ++patches === 2 ? portsView : {status: 409, body: {detail: {code: "stale_version"}}};
   });
 });
 

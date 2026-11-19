@@ -52,8 +52,9 @@ pub enum TunnelError {
     Removed(String),
 
     /// `TunnelNotProvisioned` — raised by `connect` when no tunnel exists for
-    /// the supplied name in the calling org. Tunnels are provisioned
-    /// atomically as part of `create_identity(...)`.
+    /// the supplied name in the calling org. Tunnels are provisioned by
+    /// `create_identity(...)`, or by `identities().create_tunnel(handle)` for
+    /// an identity that has none.
     NotProvisioned(String),
 
     /// `TunnelStateConflict` — 409 from a tunnel operation against a tunnel in

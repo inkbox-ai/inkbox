@@ -170,8 +170,8 @@ def bootstrap(
             ) from removed_error
         raise TunnelNotProvisioned(
             f"no tunnel named {name!r} exists in this org. "
-            "Tunnels are provisioned atomically by "
-            f"inkbox.create_identity({name!r}); call that first."
+            f"Create the identity with inkbox.create_identity({name!r}), or add a "
+            f"tunnel to an existing one with inkbox.identities.create_tunnel({name!r})."
         )
 
     if state and state.tunnel_id != str(tunnel.id):

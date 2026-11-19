@@ -1319,7 +1319,7 @@ await connect(inkbox, {
 });
 ```
 
-Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `rotateSecret` surface.
+Tunnels are provisioned atomically by `inkbox.createIdentity(...)`. An identity without one (for example, created with `hosted: true`) gets an edge tunnel from `await inkbox.identities.createTunnel("my-app")`; it returns `409 tunnel_exists` if one is already there. There is no `delete` / `restore` / `rotateSecret` surface.
 
 `listener.status` is `idle`, `connecting`, `connected`, `reconnecting`,
 `closed`, or `superseded`. `listener.isConnected` is local runtime liveness;
@@ -1459,7 +1459,7 @@ await ids.updateHostingPorts("my-agent", {
 await ids.rotateHostingPortToken("my-agent", 3000);            // old tokenUrl stops working
 ```
 
-Private ports are reachable only through `tokenUrl`; treat it as a secret.
+Private ports are reachable through `tokenUrl` (treat it as a secret) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
 Inbound sources give a hosted identity public URLs for third-party webhooks.
 Each request is optionally signature-checked, then delivered to the agent as
 an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).

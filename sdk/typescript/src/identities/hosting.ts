@@ -47,6 +47,8 @@ export interface HostingConfiguration {
   updatedAt: string | null;
   /** The agent's public URL. */
   url: string | null;
+  /** How Inkbox events reach the agent: internally, or over the identity's tunnel. */
+  delivery: "internal" | "tunnel";
 }
 
 interface RawHostingConfiguration {
@@ -69,6 +71,7 @@ interface RawHostingConfiguration {
   last_error?: string | null;
   updated_at?: string | null;
   url?: string | null;
+  delivery?: "internal" | "tunnel";
 }
 
 export function parseHosting(data: RawHostingConfiguration): HostingConfiguration {
@@ -83,6 +86,7 @@ export function parseHosting(data: RawHostingConfiguration): HostingConfiguratio
     idleStopEnabled: data.idle_stop_enabled ?? true, idleTimeoutSeconds: data.idle_timeout_seconds ?? 60, lastError: data.last_error ?? null,
     updatedAt: data.updated_at ?? null,
     url: data.url ?? null,
+    delivery: data.delivery ?? "tunnel",
   };
 }
 
@@ -133,7 +137,7 @@ export interface HostingPort extends HostingPortSetting {
  * Pass the `version` you read; a stale one gets 409 `stale_version`.
  */
 export interface HostingPortsUpdate {
-  version?: number;
+  version: number;
   defaultPort?: number | null;
   ports?: HostingPortSetting[];
 }
@@ -162,8 +166,7 @@ export function parseHostingPorts(data: RawHostingPorts): HostingPorts {
 }
 
 export function hostingPortsUpdateBody(options: HostingPortsUpdate): Record<string, unknown> {
-  const body: Record<string, unknown> = {};
-  if (options.version !== undefined) body.version = options.version;
+  const body: Record<string, unknown> = { version: options.version };
   if (options.defaultPort !== undefined) body.default_port = options.defaultPort;
   if (options.ports !== undefined) body.ports = options.ports.map((p) => ({ port: p.port, public: p.public }));
   return body;

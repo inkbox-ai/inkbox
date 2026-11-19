@@ -87,10 +87,28 @@ def test_client_exposes_inbound():
 
 def test_hosting_exposes_agent_url():
     http = Mock()
-    http.get.return_value = {"mode": "inkbox", "identity_id": "identity", "url": "https://agent.example.test"}
-    assert IdentitiesResource(http).get_hosting("agent").url == "https://agent.example.test"
+    http.get.return_value = {"mode": "inkbox", "identity_id": "identity", "url": "https://agent.example.test",
+                             "delivery": "internal"}
+    hosting = IdentitiesResource(http).get_hosting("agent")
+    assert (hosting.url, hosting.delivery) == ("https://agent.example.test", "internal")
     http.get.return_value = {"mode": "external", "identity_id": "identity"}
-    assert IdentitiesResource(http).get_hosting("agent").url is None
+    hosting = IdentitiesResource(http).get_hosting("agent")
+    assert (hosting.url, hosting.delivery) == (None, "tunnel")
+
+
+def test_create_tunnel_for_existing_identity():
+    http = Mock()
+    http.post.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001", "organization_id": "org_example", "tunnel_name": "agent",
+        "agent_identity_id": "00000000-0000-0000-0000-000000000000", "tls_mode": "edge", "cert_pem": None,
+        "cert_fingerprint_sha256": None, "cert_expires_at": None, "status": "active", "last_connected_at": None,
+        "last_connected_ip_addr": None, "last_disconnected_at": None, "currently_connected": False,
+        "public_host": "agent.example.test", "zone": "example.test", "metadata": {},
+        "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
+    }
+    tunnel = IdentitiesResource(http).create_tunnel("@agent")
+    http.post.assert_called_once_with("/%40agent/tunnel", json={})
+    assert (tunnel.tunnel_name, tunnel.public_host) == ("agent", "agent.example.test")
 
 
 def test_hosting_ports_subresource():

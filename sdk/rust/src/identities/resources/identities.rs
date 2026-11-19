@@ -1,6 +1,6 @@
 //! Identity CRUD. Mailbox and tunnel are provisioned atomically by
-//! [`IdentitiesResource::create`]; there is no standalone mailbox / tunnel
-//! create surface.
+//! [`IdentitiesResource::create`]; [`IdentitiesResource::create_tunnel`] adds
+//! a tunnel to an identity that has none.
 //!
 //! Faithful port of `inkbox/identities/resources/identities.py`. Every path,
 //! query param, and request body matches the Python source exactly. The
@@ -109,6 +109,16 @@ impl IdentitiesResource {
             Some(&serde_json::json!({})),
             crate::http::NO_QUERY,
         )?)?)
+    }
+
+    /// Create a tunnel for an identity that has none, such as one created hosted.
+    /// 409 `tunnel_exists` if it already has one.
+    pub fn create_tunnel(&self, handle: &str) -> Result<crate::tunnels::Tunnel> {
+        crate::tunnels::Tunnel::from_value(&self.http.post(
+            &format!("/{}/tunnel", path_segment(handle)),
+            Some(&serde_json::json!({})),
+            crate::http::NO_QUERY,
+        )?)
     }
 
     /// Create a hosted identity. No tunnel is created; `tunnel` is `None`.

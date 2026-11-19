@@ -2,9 +2,8 @@
 inkbox/tunnels/resources/tunnels.py
 
 Control-plane reads + update + sign-csr for tunnels. Tunnels are created
-and deleted exclusively via identity-create / identity-delete cascades;
-there is no standalone create / delete / restore / force-delete /
-rotate-secret surface.
+with the identity (or by ``inkbox.identities.create_tunnel()`` for an
+identity that has none) and deleted with it.
 """
 
 from __future__ import annotations
@@ -62,9 +61,9 @@ def _map_sign_csr_error(err: InkboxAPIError) -> Exception:
 
 class TunnelsResource:
     """Read + edit wrapper for ``/api/v1/tunnels/*`` plus the
-    ``connect()`` data-plane entry point. Tunnel lifecycle is owned by
-    identity-create / identity-delete; there is no create / delete /
-    restore / force-delete / rotate-secret surface here."""
+    ``connect()`` data-plane entry point. Tunnels are created with the
+    identity or by ``inkbox.identities.create_tunnel()``, and deleted
+    with the identity."""
 
     def __init__(self, http: HttpTransport, *, inkbox: Any | None = None) -> None:
         self._http = http

@@ -2,7 +2,7 @@
 inkbox/identities/resources/identities.py
 
 Identity CRUD. Mailbox and tunnel are provisioned atomically by
-``create()``; there is no standalone mailbox / tunnel create surface.
+``create()``; ``create_tunnel()`` adds a tunnel to an identity that has none.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from inkbox.whatsapp import WhatsAppChannelStatus
 from inkbox.exceptions import InkboxAPIError
 from inkbox.identities.hosting import HostingConfiguration, HostingUpdate, HostingDelivery, HostingPorts, HostingPortsUpdate
 from inkbox.identities.exceptions import map_identity_conflict_error
+from inkbox.tunnels.types import Tunnel
 from inkbox.identities.types import (
     _UNSET,
     AgentIdentitySummary,
@@ -54,6 +55,13 @@ class IdentitiesResource:
     def update_hosting_ports(self, agent_handle: str, options: HostingPortsUpdate) -> HostingPorts:
         """Set the default port and/or which ports are public; omitted fields are unchanged."""
         return HostingPorts.from_dict(self._http.patch(f"/{quote(agent_handle, safe='')}/hosting/ports", json=dict(options)))
+
+    def create_tunnel(self, agent_handle: str) -> Tunnel:
+        """Create a tunnel for an identity that has none, such as one created hosted.
+
+        409 ``tunnel_exists`` if it already has one.
+        """
+        return Tunnel._from_dict(self._http.post(f"/{quote(agent_handle, safe='')}/tunnel", json={}))
 
     def rotate_hosting_port_token(self, agent_handle: str, port: int) -> HostingPorts:
         """Issue a new access token for a port; the previous token stops working."""

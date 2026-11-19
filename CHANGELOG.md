@@ -7,14 +7,15 @@
 - Inbound sources for hosted identities in Python, TypeScript and Rust (`inbound` on the client): create, list, get, update, delete and rotate sources; list, get and replay received events; and report a failed delivery with `report_inbound_event_result` / `reportInboundEventResult`, which takes the payload's `delivery_id` (`deliveryId` in TypeScript); the server answers 409 `stale_delivery` when the event has since been delivered again. Each source has a public URL, an optional sender signature check (`stripe`, `github`, `slack`, `standard-webhooks` or `hmac`) and an `agent` or `script` handler.
 - Typed `inbound.received` webhook payloads. `data.delivery_id` is the same across retries of one delivery and new for each replay; dedupe on it.
 - Hosted identities: create with `hosted` (`hosted=True` / `{ hosted: true }` / Rust `create_hosted_identity`); no tunnel is created and `tunnel` is null.
-- Hosting configuration returns the agent's public `url`.
-- Agent ports: `get_hosting_ports` / `getHostingPorts`, `update_hosting_ports` / `updateHostingPorts` (default port, public or private per port) and `rotate_hosting_port_token` / `rotateHostingPortToken`. Each port has a `url` and a private `token_url` access link. The ports view carries a `version`; pass it back on update and a stale one returns 409 `stale_version`.
-- CLI: `identity create --hosted`; `identity hosting ports show|default|set|rotate-token` (`ports set` sends the version it read and retries once after a concurrent edit); `inbound create|list|get|update|delete|rotate` and `inbound events list|get|replay`. Signing secrets are read from stdin.
+- Hosting configuration returns the agent's public `url` and `delivery` (`internal` or `tunnel`): how Inkbox events reach the agent.
+- Create a tunnel for an existing identity that has none, such as a hosted identity: `identities.create_tunnel(handle)` / `identities.createTunnel(handle)` / Rust `identities().create_tunnel(handle)`, CLI `tunnel create <handle>`. Returns 409 `tunnel_exists` when the identity already has one.
+- Agent ports: `get_hosting_ports` / `getHostingPorts`, `update_hosting_ports` / `updateHostingPorts` (default port, public or private per port) and `rotate_hosting_port_token` / `rotateHostingPortToken`. Each port has a `url` and a private `token_url` access link. The ports view carries a `version`; updates require it (`version` is a required field of the update type in all three SDKs) and a stale one returns 409 `stale_version`.
+- CLI: `identity create --hosted`; `identity hosting ports show|default|set|rotate-token` (`ports default` and `ports set` send the version they read and retry once after a concurrent edit; `ports default` adds an unlisted port as private in the same update); `inbound create|list|get|update|delete|rotate` and `inbound events list|get|replay`. Signing secrets are read from stdin.
 
 ### Changed
 
-- The Python managed inbox accepts deliveries up to 2 MiB (was 512 KiB).
-- **Rust:** `HostingConfiguration` gains a public `url` field. Code that builds `HostingConfiguration` with a struct literal must add it.
+- The Python managed inbox accepts deliveries up to 2 MiB (was 512 KiB), measured in UTF-8 bytes; non-ASCII text is no longer counted as escape sequences.
+- **Rust:** `HostingConfiguration` gains public `url` and `delivery` fields. Code that builds `HostingConfiguration` with a struct literal must add them.
 
 ## 0.7.40
 

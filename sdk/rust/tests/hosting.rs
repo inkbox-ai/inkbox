@@ -208,7 +208,7 @@ fn hosting_url_and_ports_subresource() {
         "applied_generation": 1, "instructions": "", "trigger_events": [], "follow_defaults": true,
         "credential_binding_id": null, "idle_timeout_seconds": 60, "last_error": null, "updated_at": null,
         "machine_id": null, "harness": null, "tier": null, "shape_id": null,
-        "url": "https://agent.example.test"
+        "url": "https://agent.example.test", "delivery": "internal"
     });
     let view = json!({
         "url": "https://agent.example.test", "default_port": 3000, "version": 4,
@@ -243,10 +243,9 @@ fn hosting_url_and_ports_subresource() {
         .build()
         .unwrap();
     let ids = client.identities();
-    assert_eq!(
-        ids.get_hosting("agent").unwrap().url.as_deref(),
-        Some("https://agent.example.test")
-    );
+    let hosting = ids.get_hosting("agent").unwrap();
+    assert_eq!(hosting.url.as_deref(), Some("https://agent.example.test"));
+    assert_eq!(hosting.delivery, "internal");
     let ports = ids.get_hosting_ports("agent").unwrap();
     assert_eq!((ports.default_port, ports.version), (Some(3000), 4));
     assert!(ports.ports[0]
@@ -258,7 +257,7 @@ fn hosting_url_and_ports_subresource() {
     ids.update_hosting_ports(
         "agent",
         &HostingPortsUpdate {
-            version: Some(ports.version),
+            version: ports.version,
             default_port: Unset::Value(None),
             ports: Some(vec![HostingPortSetting {
                 port: 8080,
@@ -273,14 +272,48 @@ fn hosting_url_and_ports_subresource() {
     update.assert();
     rotate.assert();
     assert_eq!(
-        serde_json::to_value(HostingPortsUpdate::default()).unwrap(),
-        json!({})
+        serde_json::to_value(HostingPortsUpdate {
+            version: 4,
+            default_port: Unset::Omit,
+            ports: None
+        })
+        .unwrap(),
+        json!({"version": 4})
     );
 
     let mut legacy = config;
     legacy.as_object_mut().unwrap().remove("url");
+    legacy.as_object_mut().unwrap().remove("delivery");
     let legacy: inkbox::identities::HostingConfiguration = serde_json::from_value(legacy).unwrap();
     assert!(legacy.url.is_none());
+    assert_eq!(legacy.delivery, "tunnel");
+}
+
+#[test]
+fn create_tunnel_for_existing_identity() {
+    use httpmock::prelude::*;
+    let server = MockServer::start();
+    let create = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/identities/agent/tunnel");
+        then.status(201).json_body(json!({
+            "id": "00000000-0000-0000-0000-000000000001", "organization_id": "org_example",
+            "tunnel_name": "agent", "agent_identity_id": "00000000-0000-0000-0000-000000000000",
+            "tls_mode": "edge", "cert_pem": null, "cert_fingerprint_sha256": null,
+            "cert_expires_at": null, "status": "active", "last_connected_at": null,
+            "last_connected_ip_addr": null, "last_disconnected_at": null,
+            "currently_connected": false, "public_host": "agent.example.test",
+            "zone": "example.test", "metadata": {},
+            "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"
+        }));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let tunnel = client.identities().create_tunnel("agent").unwrap();
+    create.assert();
+    assert_eq!(tunnel.tunnel_name, "agent");
+    assert_eq!(tunnel.public_host, "agent.example.test");
 }
 
 #[test]

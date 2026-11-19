@@ -1316,7 +1316,7 @@ reconnecting. `listener.tunnel` remains the bootstrap resource snapshot.
 `listener.close()` raises `TimeoutError` if its runtime thread cannot stop within
 30 seconds.
 
-Tunnels are provisioned atomically by `inkbox.create_identity(...)`; there is no standalone `create` / `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
+Tunnels are provisioned atomically by `inkbox.create_identity(...)`. An identity without one (for example, created with `hosted=True`) gets an edge tunnel from `inkbox.identities.create_tunnel("my-app")`; it returns `409 tunnel_exists` if one is already there. There is no `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
 
 Reads + edit:
 
@@ -1441,7 +1441,7 @@ ids.update_hosting_ports("my-agent", {"version": ports.version, "default_port": 
 ids.rotate_hosting_port_token("my-agent", 3000)               # old token_url stops working
 ```
 
-Private ports are reachable only through `token_url`; treat it as a secret.
+Private ports are reachable through `token_url` (treat it as a secret) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
 Inbound sources give a hosted identity public URLs for third-party webhooks.
 Each request is optionally signature-checked, then delivered to the agent as
 an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).

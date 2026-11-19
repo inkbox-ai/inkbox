@@ -106,7 +106,7 @@ class ManagedInbox:
                 or not re.fullmatch(r'evt_[a-f0-9]{64}', metadata['event_id'])
                 or envelope.get('id') != metadata['event_id']):
             raise InboxError('Invalid delivery identity')
-        payload = json.dumps(envelope, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        payload = json.dumps(envelope, sort_keys=True, separators=(',', ':'), allow_nan=False, ensure_ascii=False)
         size = len(payload.encode())
         if size > MAX_DELIVERY_BYTES:
             raise InboxError('Delivery exceeds size limit')
@@ -127,7 +127,7 @@ class ManagedInbox:
                     for field in ('data', 'timestamp'):
                         if field in envelope:
                             refreshed[field] = envelope[field]
-                    payload = json.dumps(refreshed, sort_keys=True, separators=(',', ':'), allow_nan=False)
+                    payload = json.dumps(refreshed, sort_keys=True, separators=(',', ':'), allow_nan=False, ensure_ascii=False)
                     size = len(payload.encode())
                     used = self.db.execute("SELECT coalesce(sum(bytes),0) FROM deliveries WHERE state != 'completed' AND settled_at IS NULL").fetchone()[0]
                     if size > MAX_DELIVERY_BYTES or used - row[3] + size > MAX_BYTES:

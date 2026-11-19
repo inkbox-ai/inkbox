@@ -4,12 +4,13 @@ import { HostedWorkspace } from "../../hosted-workspace.js";
  *
  * Identity create / list / get / update / delete, plus phone-number
  * release. Mailbox and tunnel are provisioned atomically by `create()`
- * and removed by `delete()` (cascade); there is no standalone mailbox
- * or tunnel create / link surface.
+ * and removed by `delete()` (cascade); `createTunnel()` adds a tunnel to
+ * an identity that has none.
  */
 
 import { parseWhatsAppChannelStatus, type RawWhatsAppChannelStatus, type WhatsAppChannelStatus } from "../../whatsapp.js";
 import { HttpTransport, InkboxAPIError, validateIdempotencyKey } from "../../_http.js";
+import { parseTunnel, type RawTunnel, type Tunnel } from "../../tunnels/types.js";
 import { parseIdentityDomainAffiliation } from "../../organization_domains/types.js";
 import type { IdentityDomainAffiliation, SetDomainAffiliationOptions } from "../../organization_domains/types.js";
 import { mapIdentityConflictError } from "../exceptions.js";
@@ -60,6 +61,11 @@ export class IdentitiesResource {
   /** Set the default port and/or which ports are public. */
   async updateHostingPorts(handle: string, options: HostingPortsUpdate): Promise<HostingPorts> {
     return parseHostingPorts(await this.http.patch<RawHostingPorts>(`/${encodeURIComponent(handle)}/hosting/ports`, hostingPortsUpdateBody(options)));
+  }
+
+  /** Create a tunnel for an identity that has none, such as one created hosted. 409 `tunnel_exists` if it already has one. */
+  async createTunnel(handle: string): Promise<Tunnel> {
+    return parseTunnel(await this.http.post<RawTunnel>(`/${encodeURIComponent(handle)}/tunnel`, {}));
   }
 
   /** Issue a new access token for a port; the previous token stops working. */

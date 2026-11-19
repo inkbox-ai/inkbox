@@ -6,8 +6,9 @@
 //! matches the Python source exactly.
 //!
 //! Mailbox and tunnel are provisioned atomically by
-//! [`resources::IdentitiesResource::create`]; there is no standalone create
-//! surface. The per-identity facade with convenience methods lives at
+//! [`resources::IdentitiesResource::create`];
+//! [`resources::IdentitiesResource::create_tunnel`] adds a tunnel to an
+//! identity that has none. The per-identity facade with convenience methods lives at
 //! [`crate::agent_identity::AgentIdentity`].
 
 pub mod directional;

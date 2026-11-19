@@ -2,9 +2,8 @@
  * inkbox-tunnels/resources/tunnels.ts
  *
  * Control-plane reads + update + sign-csr for tunnels. Tunnels are
- * created and deleted exclusively via identity-create / identity-delete
- * cascades; there is no standalone create / delete / restore /
- * force-delete / rotate-secret surface.
+ * created with the identity (or by `inkbox.identities.createTunnel()`
+ * for an identity that has none) and deleted with it.
  */
 
 import { HttpTransport, InkboxAPIError } from "../../_http.js";

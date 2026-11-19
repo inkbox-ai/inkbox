@@ -27,6 +27,9 @@ pub struct HostingConfiguration {
     /// The agent's public URL.
     #[serde(default)]
     pub url: Option<String>,
+    /// How Inkbox events reach the agent: `internal`, or `tunnel` over the identity's tunnel.
+    #[serde(default = "default_delivery")]
+    pub delivery: String,
 }
 
 /// Agent URL, default port and per-port access.
@@ -60,11 +63,10 @@ pub struct HostingPortSetting {
 }
 
 /// Partial update; omitted fields are unchanged. `Unset::Value(None)` clears the default port.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct HostingPortsUpdate {
     /// The `version` you read; a stale one gets 409 `stale_version`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub version: Option<u64>,
+    pub version: u64,
     #[serde(
         skip_serializing_if = "Unset::is_omit",
         serialize_with = "serialize_port"
@@ -153,6 +155,10 @@ pub struct HostingDeliveries {
 
 fn default_idle_stop() -> bool {
     true
+}
+
+fn default_delivery() -> String {
+    "tunnel".into()
 }
 
 fn default_model() -> String {
