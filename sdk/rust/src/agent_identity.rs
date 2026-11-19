@@ -50,6 +50,7 @@ use crate::imessage::types::{
     IMessageSendStyle, IMessageThread, IMessageThreadListOptions, IdentityIMessageNumber,
     ThreadedIMessage,
 };
+use crate::imessage::IMessageRecipients;
 use crate::mail::types::{
     DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
     MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
@@ -1510,10 +1511,11 @@ impl AgentIdentity {
     /// Speak `text` (at most 600 characters) in this identity's voice and send
     /// it as a native iMessage voice note. With `fallback_to_text`, the text is
     /// sent as an ordinary message when a voice note can't be produced; false
-    /// makes the send fail.
+    /// makes the send fail. Pass [`IMessageRecipients::Group`] to send to a
+    /// group by its recipient list, as [`Self::send_imessage_group`] does.
     pub fn send_imessage_voice_note(
         &self,
-        to: Option<&str>,
+        to: Option<IMessageRecipients<'_>>,
         conversation_id: Option<&Uuid>,
         text: &str,
         idempotency_key: Option<&str>,
