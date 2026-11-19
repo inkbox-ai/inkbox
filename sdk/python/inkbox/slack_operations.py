@@ -612,11 +612,18 @@ class SlackOperationsMixin:
         latest_per_conversation: bool | None = None,
         roots_only: bool | None = None,
         include: list[SlackArchiveInclude] | None = None,
+        message_id: UUID | str | None = None,
     ) -> SlackArchiveMessagesResponse:
-        """List retained messages, optionally the latest match per conversation."""
+        """List retained messages, optionally the latest match per conversation.
+
+        ``message_id`` returns only that retained message, such as a received
+        event's ``data["message_id"]``. Audio file entries in ``files`` carry a
+        ``transcription`` (``status``, ``text``, ``error_code``).
+        """
         return self._archive_messages(
             f"{_base(connection_id)}/archive/messages",
             {
+                "message_id": str(message_id) if message_id is not None else None,
                 "conversation_id": conversation_id,
                 "thread_ts": thread_ts,
                 "before_ts": before_ts,

@@ -47,6 +47,17 @@ it("keeps legacy reads unexpanded with unknown state", async () => {
   expect(page.messages[0]).toMatchObject({ reactions: null, reactionsComplete: null, replyCount: null });
   expect(Object.fromEntries(new URL(String(fetch.mock.calls[0][0])).searchParams)).toEqual({ limit: "50" });
 });
+it("reads one retained message by ID with its file transcription", async () => {
+  const raw = structuredClone(data.page); delete raw.included;
+  const transcription = { status: "completed", text: "See you at noon", error_code: null };
+  raw.messages[0].files = [{ id: "F123", name: "clip.m4a", transcription }];
+  const { fetch, client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, { messageId: raw.messages[0].id });
+  expect(Object.fromEntries(new URL(String(fetch.mock.calls[0][0])).searchParams)).toEqual({
+    message_id: raw.messages[0].id, limit: "50",
+  });
+  expect(page.messages[0].files[0].transcription).toEqual(transcription);
+});
 it("searches one cached emoji page without following its cursor", async () => {
   const { fetch, client } = setup(data.emoji_page);
   const page = await client.slack.listCachedEmoji(C, { q: "party +", limit: 2, cursor: "previous" });

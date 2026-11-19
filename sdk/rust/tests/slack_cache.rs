@@ -302,3 +302,59 @@ fn legacy_values_can_be_wrapped_without_constructing_response_literals() {
     );
     assert!(included.files["F123"].content_cached);
 }
+#[test]
+fn archived_message_by_id_reads_its_file_transcription() {
+    let data = fixture();
+    let connection = Uuid::parse_str(data["connection_id"].as_str().unwrap()).unwrap();
+    let mut page = data["page"].clone();
+    page.as_object_mut().unwrap().remove("included");
+    let message_id = Uuid::parse_str(page["messages"][0]["id"].as_str().unwrap()).unwrap();
+    page["messages"][0]["files"] = serde_json::json!([{
+        "id": "F123", "name": "clip.m4a",
+        "transcription": {"status": "completed", "text": "See you at noon", "error_code": null}
+    }]);
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-test-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let mut found = server.mock(|when, then| {
+        when.method(Method::GET)
+            .path(format!(
+                "/api/v1/slack/connections/{connection}/archive/messages"
+            ))
+            .query_param("message_id", message_id.to_string())
+            .query_param("limit", "1")
+            .matches(|request| request.query_params.as_ref().unwrap().len() == 2);
+        then.status(200).json_body(page.clone());
+    });
+    let message = client
+        .slack()
+        .get_archived_message(connection, message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.id, message_id);
+    assert_eq!(
+        message.files[0]["transcription"]["text"],
+        serde_json::json!("See you at noon")
+    );
+    found.assert();
+    found.delete();
+    let missing = Uuid::nil();
+    let empty = server.mock(|when, then| {
+        when.method(Method::GET)
+            .path(format!(
+                "/api/v1/slack/connections/{connection}/archive/messages"
+            ))
+            .query_param("message_id", missing.to_string());
+        then.status(200).json_body(serde_json::json!({
+            "messages": [], "next_cursor": null, "source": "archive"
+        }));
+    });
+    assert!(client
+        .slack()
+        .get_archived_message(connection, missing)
+        .unwrap()
+        .is_none());
+    empty.assert();
+}

@@ -904,7 +904,8 @@ Use `whoami --json` when you need the authenticated caller shape exactly.
 
 For an agent that handles incoming voice notes, include `message.transcription_finished`
 once alongside the channels' `received` events when registering
-notifications. Check `media[].transcription` in the original message: if any
+notifications. Check `media[].transcription` in the original message (Slack:
+`event.files[].transcription`, re-read with `slack archive messages --message-id`): if any
 attachment is pending, wait up to 60 seconds for its completion notification, then
 read the original message once. If the transcript failed, remains pending, or
 cannot be retrieved, process the original message and attachments normally.
@@ -928,6 +929,8 @@ The body can be any of:
 - **Incoming audio** (envelope): `message.transcription_finished` is not email. Read
   `data.text_message` when `data.channel` is `text`, or `data.message` for
   `imessage` and `whatsapp`. The nested message carries its conversation and media.
+  For `slack`, `data.event.files[]` carries the results with `connection_id`,
+  `conversation_id`, `message_ts` and `thread_ts`.
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
   `inkbox webhook subscription create --agent-identity-id ...`.
@@ -1160,6 +1163,7 @@ Use `slack emoji list`, `slack cached-media-download`, and `slack file preview` 
 missing permissions or pending synchronization can leave an empty incomplete page.
 Unknown reaction/thread counts are not zero, and known reaction counts do not imply complete actor lists.
 Omit the roots-only option when reading a selected thread. Expansions do not apply to ranked search.
+`slack archive messages --connection-id ID --message-id UUID` reads one retained message, such as a received event's `data.message_id`; audio files carry `transcription`.
 Keep caches separate by connection and invalidate them when its generation changes. Never forward
 Inkbox credentials to fallback image URLs. Current message and file access checks still apply.
 
@@ -1190,10 +1194,11 @@ characters, the text is sent as an ordinary message. Add `--no-fallback-to-text`
 to fail instead (`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
 `409 whatsapp_capability_not_ready`).
 
-On iMessage, SMS/MMS, and WhatsApp, the send response shows a voice note with no text
-and one audio attachment. The spoken text appears shortly after as a completed
-`transcription` on later reads of the message; recording it never fails the send. A
-fallback comes back as an ordinary text message.
+A voice note has no message text. The spoken text is stored with the message as the
+audio attachment's completed `transcription`. iMessage and WhatsApp send responses
+include it; on SMS/MMS it appears on the next read of the message. On Slack, the
+uploaded audio file carries it in archived message reads. A fallback comes back as an
+ordinary text message.
 
 Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is
 sent as text, or without fallback fails with

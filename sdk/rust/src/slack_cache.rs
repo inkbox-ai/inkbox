@@ -308,6 +308,31 @@ impl SlackResource {
             &params,
         )?)?)
     }
+    /// Read one retained message by its ID, such as a received event's `message_id`.
+    /// `None` when it is not retained or not visible. Audio file entries in `files`
+    /// carry `transcription` (`status`, `text`, `error_code`).
+    ///
+    /// ```no_run
+    /// # fn example(client: &inkbox::Inkbox, id: uuid::Uuid, message_id: uuid::Uuid) -> inkbox::Result<()> {
+    /// if let Some(message) = client.slack().get_archived_message(id, message_id)? {
+    ///     let transcript = message.files.iter().find_map(|file| file.get("transcription"));
+    /// }
+    /// # Ok(()) }
+    /// ```
+    pub fn get_archived_message(
+        &self,
+        id: Uuid,
+        message_id: Uuid,
+    ) -> Result<Option<SlackEnrichedArchivedMessage>> {
+        let page: SlackEnrichedArchiveMessagesResponse = serde_json::from_value(self.http.get(
+            &format!("{}/archive/messages", base(id)),
+            &[
+                ("message_id", message_id.to_string()),
+                ("limit", "1".to_string()),
+            ],
+        )?)?;
+        Ok(page.messages.into_iter().next())
+    }
     pub fn list_cached_emoji(
         &self,
         id: Uuid,

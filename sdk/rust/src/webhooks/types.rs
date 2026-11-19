@@ -1692,8 +1692,14 @@ pub struct SlackWebhookData {
     pub actor_profile: Option<SlackActorProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contact_id: Option<uuid::Uuid>,
+    /// Retained Slack message ID on received-message events; matches
+    /// `message.transcription_finished` `data.message_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
     #[serde(default)]
     pub message_kinds: Vec<crate::slack::SlackMessageKind>,
+    /// Event content. Enrolled audio items in `event["files"]` carry `transcription`;
+    /// other files omit it.
     #[serde(default)]
     pub event: serde_json::Map<String, serde_json::Value>,
 }
@@ -1860,7 +1866,11 @@ pub enum MessageTranscriptionFinishedWebhookEventType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageTranscriptionFinishedWebhookData {
     pub message_id: String,
+    /// Empty for Slack, whose completion carries no contact list.
+    #[serde(default)]
     pub contacts: Vec<WebhookContact>,
+    /// Empty for Slack, whose completion carries no identity list.
+    #[serde(default)]
     pub agent_identities: Vec<WebhookAgentIdentity>,
     #[serde(flatten)]
     pub source: TranscriptionFinishedSource,
@@ -1878,4 +1888,9 @@ pub enum TranscriptionFinishedSource {
     IMessage { message: IMessageWebhookMessage },
     #[serde(rename = "whatsapp")]
     WhatsApp { message: WhatsAppWebhookMessage },
+    /// The original Slack message; each audio item in `event["files"]` carries its
+    /// `transcription`. The correlation key is the outer `message_id`, so this
+    /// projection's own `message_id` is `None`.
+    #[serde(rename = "slack")]
+    Slack(Box<SlackWebhookData>),
 }

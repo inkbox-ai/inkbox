@@ -116,6 +116,7 @@ export type {
   InboundReceivedWebhookData,
   InboundReceivedWebhookPayload,
   InboundWebhookRequest,
+  SlackTranscriptionFinishedWebhookData,
   TextWebhookPayload,
   TextWebhookEventType,
   TextWebhookMessage,
