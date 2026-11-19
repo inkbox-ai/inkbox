@@ -114,7 +114,7 @@ export function registerSignupCommands(program: Command): void {
         const result = await Inkbox.verifySignup(
           apiKey,
           { verificationCode: cmdOpts.code },
-          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
+          { baseUrl: resolveBaseUrl(globalOpts), onResponse: observeResponse },
         );
         output(result, { json: !!globalOpts.json });
       }),
@@ -129,7 +129,7 @@ export function registerSignupCommands(program: Command): void {
         const apiKey = requireApiKey(globalOpts);
         const result = await Inkbox.resendSignupVerification(
           apiKey,
-          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
+          { baseUrl: resolveBaseUrl(globalOpts), onResponse: observeResponse },
         );
         output(result, { json: !!globalOpts.json });
       }),
@@ -144,7 +144,7 @@ export function registerSignupCommands(program: Command): void {
         const apiKey = requireApiKey(globalOpts);
         const result = await Inkbox.getSignupStatus(
           apiKey,
-          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
+          { baseUrl: resolveBaseUrl(globalOpts), onResponse: observeResponse },
         );
         if (globalOpts.json) {
           output(result, { json: true });
