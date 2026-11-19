@@ -128,8 +128,12 @@ export interface HostingPort extends HostingPortSetting {
   tokenUrl: string | null;
 }
 
-/** Omitted fields stay unchanged; `defaultPort: null` clears it. */
+/**
+ * Omitted fields stay unchanged; `defaultPort: null` clears it.
+ * Pass the `version` you read; a stale one gets 409 `stale_version`.
+ */
 export interface HostingPortsUpdate {
+  version?: number;
   defaultPort?: number | null;
   ports?: HostingPortSetting[];
 }
@@ -139,23 +143,27 @@ export interface HostingPorts {
   url: string | null;
   defaultPort: number | null;
   ports: HostingPort[];
+  version: number;
 }
 
 export interface RawHostingPorts {
   url?: string | null;
   default_port?: number | null;
   ports?: { port: number; public: boolean; url?: string | null; token_url?: string | null }[];
+  version?: number;
 }
 
 export function parseHostingPorts(data: RawHostingPorts): HostingPorts {
   return {
     url: data.url ?? null, defaultPort: data.default_port ?? null,
     ports: (data.ports ?? []).map((p) => ({ port: p.port, public: p.public, url: p.url ?? null, tokenUrl: p.token_url ?? null })),
+    version: data.version ?? 0,
   };
 }
 
 export function hostingPortsUpdateBody(options: HostingPortsUpdate): Record<string, unknown> {
   const body: Record<string, unknown> = {};
+  if (options.version !== undefined) body.version = options.version;
   if (options.defaultPort !== undefined) body.default_port = options.defaultPort;
   if (options.ports !== undefined) body.ports = options.ports.map((p) => ({ port: p.port, public: p.public }));
   return body;

@@ -267,17 +267,21 @@ impl InboundResource {
         )?)?)
     }
 
-    /// Report that the agent could not process an event. Requires the identity's own API key.
+    /// Report that the agent could not process a delivery. Requires the identity's own API key.
+    ///
+    /// `delivery_id` is the `delivery_id` of the `inbound.received` payload. The server answers
+    /// 409 `stale_delivery` when the event has since been delivered again.
     pub fn report_inbound_event_result(
         &self,
         handle: &str,
         source_id: &str,
         event_id: &str,
         error: &str,
+        delivery_id: &str,
     ) -> Result<()> {
         self.http.post(
             &Self::path(handle, &[source_id, "events", event_id, "result"]),
-            Some(&json!({ "status": "failed", "error": error })),
+            Some(&json!({ "status": "failed", "error": error, "delivery_id": delivery_id })),
             NO_QUERY,
         )?;
         Ok(())
@@ -416,7 +420,9 @@ mod tests {
         let result = server.mock(|when, then| {
             when.method(POST)
                 .path(format!("{base}/inbev_1/result"))
-                .json_body(json!({"status": "failed", "error": "exit 1"}));
+                .json_body(
+                    json!({"status": "failed", "error": "exit 1", "delivery_id": "inbdel_1"}),
+                );
             then.status(204);
         });
 
@@ -436,7 +442,7 @@ mod tests {
             2
         );
         inbound
-            .report_inbound_event_result("agent", "inbsrc_1", "inbev_1", "exit 1")
+            .report_inbound_event_result("agent", "inbsrc_1", "inbev_1", "exit 1", "inbdel_1")
             .unwrap();
         for mock in [list, get, replay, result] {
             mock.assert();

@@ -1423,12 +1423,21 @@ Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhoo
 ## Hosted Agent URL & Inbound Sources
 
 ```python
+import time
+
 identity = inkbox.create_identity("my-agent", hosted=True)   # no tunnel; identity.tunnel is None
 ids = inkbox.identities
-ids.get_hosting("my-agent").url                               # agent's public URL
+# Enable hosting, then wait for the machine before using ports or inbound sources.
+hosting = ids.update_hosting("my-agent", {"expected_generation": ids.get_hosting("my-agent").generation, "harness": "codex"})
+while hosting.state == "provisioning":
+    time.sleep(5)
+    hosting = ids.get_hosting("my-agent")
+assert hosting.state == "ready", hosting.last_error
+hosting.url                                                   # agent's public URL
 
-ports = ids.get_hosting_ports("my-agent")                     # url, default_port, ports[{port, public, url, token_url}]
-ids.update_hosting_ports("my-agent", {"default_port": 3000, "ports": [{"port": 8080, "public": True}]})
+ports = ids.get_hosting_ports("my-agent")                     # url, default_port, version, ports[{port, public, url, token_url}]
+# Pass the version you read; a concurrent edit returns 409 stale_version (re-read and retry).
+ids.update_hosting_ports("my-agent", {"version": ports.version, "default_port": 3000, "ports": [{"port": 3000, "public": False}, {"port": 8080, "public": True}]})
 ids.rotate_hosting_port_token("my-agent", 3000)               # old token_url stops working
 ```
 

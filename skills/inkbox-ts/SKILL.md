@@ -1440,10 +1440,22 @@ Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhoo
 ```typescript
 const identity = await inkbox.createIdentity("my-agent", { hosted: true }); // no tunnel; identity.tunnel is null
 const ids = inkbox.identities;
-(await ids.getHosting("my-agent")).url;                        // agent's public URL
+// Enable hosting, then wait for the machine before using ports or inbound sources.
+let hosting = await ids.updateHosting("my-agent", {
+  expectedGeneration: (await ids.getHosting("my-agent")).generation, harness: "codex",
+});
+while (hosting.state === "provisioning") {
+  await new Promise((r) => setTimeout(r, 5000));
+  hosting = await ids.getHosting("my-agent");
+}
+if (hosting.state !== "ready") throw new Error(hosting.lastError ?? hosting.state);
+hosting.url;                                                   // agent's public URL
 
-const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, ports[{ port, public, url, tokenUrl }]
-await ids.updateHostingPorts("my-agent", { defaultPort: 3000, ports: [{ port: 8080, public: true }] });
+const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, version, ports[{ port, public, url, tokenUrl }]
+// Pass the version you read; a concurrent edit returns 409 stale_version (re-read and retry).
+await ids.updateHostingPorts("my-agent", {
+  version: ports.version, defaultPort: 3000, ports: [{ port: 3000, public: false }, { port: 8080, public: true }],
+});
 await ids.rotateHostingPortToken("my-agent", 3000);            // old tokenUrl stops working
 ```
 

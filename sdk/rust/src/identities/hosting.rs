@@ -38,6 +38,8 @@ pub struct HostingPorts {
     pub default_port: Option<u16>,
     #[serde(default)]
     pub ports: Vec<HostingPort>,
+    #[serde(default)]
+    pub version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -60,6 +62,9 @@ pub struct HostingPortSetting {
 /// Partial update; omitted fields are unchanged. `Unset::Value(None)` clears the default port.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct HostingPortsUpdate {
+    /// The `version` you read; a stale one gets 409 `stale_version`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<u64>,
     #[serde(
         skip_serializing_if = "Unset::is_omit",
         serialize_with = "serialize_port"

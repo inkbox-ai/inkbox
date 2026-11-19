@@ -662,14 +662,18 @@ Data-plane auth uses the same API key the CLI was invoked with — admin-scoped 
 
 ## Hosted Agent URL & Inbound Sources
 
-`identity create --hosted` creates an identity without a tunnel. A hosted
-agent has a public URL; each port is private (reachable only with its token
-link) unless made public.
+`identity create --hosted` creates an identity without a tunnel. Enable
+hosting and wait until `state` is `ready` before using ports or inbound
+sources. A hosted agent has a public URL; each port is private (reachable
+only with its token link) unless made public.
 
 ```bash
+inkbox identity create <handle> --hosted
+inkbox identity hosting configure <handle> --expected-generation 0 --harness codex
+inkbox identity hosting get <handle> --json                  # repeat until state is "ready"
 inkbox identity hosting ports show <handle>                  # url, default port, per-port url + tokenUrl
 inkbox identity hosting ports default <handle> <port|none>   # port served at the agent URL
-inkbox identity hosting ports set <handle> <port> --public|--private
+inkbox identity hosting ports set <handle> <port> --public|--private   # sends the version it read; retries once on a concurrent edit
 inkbox identity hosting ports rotate-token <handle> <port>   # old token link stops working
 ```
 

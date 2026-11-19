@@ -64,8 +64,8 @@ describe("InboundResource", () => {
     expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/inbsrc_1/events/inbev_1/replay");
 
     http.post.mockResolvedValueOnce(undefined);
-    await inbound.reportInboundEventResult("agent", "inbsrc_1", "inbev_1", { status: "failed", error: "exit 1" });
-    expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/inbsrc_1/events/inbev_1/result", { status: "failed", error: "exit 1" });
+    await inbound.reportInboundEventResult("agent", "inbsrc_1", "inbev_1", { status: "failed", error: "exit 1", deliveryId: "inbdel_1" });
+    expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/inbsrc_1/events/inbev_1/result", { status: "failed", error: "exit 1", delivery_id: "inbdel_1" });
   });
 
   it("is exposed on the client", () => {
@@ -84,7 +84,7 @@ describe("hosting agent URL and ports", () => {
 
   it("gets, updates and rotates ports", async () => {
     const wire = {
-      url: "https://agent.example.test", default_port: 3000,
+      url: "https://agent.example.test", default_port: 3000, version: 4,
       ports: [
         { port: 3000, public: false, url: "https://agent.example.test", token_url: "https://agent.example.test?_token=t" },
         { port: 8080, public: true, url: null, token_url: null },
@@ -93,15 +93,15 @@ describe("hosting agent URL and ports", () => {
     const http = { get: vi.fn().mockResolvedValue(wire), patch: vi.fn().mockResolvedValue(wire), post: vi.fn().mockResolvedValue(wire) };
     const resource = new IdentitiesResource(http as unknown as HttpTransport);
     expect(await resource.getHostingPorts("@agent")).toEqual({
-      url: wire.url, defaultPort: 3000,
+      url: wire.url, defaultPort: 3000, version: 4,
       ports: [
         { port: 3000, public: false, url: wire.url, tokenUrl: wire.ports[0].token_url },
         { port: 8080, public: true, url: null, tokenUrl: null },
       ],
     });
     expect(http.get).toHaveBeenCalledWith("/%40agent/hosting/ports");
-    await resource.updateHostingPorts("agent", { defaultPort: null, ports: [{ port: 8080, public: true }] });
-    expect(http.patch).toHaveBeenCalledWith("/agent/hosting/ports", { default_port: null, ports: [{ port: 8080, public: true }] });
+    await resource.updateHostingPorts("agent", { version: 4, defaultPort: null, ports: [{ port: 8080, public: true }] });
+    expect(http.patch).toHaveBeenCalledWith("/agent/hosting/ports", { version: 4, default_port: null, ports: [{ port: 8080, public: true }] });
     await resource.updateHostingPorts("agent", { defaultPort: 8080 });
     expect(http.patch.mock.calls[1][1]).toEqual({ default_port: 8080 });
     await resource.rotateHostingPortToken("agent", 3000);

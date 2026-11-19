@@ -22,6 +22,9 @@ class HostingPort(HostingPortSetting):
 
 
 class HostingPortsUpdate(TypedDict):
+    """Omitted fields are unchanged. Pass the ``version`` you read; a stale one gets 409 ``stale_version``."""
+
+    version: NotRequired[int]
     default_port: NotRequired[int | None]
     ports: NotRequired[list[HostingPortSetting]]
 
@@ -31,6 +34,7 @@ class HostingPorts:
     url: str | None = None
     default_port: int | None = None
     ports: list[HostingPort] = field(default_factory=list)
+    version: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'HostingPorts':

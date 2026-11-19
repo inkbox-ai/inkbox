@@ -1,6 +1,7 @@
 import { registerWorkspaceCommands } from "./workspace.js";
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
+import { InkboxAPIError } from "@inkbox/sdk";
 import type { HostingHarness, HostingModel, HostingPorts, HostingUpdate } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -109,10 +110,20 @@ function registerPortCommands(hosting: Command): void {
       const number = portNumber(port);
       const global = getGlobalOpts(this);
       const client = createClient(global);
-      const current = await client.identities.getHostingPorts(handle);
-      const settings = current.ports.filter(p => p.port !== number).map(p => ({ port: p.port, public: p.public }));
-      settings.push({ port: number, public: !!opts.public });
-      show(await client.identities.updateHostingPorts(handle, { ports: settings }), !!global.json);
+      const update = async () => {
+        const current = await client.identities.getHostingPorts(handle);
+        const settings = current.ports.filter(p => p.port !== number).map(p => ({ port: p.port, public: p.public }));
+        settings.push({ port: number, public: !!opts.public });
+        return client.identities.updateHostingPorts(handle, { version: current.version, ports: settings });
+      };
+      let result: HostingPorts;
+      try {
+        result = await update();
+      } catch (err) {
+        if (!staleVersion(err)) throw err;
+        result = await update();
+      }
+      show(result, !!global.json);
     }));
   ports.command("rotate-token <handle> <port>")
     .description("Issue a new access token for a port; the previous token stops working")
@@ -120,6 +131,12 @@ function registerPortCommands(hosting: Command): void {
       const global = getGlobalOpts(this);
       show(await createClient(global).identities.rotateHostingPortToken(handle, portNumber(port)), !!global.json);
     }));
+}
+
+function staleVersion(err: unknown): boolean {
+  if (!(err instanceof InkboxAPIError) || err.statusCode !== 409) return false;
+  const detail = err.detail;
+  return typeof detail === "string" ? detail === "stale_version" : detail?.error === "stale_version" || detail?.code === "stale_version";
 }
 
 function show(ports: HostingPorts, json: boolean): void {

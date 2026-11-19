@@ -155,13 +155,21 @@ export class InboundResource {
     );
   }
 
-  /** Report that the agent could not process an event. Requires the identity's own API key. */
+  /**
+   * Report that the agent could not process a delivery. Requires the identity's own API key.
+   * `deliveryId` is the `delivery_id` of the `inbound.received` payload; the server answers
+   * 409 `stale_delivery` when the event has since been delivered again.
+   */
   async reportInboundEventResult(
     handle: string,
     sourceId: string,
     eventId: string,
-    result: { status: "failed"; error: string },
+    result: { status: "failed"; error: string; deliveryId: string },
   ): Promise<void> {
-    await this.http.post<void>(this.path(handle, sourceId, "events", eventId, "result"), result);
+    await this.http.post<void>(this.path(handle, sourceId, "events", eventId, "result"), {
+      status: result.status,
+      error: result.error,
+      delivery_id: result.deliveryId,
+    });
   }
 }

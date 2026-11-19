@@ -28,8 +28,9 @@ async function withApi(action, response = () => config) {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     requests.push({method: req.method, path: req.url, body: chunks.length ? JSON.parse(Buffer.concat(chunks)) : null});
-    res.writeHead(200, {"content-type": "application/json"});
-    res.end(JSON.stringify(response(req)));
+    const out = response(req);
+    res.writeHead(out?.status ?? 200, {"content-type": "application/json"});
+    res.end(JSON.stringify(out?.status ? out.body : out));
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const run = (args, json = true) => new Promise(resolve => execFile(process.execPath,
@@ -245,7 +246,7 @@ test("published chat file schema advertises the decoded 5 MB limit", async () =>
   });
 });
 
-const portsView = {url: "https://agent.example.test", default_port: 3000, ports: [
+const portsView = {url: "https://agent.example.test", default_port: 3000, version: 4, ports: [
   {port: 3000, public: false, url: "https://agent.example.test", token_url: "https://agent.example.test?_token=t"},
   {port: 8080, public: true, url: null, token_url: null},
 ]};
@@ -264,13 +265,26 @@ test("ports show, default, set and rotate-token use the ports subresource", asyn
       {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: 8080}},
       {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {default_port: null}},
       {method: "GET", path: "/api/v1/identities/example/hosting/ports", body: null},
-      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {ports: [{port: 8080, public: true}, {port: 3000, public: true}]}},
+      {method: "PATCH", path: "/api/v1/identities/example/hosting/ports", body: {version: 4, ports: [{port: 8080, public: true}, {port: 3000, public: true}]}},
       {method: "POST", path: "/api/v1/identities/example/hosting/ports/3000/token", body: {}},
     ]);
     const human = await run(["ports", "show", "example"], false);
     assert.ifError(human.error);
     assert.match(human.stdout, /tokenUrl/);
   }, () => portsView);
+});
+
+test("ports set re-reads and retries once on a stale version", async () => {
+  let gets = 0, patches = 0;
+  await withApi(async (run, requests) => {
+    assert.ifError((await run(["ports", "set", "example", "9000", "--private"])).error);
+    assert.deepEqual(requests.map(r => [r.method, r.body?.version]), [["GET", undefined], ["PATCH", 4], ["GET", undefined], ["PATCH", 5]]);
+    assert.ok((await run(["ports", "set", "example", "9000", "--private"])).error);
+    assert.equal(requests.length, 8);
+  }, req => {
+    if (req.method === "GET") return {...portsView, version: 4 + (gets++ % 2)};
+    return ++patches === 2 ? portsView : {status: 409, body: {detail: {error: "stale_version"}}};
+  });
 });
 
 test("invalid port settings fail before a request", async () => {

@@ -182,9 +182,14 @@ class InboundResource:
         *,
         status: Literal["failed"],
         error: str,
+        delivery_id: str,
     ) -> None:
-        """Report that the agent could not process an event. Requires the identity's own API key."""
+        """Report that the agent could not process a delivery. Requires the identity's own API key.
+
+        ``delivery_id`` is the ``delivery_id`` of the ``inbound.received`` payload. The server
+        answers 409 ``stale_delivery`` when the event has since been delivered again.
+        """
         self._http.post(
             self._path(handle, source_id, "events", event_id, "result"),
-            json={"status": status, "error": error},
+            json={"status": status, "error": error, "delivery_id": delivery_id},
         )

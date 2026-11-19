@@ -72,8 +72,11 @@ def test_events_list_get_replay_and_result():
     http.post.assert_called_with("/agent/inbound/inbsrc_1/events/inbev_1/replay")
 
     http.post.return_value = None
-    assert inbound.report_inbound_event_result("agent", "inbsrc_1", "inbev_1", status="failed", error="exit 1") is None
-    http.post.assert_called_with("/agent/inbound/inbsrc_1/events/inbev_1/result", json={"status": "failed", "error": "exit 1"})
+    assert inbound.report_inbound_event_result("agent", "inbsrc_1", "inbev_1", status="failed", error="exit 1", delivery_id="inbdel_1") is None
+    http.post.assert_called_with(
+        "/agent/inbound/inbsrc_1/events/inbev_1/result",
+        json={"status": "failed", "error": "exit 1", "delivery_id": "inbdel_1"},
+    )
 
 
 def test_client_exposes_inbound():
@@ -92,7 +95,7 @@ def test_hosting_exposes_agent_url():
 
 def test_hosting_ports_subresource():
     view = {
-        "url": "https://agent.example.test", "default_port": 3000,
+        "url": "https://agent.example.test", "default_port": 3000, "version": 4,
         "ports": [
             {"port": 3000, "public": False, "url": "https://agent.example.test",
              "token_url": "https://agent.example.test?_token=t"},
@@ -104,9 +107,9 @@ def test_hosting_ports_subresource():
     resource = IdentitiesResource(http)
     ports = resource.get_hosting_ports("@agent")
     http.get.assert_called_once_with("/%40agent/hosting/ports")
-    assert ports.default_port == 3000 and ports.ports[0]["token_url"].endswith("?_token=t")
+    assert ports.default_port == 3000 and ports.version == 4 and ports.ports[0]["token_url"].endswith("?_token=t")
     assert ports.ports[1]["url"] is None
-    options = {"default_port": None, "ports": [{"port": 8080, "public": True}]}
+    options = {"version": 4, "default_port": None, "ports": [{"port": 8080, "public": True}]}
     resource.update_hosting_ports("agent", options)
     http.patch.assert_called_once_with("/agent/hosting/ports", json=options)
     assert resource.rotate_hosting_port_token("agent", 3000).url == "https://agent.example.test"

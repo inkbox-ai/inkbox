@@ -211,7 +211,7 @@ fn hosting_url_and_ports_subresource() {
         "url": "https://agent.example.test"
     });
     let view = json!({
-        "url": "https://agent.example.test", "default_port": 3000,
+        "url": "https://agent.example.test", "default_port": 3000, "version": 4,
         "ports": [
             {"port": 3000, "public": false, "url": "https://agent.example.test",
              "token_url": "https://agent.example.test?_token=t"},
@@ -230,7 +230,7 @@ fn hosting_url_and_ports_subresource() {
     let update = server.mock(|when, then| {
         when.method(httpmock::Method::PATCH)
             .path("/api/v1/identities/agent/hosting/ports")
-            .json_body(json!({"default_port": null, "ports": [{"port": 8080, "public": true}]}));
+            .json_body(json!({"version": 4, "default_port": null, "ports": [{"port": 8080, "public": true}]}));
         then.status(200).json_body(view.clone());
     });
     let rotate = server.mock(|when, then| {
@@ -248,7 +248,7 @@ fn hosting_url_and_ports_subresource() {
         Some("https://agent.example.test")
     );
     let ports = ids.get_hosting_ports("agent").unwrap();
-    assert_eq!(ports.default_port, Some(3000));
+    assert_eq!((ports.default_port, ports.version), (Some(3000), 4));
     assert!(ports.ports[0]
         .token_url
         .as_deref()
@@ -258,6 +258,7 @@ fn hosting_url_and_ports_subresource() {
     ids.update_hosting_ports(
         "agent",
         &HostingPortsUpdate {
+            version: Some(ports.version),
             default_port: Unset::Value(None),
             ports: Some(vec![HostingPortSetting {
                 port: 8080,

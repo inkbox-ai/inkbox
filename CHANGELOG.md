@@ -4,12 +4,12 @@
 
 ### Added
 
-- Inbound sources for hosted identities in Python, TypeScript and Rust (`inbound` on the client): create, list, get, update, delete and rotate sources; list, get and replay received events; and report a failed event with `report_inbound_event_result` / `reportInboundEventResult`. Each source has a public URL, an optional sender signature check (`stripe`, `github`, `slack`, `standard-webhooks` or `hmac`) and an `agent` or `script` handler.
+- Inbound sources for hosted identities in Python, TypeScript and Rust (`inbound` on the client): create, list, get, update, delete and rotate sources; list, get and replay received events; and report a failed delivery with `report_inbound_event_result` / `reportInboundEventResult`, which takes the payload's `delivery_id` (`deliveryId` in TypeScript); the server answers 409 `stale_delivery` when the event has since been delivered again. Each source has a public URL, an optional sender signature check (`stripe`, `github`, `slack`, `standard-webhooks` or `hmac`) and an `agent` or `script` handler.
 - Typed `inbound.received` webhook payloads. `data.delivery_id` is the same across retries of one delivery and new for each replay; dedupe on it.
 - Hosted identities: create with `hosted` (`hosted=True` / `{ hosted: true }` / Rust `create_hosted_identity`); no tunnel is created and `tunnel` is null.
 - Hosting configuration returns the agent's public `url`.
-- Agent ports: `get_hosting_ports` / `getHostingPorts`, `update_hosting_ports` / `updateHostingPorts` (default port, public or private per port) and `rotate_hosting_port_token` / `rotateHostingPortToken`. Each port has a `url` and a private `token_url` access link.
-- CLI: `identity create --hosted`; `identity hosting ports show|default|set|rotate-token`; `inbound create|list|get|update|delete|rotate` and `inbound events list|get|replay`. Signing secrets are read from stdin.
+- Agent ports: `get_hosting_ports` / `getHostingPorts`, `update_hosting_ports` / `updateHostingPorts` (default port, public or private per port) and `rotate_hosting_port_token` / `rotateHostingPortToken`. Each port has a `url` and a private `token_url` access link. The ports view carries a `version`; pass it back on update and a stale one returns 409 `stale_version`.
+- CLI: `identity create --hosted`; `identity hosting ports show|default|set|rotate-token` (`ports set` sends the version it read and retries once after a concurrent edit); `inbound create|list|get|update|delete|rotate` and `inbound events list|get|replay`. Signing secrets are read from stdin.
 
 ### Changed
 
