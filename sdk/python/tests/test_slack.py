@@ -158,6 +158,27 @@ def test_all_slack_operations_exact_wire(wire):
     assert len(requests) == 12
 
 
+def test_send_voice_note_options_sent_only_when_set(wire):
+    c, requests, replies = wire
+    replies.extend([DATA["action"], DATA["action"]])
+    c.slack.send_message(
+        C,
+        conversation_id="CEXAMPLE",
+        text="Hello",
+        idempotency_key="voice:1",
+        send_as_voice_note=True,
+        fallback_to_text=False,
+    )
+    assert json.loads(requests[-1].content) == {
+        "conversation_id": "CEXAMPLE",
+        "text": "Hello",
+        "send_as_voice_note": True,
+        "fallback_to_text": False,
+    }
+    c.slack.send_message(C, conversation_id="CEXAMPLE", text="Hello", idempotency_key="voice:2")
+    assert json.loads(requests[-1].content) == {"conversation_id": "CEXAMPLE", "text": "Hello"}
+
+
 @pytest.mark.parametrize("retry_after", [73, 0, None])
 def test_send_rate_limit_hint_and_read_only_key_recovery(wire, retry_after):
     c, requests, replies = wire

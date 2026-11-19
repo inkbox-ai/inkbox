@@ -29,6 +29,8 @@ export interface TextSendCommandOptions {
   conversationId?: string;
   text?: string;
   mediaUrl?: string[];
+  voiceNote?: boolean;
+  fallbackToText?: boolean;
   idempotencyKey?: string;
 }
 
@@ -46,6 +48,12 @@ export function buildTextSendOptions(
   if (!cmdOpts.text && mediaUrls.length === 0) {
     return { error: "Pass --text, --media-url, or both." };
   }
+  if (cmdOpts.voiceNote && (!cmdOpts.text || mediaUrls.length > 0)) {
+    return { error: "--voice-note requires --text and no --media-url." };
+  }
+  if (cmdOpts.fallbackToText === false && !cmdOpts.voiceNote) {
+    return { error: "--no-fallback-to-text requires --voice-note." };
+  }
 
   const sendOptions: SendTextOptions = {};
   if (cmdOpts.idempotencyKey !== undefined) sendOptions.idempotencyKey = cmdOpts.idempotencyKey;
@@ -61,6 +69,8 @@ export function buildTextSendOptions(
   if (mediaUrls.length > 0) {
     sendOptions.mediaUrls = mediaUrls;
   }
+  if (cmdOpts.voiceNote) sendOptions.sendAsVoiceNote = true;
+  if (cmdOpts.voiceNote && cmdOpts.fallbackToText === false) sendOptions.fallbackToText = false;
   return { sendOptions };
 }
 
@@ -78,16 +88,12 @@ export function registerTextCommands(program: Command): void {
     .option("--text <text>", "Message body")
     .option("--idempotency-key <key>", "Reuse this key when retrying the same message")
     .option("--media-url <url>", "MMS media URL; repeat for multiple", collect, [])
+    .option("--voice-note", "Speak --text (at most 600 characters) in the agent's voice and send it as an MMS audio file")
+    .option("--no-fallback-to-text", "With --voice-note, fail instead of sending the text when a voice note can't be produced")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: {
-          identity: string;
-          to?: string;
-          conversationId?: string;
-          text?: string;
-          mediaUrl: string[];
-        },
+        cmdOpts: TextSendCommandOptions & { mediaUrl: string[] },
       ) {
         const sendResult = buildTextSendOptions(cmdOpts);
         if ("error" in sendResult) {

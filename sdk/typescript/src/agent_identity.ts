@@ -903,6 +903,10 @@ export class AgentIdentity {
    *   The server resolves it to that conversation's participants.
    * @param options.text - Message body.
    * @param options.mediaUrls - MMS media URLs.
+   * @param options.sendAsVoiceNote - Speak `text` (at most 600 characters) in
+   *   this identity's voice and send it as an MMS audio file. Requires `text`; no media.
+   * @param options.fallbackToText - When a voice note can't be produced, send
+   *   `text` as an ordinary message (default true). False makes the send fail.
    *
    * @throws {InkboxError} when this identity has no phone number.
    * @throws {RecipientBlockedError} when the destination is blocked by an
@@ -914,6 +918,8 @@ export class AgentIdentity {
     conversationId?: string | null;
     text?: string | null;
     mediaUrls?: string[] | null;
+    sendAsVoiceNote?: boolean;
+    fallbackToText?: boolean;
     idempotencyKey?: string;
   }): Promise<TextMessage> {
     this._requirePhone();
@@ -1087,6 +1093,10 @@ export class AgentIdentity {
    * @param options.sendStyle - Optional expressive send style. The same
    *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
    *   replies by group `conversationId`, including sends with one media URL.
+   * @param options.sendAsVoiceNote - Speak `text` (at most 600 characters) in
+   *   this identity's voice and send it as a native voice note. Requires `text`; no media or `sendStyle`.
+   * @param options.fallbackToText - When a voice note can't be produced, send
+   *   `text` as an ordinary message (default true). False makes the send fail.
    *
    * @throws {InkboxError} when this identity is not iMessage-enabled.
    * @throws {InkboxAPIError} 403 when the recipient is blocked by a
@@ -1100,6 +1110,8 @@ export class AgentIdentity {
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
+    sendAsVoiceNote?: boolean;
+    fallbackToText?: boolean;
     idempotencyKey?: string;
   }): Promise<IMessage> {
     this._requireIMessage();

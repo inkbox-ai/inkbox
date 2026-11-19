@@ -539,6 +539,8 @@ class WhatsAppResource:
         media_ids: list[UUID | str] | None = None,
         agent_identity_id: UUID | str | None = None,
         idempotency_key: str | None = None,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> WhatsAppMessage:
         """Queue a direct or eligible group message or native quoted reply, without assuming delivery.
 
@@ -546,6 +548,11 @@ class WhatsAppResource:
         plain_reply_fallback defaults to True; False explicitly requires a native
         quote. Current supported targets use native quotes; missing evidence or
         rejected/uncertain sends never trigger a plain replacement.
+
+        send_as_voice_note speaks ``text`` (at most 600 characters, no media) in
+        the agent's voice and sends it as a native voice note. With
+        fallback_to_text (default True) the text is sent instead when a voice
+        note can't be produced; False makes the send fail.
 
         Raises:
             WhatsAppAwaitingInboundError: The recipient has not messaged this
@@ -588,6 +595,10 @@ class WhatsAppResource:
             body["media_ids"] = [str(value) for value in media_ids]
         if gif_playback:
             body["gif_playback"] = True
+        if send_as_voice_note:
+            body["send_as_voice_note"] = True
+        if not fallback_to_text:
+            body["fallback_to_text"] = False
         key = send_key(idempotency_key)
         data = post_message(
             self._http,

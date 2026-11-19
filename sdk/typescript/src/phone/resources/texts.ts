@@ -38,6 +38,10 @@ export class TextsResource {
    *   The server resolves it to that conversation's participants.
    * @param options.text - Message body.
    * @param options.mediaUrls - MMS media URLs.
+   * @param options.sendAsVoiceNote - Speak `text` (at most 600 characters) in
+   *   the agent's voice and send it as an MMS audio file. Requires `text`; no media.
+   * @param options.fallbackToText - When a voice note can't be produced, send
+   *   `text` as an ordinary message (default true). False makes the send fail.
    * @param options.idempotencyKey - Reuse across calls with identical input;
    *   otherwise a key is generated per call and retained during request retries.
    *
@@ -53,6 +57,8 @@ export class TextsResource {
       conversationId?: string | null;
       text?: string | null;
       mediaUrls?: string[] | null;
+      sendAsVoiceNote?: boolean;
+      fallbackToText?: boolean;
       idempotencyKey?: string;
     },
   ): Promise<TextMessage> {
@@ -61,6 +67,8 @@ export class TextsResource {
       conversation_id?: string;
       text?: string;
       media_urls?: string[];
+      send_as_voice_note?: boolean;
+      fallback_to_text?: boolean;
     } = {};
     if (options.to != null) {
       body.to = options.to;
@@ -73,6 +81,12 @@ export class TextsResource {
     }
     if (options.mediaUrls != null) {
       body.media_urls = options.mediaUrls;
+    }
+    if (options.sendAsVoiceNote === true) {
+      body.send_as_voice_note = true;
+    }
+    if (options.fallbackToText === false) {
+      body.fallback_to_text = false;
     }
     const data = await postMessage<RawTextMessage>(this.http,
       `/numbers/${phoneNumberId}/texts`,

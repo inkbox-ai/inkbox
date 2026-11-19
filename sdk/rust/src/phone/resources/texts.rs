@@ -106,6 +106,40 @@ impl TextsResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Speak `text` (at most 600 characters) in the agent's voice and send it
+    /// as an MMS audio file. With `fallback_to_text`, the text is sent as an
+    /// ordinary message when a voice note can't be produced; false makes the
+    /// send fail. A generated key is used when `idempotency_key` is `None`.
+    pub fn send_voice_note(
+        &self,
+        phone_number_id: &str,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<TextMessage> {
+        let mut body = Map::new();
+        if let Some(recipients) = to {
+            body.insert("to".into(), recipients.to_json());
+        }
+        if let Some(cid) = conversation_id {
+            body.insert("conversation_id".into(), cid.into());
+        }
+        body.insert("text".into(), text.into());
+        body.insert("send_as_voice_note".into(), true.into());
+        if !fallback_to_text {
+            body.insert("fallback_to_text".into(), false.into());
+        }
+        let data = self.http.post_message(
+            &format!("/numbers/{phone_number_id}/texts"),
+            &body,
+            crate::http::NO_QUERY,
+            idempotency_key,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// List text messages for a phone number, newest first.
     ///
     /// # Arguments

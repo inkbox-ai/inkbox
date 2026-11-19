@@ -419,6 +419,12 @@ pub struct WhatsAppSendOptions {
     /// Play an uploaded MP4 attachment as an animation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gif_playback: Option<bool>,
+    /// Speak `text` (at most 600 characters, no media) in the agent's voice and send it as a native voice note.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub send_as_voice_note: Option<bool>,
+    /// Defaults to true: send `text` as an ordinary message when a voice note can't be produced. False makes the send fail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_to_text: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -503,6 +509,16 @@ impl WhatsAppResource {
             body.as_object_mut()
                 .expect("send options serialize to an object")
                 .remove("plain_reply_fallback");
+        }
+        if o.send_as_voice_note != Some(true) {
+            body.as_object_mut()
+                .expect("send options serialize to an object")
+                .remove("send_as_voice_note");
+        }
+        if o.fallback_to_text != Some(false) {
+            body.as_object_mut()
+                .expect("send options serialize to an object")
+                .remove("fallback_to_text");
         }
         let key = o
             .idempotency_key

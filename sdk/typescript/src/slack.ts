@@ -91,6 +91,10 @@ export interface SlackSendMessageOptions {
   text: string;
   idempotencyKey: string;
   threadTs?: string | null;
+  /** Speak `text` (at most 600 characters, no media) in the agent's voice and post it as an audio file. */
+  sendAsVoiceNote?: boolean;
+  /** Defaults true: send `text` as an ordinary message when a voice note can't be produced. False makes the send fail. */
+  fallbackToText?: boolean;
 }
 export interface SlackPageOptions {
   limit?: number;
@@ -392,6 +396,8 @@ export class SlackResource extends SlackOperationsResource {
           conversation_id: options.conversationId,
           text: options.text,
           thread_ts: options.threadTs,
+          ...(options.sendAsVoiceNote === true ? { send_as_voice_note: true } : {}),
+          ...(options.fallbackToText === false ? { fallback_to_text: false } : {}),
         },
         { headers: { "Idempotency-Key": options.idempotencyKey } },
       ),

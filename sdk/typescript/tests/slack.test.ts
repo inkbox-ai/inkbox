@@ -293,6 +293,30 @@ it("rejects absent/invalid keys and numeric timestamps before sending", async ()
   expect(fetch).not.toHaveBeenCalled();
 });
 
+it("sends voice note options only when set", async () => {
+  const { fetch, reply } = mock();
+  const c = client();
+  reply(fixture.action);
+  await c.slack.sendMessage(C, {
+    conversationId: "CEXAMPLE",
+    text: "Hello",
+    idempotencyKey: "voice:1",
+    sendAsVoiceNote: true,
+    fallbackToText: false,
+  });
+  expect(JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body))).toEqual({
+    conversation_id: "CEXAMPLE",
+    text: "Hello",
+    send_as_voice_note: true,
+    fallback_to_text: false,
+  });
+  reply(fixture.action);
+  await c.slack.sendMessage(C, { conversationId: "CEXAMPLE", text: "Hello", idempotencyKey: "voice:2" });
+  expect(JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body))).toEqual({
+    conversation_id: "CEXAMPLE",
+    text: "Hello",
+  });
+});
 it("accepts explicit null for optional Slack thread and cursor fields", async () => {
   const { fetch, reply } = mock();
   const c = client();
