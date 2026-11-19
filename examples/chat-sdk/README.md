@@ -74,7 +74,7 @@ before accepting deliveries. The secret is never printed.
 If a signing key already exists, supply its existing value as
 `INKBOX_SIGNING_SECRET`; setup does not rotate it. The empty reserved file is
 removed when no new secret is returned. An existing matching subscription is
-preserved. If its event list differs, setup stops and asks you to update that
+preserved. Setup adds `message.transcription_finished` to the previous default event set. For other custom event lists, setup asks you to update that
 subscription explicitly rather than silently changing other consumers.
 
 The setup command subscribes to message receipts, completed calls, and incoming
@@ -109,7 +109,9 @@ Use a durable Redis deployment with persistence enabled. Memory-only state loses
 subscriptions and replay suppression when the process restarts. Keep each
 application and identity's Redis key prefix separate.
 
-This handler awaits processing before returning. On hosts with a request-scoped
+For pending voice notes, schedule the adapter's [signed recovery request](../../adapters/chat-sdk/#recover-pending-voice-notes)
+every minute. The webhook acknowledges the persisted original before transcription.
+For ordinary messages, this handler awaits processing before returning. On hosts with a request-scoped
 background task API, forward it as the Chat SDK `waitUntil` option instead of
 starting an untracked promise:
 

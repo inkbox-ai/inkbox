@@ -57,3 +57,13 @@ void [assignments, triage, allRead, typing, removal, localNumber];
 
 const directRemoval: Promise<import("../dist/index.js").WhatsAppReaction> = client.whatsapp.removeReaction("reaction-id", { idempotencyKey: "stable-key" });
 void directRemoval;
+
+declare const completed: import("../dist/index.js").MessageTranscriptionFinishedWebhookPayload;
+const completionType: "message.transcription_finished" = completed.event_type;
+const originalId: string = completed.data.message_id;
+const sourceId: string = completed.data.channel === "text"
+  ? completed.data.text_message.id
+  : completed.data.message.id;
+// @ts-expect-error The original message projection depends on the channel.
+completed.data.text_message;
+void [completionType, originalId, sourceId];

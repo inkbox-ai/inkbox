@@ -745,6 +745,10 @@ pub struct PostCallActionItem {
 /// A single media attachment in an MMS message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextMediaItem {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
+    #[serde(default)]
+    pub id: Option<Uuid>,
     pub content_type: String,
     pub size: i64,
     pub url: String,

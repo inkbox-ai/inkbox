@@ -1,3 +1,4 @@
+import type { RawMediaTranscription } from "../media.js";
 /**
  * Receiver-side webhook payload types.
  *
@@ -488,6 +489,8 @@ export type IMessageSendStyleWire =
 
 /** iMessage media attachment (snake_case wire shape). */
 export interface IMessageMediaItemWire {
+  id?: string | null;
+  transcription?: RawMediaTranscription | null;
   content_type: string | null;
   size: number | null;
   url: string;
@@ -896,3 +899,21 @@ export type WhatsAppWebhookMedia = import("../whatsapp.js").RawWhatsAppMedia;
 export type WhatsAppWebhookReaction = import("../whatsapp.js").RawWhatsAppReaction;
 export interface WhatsAppWebhookData { message?: WhatsAppWebhookMessage | null; reaction?: WhatsAppWebhookReaction | null; contacts: WebhookContact[]; agent_identities: WebhookAgentIdentity[]; context?: WebhookContext; }
 export interface WhatsAppWebhookPayload { companion?: CompanionMetadata; id:string;event_type:WhatsAppWebhookEventType;timestamp:string;data:WhatsAppWebhookData; }
+
+/** Terminal attachment results for one original incoming message. */
+export interface MessageTranscriptionFinishedWebhookPayload {
+  id: string;
+  event_type: "message.transcription_finished";
+  timestamp: string;
+  data: MessageTranscriptionFinishedWebhookData;
+}
+
+export type MessageTranscriptionFinishedWebhookData = {
+  message_id: string;
+  contacts: WebhookContact[];
+  agent_identities: WebhookAgentIdentity[];
+} & (
+  | { channel: "text"; text_message: TextWebhookMessage; recipient_phone_number: string | null }
+  | { channel: "imessage"; message: IMessageWebhookMessage; reaction: null }
+  | { channel: "whatsapp"; message: WhatsAppWebhookMessage; reaction?: null }
+);

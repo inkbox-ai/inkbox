@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from inkbox.media import MediaTranscription
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -81,6 +83,8 @@ class WhatsAppMedia:
     status: WhatsAppMediaStatus
     url: str | None
 
+    transcription: MediaTranscription | None = None
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhatsAppMedia:
         return cls(
@@ -90,6 +94,9 @@ class WhatsAppMedia:
             d.get("size"),
             WhatsAppMediaStatus(d["status"]),
             d.get("url"),
+            transcription=MediaTranscription._from_dict(d["transcription"])
+            if d.get("transcription")
+            else None,
         )
 
 

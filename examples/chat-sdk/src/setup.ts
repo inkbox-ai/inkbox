@@ -18,10 +18,21 @@ if (subscriptions.length) {
   const existing = subscriptions.find((subscription) =>
     eventTypes.every((event) => subscription.eventTypes.includes(event)),
   );
-  if (!existing) {
-    throw new Error("An existing subscription needs additional events. Update it explicitly before rerunning setup.");
+  if (existing) {
+    console.info("The webhook subscription already exists. No changes made.");
+  } else {
+    // Upgrade only the exact previous setup default. Leave custom subscriptions alone.
+    const previous = eventTypes.filter((event) => event !== "message.transcription_finished");
+    const defaults = subscriptions.filter((subscription) =>
+      subscription.eventTypes.length === previous.length &&
+      previous.every((event) => subscription.eventTypes.includes(event)),
+    );
+    if (defaults.length !== 1) {
+      throw new Error("An existing subscription needs additional events. Update it explicitly before rerunning setup.");
+    }
+    await client.webhooks.subscriptions.update(defaults[0].id, { scope: "identity", eventTypes });
+    console.info("Added voice-note completions to the existing webhook subscription.");
   }
-  console.info("The webhook subscription already exists. No changes made.");
 } else {
   if (identity.signingKeyConfigured && !process.env.INKBOX_SIGNING_SECRET) {
     throw new Error("Supply the existing INKBOX_SIGNING_SECRET. Setup will not rotate an identity signing key.");

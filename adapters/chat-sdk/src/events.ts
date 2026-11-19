@@ -1,8 +1,10 @@
+import { readVoiceNotes, type VoiceNote } from "./voice-notes.js";
 import type { Attachment } from "chat";
 import type { InkboxRoute } from "./transport.js";
 
 export const INKBOX_CHAT_EVENTS = [
   "message.received",
+  "message.transcription_finished",
   "text.received",
   "imessage.received",
   "slack.dm_received",
@@ -25,6 +27,7 @@ export interface InkboxMessage {
   isBot?: boolean;
   createdAt: Date | string;
   attachments?: Attachment[];
+  voiceNotes?: VoiceNote[];
   event?: Record<string, unknown>;
   isMention?: boolean;
   raw?: unknown;
@@ -74,6 +77,7 @@ export function normalizeEvent(
 ): InkboxMessage | null {
   const event = object(value);
   const type = required(event.event_type, "event_type");
+  if (type === "message.transcription_finished") return null;
   if (!(INKBOX_CHAT_EVENTS as readonly string[]).includes(type)) return null;
   required(event.id, "event id");
   const timestamp = required(event.timestamp, "timestamp");
@@ -263,7 +267,26 @@ export function normalizeEvent(
     isBot,
     createdAt: optional(record.created_at) ?? timestamp,
     attachments,
+    ...((route.channel === "sms" || route.channel === "imessage") && {
+      voiceNotes: readVoiceNotes(record.media),
+    }),
     event,
     isMention,
   };
+}
+
+/** A completion is metadata for the original message, never a conversation input. */
+export function normalizeCompletion(
+  event: Record<string, unknown>,
+  identity: { id: string; emailAddress: string | null },
+): InkboxMessage | null {
+  const data = object(event.data);
+  if (data.channel !== "text" && data.channel !== "imessage") return null;
+  const message = normalizeEvent(
+    { ...event, event_type: data.channel + ".received" },
+    identity,
+  );
+  if (message && message.id !== required(data.message_id, "source message id"))
+    throw new Error("Mismatched source message id");
+  return message;
 }

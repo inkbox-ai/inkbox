@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.40
+
+- Expose audio attachment transcription status, text, errors and attachment IDs in Python, TypeScript and Rust.
+- Expose one `message.transcription_finished` webhook for MMS, iMessage and WhatsApp while preserving older payloads without transcription metadata.
+- Deliver MMS and iMessage voice-note transcripts on the original Chat SDK and Eve message, without a second turn.
+- **Upgrading Chat SDK / Eve:** Use persistent Chat state, subscribe the same channel endpoint to `message.transcription_finished`, and configure a signed recovery invocation every minute. In Eve, set `INKBOX_WEBHOOK_URL` to that endpoint. Recovery delivers saved voice notes after a restart or a missing callback, including on hosts without `waitUntil`.
+
 ## Chat SDK adapter 0.7.39 (initial release)
 
 ### Added

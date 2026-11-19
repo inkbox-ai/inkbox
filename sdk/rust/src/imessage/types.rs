@@ -242,6 +242,10 @@ impl IMessageReactionType {
 /// Media attachment on an iMessage.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageMediaItem {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
+    #[serde(default)]
+    pub id: Option<Uuid>,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,

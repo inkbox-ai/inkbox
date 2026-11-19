@@ -953,13 +953,19 @@ missing delivery confirmation. `mark_whatsapp_read` / `markWhatsAppRead` /
 ### Notifications and contact history
 
 Identity webhook subscriptions accept `whatsapp.received`, `whatsapp.sent`,
-`whatsapp.delivered`, `whatsapp.delivery_failed`, and
-`whatsapp.delivery_unconfirmed`, plus `whatsapp.reaction_received`, including subscriptions created before approval.
+`whatsapp.delivered`, `whatsapp.delivery_failed`,
+`whatsapp.delivery_unconfirmed`, and `whatsapp.reaction_received`, including subscriptions created before approval.
 Only `whatsapp.received` represents a new incoming message. Deduplicate retries by
-event ID; status notifications should update delivery state without starting an
+event ID; delivery notifications should update delivery state without starting an
 agent reply. Payloads keep snake_case fields and ISO timestamps. Received events
 can opt into the existing `texts` context class, whose items can have channel
 `whatsapp`. No new context class is required.
+
+Subscribe once to `message.transcription_finished` for MMS, iMessage and WhatsApp.
+It updates the original message when all its audio attachments have completed,
+failed, or been skipped. When `data.channel` is `whatsapp`, results are in
+`data.message.media[].transcription`. Match the receiving identity, channel and
+`data.message_id` to the original receipt; don't start a second reply.
 
 Contact correspondence is explicitly opt-in: select `channels=["whatsapp"]` and
 optionally `whatsapp_limit` / `whatsappLimit` (`--channels whatsapp

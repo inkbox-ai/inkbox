@@ -18,7 +18,14 @@ conversation.
    `INKBOX_AGENT_HANDLE`. Configure model access according to the [Eve setup
    guide](https://eve.dev/docs/getting-started), and set `EVE_MODEL` to your chosen
    model ID.
-3. Configure a persistent Redis service at `REDIS_URL`.
+3. Configure a persistent Redis service at `REDIS_URL`. Set `INKBOX_WEBHOOK_URL`
+   to this application's own reachable `/eve/v1/inkbox` URL. The included
+   every-minute `voice-notes` schedule signs a recovery request to that route
+   so Eve establishes the same channel context as an incoming webhook. Run a
+   deployment supporting one-minute Eve schedules (for example, `eve start`).
+   HTTP-only hosts need an external scheduled job; `eve dev` does not fire cron
+   automatically. For local recovery, send a POST to
+   `http://localhost:2000/eve/v1/dev/schedules/voice-notes`. See [Eve schedules](https://eve.dev/docs/schedules).
 4. Start with `npm run dev`, which uses `eve dev --resume` so local restarts
    attempt to recover retained conversation workflows. Keep both Redis state and
    Eve's local `.eve` workflow data; Redis alone cannot restore an Eve run.
@@ -83,6 +90,12 @@ receiving and replying to messages.
   deferred handlers must initialize Chat before using state-backed adapter sends.
 - Redis stores Chat SDK state; Eve owns durable agent execution and session
   history. Configure both according to your hosting requirements.
+- MMS and iMessage voice notes stay in their original conversation. Eve receives
+  the caption and recording, with any transcript labeled as the sender’s speech.
+  If transcription is pending, the adapter waits up to 60 seconds for
+  `message.transcription_finished`, then checks the original message once. If no
+  transcript is available, Eve still receives the original message. A late
+  completion does not start another turn.
 - Completed-call transcripts enter the caller’s existing SMS or iMessage
   conversation when the adapter resolves one unambiguous direct destination on
   the call’s originating channel. They trigger an Eve turn; any reply is a text

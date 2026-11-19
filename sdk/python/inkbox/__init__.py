@@ -2,6 +2,8 @@
 inkbox — Python SDK for the Inkbox APIs.
 """
 
+from inkbox.media import MediaTranscription, MediaTranscriptionWire, TranscriptionStatus
+
 from inkbox.webhooks import WhatsAppWebhookMention, WhatsAppWebhookReaction, WhatsAppWebhookPayload, WhatsAppWebhookData, WhatsAppWebhookMessage, WhatsAppWebhookMedia, WhatsAppWebhookRecipient, WhatsAppWebhookEventType
 from inkbox.whatsapp import (
     WhatsAppOnboarding,
@@ -492,6 +494,8 @@ from inkbox.webhooks import (
     IMessageWebhookPayload,
     IMessageWebhookReaction,
     TextWebhookData,
+    MessageTranscriptionFinishedWebhookData,
+    MessageTranscriptionFinishedWebhookPayload,
     TextWebhookEventType,
     TextWebhookMessage,
     TextWebhookPayload,
@@ -546,6 +550,9 @@ from .whatsapp import WhatsAppAssignment, WhatsAppTriageNumber, WhatsAppConnectR
 from inkbox.hosted_workspace import HostedWorkspace, ChatConversation, ChatTurn, ChatEvent, ChatEventPage, ChatCapabilities, ChatText, ChatFileReference
 
 __all__ = [
+    "MediaTranscription",
+    "MediaTranscriptionWire",
+    "TranscriptionStatus",
     "HostedWorkspace",
     "ChatConversation",
     "ChatTurn",
@@ -1011,6 +1018,8 @@ __all__ = [
     "IMessageWebhookPayload",
     "IMessageWebhookReaction",
     "TextWebhookData",
+    "MessageTranscriptionFinishedWebhookData",
+    "MessageTranscriptionFinishedWebhookPayload",
     "TextWebhookEventType",
     "TextWebhookMessage",
     "TextWebhookPayload",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.40
+
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0740) for audio attachment transcription results, completion events, and agent receiver guidance.
+
 ## 0.7.38
 
 See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0738) for onboarding compatibility, nullable shared numbers and number/router management.

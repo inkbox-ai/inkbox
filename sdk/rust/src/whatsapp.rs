@@ -286,6 +286,8 @@ fn reaction_key(value: &str) -> Result<()> {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhatsAppMedia {
+    #[serde(default)]
+    pub transcription: Option<crate::media::MediaTranscription>,
     pub id: Uuid,
     pub filename: String,
     pub content_type: String,

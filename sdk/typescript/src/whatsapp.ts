@@ -1,3 +1,4 @@
+import { parseMediaTranscription, type MediaTranscription, type RawMediaTranscription } from "./media.js";
 import { conversationFilterParams } from "./_conversationFilters.js";
 import type { SenderAccess } from "./sender_access.js";
 /** WhatsApp conversations, recipient connections, quoted replies, reactions, and owned media. */
@@ -94,6 +95,7 @@ function connectionBody(o: WhatsAppConnectOptions): Record<string, string> {
 }
 export type WhatsAppMediaStatus = "pending" | "ready" | "unavailable";
 export interface WhatsAppMedia {
+  transcription?: MediaTranscription | null;
   id: string;
   filename: string;
   contentType: string;
@@ -102,6 +104,7 @@ export interface WhatsAppMedia {
   url: string | null;
 }
 export interface RawWhatsAppMedia {
+  transcription?: RawMediaTranscription | null;
   id: string;
   filename: string;
   content_type: string;
@@ -111,6 +114,7 @@ export interface RawWhatsAppMedia {
 }
 export function parseWhatsAppMedia(r: RawWhatsAppMedia): WhatsAppMedia {
   return {
+    transcription: r.transcription ? parseMediaTranscription(r.transcription) : null,
     id: r.id,
     filename: r.filename,
     contentType: r.content_type,

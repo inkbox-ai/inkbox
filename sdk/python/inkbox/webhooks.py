@@ -12,6 +12,8 @@ since ``json.loads`` produces bare strings.
 
 from __future__ import annotations
 
+from inkbox.media import MediaTranscriptionWire
+
 from typing import Literal, NotRequired, TypedDict
 from inkbox.companion import CompanionMetadata
 from inkbox.sender_access import SenderAccess
@@ -89,6 +91,8 @@ class TextMediaItemWire(TypedDict):
 
     content_type: str
     size: int
+    transcription: NotRequired[MediaTranscriptionWire | None]
+    id: NotRequired[str | None]
     url: str
 
 
@@ -525,6 +529,8 @@ class IMessageMediaItemWire(TypedDict):
 
     content_type: str | None
     size: int | None
+    transcription: NotRequired[MediaTranscriptionWire | None]
+    id: NotRequired[str | None]
     url: str
 
 
@@ -953,6 +959,7 @@ class WhatsAppWebhookMedia(TypedDict):
     content_type: str
     size: int | None
     status: WhatsAppMediaStatusWire
+    transcription: NotRequired[MediaTranscriptionWire | None]
     url: str | None
 
 
@@ -1041,3 +1048,40 @@ class WhatsAppWebhookPayload(TypedDict):
     event_type: WhatsAppWebhookEventType
     timestamp: str
     data: WhatsAppWebhookData
+
+class _TranscriptionFinishedData(TypedDict):
+    message_id: str
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]
+
+
+class TextTranscriptionFinishedData(_TranscriptionFinishedData):
+    channel: Literal["text"]
+    text_message: TextWebhookMessage
+    recipient_phone_number: str | None
+
+
+class IMessageTranscriptionFinishedData(_TranscriptionFinishedData):
+    channel: Literal["imessage"]
+    message: IMessageWebhookMessage
+    reaction: None
+
+
+class WhatsAppTranscriptionFinishedData(_TranscriptionFinishedData):
+    channel: Literal["whatsapp"]
+    message: WhatsAppWebhookMessage
+    reaction: NotRequired[None]
+
+
+MessageTranscriptionFinishedWebhookData = (
+    TextTranscriptionFinishedData | IMessageTranscriptionFinishedData | WhatsAppTranscriptionFinishedData
+)
+
+
+class MessageTranscriptionFinishedWebhookPayload(TypedDict):
+    """Terminal attachment results for one original incoming message."""
+
+    id: str
+    event_type: Literal["message.transcription_finished"]
+    timestamp: str
+    data: MessageTranscriptionFinishedWebhookData
