@@ -902,7 +902,7 @@ await identity.update({
 
 Inbound messages, tapbacks, and outbound delivery status arrive via
 identity-owned webhook subscriptions — see
-[Webhooks](#webhooks) for the six `imessage.*` event types.
+[Webhooks](#webhooks) for the `imessage.*` event types.
 
 ---
 

@@ -818,7 +818,7 @@ reused with a different request.
 
 Inbound messages, tapbacks, and outbound delivery status arrive via
 identity-owned webhook subscriptions — see [Webhooks](#webhooks) for
-the six `imessage.*` event types.
+the `imessage.*` event types.
 
 ---
 
