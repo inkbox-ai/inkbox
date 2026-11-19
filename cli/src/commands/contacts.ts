@@ -155,7 +155,7 @@ export function parseContactAccessFile(raw: string): UpdateContactAccess {
       if (!Array.isArray(values) || values.length > 50 || values.some((value) => typeof value !== "string" || !value.trim())) {
         throw new Error(`access.${key}.${field} must be an array of at most 50 addresses`);
       }
-      if (new Set(values).size !== values.length) throw new Error(`access.${key}.contactable must not contain duplicates`);
+      if (new Set(values).size !== values.length) throw new Error(`access.${key}.${field} must not contain duplicates`);
       if (group.visible === false && values.length) throw new Error(`access.${key}: hidden addresses cannot be contactable`);
     }
   }
