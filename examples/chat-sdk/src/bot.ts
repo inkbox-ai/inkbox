@@ -66,7 +66,7 @@ export function handleWebhook(
 }
 
 // Mount this Fetch API handler at POST /webhooks/inkbox in your web framework.
-// Without waitUntil, the request stays open until processing finishes.
+// Without waitUntil, ordinary messages run inline; pending voice notes use durable state.
 export function POST(request: Request): Promise<Response> {
   return handleWebhook(request);
 }

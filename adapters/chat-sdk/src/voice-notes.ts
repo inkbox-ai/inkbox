@@ -1,7 +1,34 @@
+import { createHmac, randomUUID } from "node:crypto";
 import type { ChatInstance } from "chat";
 import type { MediaTranscription } from "@inkbox/sdk";
 import type { InkboxMessage } from "./events.js";
 import type { InkboxRoute, TransportMessage } from "./transport.js";
+
+export const recoveryEvent = "adapter.voice_notes_due";
+
+/** Send to your own adapter webhook from a trusted recurring job. */
+export function createVoiceNoteRecoveryRequest(
+  url: string,
+  signingSecret: string,
+): Request {
+  const body = JSON.stringify({ event_type: recoveryEvent });
+  const requestId = randomUUID();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac("sha256", signingSecret.replace(/^whsec_/, ""))
+    .update(requestId + "." + timestamp + "." + body)
+    .digest("hex");
+  return new Request(url, {
+    method: "POST",
+    body,
+    redirect: "error",
+    headers: {
+      "content-type": "application/json",
+      "x-inkbox-request-id": requestId,
+      "x-inkbox-timestamp": timestamp,
+      "x-inkbox-signature": "sha256=" + signature,
+    },
+  });
+}
 
 export interface VoiceNote extends MediaTranscription {
   attachmentId?: string;
@@ -34,7 +61,9 @@ export function withVoiceNoteLabels(message: InkboxMessage): string {
   const labels = (message.voiceNotes ?? []).flatMap((note) => {
     if (note.errorCode === "not_audio") return [];
     if (note.status === "completed" && note.text?.trim())
-      return [`[Voice note ${note.position} — automatically transcribed]\n${note.text}`];
+      return [
+        `[Voice note ${note.position} — automatically transcribed]\n${note.text}`,
+      ];
     return [
       `[Voice note ${note.position}: transcript unavailable; process the original attachment normally.]`,
     ];
@@ -47,7 +76,7 @@ const retention = 24 * 60 * 60 * 1000;
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function sourceKey(message: InkboxMessage): string {
+export function sourceKey(message: InkboxMessage): string {
   const route = message.route;
   if (route.channel !== "sms" && route.channel !== "imessage")
     throw new Error("Unsupported voice-note channel");
@@ -62,17 +91,70 @@ function sourceKey(message: InkboxMessage): string {
   );
 }
 
+interface Accepted {
+  message: InkboxMessage;
+  deadline: number;
+}
+
+function indexKey(identityId: string) {
+  return "inkbox:pending-voice-notes:" + identityId;
+}
+
+// StateAdapter has no key scan. Keep a discoverable index, including while a
+// worker owns a delivery; a crash must never pop the only reference to work.
+async function editIndex(
+  state: State,
+  identityId: string,
+  edit: (keys: Set<string>) => Promise<void>,
+) {
+  const index = indexKey(identityId);
+  let lock = await state.acquireLock(index, 30_000);
+  for (let attempt = 0; !lock && attempt < 10; attempt++) {
+    await sleep(25);
+    lock = await state.acquireLock(index, 30_000);
+  }
+  if (!lock) throw new Error("Voice-note index is busy; retry delivery");
+  try {
+    const keys = new Set(await pendingVoiceNotes(state, identityId));
+    await edit(keys);
+    if (!(await state.extendLock(lock, 30_000)))
+      throw new Error("Voice-note index lease expired; retry delivery");
+    await state.set(index, [...keys]);
+  } finally {
+    await state.releaseLock(lock);
+  }
+}
+
+export async function pendingVoiceNotes(state: State, identityId: string) {
+  return (await state.get<string[]>(indexKey(identityId))) ?? [];
+}
+
+export async function acceptVoiceNote(state: State, message: InkboxMessage) {
+  const key = sourceKey(message);
+  await editIndex(state, message.route.identityId, async (keys) => {
+    if (await state.get(key + ":done")) return;
+    await state.setIfNotExists(key, { message, deadline: Date.now() + 60_000 });
+    keys.add(key);
+  });
+}
+
+async function retireVoiceNote(state: State, identityId: string, key: string) {
+  await editIndex(state, identityId, async (keys) => {
+    await state.delete(key);
+    keys.delete(key);
+  });
+}
+
 export async function recordVoiceNoteCompletion(
   state: State,
   message: InkboxMessage,
 ): Promise<void> {
   const notes = message.voiceNotes ?? [];
-  if (notes.length && notes.every((note) => note.status !== "pending"))
-    await state.setIfNotExists(
-      sourceKey(message) + ":completion",
-      notes,
-      retention,
-    );
+  if (!notes.length || notes.some((note) => note.status === "pending")) return;
+  const key = sourceKey(message);
+  const accepted = await state.get<Accepted>(key);
+  if (accepted && Date.now() > accepted.deadline) return;
+  await state.setIfNotExists(key + ":completion", notes, retention);
 }
 
 function applyResults(
@@ -93,62 +175,90 @@ function applyResults(
   return { ...message, voiceNotes };
 }
 
-/** Only the signed original is admitted to Chat. A completion, even on another
- * receiver instance, supplies data without creating a new message or route. */
-export async function resolveVoiceNotes(
+async function pollOnce(
   state: State,
-  message: InkboxMessage,
-  lookup: (route: InkboxRoute, id: string) => Promise<TransportMessage>,
-): Promise<InkboxMessage> {
-  if (!message.voiceNotes?.some((note) => note.status === "pending"))
-    return message;
-  const key = sourceKey(message);
-  const deadlineKey = key + ":deadline";
-  const proposedDeadline = Date.now() + 60_000;
-  await state.setIfNotExists(deadlineKey, proposedDeadline, retention);
-  const deadline = (await state.get<number>(deadlineKey)) ?? proposedDeadline;
-
-  while (true) {
-    const completed = await state.get<VoiceNote[]>(key + ":completion");
-    if (completed) {
-      const merged = applyResults(message, completed);
-      if (!merged.voiceNotes!.some((note) => note.status === "pending"))
-        return merged;
-    }
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
-    // Check shared webhook state, not the Inkbox API, during the wait.
-    await sleep(Math.min(1000, remaining));
-  }
-
+  key: string,
+  messageId: string,
+  lookup: () => Promise<TransportMessage>,
+): Promise<VoiceNote[]> {
   const resultKey = key + ":poll-result";
-  if (await state.setIfNotExists(key + ":polled", true, retention)) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let notes: VoiceNote[] = [];
-    try {
-      const result = await Promise.race([
-        lookup(message.route, message.id),
-        new Promise<undefined>((resolve) => {
-          timer = setTimeout(() => resolve(undefined), 10_000);
-        }),
-      ]);
-      if (result?.id === message.id) notes = result.voiceNotes ?? [];
-    } catch {
-      // The original message and its attachment remain deliverable.
-    } finally {
-      clearTimeout(timer);
-    }
-    await state.set(resultKey, notes, retention);
-    return applyResults(message, notes);
+  // Claim the one allowed read with its fallback result before issuing it.
+  // A worker lost mid-read leaves the original deliverable on the next tick.
+  if (!(await state.setIfNotExists(resultKey, [])))
+    return (await state.get<VoiceNote[]>(resultKey)) ?? [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let notes: VoiceNote[] = [];
+  try {
+    const result = await Promise.race([
+      lookup(),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), 10_000);
+      }),
+    ]);
+    if (result?.id === messageId) notes = result.voiceNotes ?? [];
+  } catch {
+    // Retain the original attachment.
+  } finally {
+    clearTimeout(timer);
   }
+  await state.set(resultKey, notes);
+  return notes;
+}
 
-  // A replay joins the first poll, even when it reached another receiver.
-  const pollDeadline = deadline + 10_000;
-  while (true) {
-    const notes = await state.get<VoiceNote[]>(resultKey);
-    if (notes) return applyResults(message, notes);
-    const remaining = pollDeadline - Date.now();
-    if (remaining <= 0) return message;
-    await sleep(Math.min(250, remaining));
+/** Completion webhooks and scheduled recovery can both claim a saved original.
+ * A host-provided waitUntil may also wake it at its original deadline. */
+export async function deliverVoiceNote(
+  state: State,
+  key: string,
+  identityId: string,
+  wait: boolean,
+  lookup: (route: InkboxRoute, id: string) => Promise<TransportMessage>,
+  deliver: (message: InkboxMessage) => Promise<void>,
+): Promise<void> {
+  const accepted = await state.get<Accepted>(key);
+  if (!accepted) {
+    // A worker can crash between deleting a delivered record and its index entry.
+    if (await state.get(key + ":done"))
+      await retireVoiceNote(state, identityId, key);
+    return;
+  }
+  const { deadline, message } = accepted;
+  async function completed() {
+    const notes = await state.get<VoiceNote[]>(key + ":completion");
+    if (!notes) return;
+    const merged = applyResults(message, notes);
+    if (merged.voiceNotes!.every((note) => note.status !== "pending"))
+      return merged;
+  }
+  let ready = await completed();
+  while (!ready && Date.now() < deadline) {
+    if (!wait) return;
+    await sleep(Math.min(1000, deadline - Date.now()));
+    if (await state.get(key + ":done")) return;
+    ready = await completed();
+  }
+  const lock = await state.acquireLock(key + ":delivery", 120_000);
+  if (!lock) return;
+  const renew = setInterval(() => {
+    // If the backend is unavailable the lease can lapse. The stable delivery
+    // ID also protects idempotent handlers across a crash at this boundary.
+    void state.extendLock(lock, 120_000).catch(() => {});
+  }, 40_000);
+  try {
+    if (!(await state.get(key + ":done"))) {
+      if (!ready) {
+        const notes = await pollOnce(state, key, message.id, () =>
+          lookup(message.route, message.id),
+        );
+        ready = applyResults(message, notes);
+      }
+      await deliver(ready);
+      await state.set(key + ":done", true, retention);
+    }
+    await state.delete(key + ":poll-result");
+    await retireVoiceNote(state, identityId, key);
+  } finally {
+    clearInterval(renew);
+    await state.releaseLock(lock);
   }
 }

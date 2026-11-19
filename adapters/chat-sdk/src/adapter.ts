@@ -42,7 +42,11 @@ import {
 
 import {
   recordVoiceNoteCompletion,
-  resolveVoiceNotes,
+  acceptVoiceNote,
+  deliverVoiceNote,
+  pendingVoiceNotes,
+  sourceKey,
+  recoveryEvent,
   withVoiceNoteLabels,
 } from "./voice-notes.js";
 
@@ -237,30 +241,68 @@ export class InkboxAdapter implements Adapter<InkboxRoute, InkboxMessage> {
     this.identityId = identity.id;
     let normalized: InkboxMessage | null;
     let completion: InkboxMessage | null = null;
+    let recovery = false;
     try {
       const event = object(JSON.parse(body.toString("utf8")));
+      recovery = event.event_type === recoveryEvent;
       normalized = normalizeEvent(event, identity);
       if (event.event_type === "message.transcription_finished")
         completion = normalizeCompletion(event, identity);
     } catch {
       return new Response("Invalid webhook payload", { status: 400 });
     }
-    if (completion)
-      await recordVoiceNoteCompletion(this.chat.getState(), completion);
+    const chat = this.chat;
+    const state = chat.getState();
+    const deliver = (key: string, wait = false) =>
+      deliverVoiceNote(
+        state,
+        key,
+        identity.id,
+        wait,
+        (route, id) => this.transport.getMessage(route, id),
+        async (message) => {
+          // Our inbox owns the receipt. Chat's pre-handler dedupe would suppress
+          // retry after a failed handoff. Handlers should use the stable message ID.
+          await chat.processMessage(
+            this,
+            this.encodeThreadId(message.route),
+            this.parseMessage(message),
+            { deduplicate: false },
+          );
+        },
+      );
+    if (recovery) {
+      const keys = await pendingVoiceNotes(state, identity.id);
+      const outcomes = await Promise.allSettled(
+        keys.map((key) => deliver(key, true)),
+      );
+      if (outcomes.some((result) => result.status === "rejected")) {
+        throw new Error("Some pending voice notes could not be delivered");
+      }
+      return new Response("OK");
+    }
+    if (completion) {
+      await recordVoiceNoteCompletion(state, completion);
+      await deliver(sourceKey(completion));
+    }
     if (!normalized) return new Response("OK");
     normalized = await this.hydrate(normalized);
     if (this.options.onMessage && !(await this.options.onMessage(normalized)))
       return new Response("OK");
     const threadId = this.encodeThreadId(normalized.route);
-    const chat = this.chat;
-    const task = resolveVoiceNotes(chat.getState(), normalized, (route, id) =>
-      this.transport.getMessage(route, id),
-    ).then((message) =>
-      chat.processMessage(this, threadId, this.parseMessage(message), {
-        ...options,
-        waitUntil: undefined,
-      }),
-    );
+    let task: Promise<unknown>;
+    if (normalized.voiceNotes?.some((note) => note.status === "pending")) {
+      await acceptVoiceNote(state, sanitizeMessageRaw(normalized));
+      if (!options?.waitUntil) return new Response("OK");
+      task = deliver(sourceKey(normalized), true);
+    } else {
+      task = Promise.resolve(
+        chat.processMessage(this, threadId, this.parseMessage(normalized), {
+          ...options,
+          waitUntil: undefined,
+        }),
+      );
+    }
     const tracked = task.catch(() => {
       this.chat!.getLogger("inkbox").error(
         "Incoming message processing failed",

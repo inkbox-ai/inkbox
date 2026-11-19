@@ -301,13 +301,35 @@ Identity resolution and required message enrichment complete before the webhook
 is acknowledged. Transient lookup or enrichment failures can fail that delivery
 without permanently poisoning adapter initialization. When `waitUntil` is supplied,
 only the subsequent Chat handler work runs in the host's background lifecycle.
-Without it, the handler waits for processing. Do not launch an untracked background
+Without it, ordinary messages wait for processing. Pending voice notes are an exception: the adapter saves the admitted original and its deadline in shared Chat state before returning success, without waiting for transcription. Do not launch an untracked background
 promise that can be terminated after returning a response. Monitor delivery
 outcomes and application-handler failures separately. Webhook replay can recover
 some delivery failures, but a message already admitted by Chat SDK may remain
 deduplicated after its handler fails. Recover that application operation explicitly.
 A successful webhook response is not an assurance that your agent completed its
 work, and failed deliveries are not universally retried automatically.
+
+### Recover pending voice notes
+
+Use persistent Chat state and schedule a signed recovery request to your **own**
+webhook every minute, including when no incoming messages arrive. For example,
+run this inside a trusted recurring job:
+
+```ts
+import { createVoiceNoteRecoveryRequest } from "@inkbox/chat-sdk-adapter";
+
+const response = await fetch(createVoiceNoteRecoveryRequest(webhookUrl, signingSecret));
+if (!response.ok) throw new Error(`Recovery failed: HTTP ${response.status}`);
+```
+
+A matching completion can deliver the saved original immediately. The job also
+recovers originals after a restart or missing completion; it awaits dispatch in
+the request, so allow up to the remaining 60-second wait, a 10-second lookup,
+and handler time. Late jobs do not restart the deadline. Without a running job,
+a quiet host cannot guarantee timeout delivery. Memory-only state cannot recover
+from a restart. Receipts suppress completed originals for 24 hours; use the
+stable message ID for handler idempotency because a crash after an external
+effect but before the receipt can replay that effect.
 
 ## Examples
 

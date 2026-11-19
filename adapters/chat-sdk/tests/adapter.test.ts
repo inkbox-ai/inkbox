@@ -4,6 +4,7 @@ import { Chat, Message, emoji } from "chat";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import {
   createInkboxAdapter,
+  createVoiceNoteRecoveryRequest,
   type InkboxRoute,
   type InkboxAdapterOptions,
 } from "../src/index.js";
@@ -50,6 +51,7 @@ function signed(payload: unknown, extra: Record<string, string> = {}) {
 async function setup(
   options: Partial<InkboxAdapterOptions> = {},
   concurrency?: "concurrent",
+  state = createMemoryState(),
 ) {
   const adapter = createInkboxAdapter({
     apiKey: "test-key",
@@ -61,7 +63,7 @@ async function setup(
   const bot = new Chat({
     userName: "assistant",
     adapters: { inkbox: adapter },
-    state: createMemoryState(),
+    state,
     ...(concurrency ? { concurrency } : {}),
   });
   const handler = vi.fn(async (thread) => {
@@ -267,6 +269,83 @@ describe("voice-note completion routing", () => {
       await bot.shutdown();
     },
   );
+
+  it.each(["completion", "deadline"])(
+    "accepts before ACK without waitUntil and recovers on %s in a fresh Chat",
+    async (wake) => {
+      vi.useFakeTimers();
+      const state = createMemoryState();
+      try {
+        const first = await setup({}, "concurrent", state);
+        const original = note("imessage", "pending").original;
+        const { completion } = note(
+          "imessage",
+          "completed",
+          "spoken",
+        ).completion;
+        // No time advances and no request-scoped background callback is supplied.
+        const now = Date.now();
+        expect((await first.bot.webhooks.inkbox(signed(original))).status).toBe(
+          200,
+        );
+        expect(Date.now()).toBe(now);
+        expect(first.handler).not.toHaveBeenCalled();
+        await first.bot.shutdown();
+
+        const fresh = await setup({}, "concurrent", state);
+        const lookup = vi
+          .spyOn(fresh.adapter.transport, "getMessage")
+          .mockImplementation(() => new Promise(() => {}));
+        const tick = () =>
+          fresh.bot.webhooks.inkbox(
+            createVoiceNoteRecoveryRequest(
+              "https://example.com/webhook",
+              "whsec_" + secret,
+            ),
+          );
+        if (wake === "completion") {
+          await fresh.bot.webhooks.inkbox(signed(completion));
+          expect(lookup).not.toHaveBeenCalled();
+        } else {
+          await vi.advanceTimersByTimeAsync(55_000);
+          await fresh.bot.webhooks.inkbox(signed(original));
+          const recovery = tick();
+          await vi.advanceTimersByTimeAsync(4_999);
+          expect(lookup).not.toHaveBeenCalled();
+          await vi.advanceTimersByTimeAsync(10_001);
+          await recovery;
+          expect(lookup).toHaveBeenCalledTimes(1);
+        }
+        await fresh.bot.webhooks.inkbox(signed(original));
+        await fresh.bot.webhooks.inkbox(signed(completion));
+        await tick();
+        expect(fresh.handler).toHaveBeenCalledTimes(1);
+        const message = fresh.handler.mock.calls[0][1];
+        expect(message.raw.text).toBe("typed caption");
+        expect(message.text).toContain(
+          wake === "completion" ? "spoken" : "transcript unavailable",
+        );
+        expect(message.raw.route.conversationId).toBe("chat-one");
+        expect(message.attachments).toHaveLength(2);
+        await fresh.bot.shutdown();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not acknowledge a pending original when persistent admission fails", async () => {
+    const state = createMemoryState();
+    const { bot, handler } = await setup({}, "concurrent", state);
+    vi.spyOn(state, "set").mockRejectedValueOnce(
+      new Error("store unavailable"),
+    );
+    await expect(
+      bot.webhooks.inkbox(signed(note("text", "pending").original)),
+    ).rejects.toThrow("store unavailable");
+    expect(handler).not.toHaveBeenCalled();
+    await bot.shutdown();
+  });
 
   it("waits for the matching signed event, and never wakes for the completion itself", async () => {
     vi.useFakeTimers();

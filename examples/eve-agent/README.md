@@ -18,7 +18,13 @@ conversation.
    `INKBOX_AGENT_HANDLE`. Configure model access according to the [Eve setup
    guide](https://eve.dev/docs/getting-started), and set `EVE_MODEL` to your chosen
    model ID.
-3. Configure a persistent Redis service at `REDIS_URL`.
+3. Configure a persistent Redis service at `REDIS_URL`. Set `INKBOX_WEBHOOK_URL`
+   to this application's own reachable `/eve/v1/inkbox` URL. The included
+   every-minute `voice-notes` schedule signs a recovery request to that route
+   so Eve establishes the same channel context as an incoming webhook. Run a
+   deployment supporting one-minute Eve schedules (for example, `eve start`).
+   HTTP-only hosts need an external scheduled job; `eve dev` does not fire cron
+   automatically. See [Eve schedules](https://eve.dev/docs/schedules).
 4. Start with `npm run dev`, which uses `eve dev --resume` so local restarts
    attempt to recover retained conversation workflows. Keep both Redis state and
    Eve's local `.eve` workflow data; Redis alone cannot restore an Eve run.

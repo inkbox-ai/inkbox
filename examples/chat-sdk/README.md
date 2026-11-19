@@ -109,7 +109,9 @@ Use a durable Redis deployment with persistence enabled. Memory-only state loses
 subscriptions and replay suppression when the process restarts. Keep each
 application and identity's Redis key prefix separate.
 
-This handler awaits processing before returning. On hosts with a request-scoped
+For pending voice notes, schedule the adapter's [signed recovery request](../../adapters/chat-sdk/#recover-pending-voice-notes)
+every minute. The webhook acknowledges the persisted original before transcription.
+For ordinary messages, this handler awaits processing before returning. On hosts with a request-scoped
 background task API, forward it as the Chat SDK `waitUntil` option instead of
 starting an untracked promise:
 
