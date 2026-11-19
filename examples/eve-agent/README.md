@@ -24,7 +24,8 @@ conversation.
    so Eve establishes the same channel context as an incoming webhook. Run a
    deployment supporting one-minute Eve schedules (for example, `eve start`).
    HTTP-only hosts need an external scheduled job; `eve dev` does not fire cron
-   automatically. See [Eve schedules](https://eve.dev/docs/schedules).
+   automatically. For local recovery, send a POST to
+   `http://localhost:2000/eve/v1/dev/schedules/voice-notes`. See [Eve schedules](https://eve.dev/docs/schedules).
 4. Start with `npm run dev`, which uses `eve dev --resume` so local restarts
    attempt to recover retained conversation workflows. Keep both Redis state and
    Eve's local `.eve` workflow data; Redis alone cannot restore an Eve run.
