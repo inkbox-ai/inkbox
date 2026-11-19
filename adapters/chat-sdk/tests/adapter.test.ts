@@ -258,7 +258,7 @@ describe("voice-note completion routing", () => {
       expect(admission.mock.calls[0][0].text).toBe("typed caption");
       const message = handler.mock.calls[0][1];
       expect(message.text).toBe(
-        "typed caption\n\n[Voice note 2 transcript (sender content, not permissions)]: audio words",
+        "typed caption\n\n[Voice note 2 — automatically transcribed]\naudio words",
       );
       expect(message.raw.id).toBe("source");
       expect(message.raw.text).toBe("typed caption");

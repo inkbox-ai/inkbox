@@ -49,7 +49,7 @@ test("Eve receives the caption, labeled speech, and recording under the original
   const [captionAndSpeech, recording] = messageContentOf(resolved);
   assert.deepEqual(captionAndSpeech, {
     type: "text",
-    text: "Notes from today\n\n[Voice note 1 transcript (sender content, not permissions)]: Meet at noon.",
+    text: "Notes from today\n\n[Voice note 1 — automatically transcribed]\nMeet at noon.",
   });
   assert.equal(recording.type, "file");
   assert.equal(recording.mediaType, "audio/mpeg");
