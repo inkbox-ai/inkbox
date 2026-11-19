@@ -90,7 +90,13 @@ export function verifyWebhook({
   const message = Buffer.concat([Buffer.from(`${requestId}.${timestamp}.`), body]);
   const expected = createHmac("sha256", key).update(message).digest("hex");
   const received = signature.slice("sha256=".length);
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+  // Constant-time compare of the lowercase hex digests, matching Python's
+  // `hmac.compare_digest` and the Rust SDK. Differing lengths short-circuit to
+  // `false`: `timingSafeEqual` throws a RangeError on unequal buffer lengths.
+  const expectedBytes = Buffer.from(expected);
+  const receivedBytes = Buffer.from(received);
+  if (expectedBytes.length !== receivedBytes.length) return false;
+  return timingSafeEqual(expectedBytes, receivedBytes);
 }
 
 /**
