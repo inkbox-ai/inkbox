@@ -162,7 +162,7 @@ fn text_voice_note_omits_default_fallback() {
 }
 
 #[test]
-fn whatsapp_voice_note_options_are_sent_only_when_set() {
+fn whatsapp_voice_note_fields_are_sent_only_by_send_voice_note() {
     let f: Value =
         serde_json::from_str(include_str!("../../../tests/fixtures/whatsapp.json")).unwrap();
     let server = MockServer::start();
@@ -185,28 +185,33 @@ fn whatsapp_voice_note_options_are_sent_only_when_set() {
             .json_body(json!({"to": "+15555550101", "text": "Hello"}));
         then.status(201).json_body(json!({"message": f["message"]}));
     });
+    let fallback = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/whatsapp/messages")
+            .header("Idempotency-Key", "voice-2")
+            .json_body(json!({
+                "to": "+15555550101",
+                "text": "Hello",
+                "send_as_voice_note": true
+            }));
+        then.status(201).json_body(json!({"message": f["message"]}));
+    });
     let sdk = client(&server);
+    let options = |key: &str| WhatsAppSendOptions {
+        to: Some("+15555550101".into()),
+        text: Some("Hello".into()),
+        idempotency_key: Some(key.into()),
+        ..Default::default()
+    };
     sdk.whatsapp()
-        .send(&WhatsAppSendOptions {
-            to: Some("+15555550101".into()),
-            text: Some("Hello".into()),
-            send_as_voice_note: Some(true),
-            fallback_to_text: Some(false),
-            idempotency_key: Some("voice-1".into()),
-            ..Default::default()
-        })
+        .send_voice_note(&options("voice-1"), false)
         .unwrap();
     sdk.whatsapp()
-        .send(&WhatsAppSendOptions {
-            to: Some("+15555550101".into()),
-            text: Some("Hello".into()),
-            send_as_voice_note: Some(false),
-            fallback_to_text: Some(true),
-            idempotency_key: Some("plain-1".into()),
-            ..Default::default()
-        })
+        .send_voice_note(&options("voice-2"), true)
         .unwrap();
+    sdk.whatsapp().send(&options("plain-1")).unwrap();
     voice.assert();
+    fallback.assert();
     plain.assert();
 }
 

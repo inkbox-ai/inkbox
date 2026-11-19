@@ -705,15 +705,15 @@ WhatsApp `gif_playback` can't be combined with a voice note.
 |---|---|---|---|---|
 | iMessage | `send_imessage(..., send_as_voice_note=True)` | `sendIMessage({ ..., sendAsVoiceNote: true })` | `send_imessage_voice_note(...)` | `imessage send --voice-note` |
 | SMS/MMS | `send_text(..., send_as_voice_note=True)` | `sendText({ ..., sendAsVoiceNote: true })` | `send_text_voice_note(...)` | `text send --voice-note` |
-| WhatsApp | `send_whatsapp(..., send_as_voice_note=True)` | `sendWhatsApp({ ..., sendAsVoiceNote: true })` | `send_as_voice_note: Some(true)` | `whatsapp send --voice-note` |
+| WhatsApp | `send_whatsapp(..., send_as_voice_note=True)` | `sendWhatsApp({ ..., sendAsVoiceNote: true })` | `send_whatsapp_voice_note(...)` | `whatsapp send --voice-note` |
 | Slack | `slack.send_message(..., send_as_voice_note=True)` | `slack.sendMessage(id, { ..., sendAsVoiceNote: true })` | `slack().send_voice_note(...)` | `slack message send --voice-note` |
 
 Fallback defaults to on: when the voice note can't be produced, including text over 600
 characters, the text is sent as an ordinary message. Pass
 `fallback_to_text=False` (Python), `fallbackToText: false` (TypeScript), `false` for
-Rust's `fallback_to_text` argument or `fallback_to_text: Some(false)` on WhatsApp, or
-`--no-fallback-to-text` (CLI) to fail instead (`422 voice_note_text_too_long`,
-`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+Rust's `fallback_to_text` argument, or `--no-fallback-to-text` (CLI) to fail instead
+(`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
+`409 whatsapp_capability_not_ready`).
 
 On iMessage, SMS/MMS, and WhatsApp, the send response shows a voice note with no text
 and one audio attachment. The spoken text appears shortly after as a completed
@@ -724,9 +724,11 @@ Before the recipient's first reply, a 1:1 iMessage voice note counts as media: i
 sent as text, or without fallback fails with
 `422 imessage_reply_required_for_links_or_media`. On WhatsApp, a voice note to a
 recipient who hasn't replied yet is also sent as text, or without fallback fails with
-`422 whatsapp_reply_required_for_media`. On Slack, a failure without fallback is
-recorded on the send action (`status: failed` with the `error_code`); repeating the
-same idempotency key returns that failed action, so use a new key to try again.
+`422 whatsapp_reply_required_for_media`. On Slack, a failure without fallback also
+returns `422 voice_note_text_too_long` or `502 voice_note_unavailable` on the first
+request, and is recorded on the send action (`status: failed` with the `error_code`).
+Repeating the same idempotency key returns that failed action with `200`, so use a new
+key to try again.
 
 ## Threaded iMessage replies
 

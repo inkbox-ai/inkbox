@@ -2264,9 +2264,11 @@ Before the recipient's first reply, a 1:1 iMessage voice note counts as media: i
 sent as text, or without fallback fails with
 `422 imessage_reply_required_for_links_or_media`. On WhatsApp, a voice note to a
 recipient who hasn't replied yet is also sent as text, or without fallback fails with
-`422 whatsapp_reply_required_for_media`. On Slack, a failure without fallback is
-recorded on the send action (`status: failed` with the `error_code`); repeating the
-same idempotency key returns that failed action, so use a new key to try again.
+`422 whatsapp_reply_required_for_media`. On Slack, a failure without fallback also
+returns `422 voice_note_text_too_long` or `502 voice_note_unavailable` on the first
+request, and is recorded on the send action (`status: failed` with the `error_code`).
+Repeating the same idempotency key returns that failed action with `200`, so use a new
+key to try again.
 
 ## Threaded iMessage replies
 

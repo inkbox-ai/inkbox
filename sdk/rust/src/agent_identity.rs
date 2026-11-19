@@ -2351,6 +2351,17 @@ impl AgentIdentity {
         o.agent_identity_id = Some(self.id());
         self.inkbox.whatsapp().send(&o)
     }
+    /// Send `o.text` as a WhatsApp voice note from this agent. See
+    /// [`crate::whatsapp::WhatsAppResource::send_voice_note`].
+    pub fn send_whatsapp_voice_note(
+        &self,
+        o: &crate::whatsapp::WhatsAppSendOptions,
+        fallback_to_text: bool,
+    ) -> Result<crate::whatsapp::WhatsAppMessage> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().send_voice_note(&o, fallback_to_text)
+    }
     pub fn get_whatsapp_message(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMessage> {
         self.inkbox.whatsapp().get(id, Some(&self.id()))
     }
