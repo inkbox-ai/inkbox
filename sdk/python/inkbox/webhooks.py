@@ -940,8 +940,8 @@ class _SlackEventData(TypedDict):
 
 
 class SlackWebhookData(_SlackEventData):
-    """Received-message events carry ``message_id``, the retained Slack message ID that
-    ``message.transcription_finished`` reports. Enrolled audio files in
+    """``message_id`` is the retained Slack message ID when the referenced message is
+    retained; on a received message it matches ``message.transcription_finished``. Enrolled audio files in
     ``event["files"]`` carry ``transcription``; other files omit it."""
 
     message_id: NotRequired[str]

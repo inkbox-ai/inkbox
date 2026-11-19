@@ -880,7 +880,7 @@ export interface SlackWebhookData {
   actor_id?: string | null;
   actor_profile?: SlackActorProfile | null;
   contact_id?: string | null;
-  /** Retained Slack message ID on received-message events; matches `message.transcription_finished` `data.message_id`. */
+  /** Retained Slack message ID when the referenced message is retained; on a received message it matches `message.transcription_finished` `data.message_id`. */
   message_id?: string;
   message_kinds: import("../slack.js").SlackMessageKind[];
   /** Event content. Enrolled audio items in `event.files` carry `transcription`; other files omit it. */
