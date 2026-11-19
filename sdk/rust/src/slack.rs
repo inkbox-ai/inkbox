@@ -405,6 +405,25 @@ impl SlackResource {
         connection_id: Uuid,
         options: &SlackSendMessageOptions,
     ) -> Result<SlackAction> {
+        self.post_message(connection_id, options, None)
+    }
+    /// Speak `options.text` (at most 600 characters) in the agent's voice and post it as an
+    /// audio file. With `fallback_to_text`, the text is posted instead when audio can't be
+    /// produced; false makes the send fail. Key handling matches [`Self::send_message`].
+    pub fn send_voice_note(
+        &self,
+        connection_id: Uuid,
+        options: &SlackSendMessageOptions,
+        fallback_to_text: bool,
+    ) -> Result<SlackAction> {
+        self.post_message(connection_id, options, Some(fallback_to_text))
+    }
+    fn post_message(
+        &self,
+        connection_id: Uuid,
+        options: &SlackSendMessageOptions,
+        voice_note_fallback: Option<bool>,
+    ) -> Result<SlackAction> {
         let key = &options.idempotency_key;
         if key.is_empty()
             || key.len() > 128
@@ -419,6 +438,12 @@ impl SlackResource {
         let mut body = json!({"conversation_id":options.conversation_id,"text":options.text});
         if let Some(ts) = &options.thread_ts {
             body["thread_ts"] = json!(ts);
+        }
+        if let Some(fallback_to_text) = voice_note_fallback {
+            body["send_as_voice_note"] = json!(true);
+            if !fallback_to_text {
+                body["fallback_to_text"] = json!(false);
+            }
         }
         Ok(serde_json::from_value(self.http.post_with_headers(
             &format!("{}/messages", base(connection_id)),

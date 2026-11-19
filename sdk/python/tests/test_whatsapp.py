@@ -43,6 +43,23 @@ def test_send_owner_query_and_acceptance_not_delivery():
     )
 
 
+def test_voice_note_options_sent_only_when_set():
+    http = MagicMock()
+    http.post.return_value = {"message": F["message"]}
+    resource = WhatsAppResource(http)
+    resource.send(
+        to="+15555550101", text="Hello", send_as_voice_note=True, fallback_to_text=False
+    )
+    assert http.post.call_args.kwargs["json"] == {
+        "to": "+15555550101",
+        "text": "Hello",
+        "send_as_voice_note": True,
+        "fallback_to_text": False,
+    }
+    resource.send(to="+15555550101", text="Hello")
+    assert http.post.call_args.kwargs["json"] == {"to": "+15555550101", "text": "Hello"}
+
+
 def test_uncertainty_reuses_exact_payload_and_key(monkeypatch):
     monkeypatch.setattr("inkbox._message_requests.time.sleep", lambda _: None)
     http = MagicMock()
@@ -175,6 +192,8 @@ def test_stale_disabled_snapshot_does_not_deny_fresh_api_access():
     assert client.whatsapp._http.post.call_args.kwargs["params"] == {
         "agent_identity_id": OWNER
     }
+    identity.send_whatsapp(to="+15555550101", text="Hi", send_as_voice_note=True)
+    assert client.whatsapp._http.post.call_args.kwargs["json"]["send_as_voice_note"] is True
     client._ids_resource._http = MagicMock()
     client._ids_resource._http.get.return_value = {"whatsapp": F["status"]}
     assert identity.get_whatsapp_status().enabled

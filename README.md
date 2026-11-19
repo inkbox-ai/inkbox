@@ -693,6 +693,32 @@ or assume every received message can be answered. These conversations are
 returns HTTP `422` with `recipient_not_e164`. Outbound `to` recipients must still
 be E.164 phone numbers. Reading message history does not send a read receipt.
 
+## Voice notes
+
+Set the voice-note option on an iMessage, SMS/MMS, WhatsApp, or Slack send and the
+server speaks `text` in the agent's configured Voice AI voice and sends it as audio.
+iMessage and WhatsApp get a native voice note; SMS/MMS and Slack get a plain audio file.
+`text` is required and may be at most 600 characters. Media, iMessage `send_style`, and
+WhatsApp `gif_playback` can't be combined with a voice note.
+
+| Channel | Python | TypeScript | Rust | CLI |
+|---|---|---|---|---|
+| iMessage | `send_imessage(..., send_as_voice_note=True)` | `sendIMessage({ ..., sendAsVoiceNote: true })` | `send_imessage_voice_note(...)` | `imessage send --voice-note` |
+| SMS/MMS | `send_text(..., send_as_voice_note=True)` | `sendText({ ..., sendAsVoiceNote: true })` | `send_text_voice_note(...)` | `text send --voice-note` |
+| WhatsApp | `send_whatsapp(..., send_as_voice_note=True)` | `sendWhatsApp({ ..., sendAsVoiceNote: true })` | `send_as_voice_note: Some(true)` | `whatsapp send --voice-note` |
+| Slack | `slack.send_message(..., send_as_voice_note=True)` | `slack.sendMessage(id, { ..., sendAsVoiceNote: true })` | `slack().send_voice_note(...)` | `slack message send --voice-note` |
+
+Fallback defaults to on: when the voice note can't be produced, including text over 600
+characters, the text is sent as an ordinary message. Pass
+`fallback_to_text=False` (Python), `fallbackToText: false` (TypeScript), `false` for
+Rust's `fallback_to_text` argument or `fallback_to_text: Some(false)` on WhatsApp, or
+`--no-fallback-to-text` (CLI) to fail instead (`422 voice_note_text_too_long`,
+`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+
+On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
+attachment whose `transcription` is completed with the spoken text. A fallback comes
+back as an ordinary text message.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

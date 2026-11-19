@@ -2252,6 +2252,31 @@ domains, including domain fragments. Text matches can include unverified agents.
 Use `verified_domain="example.com"` to require an exact current domain in public
 results. Preserve the query and filters when following a cursor.
 
+## Voice notes
+
+Pass `send_as_voice_note=True` to `send_imessage`, `send_text`, `send_whatsapp`, or
+`client.slack.send_message` and the server speaks `text` in the agent's configured Voice
+AI voice and sends it as audio. iMessage and WhatsApp get a native voice note; SMS/MMS
+and Slack get a plain audio file. `text` is required and may be at most 600 characters.
+Media, `send_style`, and `gif_playback` can't be combined with a voice note.
+
+```python
+identity.send_imessage(
+    conversation_id=conversation_id,
+    text="Running five minutes late.",
+    send_as_voice_note=True,
+)
+```
+
+`fallback_to_text` defaults to `True`: when the voice note can't be produced, including
+text over 600 characters, the text is sent as an ordinary message. Pass
+`fallback_to_text=False` to fail instead (`422 voice_note_text_too_long`,
+`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+
+On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
+attachment whose `transcription` is completed with the spoken text. A fallback comes
+back as an ordinary text message.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

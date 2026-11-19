@@ -173,6 +173,19 @@ class TestIMessagesSend:
             headers={"Idempotency-Key": ANY, "Prefer": "idempotency-replay"},
         )
 
+    def test_voice_note_options_sent_only_when_set(self, client, transport):
+        transport.post.return_value = {"message": IMESSAGE_DICT}
+
+        client._imessages.send(to=REMOTE, text="Hi", send_as_voice_note=True)
+        assert transport.post.call_args.kwargs["json"] == {
+            "to": REMOTE, "text": "Hi", "send_as_voice_note": True,
+        }
+
+        client._imessages.send(to=REMOTE, text="Hi", send_as_voice_note=True, fallback_to_text=False)
+        assert transport.post.call_args.kwargs["json"] == {
+            "to": REMOTE, "text": "Hi", "send_as_voice_note": True, "fallback_to_text": False,
+        }
+
     def test_passes_media_and_send_style_by_conversation_id(self, client, transport):
         transport.post.return_value = {"message": IMESSAGE_DICT}
 

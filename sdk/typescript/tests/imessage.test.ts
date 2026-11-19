@@ -211,6 +211,19 @@ describe("IMessagesResource", () => {
     expect(msg.status).toBe(IMessageDeliveryStatus.QUEUED);
   });
 
+  it("send serializes voice note options only when set", async () => {
+    vi.mocked(fetch).mockImplementation(async () => ok({ message: IMESSAGE_DICT }));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    await resource.send({ conversationId: CONVO_ID, text: "Hi", sendAsVoiceNote: true, fallbackToText: false });
+    expect(JSON.parse(lastCall().init.body as string)).toEqual({
+      conversation_id: CONVO_ID, text: "Hi", send_as_voice_note: true, fallback_to_text: false,
+    });
+
+    await resource.send({ conversationId: CONVO_ID, text: "Hi", sendAsVoiceNote: false });
+    expect(JSON.parse(lastCall().init.body as string)).toEqual({ conversation_id: CONVO_ID, text: "Hi" });
+  });
+
   it("lists attached and unattached organization-owned numbers", async () => {
     vi.mocked(fetch).mockResolvedValue(ok([
       NUMBER_DICT,

@@ -1172,6 +1172,28 @@ There are no Slack-specific filters. Context applies only to received mail, text
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
+## Voice notes
+
+Add `--voice-note` to `imessage send`, `text send`, `whatsapp send`, or
+`slack message send` and the server speaks `--text` in the agent's configured Voice AI
+voice and sends it as audio. iMessage and WhatsApp get a native voice note; SMS/MMS and
+Slack get a plain audio file. `--text` is required and may be at most 600 characters.
+Media, `--send-style`, and `--gif-playback` can't be combined with a voice note.
+
+```bash
+inkbox imessage send --identity my-agent --conversation-id <id> \
+  --text "Running five minutes late." --voice-note
+```
+
+Fallback defaults to on: when the voice note can't be produced, including text over 600
+characters, the text is sent as an ordinary message. Add `--no-fallback-to-text`
+to fail instead (`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
+`409 whatsapp_capability_not_ready`).
+
+On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
+attachment whose `transcription` is completed with the spoken text. A fallback comes
+back as an ordinary text message.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

@@ -2234,6 +2234,31 @@ Archive methods include `getArchiveSettings`, `updateArchiveSettings`,
 `listArchivedMessages`, `searchArchivedMessages`, `archiveBackfill`,
 `listArchiveCoverage`, and `purgeArchive`.
 
+## Voice notes
+
+Pass `sendAsVoiceNote: true` to `sendIMessage`, `sendText`, `sendWhatsApp`, or
+`client.slack.sendMessage` and the server speaks `text` in the agent's configured Voice
+AI voice and sends it as audio. iMessage and WhatsApp get a native voice note; SMS/MMS
+and Slack get a plain audio file. `text` is required and may be at most 600 characters.
+Media, `sendStyle`, and `gifPlayback` can't be combined with a voice note.
+
+```typescript
+await identity.sendIMessage({
+  conversationId,
+  text: "Running five minutes late.",
+  sendAsVoiceNote: true,
+});
+```
+
+`fallbackToText` defaults to `true`: when the voice note can't be produced, including
+text over 600 characters, the text is sent as an ordinary message. Pass
+`fallbackToText: false` to fail instead (`422 voice_note_text_too_long`,
+`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+
+On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
+attachment whose `transcription` is completed with the spoken text. A fallback comes
+back as an ordinary text message.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

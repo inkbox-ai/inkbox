@@ -1214,6 +1214,36 @@ and permalinks, reactions/pins, own-message update/delete, join/leave, native pr
 status, general `upload_file`, and `get_operation`. Archive settings, listing/search,
 backfill, coverage, and purge use exported `SlackArchive*` response and option types.
 
+## Voice notes
+
+Call `send_imessage_voice_note` or `send_text_voice_note` on an identity (or
+`imessages().send_voice_note` / `texts().send_voice_note`), `slack().send_voice_note`,
+or set `send_as_voice_note: Some(true)` on `WhatsAppSendOptions`, and the server speaks
+`text` in the agent's configured Voice AI voice and sends it as audio. iMessage and
+WhatsApp get a native voice note; SMS/MMS and Slack get a plain audio file. `text` is
+required and may be at most 600 characters. Media, `gif_playback`, and iMessage send
+styles can't be combined with a voice note.
+
+```rust
+identity.send_imessage_voice_note(
+    None,
+    Some(&conversation_id),
+    "Running five minutes late.",
+    None,  // idempotency key
+    true,  // fallback_to_text
+)?;
+```
+
+Fallback defaults to on: when the voice note can't be produced, including text over 600
+characters, the text is sent as an ordinary message. Pass `false` for the
+`fallback_to_text` argument (or `fallback_to_text: Some(false)` on WhatsApp) to fail
+instead (`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
+`409 whatsapp_capability_not_ready`).
+
+On iMessage, SMS/MMS, and WhatsApp, a voice note comes back with no text and one audio
+attachment whose `transcription` is completed with the spoken text. A fallback comes
+back as an ordinary text message.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

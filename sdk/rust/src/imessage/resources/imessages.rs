@@ -340,6 +340,47 @@ impl IMessagesResource {
         Ok(serde_json::from_value(message)?)
     }
 
+    /// Speak `text` (at most 600 characters) in the agent's voice and send it
+    /// as a native voice note. With `fallback_to_text`, the text is sent as an
+    /// ordinary message when a voice note can't be produced; false makes the
+    /// send fail. A generated key is used when `idempotency_key` is `None`.
+    pub fn send_voice_note(
+        &self,
+        to: Option<&str>,
+        conversation_id: Option<&Uuid>,
+        text: &str,
+        agent_identity_id: Option<&Uuid>,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<IMessage> {
+        let mut body = serde_json::Map::new();
+        if let Some(t) = to {
+            body.insert("to".to_string(), json!(t));
+        }
+        if let Some(cid) = conversation_id {
+            body.insert("conversation_id".to_string(), json!(cid.to_string()));
+        }
+        body.insert("text".to_string(), json!(text));
+        body.insert("send_as_voice_note".to_string(), json!(true));
+        if !fallback_to_text {
+            body.insert("fallback_to_text".to_string(), json!(false));
+        }
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        let data = self.http.post_message(
+            "/messages",
+            &serde_json::Value::Object(body),
+            &params,
+            idempotency_key,
+        )?;
+        Ok(serde_json::from_value(
+            data.get("message")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        )?)
+    }
+
     /// Send to 2–8 distinct recipients from a dedicated iMessage line.
     ///
     /// The server selects or creates a group from the exact best-known

@@ -284,6 +284,17 @@ test("quoted group animation options use conversation IDs, not display names", (
   assert.throws(() => buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "hello", gifPlayback: true}), /requires --media-id/);
 });
 
+test("voice note options are sent only when set", () => {
+  assert.deepEqual(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "hello", voiceNote: true, fallbackToText: false}), {
+    conversationId: f.conversation.id, text: "hello", sendAsVoiceNote: true, fallbackToText: false,
+  });
+  assert.deepEqual(buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "hello", voiceNote: true, fallbackToText: true}), {
+    conversationId: f.conversation.id, text: "hello", sendAsVoiceNote: true,
+  });
+  assert.throws(() => buildWhatsAppSendOptions({conversationId: f.conversation.id, mediaId: f.media.id, voiceNote: true}), /requires --text/);
+  assert.throws(() => buildWhatsAppSendOptions({conversationId: f.conversation.id, text: "hello", fallbackToText: false}), /requires --voice-note/);
+});
+
 test("group names appear in conversation tables and nullable metadata survives JSON", async (t) => {
   const group = JSON.parse(readFileSync(new URL("../../tests/fixtures/whatsapp-groups.json", import.meta.url), "utf8"));
   const server = createServer((req, res) => {

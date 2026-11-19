@@ -36,6 +36,8 @@ class TextsResource:
         text: str | None = None,
         media_urls: list[str] | None = None,
         idempotency_key: str | None = None,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> TextMessage:
         """Send an outbound SMS/MMS from a phone number.
 
@@ -48,6 +50,11 @@ class TextsResource:
                 server resolves it to that conversation's participants.
             text: Message body.
             media_urls: MMS media URLs. Pass with ``text`` or by themselves.
+            send_as_voice_note: Speak ``text`` (at most 600 characters) in the
+                agent's voice and send it as an MMS audio file. Requires
+                ``text``; no media.
+            fallback_to_text: When a voice note can't be produced, send ``text``
+                as an ordinary message (default True). False makes the send fail.
             idempotency_key: Optional stable key for retries across calls. Each
                 call otherwise generates a key and preserves it during retries.
 
@@ -79,6 +86,10 @@ class TextsResource:
             body["text"] = text
         if media_urls is not None:
             body["media_urls"] = media_urls
+        if send_as_voice_note:
+            body["send_as_voice_note"] = True
+        if not fallback_to_text:
+            body["fallback_to_text"] = False
 
         data = post_message(self._http,
             f"/numbers/{phone_number_id}/texts",

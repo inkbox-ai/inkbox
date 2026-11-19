@@ -1162,6 +1162,28 @@ impl AgentIdentity {
         )
     }
 
+    /// Speak `text` (at most 600 characters) in this identity's voice and send
+    /// it as an MMS audio file. With `fallback_to_text`, the text is sent as an
+    /// ordinary message when a voice note can't be produced; false makes the
+    /// send fail.
+    pub fn send_text_voice_note(
+        &self,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<TextMessage> {
+        self.inkbox.texts().send_voice_note(
+            &self.require_phone_id()?,
+            to,
+            conversation_id,
+            text,
+            idempotency_key,
+            fallback_to_text,
+        )
+    }
+
     /// List text messages for this identity's phone number.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
@@ -1482,6 +1504,29 @@ impl AgentIdentity {
             send_style,
             Some(&self.id()),
             key,
+        )
+    }
+
+    /// Speak `text` (at most 600 characters) in this identity's voice and send
+    /// it as a native iMessage voice note. With `fallback_to_text`, the text is
+    /// sent as an ordinary message when a voice note can't be produced; false
+    /// makes the send fail.
+    pub fn send_imessage_voice_note(
+        &self,
+        to: Option<&str>,
+        conversation_id: Option<&Uuid>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_voice_note(
+            to,
+            conversation_id,
+            text,
+            Some(&self.id()),
+            idempotency_key,
+            fallback_to_text,
         )
     }
 

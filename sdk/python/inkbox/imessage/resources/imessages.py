@@ -158,6 +158,8 @@ class IMessagesResource:
         idempotency_key: str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage.
 
@@ -183,6 +185,11 @@ class IMessagesResource:
                 ``IMessageSendStyle``). The same styles work for one-to-one
                 sends, new groups, and replies by group ``conversation_id``;
                 they may be combined with the single supported media URL.
+            send_as_voice_note: Speak ``text`` (at most 600 characters) in the
+                agent's voice and send it as a native voice note. Requires
+                ``text``; no media or ``send_style``.
+            fallback_to_text: When a voice note can't be produced, send ``text``
+                as an ordinary message (default True). False makes the send fail.
             agent_identity_id: Identity to send as. Required for
                 org-wide API keys when sending by ``to``; ignored for
                 identity-scoped keys (the key's identity wins).
@@ -224,6 +231,10 @@ class IMessagesResource:
             body["send_style"] = (
                 send_style.value if isinstance(send_style, IMessageSendStyle) else send_style
             )
+        if send_as_voice_note:
+            body["send_as_voice_note"] = True
+        if not fallback_to_text:
+            body["fallback_to_text"] = False
 
         params: dict[str, Any] | None = None
         if agent_identity_id is not None:

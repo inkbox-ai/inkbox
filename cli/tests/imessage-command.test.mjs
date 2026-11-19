@@ -106,6 +106,21 @@ test("buildIMessageSendOptions rejects missing destination or content", () => {
   }), { error: "Pass --text, --media-url, or both." });
 });
 
+test("buildIMessageSendOptions sends voice note options only when set", () => {
+  assert.deepEqual(buildIMessageSendOptions({
+    identity: "support-bot", conversationId: "conversation", text: "Hello", voiceNote: true, fallbackToText: false,
+  }), { sendOptions: { conversationId: "conversation", text: "Hello", sendAsVoiceNote: true, fallbackToText: false } });
+  assert.deepEqual(buildIMessageSendOptions({
+    identity: "support-bot", conversationId: "conversation", text: "Hello", voiceNote: true, fallbackToText: true,
+  }), { sendOptions: { conversationId: "conversation", text: "Hello", sendAsVoiceNote: true } });
+  assert.deepEqual(buildIMessageSendOptions({
+    identity: "support-bot", conversationId: "conversation", text: "Hello", sendStyle: "slam", voiceNote: true,
+  }), { error: "--voice-note requires --text and no --media-url or --send-style." });
+  assert.deepEqual(buildIMessageSendOptions({
+    identity: "support-bot", conversationId: "conversation", text: "Hello", fallbackToText: false,
+  }), { error: "--no-fallback-to-text requires --voice-note." });
+});
+
 test("threaded replies require a conversation and retain the message target", () => {
   assert.deepEqual(buildIMessageSendOptions({ identity: "support-bot", conversationId: "conversation", replyToMessageId: "message", text: "Agreed" }), {
     sendOptions: { conversationId: "conversation", replyToMessageId: "message", plainReplyFallback: true, text: "Agreed" },

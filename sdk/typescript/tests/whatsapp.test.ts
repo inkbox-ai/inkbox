@@ -240,6 +240,14 @@ it("forwards date filters for both direct-message lists", async () => {
   }
 });
 
+it("sends voice note options only when set", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok({message: f.message}, 201)));
+  await resource().send({to: "+15555550101", text: "Hello", sendAsVoiceNote: true, fallbackToText: false});
+  expect(last().body).toEqual({to: "+15555550101", text: "Hello", send_as_voice_note: true, fallback_to_text: false});
+  await resource().send({to: "+15555550101", text: "Hello", sendAsVoiceNote: false, fallbackToText: true});
+  expect(last().body).toEqual({to: "+15555550101", text: "Hello"});
+});
+
 it("preserves legacy quote/default bodies and binds only an explicit native requirement", async () => {
   vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ok({message: f.message}, 201)));
   for (const quoted of [false, true]) for (const fallback of [false, true]) {
