@@ -89,7 +89,7 @@ export function registerHostingCommands(identity: Command): void {
 function registerPortCommands(hosting: Command): void {
   const ports = hosting.command("ports").description("Show and manage the agent URL and its ports");
   ports.command("show <handle>")
-    .description("Show the agent URL, default port and per-port access links")
+    .description("Show the agent URL, default port and per-port access; token links are shown only when issued")
     .action(withErrorHandler(async function (this: Command, handle: string) {
       const global = getGlobalOpts(this);
       show(await createClient(global).identities.getHostingPorts(handle), !!global.json);

@@ -43,6 +43,7 @@ export async function buildSignature(opts: SourceOpts): Promise<InboundSignature
   }
   if (!opts.secretStdin) throw new Error("--scheme requires --secret-stdin");
   if (hmacOnly && opts.scheme !== "hmac") throw new Error("--header, --algorithm, --encoding and --prefix apply only to --scheme hmac");
+  if (opts.scheme === "hmac" && opts.header === undefined) throw new Error("--scheme hmac requires --header");
   const signature: InboundSignatureInput = { scheme: opts.scheme, secret: await readSecretFromStdin("signing secret") };
   if (opts.header !== undefined) signature.header = opts.header;
   if (opts.algorithm !== undefined) signature.algorithm = opts.algorithm;

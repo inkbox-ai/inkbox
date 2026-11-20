@@ -126,10 +126,22 @@ impl IdentitiesResource {
         &self,
         agent_handle: &str,
         display_name: Option<&str>,
+        mailbox: Option<&IdentityMailboxCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
     ) -> Result<AgentIdentityData> {
         let mut body = serde_json::json!({"agent_handle": agent_handle, "hosted": true});
         if let Some(name) = display_name {
             body["display_name"] = Value::String(name.to_string());
+        }
+        if let Some(m) = mailbox {
+            body["mailbox"] = m.to_wire();
+        }
+        if let Some(p) = phone_number {
+            body["phone_number"] = p.to_wire()?;
+        }
+        if let Some(ids) = vault_secret_ids {
+            body["vault_secret_ids"] = ids.to_wire();
         }
         let data = self
             .http

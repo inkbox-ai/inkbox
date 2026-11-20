@@ -338,3 +338,37 @@ fn create_hosted_identity_sends_flag_and_has_no_tunnel() {
     create.assert();
     assert!(identity.tunnel().is_none());
 }
+
+#[test]
+fn create_hosted_sends_mailbox_options() {
+    use httpmock::prelude::*;
+    use inkbox::identities::IdentityMailboxCreateOptions;
+    let server = MockServer::start();
+    let create = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/")
+            .json_body(json!({
+                "agent_handle": "agent", "hosted": true,
+                "mailbox": {"email_local_part": "support"}
+            }));
+        then.status(201).json_body(json!({
+            "id": "00000000-0000-0000-0000-000000000000", "organization_id": "org_example",
+            "agent_handle": "agent", "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z", "tunnel": null
+        }));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let mailbox = IdentityMailboxCreateOptions {
+        email_local_part: Some("support".into()),
+        ..Default::default()
+    };
+    let identity = client
+        .identities()
+        .create_hosted("agent", None, Some(&mailbox), None, None)
+        .unwrap();
+    create.assert();
+    assert!(identity.tunnel.is_none());
+}

@@ -1451,7 +1451,7 @@ while (hosting.state === "provisioning") {
 if (hosting.state !== "ready") throw new Error(hosting.lastError ?? hosting.state);
 hosting.url;                                                   // agent's public URL
 
-const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, version, ports[{ port, public, url, tokenUrl }]
+const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, version, ports[{ port, public, url }]
 // Pass the version you read; a concurrent edit returns 409 stale_version (re-read and retry).
 await ids.updateHostingPorts("my-agent", {
   version: ports.version, defaultPort: 3000, ports: [{ port: 3000, public: false }, { port: 8080, public: true }],
@@ -1459,7 +1459,7 @@ await ids.updateHostingPorts("my-agent", {
 await ids.rotateHostingPortToken("my-agent", 3000);            // old tokenUrl stops working
 ```
 
-Private ports are reachable through `tokenUrl` (treat it as a secret) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
+Private ports are reachable through `tokenUrl` (treat it as a secret; only `updateHostingPorts` responses that issue a token and `rotateHostingPortToken` include it) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
 Inbound sources give a hosted identity public URLs for third-party webhooks.
 Each request is optionally signature-checked, then delivered to the agent as
 an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).
