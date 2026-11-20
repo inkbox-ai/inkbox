@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.7.41
+## 0.7.42
 
-See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0741) for voice-note sends on iMessage, SMS/MMS, WhatsApp and Slack, and Slack incoming audio transcription.
+See the [canonical SDK and CLI changelog](../../CHANGELOG.md#0742) for voice-note sends on iMessage, SMS/MMS, WhatsApp and Slack, and Slack incoming audio transcription.
 
 ## 0.7.40
 

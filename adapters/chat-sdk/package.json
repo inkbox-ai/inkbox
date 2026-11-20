@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/chat-sdk-adapter",
-  "version": "0.7.41",
+  "version": "0.7.42",
   "description": "Inkbox communication channels for Chat SDK",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@inkbox/sdk": "^0.7.41",
+    "@inkbox/sdk": "^0.7.42",
     "@chat-adapter/shared": "^4.45.0",
     "html-to-text": "^9.0.5"
   },
