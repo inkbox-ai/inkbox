@@ -1449,7 +1449,10 @@ an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrus
 ```python
 src = inkbox.inbound.create_source(
     "my-agent", name="payments",
-    signature={"scheme": "stripe", "secret": stripe_secret},  # stripe | github | slack | standard-webhooks | hmac
+    signature={  # Stripe-style: Stripe-Signature: t=<unix>,v1=<hex HMAC of "<t>.<body>">
+        "secret": signing_secret, "header": "Stripe-Signature", "format": "list", "format_value": "v1",
+        "signed_content": "{timestamp}.{body}", "timestamp_from": "list", "timestamp_value": "t", "max_age_seconds": 300,
+    },
     handler={"type": "agent", "instructions": "Reconcile the payment."},  # or {"type": "script", "command": "./handle.sh"}
 )
 print(src.url)                                                # give this to the sender
@@ -1460,7 +1463,7 @@ event = inkbox.inbound.get_event("my-agent", src.id, page.events[0].id)  # inclu
 inkbox.inbound.replay_event("my-agent", src.id, event.id)
 ```
 
-`hmac` also accepts `header`, `algorithm` (`sha256`/`sha1`), `encoding` (`hex`/`base64`) and `prefix`. Secrets are never returned.
+Signature settings are one generic HMAC check: `header` (required), `secret_encoding` (`text`/`base64`; base64 ignores a leading `whsec_`), `format` (`whole`/`prefix`/`list`) with `format_value` (prefix such as `sha256=` or list key such as `v1`), `algorithm` (`sha256`/`sha1`/`sha512`), `encoding` (`hex`/`base64`), `signed_content` (must include `{body}`; may use `{timestamp}`, `{header:Name}` and fixed text), `timestamp_from` (`none`/`header`/`list`) with `timestamp_value`, and `max_age_seconds`. Secrets are never returned. Test settings without saving: `inkbox.inbound.check_signature("my-agent", signature={...}, headers={...}, body=raw)` or `source_id=src.id`; returns `verified` and `reason`.
 
 ## Error Handling
 

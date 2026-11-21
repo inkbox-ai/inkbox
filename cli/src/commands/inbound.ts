@@ -1,5 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
-import type { InboundHandler, InboundSignatureInput, InboundSignatureScheme, InboundSource } from "@inkbox/sdk";
+import type { InboundHandler, InboundSignatureInput, InboundSource } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { readSecretFromStdin } from "../invitation-token.js";
 import { output, printStatus } from "../output.js";
@@ -8,14 +9,22 @@ import { withErrorHandler } from "../errors.js";
 const SOURCE_COLUMNS = ["id", "name", "url", "signature", "handler", "createdAt"];
 const EVENT_COLUMNS = ["id", "receivedAt", "status", "attempts", "signatureVerified", "contentType", "sizeBytes", "lastError"];
 
-interface SourceOpts {
-  name?: string;
-  scheme?: InboundSignatureScheme;
+interface SignatureOpts {
   secretStdin?: boolean;
+  secretEncoding?: "text" | "base64";
   header?: string;
-  algorithm?: "sha256" | "sha1";
+  format?: "whole" | "prefix" | "list";
+  formatValue?: string;
+  algorithm?: "sha256" | "sha1" | "sha512";
   encoding?: "hex" | "base64";
-  prefix?: string;
+  signedContent?: string;
+  timestampFrom?: "none" | "header" | "list";
+  timestampValue?: string;
+  maxAge?: string;
+}
+
+interface SourceOpts extends SignatureOpts {
+  name?: string;
   signature?: boolean;
   handler?: "agent" | "script";
   instructions?: string;
@@ -25,30 +34,30 @@ interface SourceOpts {
 function flattenSource(source: InboundSource): Record<string, unknown> {
   return {
     ...source,
-    signature: source.signature?.scheme ?? null,
+    signature: source.signature?.header ?? null,
     handler: source.handler.type === "script" ? `script: ${source.handler.command}` : "agent",
   };
 }
 
+const SETTINGS: Array<[keyof SignatureOpts, keyof InboundSignatureInput]> = [
+  ["secretEncoding", "secretEncoding"], ["format", "format"], ["formatValue", "formatValue"], ["algorithm", "algorithm"],
+  ["encoding", "encoding"], ["signedContent", "signedContent"], ["timestampFrom", "timestampFrom"], ["timestampValue", "timestampValue"],
+];
+
 // Secrets come only from stdin so they never land in shell history or process listings.
 export async function buildSignature(opts: SourceOpts): Promise<InboundSignatureInput | null | undefined> {
-  const hmacOnly = [opts.header, opts.algorithm, opts.encoding, opts.prefix].some(v => v !== undefined);
+  const settings = opts.header !== undefined || opts.maxAge !== undefined || SETTINGS.some(([flag]) => opts[flag] !== undefined);
   if (opts.signature === false) {
-    if (opts.scheme || opts.secretStdin || hmacOnly) throw new Error("--no-signature cannot be combined with signature options");
+    if (opts.secretStdin || settings) throw new Error("--no-signature cannot be combined with signature options");
     return null;
   }
-  if (!opts.scheme) {
-    if (opts.secretStdin || hmacOnly) throw new Error("--scheme is required with signature options");
-    return undefined;
-  }
-  if (!opts.secretStdin) throw new Error("--scheme requires --secret-stdin");
-  if (hmacOnly && opts.scheme !== "hmac") throw new Error("--header, --algorithm, --encoding and --prefix apply only to --scheme hmac");
-  if (opts.scheme === "hmac" && opts.header === undefined) throw new Error("--scheme hmac requires --header");
-  const signature: InboundSignatureInput = { scheme: opts.scheme, secret: await readSecretFromStdin("signing secret") };
-  if (opts.header !== undefined) signature.header = opts.header;
-  if (opts.algorithm !== undefined) signature.algorithm = opts.algorithm;
-  if (opts.encoding !== undefined) signature.encoding = opts.encoding;
-  if (opts.prefix !== undefined) signature.prefix = opts.prefix;
+  if (!opts.secretStdin && !settings) return undefined;
+  if (opts.header === undefined) throw new Error("--header is required to verify signatures");
+  if (!opts.secretStdin) throw new Error("signature options require --secret-stdin");
+  if (opts.maxAge !== undefined && !/^[1-9]\d*$/.test(opts.maxAge)) throw new Error("--max-age must be a positive integer");
+  const signature: InboundSignatureInput = { secret: await readSecretFromStdin("signing secret"), header: opts.header };
+  for (const [flag, field] of SETTINGS) if (opts[flag] !== undefined) Object.assign(signature, { [field]: opts[flag] });
+  if (opts.maxAge !== undefined) signature.maxAgeSeconds = Number(opts.maxAge);
   return signature;
 }
 
@@ -66,14 +75,23 @@ export function buildHandler(opts: SourceOpts): InboundHandler | undefined {
   return opts.instructions !== undefined ? { type: "agent", instructions: opts.instructions } : { type: "agent" };
 }
 
-function sourceOptions(command: Command): Command {
+function signatureOptions(command: Command): Command {
   return command
-    .addOption(new Option("--scheme <scheme>", "Sender signature scheme").choices(["stripe", "github", "slack", "standard-webhooks", "hmac"]))
     .option("--secret-stdin", "Read the sender's signing secret from stdin")
-    .option("--header <name>", "Signature header (hmac only)")
-    .addOption(new Option("--algorithm <alg>", "HMAC algorithm (hmac only)").choices(["sha256", "sha1"]))
-    .addOption(new Option("--encoding <enc>", "Signature encoding (hmac only)").choices(["hex", "base64"]))
-    .option("--prefix <prefix>", "Signature value prefix, e.g. 'sha256=' (hmac only)")
+    .addOption(new Option("--secret-encoding <enc>", "How the secret is written; base64 ignores a leading whsec_ (default text)").choices(["text", "base64"]))
+    .option("--header <name>", "Header holding the signature; turns on verification")
+    .addOption(new Option("--format <format>", "whole header, value after a prefix, or a key in a list (default whole)").choices(["whole", "prefix", "list"]))
+    .option("--format-value <value>", "The prefix (e.g. 'sha256=') or list key (e.g. v1)")
+    .addOption(new Option("--algorithm <alg>", "HMAC algorithm (default sha256)").choices(["sha256", "sha1", "sha512"]))
+    .addOption(new Option("--encoding <enc>", "Signature encoding (default hex)").choices(["hex", "base64"]))
+    .option("--signed-content <template>", "What was signed; must include {body}, may use {timestamp}, {header:Name} and fixed text (default '{body}')")
+    .addOption(new Option("--timestamp-from <source>", "Where the timestamp comes from (default none)").choices(["none", "header", "list"]))
+    .option("--timestamp-value <value>", "Timestamp header name, or key in the signature header list (e.g. t)")
+    .option("--max-age <seconds>", "Reject requests whose timestamp is further than this from now");
+}
+
+function sourceOptions(command: Command): Command {
+  return signatureOptions(command)
     .addOption(new Option("--handler <type>", "Who handles each request").choices(["agent", "script"]))
     .option("--instructions <text>", "Extra instructions for the agent (agent handler)")
     .option("--command <cmd>", "Command to run on the agent's computer (script handler)");
@@ -142,6 +160,33 @@ export function registerInboundCommands(program: Command): void {
       const global = getGlobalOpts(this);
       output(await createClient(global).inbound.rotateSource(handle, sourceId), { json: !!global.json });
     }));
+
+  signatureOptions(
+    inbound.command("check-signature <handle>")
+      .description("Check a sample request against signature settings or a saved source; nothing is stored")
+      .option("--source <source-id>", "Use this source's saved settings instead of signature options")
+      .option("--sample-header <header>", "Sample request header as 'Name: value' (repeatable)", (value: string, all: string[]) => [...all, value], [])
+      .requiredOption("--body-file <path>", "File holding the sample request body, exactly as sent"),
+  ).action(withErrorHandler(async function (this: Command, handle: string, opts: SignatureOpts & { source?: string; sampleHeader: string[]; bodyFile: string }) {
+    const headers: Record<string, string> = {};
+    for (const line of opts.sampleHeader) {
+      const colon = line.indexOf(":");
+      if (colon < 1) throw new Error(`--sample-header must be 'Name: value', got '${line}'`);
+      headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+    }
+    const signature = await buildSignature(opts);
+    if ((opts.source === undefined) === !signature) throw new Error("use either --source or signature options with --header and --secret-stdin");
+    const raw = await readFile(opts.bodyFile);
+    let body: string | Uint8Array;
+    try { body = new TextDecoder("utf-8", { fatal: true }).decode(raw); } catch { body = raw; }
+    const global = getGlobalOpts(this);
+    const result = await createClient(global).inbound.checkSignature(handle, {
+      headers, body, ...(signature ? { signature } : { sourceId: opts.source }),
+    });
+    if (global.json) return output(result, { json: true });
+    console.log(result.verified ? "Signature is valid." : `Signature is not valid: ${result.reason}`);
+    if (!result.verified) process.exitCode = 1;
+  }));
 
   const events = inbound.command("events").description("Inspect and replay received requests");
   events.command("list <handle> <source-id>")

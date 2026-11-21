@@ -6,6 +6,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -14,42 +16,51 @@ use crate::http::{HttpTransport, NO_QUERY};
 use crate::identities::types::Unset;
 use crate::organization_domains::path_segment;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum InboundSignatureScheme {
-    Stripe,
-    Github,
-    Slack,
-    StandardWebhooks,
-    Hmac,
-}
-
-/// Sender signature check. `header`/`algorithm`/`encoding`/`prefix` apply to `Hmac`.
-#[derive(Clone, Debug, Serialize)]
+/// Signature settings to verify the sender (HMAC). Unset fields take the server defaults.
+///
+/// `format`: `whole` (the header value is the signature), `prefix` (the value after
+/// `format_value`, for example `sha256=`) or `list` (every item under key `format_value`
+/// in a list such as `t=1,v1=ab` or `v1,ab v1,cd`; any match passes).
+/// `signed_content` is a template of what was signed and must contain `{body}`; it may also
+/// use `{timestamp}`, `{header:Name}` and fixed text. `secret_encoding` `base64` decodes the
+/// secret first, ignoring a leading `whsec_`. `timestamp_from` is `header` (header
+/// `timestamp_value`) or `list` (key `timestamp_value` in the signature header);
+/// `max_age_seconds` rejects requests whose timestamp is further from now.
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct InboundSignatureInput {
-    pub scheme: InboundSignatureScheme,
     pub secret: String,
+    pub header: String,
+    /// `text` or `base64`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub header: Option<String>,
-    /// `sha256` or `sha1`.
+    pub secret_encoding: Option<String>,
+    /// `whole`, `prefix` or `list`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format_value: Option<String>,
+    /// `sha256`, `sha1` or `sha512`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<String>,
     /// `hex` or `base64`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
+    pub signed_content: Option<String>,
+    /// `none`, `header` or `list`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_age_seconds: Option<u32>,
 }
 
 impl InboundSignatureInput {
-    pub fn new(scheme: InboundSignatureScheme, secret: impl Into<String>) -> Self {
+    pub fn new(secret: impl Into<String>, header: impl Into<String>) -> Self {
         Self {
-            scheme,
             secret: secret.into(),
-            header: None,
-            algorithm: None,
-            encoding: None,
-            prefix: None,
+            header: header.into(),
+            ..Default::default()
         }
     }
 }
@@ -57,15 +68,33 @@ impl InboundSignatureInput {
 /// Signature settings as returned; the secret is never returned.
 #[derive(Clone, Debug, Deserialize)]
 pub struct InboundSignature {
-    pub scheme: String,
+    pub secret_encoding: String,
+    pub header: String,
+    pub format: String,
     #[serde(default)]
-    pub header: Option<String>,
+    pub format_value: Option<String>,
+    pub algorithm: String,
+    pub encoding: String,
+    pub signed_content: String,
+    pub timestamp_from: String,
     #[serde(default)]
-    pub algorithm: Option<String>,
+    pub timestamp_value: Option<String>,
     #[serde(default)]
-    pub encoding: Option<String>,
+    pub max_age_seconds: Option<u32>,
+}
+
+/// What a sample request is checked against.
+#[derive(Clone, Copy, Debug)]
+pub enum InboundSignatureCheckTarget<'a> {
+    Settings(&'a InboundSignatureInput),
+    Source(&'a str),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct InboundSignatureCheck {
+    pub verified: bool,
     #[serde(default)]
-    pub prefix: Option<String>,
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -225,6 +254,36 @@ impl InboundResource {
         )?)?)
     }
 
+    /// Check a sample request against signature settings or a saved source's; nothing is stored.
+    /// A body that is not UTF-8 is sent base64-encoded.
+    pub fn check_signature(
+        &self,
+        handle: &str,
+        target: InboundSignatureCheckTarget<'_>,
+        headers: &HashMap<String, String>,
+        body: &[u8],
+    ) -> Result<InboundSignatureCheck> {
+        let mut request = match std::str::from_utf8(body) {
+            Ok(text) => json!({ "headers": headers, "body": text }),
+            Err(_) => {
+                json!({ "headers": headers, "body": BASE64.encode(body), "body_encoding": "base64" })
+            }
+        };
+        match target {
+            InboundSignatureCheckTarget::Settings(signature) => {
+                request["signature"] = serde_json::to_value(signature)?
+            }
+            InboundSignatureCheckTarget::Source(source_id) => {
+                request["source_id"] = json!(source_id)
+            }
+        }
+        Ok(serde_json::from_value(self.http.post(
+            &Self::path(handle, &["signature-check"]),
+            Some(&request),
+            NO_QUERY,
+        )?)?)
+    }
+
     pub fn list_events(
         &self,
         handle: &str,
@@ -306,7 +365,11 @@ mod tests {
     fn source_json() -> Value {
         json!({
             "id": "inbsrc_1", "name": "payments", "url": "https://agent.example.test/inbound/token",
-            "signature": {"scheme": "hmac", "header": "x-signature", "algorithm": "sha256"},
+            "signature": {
+                "secret_encoding": "text", "header": "x-signature", "format": "prefix", "format_value": "sha256=",
+                "algorithm": "sha256", "encoding": "hex", "signed_content": "{body}", "timestamp_from": "none",
+                "timestamp_value": null, "max_age_seconds": null
+            },
             "handler": {"type": "script", "command": "./run.sh"},
             "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"
         })
@@ -327,7 +390,12 @@ mod tests {
         let create = server.mock(|when, then| {
             when.method(POST).path(base).json_body(json!({
                 "name": "payments",
-                "signature": {"scheme": "standard-webhooks", "secret": "synthetic-secret"},
+                "signature": {
+                    "secret": "synthetic-secret", "header": "webhook-signature", "secret_encoding": "base64",
+                    "format": "list", "format_value": "v1", "encoding": "base64",
+                    "signed_content": "{header:webhook-id}.{timestamp}.{body}", "timestamp_from": "header",
+                    "timestamp_value": "webhook-timestamp", "max_age_seconds": 300
+                },
                 "handler": {"type": "agent"}
             }));
             then.status(201).json_body(source_json());
@@ -354,10 +422,17 @@ mod tests {
 
         let inbound = client(&server);
         let inbound = inbound.inbound();
-        let signature = InboundSignatureInput::new(
-            InboundSignatureScheme::StandardWebhooks,
-            "synthetic-secret",
-        );
+        let signature = InboundSignatureInput {
+            secret_encoding: Some("base64".into()),
+            format: Some("list".into()),
+            format_value: Some("v1".into()),
+            encoding: Some("base64".into()),
+            signed_content: Some("{header:webhook-id}.{timestamp}.{body}".into()),
+            timestamp_from: Some("header".into()),
+            timestamp_value: Some("webhook-timestamp".into()),
+            max_age_seconds: Some(300),
+            ..InboundSignatureInput::new("synthetic-secret", "webhook-signature")
+        };
         let source = inbound
             .create_source(
                 "agent",
@@ -372,7 +447,11 @@ mod tests {
                 command: "./run.sh".into()
             }
         );
-        assert_eq!(source.signature.unwrap().scheme, "hmac");
+        let saved = source.signature.unwrap();
+        assert_eq!(
+            (saved.format.as_str(), saved.format_value.as_deref()),
+            ("prefix", Some("sha256="))
+        );
         assert_eq!(inbound.list_sources("agent").unwrap().len(), 1);
         inbound
             .update_source(
@@ -390,6 +469,53 @@ mod tests {
         for mock in [create, list, update, rotate, delete] {
             mock.assert();
         }
+    }
+
+    #[test]
+    fn checks_sample_requests() {
+        let server = MockServer::start();
+        let path = "/api/v1/identities/agent/inbound/signature-check";
+        let settings = server.mock(|when, then| {
+            when.method(POST).path(path).json_body(json!({
+                "headers": {"X-Sig": "00"}, "body": "{}",
+                "signature": {"secret": "s", "header": "X-Sig"}
+            }));
+            then.status(200)
+                .json_body(json!({"verified": false, "reason": "Signature does not match"}));
+        });
+        let source = server.mock(|when, then| {
+            when.method(POST).path(path).json_body(json!({
+                "headers": {}, "body": "/w==", "body_encoding": "base64", "source_id": "inbsrc_1"
+            }));
+            then.status(200)
+                .json_body(json!({"verified": true, "reason": null}));
+        });
+        let client = client(&server);
+        let inbound = client.inbound();
+        let signature = InboundSignatureInput::new("s", "X-Sig");
+        let headers = HashMap::from([("X-Sig".to_string(), "00".to_string())]);
+        let result = inbound
+            .check_signature(
+                "agent",
+                InboundSignatureCheckTarget::Settings(&signature),
+                &headers,
+                b"{}",
+            )
+            .unwrap();
+        assert_eq!(result.reason.as_deref(), Some("Signature does not match"));
+        assert!(
+            inbound
+                .check_signature(
+                    "agent",
+                    InboundSignatureCheckTarget::Source("inbsrc_1"),
+                    &HashMap::new(),
+                    &[0xff],
+                )
+                .unwrap()
+                .verified
+        );
+        settings.assert();
+        source.assert();
     }
 
     #[test]

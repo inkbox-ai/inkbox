@@ -5,7 +5,10 @@ import { IdentitiesResource } from "../src/identities/resources/identities.js";
 
 const SOURCE = {
   id: "inbsrc_1", name: "payments", url: "https://agent.example.test/inbound/token",
-  signature: { scheme: "hmac", header: "x-signature", algorithm: "sha256", encoding: "hex", prefix: "sha256=" },
+  signature: {
+    secret_encoding: "text", header: "x-signature", format: "prefix", format_value: "sha256=", algorithm: "sha256",
+    encoding: "hex", signed_content: "{body}", timestamp_from: "none", timestamp_value: null, max_age_seconds: null,
+  },
   handler: { type: "agent", instructions: "Summarize the event." },
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
 };
@@ -26,10 +29,21 @@ describe("InboundResource", () => {
     http.post.mockResolvedValue(SOURCE);
     http.get.mockResolvedValue(SOURCE);
     http.patch.mockResolvedValue(SOURCE);
-    const signature = { scheme: "stripe" as const, secret: "synthetic-secret" };
+    const signature = {
+      secret: "synthetic-secret", header: "Example-Signature", format: "list" as const, formatValue: "v1",
+      signedContent: "{timestamp}.{body}", timestampFrom: "list" as const, timestampValue: "t", maxAgeSeconds: 300,
+    };
     const source = await inbound.createSource("@agent/x", { name: "payments", handler: { type: "script", command: "./run.sh" }, signature });
-    expect(source).toMatchObject({ id: "inbsrc_1", createdAt: SOURCE.created_at, signature: { scheme: "hmac" } });
-    expect(http.post).toHaveBeenCalledWith("/%40agent%2Fx/inbound", { name: "payments", signature, handler: { type: "script", command: "./run.sh" } });
+    expect(source).toMatchObject({ id: "inbsrc_1", createdAt: SOURCE.created_at, signature: {
+      secretEncoding: "text", format: "prefix", formatValue: "sha256=", signedContent: "{body}", timestampFrom: "none",
+      timestampValue: null, maxAgeSeconds: null,
+    } });
+    expect(http.post).toHaveBeenCalledWith("/%40agent%2Fx/inbound", { name: "payments", signature: {
+      secret: "synthetic-secret", header: "Example-Signature", format: "list", format_value: "v1",
+      signed_content: "{timestamp}.{body}", timestamp_from: "list", timestamp_value: "t", max_age_seconds: 300,
+    }, handler: { type: "script", command: "./run.sh" } });
+    await inbound.updateSource("agent", "inbsrc_1", { name: "renamed", signature: { secret: "s", header: "X-Sig", encoding: "base64" } });
+    expect(http.patch).toHaveBeenLastCalledWith("/agent/inbound/inbsrc_1", { name: "renamed", signature: { secret: "s", header: "X-Sig", encoding: "base64" } });
 
     await inbound.createSource("agent", { name: "ci", handler: { type: "agent" } });
     expect(http.post).toHaveBeenLastCalledWith("/agent/inbound", { name: "ci", signature: null, handler: { type: "agent" } });
@@ -46,6 +60,22 @@ describe("InboundResource", () => {
     expect(http.delete).toHaveBeenCalledWith("/agent/inbound/inbsrc_1");
     await inbound.rotateSource("agent", "inbsrc_1");
     expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/inbsrc_1/rotate");
+  });
+
+  it("checks a sample request against settings or a saved source", async () => {
+    const { http, inbound } = setup();
+    http.post.mockResolvedValue({ verified: false, reason: "Signature does not match" });
+    const result = await inbound.checkSignature("agent", {
+      signature: { secret: "s", header: "X-Sig", secretEncoding: "base64" }, headers: { "X-Sig": "00" }, body: "{}",
+    });
+    expect(result).toEqual({ verified: false, reason: "Signature does not match" });
+    expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/signature-check", {
+      headers: { "X-Sig": "00" }, body: "{}", signature: { secret: "s", header: "X-Sig", secret_encoding: "base64" },
+    });
+    await inbound.checkSignature("agent", { sourceId: "inbsrc_1", headers: {}, body: new Uint8Array([255]) });
+    expect(http.post).toHaveBeenLastCalledWith("/agent/inbound/signature-check", {
+      headers: {}, body: "/w==", body_encoding: "base64", source_id: "inbsrc_1",
+    });
   });
 
   it("lists, gets, replays and reports events", async () => {

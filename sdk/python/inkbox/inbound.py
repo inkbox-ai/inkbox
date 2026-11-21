@@ -9,6 +9,7 @@ request to the agent as an ``inbound.received`` event.
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 from urllib.parse import quote
@@ -18,29 +19,56 @@ from inkbox.webhooks import InboundWebhookRequest
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
-InboundSignatureScheme = Literal["stripe", "github", "slack", "standard-webhooks", "hmac"]
 InboundEventStatus = Literal["pending", "delivered", "failed"]
 
 
-class InboundSignatureInput(TypedDict):
-    """Sender signature check. ``header``/``algorithm``/``encoding``/``prefix`` apply to ``hmac``."""
-
-    scheme: InboundSignatureScheme
-    secret: str
-    header: NotRequired[str]
-    algorithm: NotRequired[Literal["sha256", "sha1"]]
-    encoding: NotRequired[Literal["hex", "base64"]]
-    prefix: NotRequired[str]
-
-
 class InboundSignature(TypedDict):
-    """Signature settings as returned; the secret is never returned."""
+    """How the sender signs requests (HMAC); the secret is never returned.
 
-    scheme: InboundSignatureScheme
-    header: NotRequired[str | None]
-    algorithm: NotRequired[str | None]
-    encoding: NotRequired[str | None]
-    prefix: NotRequired[str | None]
+    ``signed_content`` is a template of what was signed and must contain ``{body}``;
+    it may also use ``{timestamp}``, ``{header:Name}`` and fixed text.
+    """
+
+    secret_encoding: Literal["text", "base64"]
+    header: str
+    format: Literal["whole", "prefix", "list"]
+    format_value: str | None
+    algorithm: Literal["sha256", "sha1", "sha512"]
+    encoding: Literal["hex", "base64"]
+    signed_content: str
+    timestamp_from: Literal["none", "header", "list"]
+    timestamp_value: str | None
+    max_age_seconds: int | None
+
+
+class InboundSignatureInput(TypedDict):
+    """Signature settings to verify the sender. Omitted fields take the server defaults.
+
+    ``format``: ``whole`` (the header value is the signature), ``prefix`` (the value after
+    ``format_value``, for example ``sha256=``) or ``list`` (every item under key ``format_value``
+    in a list such as ``t=1,v1=ab`` or ``v1,ab v1,cd``; any match passes).
+    ``secret_encoding="base64"`` decodes the secret first, ignoring a leading ``whsec_``.
+    ``timestamp_from`` is ``header`` (header ``timestamp_value``) or ``list`` (key ``timestamp_value``
+    in the signature header); ``max_age_seconds`` rejects requests whose timestamp is further from now.
+    """
+
+    secret: str
+    header: str
+    secret_encoding: NotRequired[Literal["text", "base64"]]
+    format: NotRequired[Literal["whole", "prefix", "list"]]
+    format_value: NotRequired[str]
+    algorithm: NotRequired[Literal["sha256", "sha1", "sha512"]]
+    encoding: NotRequired[Literal["hex", "base64"]]
+    signed_content: NotRequired[str]
+    timestamp_from: NotRequired[Literal["none", "header", "list"]]
+    timestamp_value: NotRequired[str]
+    max_age_seconds: NotRequired[int]
+
+
+@dataclass
+class InboundSignatureCheck:
+    verified: bool
+    reason: str | None
 
 
 class InboundAgentHandlerInput(TypedDict):
@@ -156,6 +184,31 @@ class InboundResource:
     def rotate_source(self, handle: str, source_id: str) -> InboundSource:
         """Issue a new URL; the previous URL stops accepting requests."""
         return InboundSource._from_dict(self._http.post(self._path(handle, source_id, "rotate")))
+
+    def check_signature(
+        self,
+        handle: str,
+        *,
+        headers: dict[str, str],
+        body: str | bytes,
+        signature: InboundSignatureInput | None = None,
+        source_id: str | None = None,
+    ) -> InboundSignatureCheck:
+        """Check a sample request against ``signature`` settings or a saved source's; nothing is stored.
+
+        Pass exactly one of ``signature`` or ``source_id``. ``bytes`` bodies are sent unchanged.
+        """
+        payload: dict[str, Any] = {"headers": headers}
+        if isinstance(body, bytes):
+            payload |= {"body": base64.b64encode(body).decode(), "body_encoding": "base64"}
+        else:
+            payload["body"] = body
+        if signature is not None:
+            payload["signature"] = signature
+        if source_id is not None:
+            payload["source_id"] = source_id
+        data = self._http.post(self._path(handle, "signature-check"), json=payload)
+        return InboundSignatureCheck(verified=data["verified"], reason=data.get("reason"))
 
     def list_events(
         self, handle: str, source_id: str, *, limit: int | None = None, cursor: str | None = None,

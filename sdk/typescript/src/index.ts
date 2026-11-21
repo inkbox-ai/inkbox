@@ -189,7 +189,7 @@ export type {
   InboundHandler,
   InboundSignature,
   InboundSignatureInput,
-  InboundSignatureScheme,
+  InboundSignatureCheck,
   InboundSource,
 } from "./inbound.js";
 // Snake_case wire shapes referenced by the webhook payload types above.

@@ -1467,7 +1467,10 @@ an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrus
 ```typescript
 const src = await inkbox.inbound.createSource("my-agent", {
   name: "payments",
-  signature: { scheme: "stripe", secret: stripeSecret },     // stripe | github | slack | standard-webhooks | hmac
+  signature: { // Stripe-style: Stripe-Signature: t=<unix>,v1=<hex HMAC of "<t>.<body>">
+    secret: signingSecret, header: "Stripe-Signature", format: "list", formatValue: "v1",
+    signedContent: "{timestamp}.{body}", timestampFrom: "list", timestampValue: "t", maxAgeSeconds: 300,
+  },
   handler: { type: "agent", instructions: "Reconcile the payment." }, // or { type: "script", command: "./handle.sh" }
 });
 console.log(src.url);                                         // give this to the sender
@@ -1478,7 +1481,7 @@ const event = await inkbox.inbound.getEvent("my-agent", src.id, page.events[0].i
 await inkbox.inbound.replayEvent("my-agent", src.id, event.id);
 ```
 
-`hmac` also accepts `header`, `algorithm` (`sha256`/`sha1`), `encoding` (`hex`/`base64`) and `prefix`. Secrets are never returned.
+Signature settings are one generic HMAC check: `header` (required), `secretEncoding` (`text`/`base64`; base64 ignores a leading `whsec_`), `format` (`whole`/`prefix`/`list`) with `formatValue` (prefix such as `sha256=` or list key such as `v1`), `algorithm` (`sha256`/`sha1`/`sha512`), `encoding` (`hex`/`base64`), `signedContent` (must include `{body}`; may use `{timestamp}`, `{header:Name}` and fixed text), `timestampFrom` (`none`/`header`/`list`) with `timestampValue`, and `maxAgeSeconds`. Secrets are never returned. Test settings without saving: `inkbox.inbound.checkSignature("my-agent", { signature, headers, body })` or `{ sourceId: src.id, ... }`; returns `verified` and `reason`.
 
 ## Error Handling
 

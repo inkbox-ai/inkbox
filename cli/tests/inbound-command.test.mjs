@@ -2,12 +2,17 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import http from "node:http";
 import test from "node:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const source = {
   id: "src_1", name: "payments", url: "https://agent.example.test/inbound/token",
-  signature: {scheme: "stripe"}, handler: {type: "agent"},
+  signature: {secret_encoding: "text", header: "Example-Signature", format: "list", format_value: "v1", algorithm: "sha256",
+    encoding: "hex", signed_content: "{timestamp}.{body}", timestamp_from: "list", timestamp_value: "t", max_age_seconds: 300},
+  handler: {type: "agent"},
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
 };
 const event = {
@@ -26,6 +31,7 @@ async function withApi(action) {
     const body = path.includes("/events?") || path.endsWith("/events") ? {events: [event], next_cursor: "next"}
       : path.includes("/events/") ? event
       : path.endsWith("/inbound") && req.method === "GET" ? {sources: [source]}
+      : path.endsWith("/signature-check") ? {verified: false, reason: "Signature does not match"}
       : source;
     res.writeHead(200, {"content-type": "application/json"});
     res.end(JSON.stringify(body));
@@ -49,17 +55,21 @@ const base = "/api/v1/identities/agent/inbound";
 
 test("create reads the signing secret from stdin and sends signature and handler", async () => {
   await withApi(async (run, requests) => {
-    const created = await run(["create", "agent", "--name", "payments", "--scheme", "stripe", "--secret-stdin"], {stdin: "whsec_test\n"});
+    const created = await run(["create", "agent", "--name", "payments", "--secret-stdin", "--header", "Example-Signature",
+      "--format", "list", "--format-value", "v1", "--signed-content", "{timestamp}.{body}", "--timestamp-from", "list",
+      "--timestamp-value", "t", "--max-age", "300"], {stdin: "whsec_test\n"});
     assert.equal(created.code, 0, created.stderr);
     assert.equal(JSON.parse(created.stdout).url, source.url);
-    const hmac = await run(["create", "agent", "--name", "ci", "--scheme", "hmac", "--secret-stdin", "--header", "X-Sig",
-      "--algorithm", "sha1", "--encoding", "base64", "--prefix", "sha1=", "--handler", "script", "--command", "./handle.sh"], {stdin: "s"});
+    const hmac = await run(["create", "agent", "--name", "ci", "--secret-stdin", "--header", "X-Sig", "--secret-encoding", "base64",
+      "--algorithm", "sha512", "--encoding", "base64", "--format", "prefix", "--format-value", "sha512=", "--handler", "script",
+      "--command", "./handle.sh"], {stdin: "c2VjcmV0"});
     assert.equal(hmac.code, 0, hmac.stderr);
     assert.ifError((await run(["create", "agent", "--name", "open", "--handler", "agent", "--instructions", "Summarize"])).code || null);
     assert.deepEqual(requests.map(r => r.body), [
-      {name: "payments", signature: {scheme: "stripe", secret: "whsec_test"}, handler: {type: "agent"}},
-      {name: "ci", signature: {scheme: "hmac", secret: "s", header: "X-Sig", algorithm: "sha1", encoding: "base64", prefix: "sha1="},
-        handler: {type: "script", command: "./handle.sh"}},
+      {name: "payments", signature: {secret: "whsec_test", header: "Example-Signature", format: "list", format_value: "v1",
+        signed_content: "{timestamp}.{body}", timestamp_from: "list", timestamp_value: "t", max_age_seconds: 300}, handler: {type: "agent"}},
+      {name: "ci", signature: {secret: "c2VjcmV0", header: "X-Sig", secret_encoding: "base64", format: "prefix", format_value: "sha512=",
+        algorithm: "sha512", encoding: "base64"}, handler: {type: "script", command: "./handle.sh"}},
       {name: "open", signature: null, handler: {type: "agent", instructions: "Summarize"}},
     ]);
     assert.ok(requests.every(r => r.method === "POST" && r.path === base));
@@ -84,26 +94,47 @@ test("source and event commands call the matching endpoints", async () => {
     ]);
     assert.deepEqual(requests[2].body, {name: "renamed", signature: null});
     const human = await run(["list", "agent"], {json: false});
-    assert.match(human.stdout, /payments\s+https:\/\/agent\.example\.test\/inbound\/token\s+stripe\s+agent/);
+    assert.match(human.stdout, /payments\s+https:\/\/agent\.example\.test\/inbound\/token\s+Example-Signature\s+agent/);
   });
 });
 
 test("invalid option combinations fail before a request", async () => {
   await withApi(async (run, requests) => {
     for (const args of [
-      ["create", "agent", "--name", "x", "--scheme", "stripe"],
+      ["create", "agent", "--name", "x", "--header", "X"],
       ["create", "agent", "--name", "x", "--secret-stdin"],
-      ["create", "agent", "--name", "x", "--scheme", "github", "--secret-stdin", "--header", "X"],
+      ["create", "agent", "--name", "x", "--format", "list", "--secret-stdin"],
+      ["create", "agent", "--name", "x", "--secret-stdin", "--header", "X", "--max-age", "5m"],
+      ["create", "agent", "--name", "x", "--secret-stdin", "--header", "X", "--format", "json"],
       ["create", "agent", "--name", "x", "--scheme", "stripe", "--secret-stdin", "--header", "X"],
-      ["create", "agent", "--name", "x", "--scheme", "hmac", "--secret-stdin"],
-      ["update", "agent", "src_1", "--scheme", "hmac", "--secret-stdin"],
+      ["update", "agent", "src_1", "--signed-content", "{body}"],
       ["create", "agent", "--name", "x", "--handler", "script"],
       ["create", "agent", "--name", "x", "--handler", "agent", "--command", "run"],
-      ["create", "agent", "--name", "x", "--scheme", "unknown", "--secret-stdin"],
+      ["check-signature", "agent", "--body-file", "/dev/null"],
+      ["check-signature", "agent", "--source", "src_1", "--secret-stdin", "--header", "X", "--body-file", "/dev/null"],
+      ["check-signature", "agent", "--source", "src_1", "--sample-header", "nocolon", "--body-file", "/dev/null"],
       ["update", "agent", "src_1"],
-      ["update", "agent", "src_1", "--no-signature", "--scheme", "slack", "--secret-stdin"],
+      ["update", "agent", "src_1", "--no-signature", "--header", "X", "--secret-stdin"],
       ["events", "list", "agent", "src_1", "--limit", "0"],
     ]) assert.notEqual((await run(args, {stdin: "s"})).code, 0, args.join(" "));
     assert.equal(requests.length, 0);
+  });
+});
+
+test("check-signature sends a sample with settings or a saved source", async () => {
+  await withApi(async (run, requests) => {
+    const dir = mkdtempSync(join(tmpdir(), "inbound-check-"));
+    writeFileSync(join(dir, "body.json"), '{"ok":true}');
+    writeFileSync(join(dir, "body.bin"), Buffer.from([0xff]));
+    const human = await run(["check-signature", "agent", "--secret-stdin", "--header", "X-Sig", "--sample-header", "X-Sig: 00",
+      "--sample-header", "X-Id:42", "--body-file", join(dir, "body.json")], {stdin: "s", json: false});
+    assert.equal(human.code, 1);
+    assert.match(human.stdout, /Signature is not valid: Signature does not match/);
+    const json = await run(["check-signature", "agent", "--source", "src_1", "--body-file", join(dir, "body.bin")]);
+    assert.deepEqual(JSON.parse(json.stdout), {verified: false, reason: "Signature does not match"});
+    assert.deepEqual(requests.map(r => [r.method, r.path, r.body]), [
+      ["POST", `${base}/signature-check`, {headers: {"X-Sig": "00", "X-Id": "42"}, body: '{"ok":true}', signature: {secret: "s", header: "X-Sig"}}],
+      ["POST", `${base}/signature-check`, {headers: {}, body: "/w==", body_encoding: "base64", source_id: "src_1"}],
+    ]);
   });
 });

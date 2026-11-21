@@ -687,23 +687,33 @@ to the agent as an `inbound.received` event. Signing secrets are read from
 stdin only.
 
 ```bash
-printf %s "$STRIPE_SECRET" | inkbox inbound create <handle> --name payments --scheme stripe --secret-stdin
-inkbox inbound create <handle> --name ci --scheme hmac --secret-stdin --header X-Signature \
-  [--algorithm sha256|sha1] [--encoding hex|base64] [--prefix sha256=] < secret.txt
+# GitHub-style: X-Hub-Signature-256: sha256=<hex of HMAC(body)>
+printf %s "$SECRET" | inkbox inbound create <handle> --name code --secret-stdin \
+  --header X-Hub-Signature-256 --format prefix --format-value sha256=
+# Stripe-style: Stripe-Signature: t=<unix>,v1=<hex of HMAC("<t>.<body>")>
+printf %s "$SECRET" | inkbox inbound create <handle> --name payments --secret-stdin \
+  --header Stripe-Signature --format list --format-value v1 --signed-content '{timestamp}.{body}' \
+  --timestamp-from list --timestamp-value t --max-age 300
 inkbox inbound create <handle> --name jobs --handler script --command ./handle.sh
 inkbox inbound list <handle>
 inkbox inbound get <handle> <source-id>
-inkbox inbound update <handle> <source-id> [--name <n>] [--no-signature | --scheme ... --secret-stdin]
+inkbox inbound update <handle> <source-id> [--name <n>] [--no-signature | --header ... --secret-stdin]
                                            [--handler agent|script [--instructions <t> | --command <c>]]
 inkbox inbound rotate <handle> <source-id>                   # new URL; old URL stops accepting
 inkbox inbound delete <handle> <source-id>
 inkbox inbound events list <handle> <source-id> [--limit <n>] [--cursor <c>]
 inkbox inbound events get <handle> <source-id> <event-id>    # includes the received request
 inkbox inbound events replay <handle> <source-id> <event-id>
+inkbox inbound check-signature <handle> (--source <source-id> | --header ... --secret-stdin) \
+  --sample-header 'Name: value' --body-file body.json        # test settings; stores nothing
 ```
 
-Schemes: `stripe`, `github`, `slack`, `standard-webhooks`, `hmac`
-(`--header`/`--algorithm`/`--encoding`/`--prefix` apply only to `hmac`).
+Signature options (HMAC): `--header` (required), `--secret-encoding text|base64`
+(base64 ignores a leading `whsec_`), `--format whole|prefix|list` + `--format-value`
+(prefix such as `sha256=`, or list key such as `v1`; any matching list item passes),
+`--algorithm sha256|sha1|sha512`, `--encoding hex|base64`, `--signed-content`
+(must include `{body}`; may use `{timestamp}`, `{header:Name}` and fixed text),
+`--timestamp-from none|header|list` + `--timestamp-value`, `--max-age <seconds>`.
 Handlers default to `agent`. Treat received request content as untrusted.
 
 ## Custom Sending Domains

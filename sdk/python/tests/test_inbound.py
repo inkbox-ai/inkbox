@@ -1,11 +1,13 @@
 from unittest.mock import Mock
 
-from inkbox import Inkbox, InboundEvent, InboundResource, InboundSource
+from inkbox import Inkbox, InboundEvent, InboundResource, InboundSignatureCheck, InboundSource
 from inkbox.identities.resources.identities import IdentitiesResource
 
 SOURCE = {
     "id": "inbsrc_1", "name": "payments", "url": "https://agent.example.test/inbound/token",
-    "signature": {"scheme": "hmac", "header": "x-signature", "algorithm": "sha256", "encoding": "hex", "prefix": "sha256="},
+    "signature": {"secret_encoding": "text", "header": "x-signature", "format": "prefix", "format_value": "sha256=",
+                  "algorithm": "sha256", "encoding": "hex", "signed_content": "{body}", "timestamp_from": "none",
+                  "timestamp_value": None, "max_age_seconds": None},
     "handler": {"type": "agent", "instructions": "Summarize the event."},
     "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
 }
@@ -22,9 +24,11 @@ def test_source_crud_and_rotate_use_identity_paths():
     http = Mock()
     http.post.return_value = http.get.return_value = http.patch.return_value = SOURCE
     inbound = InboundResource(http)
-    signature = {"scheme": "stripe", "secret": "synthetic-secret"}
+    signature = {"secret": "synthetic-secret", "header": "Example-Signature", "format": "list", "format_value": "v1",
+                 "signed_content": "{timestamp}.{body}", "timestamp_from": "list", "timestamp_value": "t",
+                 "max_age_seconds": 300}
     source = inbound.create_source("@agent/x", name="payments", handler={"type": "script", "command": "./run.sh"}, signature=signature)
-    assert isinstance(source, InboundSource) and source.signature["scheme"] == "hmac"
+    assert isinstance(source, InboundSource) and source.signature["format"] == "prefix"
     http.post.assert_called_once_with("/%40agent%2Fx/inbound", json={
         "name": "payments", "signature": signature, "handler": {"type": "script", "command": "./run.sh"}})
 
@@ -44,6 +48,20 @@ def test_source_crud_and_rotate_use_identity_paths():
     http.delete.assert_called_once_with("/agent/inbound/inbsrc_1")
     inbound.rotate_source("agent", "inbsrc_1")
     http.post.assert_called_with("/agent/inbound/inbsrc_1/rotate")
+
+
+def test_check_signature_sends_settings_or_source_and_encodes_bytes():
+    http = Mock()
+    http.post.return_value = {"verified": False, "reason": "Signature does not match"}
+    inbound = InboundResource(http)
+    signature = {"secret": "synthetic-secret", "header": "X-Signature"}
+    result = inbound.check_signature("agent", signature=signature, headers={"X-Signature": "00"}, body="{}")
+    assert result == InboundSignatureCheck(verified=False, reason="Signature does not match")
+    http.post.assert_called_with("/agent/inbound/signature-check", json={
+        "headers": {"X-Signature": "00"}, "body": "{}", "signature": signature})
+    inbound.check_signature("agent", source_id="inbsrc_1", headers={}, body=b"\xff")
+    http.post.assert_called_with("/agent/inbound/signature-check", json={
+        "headers": {}, "body": "/w==", "body_encoding": "base64", "source_id": "inbsrc_1"})
 
 
 def test_null_signature_and_create_without_signature():
