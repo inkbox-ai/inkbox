@@ -7,6 +7,14 @@ import { archiveIncluded, cachedEmoji, cachedReaction } from "./slack-cache.js";
 import type { CachedWire, RawArchiveIncluded, SlackArchiveInclude, SlackArchiveIncluded,
   SlackCachedEmoji, SlackCachedEmojiOptions, SlackCachedEmojiPage, SlackCachedMediaKind, SlackCachedReaction } from "./slack-cache.js";
 
+/** Lowercase hyphenated form, so compact and canonical UUID spellings compare equal. */
+function canonicalUuid(value: string): string {
+  const hex = value.toLowerCase().replace(/[{}-]/g, "");
+  return /^[0-9a-f]{32}$/.test(hex)
+    ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+    : value.toLowerCase();
+}
+
 export type SlackProcessingStatus =
   "active" | "processing" | "suspended" | "closed";
 export type SlackOperationKind =
@@ -645,10 +653,13 @@ export class SlackOperationsResource {
     if (options.messageId === undefined) return page;
     // An API without the filter returns the newest messages instead; keep only
     // the requested message.
-    const wanted = options.messageId.toLowerCase();
+    const wanted = canonicalUuid(options.messageId);
+    const messages = page.messages.filter((message) => canonicalUuid(message.id) === wanted);
     return {
       ...page,
-      messages: page.messages.filter((message) => message.id.toLowerCase() === wanted),
+      messages,
+      // The expansions describe the discarded rows too; drop them.
+      included: messages.length === page.messages.length ? page.included : null,
       nextCursor: null,
       pageBoundary: null,
     };

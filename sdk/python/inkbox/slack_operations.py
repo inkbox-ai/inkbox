@@ -639,7 +639,11 @@ class SlackOperationsMixin:
             # An API without the filter returns the newest messages instead; keep
             # only the requested message.
             wanted = str(UUID(str(message_id)))
-            result.messages = [message for message in result.messages if str(message.id).lower() == wanted]
+            kept = [message for message in result.messages if str(message.id).lower() == wanted]
+            if len(kept) != len(result.messages):
+                # The expansions describe the discarded rows too; drop them.
+                result.included = None
+            result.messages = kept
             result.next_cursor = None
             result.page_boundary = None
         return result

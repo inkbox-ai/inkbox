@@ -91,6 +91,27 @@ def test_archive_message_id_ignored_by_an_older_api_returns_no_row(wire):
     assert result.next_cursor is None
 
 
+def test_archive_message_id_drops_expansions_for_rows_an_older_api_returned(wire):
+    client, _requests, replies = wire
+    raw = copy.deepcopy(DATA["page"])
+    assert raw["included"]
+    replies.append(raw)
+    result = client.slack.list_archived_messages(
+        C, message_id="33333333-3333-4333-8333-333333333333", include=["files"])
+    assert result.messages == []
+    assert result.included is None
+
+
+def test_archive_message_id_keeps_expansions_when_the_filter_is_honoured(wire):
+    client, _requests, replies = wire
+    raw = copy.deepcopy(DATA["page"])
+    raw["messages"] = raw["messages"][:1]
+    replies.append(raw)
+    result = client.slack.list_archived_messages(C, message_id=raw["messages"][0]["id"].replace("-", ""))
+    assert [str(message.id) for message in result.messages] == [raw["messages"][0]["id"]]
+    assert result.included is not None
+
+
 def test_cached_emoji_does_not_auto_paginate_or_confuse_aliases(wire):
     client, requests, replies = wire
     replies.append(copy.deepcopy(DATA["emoji_page"]))
