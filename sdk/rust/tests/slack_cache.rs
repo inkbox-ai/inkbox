@@ -341,7 +341,7 @@ fn archived_message_by_id_reads_its_file_transcription() {
     found.assert();
     found.delete();
     let missing = Uuid::nil();
-    let empty = server.mock(|when, then| {
+    let mut empty = server.mock(|when, then| {
         when.method(Method::GET)
             .path(format!(
                 "/api/v1/slack/connections/{connection}/archive/messages"
@@ -357,4 +357,20 @@ fn archived_message_by_id_reads_its_file_transcription() {
         .unwrap()
         .is_none());
     empty.assert();
+    empty.delete();
+    let requested = Uuid::parse_str("55555555-5555-4555-8555-555555555555").unwrap();
+    let unfiltered = server.mock(|when, then| {
+        when.method(Method::GET)
+            .path(format!(
+                "/api/v1/slack/connections/{connection}/archive/messages"
+            ))
+            .query_param("message_id", requested.to_string());
+        then.status(200).json_body(page.clone());
+    });
+    assert!(client
+        .slack()
+        .get_archived_message(connection, requested)
+        .unwrap()
+        .is_none());
+    unfiltered.assert();
 }

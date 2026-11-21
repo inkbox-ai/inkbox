@@ -1878,6 +1878,7 @@ pub struct MessageTranscriptionFinishedWebhookData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "channel")]
+#[non_exhaustive]
 pub enum TranscriptionFinishedSource {
     #[serde(rename = "text")]
     Text {
