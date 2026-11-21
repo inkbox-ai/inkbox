@@ -2258,7 +2258,8 @@ text over 600 characters, the text is sent as an ordinary message. Pass
 A voice note has no message text. The spoken text is stored with the message as the
 audio attachment's completed `transcription`. iMessage and WhatsApp send responses
 include it; on SMS/MMS it appears on the next read of the message. On Slack, the
-uploaded audio file carries it in archived message reads. A fallback comes back as an
+uploaded audio file carries it in archived message reads once Slack confirms which
+message the upload became, which is nearly always. A fallback comes back as an
 ordinary text message.
 
 Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is

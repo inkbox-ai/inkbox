@@ -331,7 +331,13 @@ impl SlackResource {
                 ("limit", "1".to_string()),
             ],
         )?)?;
-        Ok(page.messages.into_iter().next())
+        // An API without the filter returns the newest messages instead; never
+        // report one of those as the requested message.
+        Ok(page
+            .messages
+            .into_iter()
+            .next()
+            .filter(|message| message.id == message_id))
     }
     pub fn list_cached_emoji(
         &self,
