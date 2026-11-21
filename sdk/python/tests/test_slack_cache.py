@@ -80,6 +80,17 @@ def test_archive_message_id_filter_reads_file_transcription(wire):
     assert result.messages[0].files[0]["transcription"] == transcription
 
 
+def test_archive_message_id_ignored_by_an_older_api_returns_no_row(wire):
+    client, _requests, replies = wire
+    raw = copy.deepcopy(DATA["page"])
+    raw.pop("included")
+    raw["next_cursor"] = "older"
+    replies.append(raw)
+    result = client.slack.list_archived_messages(C, message_id="33333333-3333-4333-8333-333333333333")
+    assert result.messages == []
+    assert result.next_cursor is None
+
+
 def test_cached_emoji_does_not_auto_paginate_or_confuse_aliases(wire):
     client, requests, replies = wire
     replies.append(copy.deepcopy(DATA["emoji_page"]))
