@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.42
+
+- Send text as a voice note on iMessage, SMS/MMS, WhatsApp and Slack with `send_as_voice_note` (Python), `sendAsVoiceNote` (TypeScript), the Rust `send_voice_note` methods, and `--voice-note` (CLI). iMessage and WhatsApp get a native voice note; SMS/MMS and Slack get a plain audio file. Text is limited to 600 characters and can't be combined with media.
+- If a voice note can't be produced, the text is sent as an ordinary message. Set `fallback_to_text` / `fallbackToText` to false, or pass `--no-fallback-to-text`, to fail instead.
+- A sent voice note's text is stored with the message as the audio attachment's completed `transcription`. iMessage and WhatsApp send responses include it; SMS/MMS shows it on the next read of the message, and Slack on archived message reads once Slack confirms which message the upload became.
+- Type Slack `message.transcription_finished` events (`channel: "slack"`) in Python, TypeScript and Rust. They carry `message_id`, `connection_id`, `conversation_id`, `message_ts`, `thread_ts` and per-file `event.files[].transcription`. Slack received-message events carry the matching `message_id`.
+- Filter Slack archive message listing by `message_id` with `list_archived_messages(..., message_id=...)` (Python), `listArchivedMessages(id, { messageId })` (TypeScript), `get_archived_message` (Rust) and `slack archive messages --message-id` (CLI). Archived audio files carry `transcription`.
+
+### Compatibility
+
+- Rust `TranscriptionFinishedSource` adds a `Slack` variant and is now `#[non_exhaustive]`, so matches need a wildcard arm once and keep compiling when later channels are added. `SlackWebhookData` adds an optional `message_id`, so struct literals must supply it. `MessageTranscriptionFinishedWebhookData` contacts and identities default to empty for Slack. `SlackArchiveMessagesOptions` is unchanged.
+- TypeScript `MessageTranscriptionFinishedWebhookData` adds a Slack member without `contacts` or `message`; narrow on `channel` before reading them.
+
 ## 0.7.41
 
 ### Added

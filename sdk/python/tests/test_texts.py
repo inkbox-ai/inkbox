@@ -37,6 +37,22 @@ class TestTextsSend:
             json={"to": "+15551234567", "text": "Hello"},
         )
 
+    def test_voice_note_options_sent_only_when_set(self, client, transport):
+        transport.post.return_value = TEXT_MESSAGE_OUTBOUND_QUEUED_DICT
+
+        client._texts.send(
+            NUM_ID, to=REMOTE, text="Hello", send_as_voice_note=True, fallback_to_text=False,
+        )
+        assert transport.post.call_args.kwargs["json"] == {
+            "to": REMOTE,
+            "text": "Hello",
+            "send_as_voice_note": True,
+            "fallback_to_text": False,
+        }
+
+        client._texts.send(NUM_ID, to=REMOTE, text="Hello", send_as_voice_note=False, fallback_to_text=True)
+        assert transport.post.call_args.kwargs["json"] == {"to": REMOTE, "text": "Hello"}
+
     def test_returns_parsed_text_with_lifecycle_fields(self, client, transport):
         transport.post.return_value = TEXT_MESSAGE_OUTBOUND_QUEUED_DICT
 

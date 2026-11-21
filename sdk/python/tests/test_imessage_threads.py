@@ -99,6 +99,9 @@ def test_identity_helpers_scope_every_thread_operation():
     assert sdk._imessages.send.call_args.kwargs["plain_reply_fallback"] is True
     identity.send_imessage(conversation_id=CONVO_ID, reply_to_message_id=MSG_ID, text="Strict", plain_reply_fallback=False)
     assert sdk._imessages.send.call_args.kwargs["plain_reply_fallback"] is False
+    identity.send_imessage(conversation_id=CONVO_ID, text="Spoken", send_as_voice_note=True, fallback_to_text=False)
+    assert sdk._imessages.send.call_args.kwargs["send_as_voice_note"] is True
+    assert sdk._imessages.send.call_args.kwargs["fallback_to_text"] is False
     identity.list_imessages(conversation_id=CONVO_ID, thread_id=THREAD_ID)
     assert sdk._imessages.list.call_args.kwargs["thread_id"] == THREAD_ID
     assert sdk._imessages.list.call_args.kwargs["agent_identity_id"] == identity.id

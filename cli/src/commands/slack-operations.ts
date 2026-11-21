@@ -32,6 +32,7 @@ interface Args {
   q: string;
   restart?: boolean;
   rootsOnly?: boolean;
+  messageId?: string;
   include?: SlackArchiveInclude[];
   kind: SlackCachedMediaKind;
   resourceId: string;
@@ -318,6 +319,7 @@ export function registerSlackOperationCommands(
       .option("--thread-ts <timestamp>", "Thread filter (requires conversation)")
       .option("--latest-per-conversation", "Return one latest message per conversation")
       .option("--roots-only", "Page roots, broadcasts, and replies whose root is unavailable")
+      .option("--message-id <id>", "Return only this retained message, such as a received event's message_id")
       .option("--include <expansions>", "Comma-separated conversation,sender,reactions,files", includes),
     (s, o) => s.listArchivedMessages(o.connectionId, o),
   );

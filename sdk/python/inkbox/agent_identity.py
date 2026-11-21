@@ -162,6 +162,8 @@ class AgentIdentity:
         text: str | None = None,
         media_ids: list[UUID | str] | None = None,
         idempotency_key: str | None = None,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> WhatsAppMessage:
         return self._inkbox.whatsapp.send(
             to=to,
@@ -173,6 +175,8 @@ class AgentIdentity:
             media_ids=media_ids,
             idempotency_key=idempotency_key,
             agent_identity_id=self.id,
+            send_as_voice_note=send_as_voice_note,
+            fallback_to_text=fallback_to_text,
         )
 
     def get_whatsapp_thread(self, message_id: UUID | str, *, limit: int = 50, cursor: str | None = None) -> WhatsAppThread:
@@ -1245,6 +1249,8 @@ class AgentIdentity:
         text: str | None = None,
         media_urls: list[str] | None = None,
         idempotency_key: str | None = None,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> TextMessage:
         """Send an outbound SMS/MMS from this identity's phone number.
 
@@ -1255,6 +1261,10 @@ class AgentIdentity:
                 server resolves it to that conversation's participants.
             text: Message body.
             media_urls: MMS media URLs. Pass with ``text`` or by themselves.
+            send_as_voice_note: Speak ``text`` (at most 600 characters) in this
+                identity's voice and send it as an MMS audio file.
+            fallback_to_text: When a voice note can't be produced, send ``text``
+                as an ordinary message (default True). False makes the send fail.
 
         Returns:
             The queued ``TextMessage``. The full outbound lifecycle
@@ -1285,6 +1295,10 @@ class AgentIdentity:
             send_kwargs["text"] = text
         if media_urls is not None:
             send_kwargs["media_urls"] = media_urls
+        if send_as_voice_note:
+            send_kwargs["send_as_voice_note"] = True
+        if not fallback_to_text:
+            send_kwargs["fallback_to_text"] = False
         return self._inkbox._texts.send(
             self._phone_number.id,  # type: ignore[union-attr]
             **send_kwargs,
@@ -1478,6 +1492,8 @@ class AgentIdentity:
         idempotency_key: str | None = None,
         reply_to_message_id: UUID | str | None = None,
         plain_reply_fallback: bool = True,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
@@ -1502,6 +1518,10 @@ class AgentIdentity:
                 ``IMessageSendStyle``). The same styles work for one-to-one
                 sends, new groups, and replies by group ``conversation_id``;
                 they may be combined with the single supported media URL.
+            send_as_voice_note: Speak ``text`` (at most 600 characters) in this
+                identity's voice and send it as a native voice note.
+            fallback_to_text: When a voice note can't be produced, send ``text``
+                as an ordinary message (default True). False makes the send fail.
 
         Raises:
             InkboxError: when this identity is not iMessage-enabled.
@@ -1516,6 +1536,8 @@ class AgentIdentity:
             media_urls=media_urls,
             send_style=send_style,
             agent_identity_id=self.id,
+            send_as_voice_note=send_as_voice_note,
+            fallback_to_text=fallback_to_text,
             **({
                 "reply_to_message_id": reply_to_message_id,
                 "plain_reply_fallback": plain_reply_fallback,

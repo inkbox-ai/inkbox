@@ -28,6 +28,29 @@ impl TextRecipients {
     }
 }
 
+/// Send body, omitting any argument left as None.
+fn send_body(
+    to: Option<TextRecipients>,
+    conversation_id: Option<&str>,
+    text: Option<&str>,
+    media_urls: Option<&[String]>,
+) -> Map<String, Value> {
+    let mut body = Map::new();
+    if let Some(recipients) = to {
+        body.insert("to".into(), recipients.to_json());
+    }
+    if let Some(cid) = conversation_id {
+        body.insert("conversation_id".into(), cid.into());
+    }
+    if let Some(t) = text {
+        body.insert("text".into(), t.into());
+    }
+    if let Some(urls) = media_urls {
+        body.insert("media_urls".into(), json!(urls));
+    }
+    body
+}
+
 pub struct TextsResource {
     http: Arc<HttpTransport>,
 }
@@ -83,25 +106,42 @@ impl TextsResource {
         media_urls: Option<&[String]>,
         idempotency_key: &str,
     ) -> Result<TextMessage> {
-        // Build body conditionally, omitting any argument left as None.
-        let mut body = Map::new();
-        if let Some(recipients) = to {
-            body.insert("to".into(), recipients.to_json());
+        let body = send_body(to, conversation_id, text, media_urls);
+        self.post_send(phone_number_id, &body, Some(idempotency_key))
+    }
+
+    /// Speak `text` (at most 600 characters) in the agent's voice and send it
+    /// as an MMS audio file. With `fallback_to_text`, the text is sent as an
+    /// ordinary message when a voice note can't be produced; false makes the
+    /// send fail. A generated key is used when `idempotency_key` is `None`.
+    pub fn send_voice_note(
+        &self,
+        phone_number_id: &str,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<TextMessage> {
+        let mut body = send_body(to, conversation_id, Some(text), None);
+        body.insert("send_as_voice_note".into(), true.into());
+        if !fallback_to_text {
+            body.insert("fallback_to_text".into(), false.into());
         }
-        if let Some(cid) = conversation_id {
-            body.insert("conversation_id".into(), cid.into());
-        }
-        if let Some(t) = text {
-            body.insert("text".into(), t.into());
-        }
-        if let Some(urls) = media_urls {
-            body.insert("media_urls".into(), json!(urls));
-        }
+        self.post_send(phone_number_id, &body, idempotency_key)
+    }
+
+    fn post_send(
+        &self,
+        phone_number_id: &str,
+        body: &Map<String, Value>,
+        idempotency_key: Option<&str>,
+    ) -> Result<TextMessage> {
         let data = self.http.post_message(
             &format!("/numbers/{phone_number_id}/texts"),
-            &body,
+            body,
             crate::http::NO_QUERY,
-            Some(idempotency_key),
+            idempotency_key,
         )?;
         Ok(serde_json::from_value(data)?)
     }

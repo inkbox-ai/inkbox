@@ -1186,6 +1186,8 @@ inkbox slack file preview F0123456789 --connection-id CONNECTION_UUID --output p
 Byte downloads require a new output path and never overwrite an existing file.
 Follow returned cursors explicitly. `--include` and `--roots-only` apply to archive
 message listing, not ranked search. Omit `--roots-only` when selecting a thread.
+`--message-id` returns only one retained message, such as a received event's
+`data.message_id`; its audio files carry `transcription`.
 
 Cached context is optional and may be incomplete or temporarily stale. Unknown
 reaction and thread counts are not zero; a known count does not imply a complete
@@ -1369,6 +1371,42 @@ Use `--json` to inspect the complete response. Public search also accepts `--que
 including domain fragments. Text matches can include agents without a verified
 domain. Add `--verified-domain example.com` to require an exact, current domain
 affiliation in public results.
+
+## Voice notes
+
+Add `--voice-note` to `imessage send`, `text send`, `whatsapp send`, or
+`slack message send` and the server speaks `--text` in the agent's configured Voice AI
+voice and sends it as audio. iMessage and WhatsApp get a native voice note; SMS/MMS and
+Slack get a plain audio file. `--text` is required and may be at most 600 characters.
+Media, `--send-style`, and `--gif-playback` can't be combined with a voice note.
+
+```bash
+inkbox imessage send --identity my-agent --conversation-id <id> \
+  --text "Running five minutes late." --voice-note
+```
+
+Fallback defaults to on: when the voice note can't be produced, including text over 600
+characters, the text is sent as an ordinary message. Add `--no-fallback-to-text`
+to fail instead (`422 voice_note_text_too_long`, `502 voice_note_unavailable`, or
+`409 whatsapp_capability_not_ready`).
+
+A voice note has no message text. The spoken text is stored with the message as the
+audio attachment's completed `transcription`. iMessage and WhatsApp send responses
+include it; on SMS/MMS it appears on the next read of the message. On Slack, the
+uploaded audio file carries it in archived message reads once Slack confirms which
+message the upload became, which is nearly always. A fallback comes back as an
+ordinary text message.
+
+Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is
+sent as text, or without fallback fails with
+`422 imessage_reply_required_for_links_or_media`. On WhatsApp, before the recipient's first reply, a voice note is
+sent as text when opening messages are allowed but opening media isn't, or without
+fallback fails with `422 whatsapp_reply_required_for_media`; when no opening messages
+are allowed, the send returns `409 whatsapp_awaiting_inbound`. On Slack, a failure without fallback also
+returns `422 voice_note_text_too_long` or `502 voice_note_unavailable` on the first
+request, and is recorded on the send action (`status: failed` with the `error_code`).
+Repeating the same idempotency key returns that failed action with `200`, so use a new
+key to try again.
 
 ## Threaded iMessage replies
 

@@ -1691,6 +1691,45 @@ There are no Slack-specific filters. Context applies only to received mail, text
 and iMessage events; Slack historical delivery replay is unsupported. The runtime owns attention rules,
 watched threads, and its own memory. Webhook delivery order is not guaranteed.
 
+## Voice notes
+
+Pass `send_as_voice_note=True` to `send_imessage`, `send_text`, `send_whatsapp`, or
+`client.slack.send_message` and the server speaks `text` in the agent's configured Voice
+AI voice and sends it as audio. iMessage and WhatsApp get a native voice note; SMS/MMS
+and Slack get a plain audio file. `text` is required and may be at most 600 characters.
+Media, `send_style`, and `gif_playback` can't be combined with a voice note.
+
+```python
+identity.send_imessage(
+    conversation_id=conversation_id,
+    text="Running five minutes late.",
+    send_as_voice_note=True,
+)
+```
+
+`fallback_to_text` defaults to `True`: when the voice note can't be produced, including
+text over 600 characters, the text is sent as an ordinary message. Pass
+`fallback_to_text=False` to fail instead (`422 voice_note_text_too_long`,
+`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+
+A voice note has no message text. The spoken text is stored with the message as the
+audio attachment's completed `transcription`. iMessage and WhatsApp send responses
+include it; on SMS/MMS it appears on the next read of the message. On Slack, the
+uploaded audio file carries it in archived message reads once Slack confirms which
+message the upload became, which is nearly always. A fallback comes back as an
+ordinary text message.
+
+Before the recipient's first reply, a 1:1 iMessage voice note counts as media: it is
+sent as text, or without fallback fails with
+`422 imessage_reply_required_for_links_or_media`. On WhatsApp, before the recipient's first reply, a voice note is
+sent as text when opening messages are allowed but opening media isn't, or without
+fallback fails with `422 whatsapp_reply_required_for_media`; when no opening messages
+are allowed, the send returns `409 whatsapp_awaiting_inbound`. On Slack, a failure without fallback also
+returns `422 voice_note_text_too_long` or `502 voice_note_unavailable` on the first
+request, and is recorded on the send action (`status: failed` with the `error_code`).
+Repeating the same idempotency key returns that failed action with `200`, so use a new
+key to try again.
+
 ## Threaded iMessage replies
 
 Requires SDK/CLI **0.7.13 or later**. These reply examples require a

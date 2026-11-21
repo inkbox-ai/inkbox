@@ -50,6 +50,7 @@ use crate::imessage::types::{
     IMessageSendStyle, IMessageThread, IMessageThreadListOptions, IdentityIMessageNumber,
     ThreadedIMessage,
 };
+use crate::imessage::IMessageRecipients;
 use crate::mail::types::{
     DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
     MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
@@ -1162,6 +1163,28 @@ impl AgentIdentity {
         )
     }
 
+    /// Speak `text` (at most 600 characters) in this identity's voice and send
+    /// it as an MMS audio file. With `fallback_to_text`, the text is sent as an
+    /// ordinary message when a voice note can't be produced; false makes the
+    /// send fail.
+    pub fn send_text_voice_note(
+        &self,
+        to: Option<TextRecipients>,
+        conversation_id: Option<&str>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<TextMessage> {
+        self.inkbox.texts().send_voice_note(
+            &self.require_phone_id()?,
+            to,
+            conversation_id,
+            text,
+            idempotency_key,
+            fallback_to_text,
+        )
+    }
+
     /// List text messages for this identity's phone number.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
@@ -1482,6 +1505,30 @@ impl AgentIdentity {
             send_style,
             Some(&self.id()),
             key,
+        )
+    }
+
+    /// Speak `text` (at most 600 characters) in this identity's voice and send
+    /// it as a native iMessage voice note. With `fallback_to_text`, the text is
+    /// sent as an ordinary message when a voice note can't be produced; false
+    /// makes the send fail. Pass [`IMessageRecipients::Group`] to send to a
+    /// group by its recipient list, as [`Self::send_imessage_group`] does.
+    pub fn send_imessage_voice_note(
+        &self,
+        to: Option<IMessageRecipients<'_>>,
+        conversation_id: Option<&Uuid>,
+        text: &str,
+        idempotency_key: Option<&str>,
+        fallback_to_text: bool,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        self.inkbox.imessages().send_voice_note(
+            to,
+            conversation_id,
+            text,
+            Some(&self.id()),
+            idempotency_key,
+            fallback_to_text,
         )
     }
 
@@ -2303,6 +2350,17 @@ impl AgentIdentity {
         let mut o = o.clone();
         o.agent_identity_id = Some(self.id());
         self.inkbox.whatsapp().send(&o)
+    }
+    /// Send `o.text` as a WhatsApp voice note from this agent. See
+    /// [`crate::whatsapp::WhatsAppResource::send_voice_note`].
+    pub fn send_whatsapp_voice_note(
+        &self,
+        o: &crate::whatsapp::WhatsAppSendOptions,
+        fallback_to_text: bool,
+    ) -> Result<crate::whatsapp::WhatsAppMessage> {
+        let mut o = o.clone();
+        o.agent_identity_id = Some(self.id());
+        self.inkbox.whatsapp().send_voice_note(&o, fallback_to_text)
     }
     pub fn get_whatsapp_message(&self, id: &Uuid) -> Result<crate::whatsapp::WhatsAppMessage> {
         self.inkbox.whatsapp().get(id, Some(&self.id()))

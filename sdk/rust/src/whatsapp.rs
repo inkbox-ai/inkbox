@@ -456,6 +456,24 @@ impl WhatsAppResource {
     /// Submission failures retain the key in [`InkboxError::idempotency_key`],
     /// and the original failure in [`InkboxError::original_error`].
     pub fn send(&self, o: &WhatsAppSendOptions) -> Result<WhatsAppMessage> {
+        self.send_message(o, None)
+    }
+    /// Speak `o.text` (at most 600 characters, no media) in the agent's voice and send it
+    /// as a native voice note. With `fallback_to_text`, the text is sent as an ordinary
+    /// message instead when the voice note can't be produced; false makes the send fail.
+    /// Key handling matches [`Self::send`].
+    pub fn send_voice_note(
+        &self,
+        o: &WhatsAppSendOptions,
+        fallback_to_text: bool,
+    ) -> Result<WhatsAppMessage> {
+        self.send_message(o, Some(fallback_to_text))
+    }
+    fn send_message(
+        &self,
+        o: &WhatsAppSendOptions,
+        voice_note_fallback: Option<bool>,
+    ) -> Result<WhatsAppMessage> {
         if o.gif_playback == Some(true) && o.media_ids.as_ref().map_or(true, |v| v.is_empty()) {
             return Err(InkboxError::InvalidArgument(
                 "gif_playback requires one MP4 media attachment".into(),
@@ -503,6 +521,15 @@ impl WhatsAppResource {
             body.as_object_mut()
                 .expect("send options serialize to an object")
                 .remove("plain_reply_fallback");
+        }
+        if let Some(fallback_to_text) = voice_note_fallback {
+            let body = body
+                .as_object_mut()
+                .expect("send options serialize to an object");
+            body.insert("send_as_voice_note".into(), serde_json::json!(true));
+            if !fallback_to_text {
+                body.insert("fallback_to_text".into(), serde_json::json!(false));
+            }
         }
         let key = o
             .idempotency_key

@@ -2,9 +2,18 @@
 import type { HttpTransport } from "./_http.js";
 import type { SlackPageOptions } from "./slack.js";
 import type { SenderAccess } from "./sender_access.js";
+import type { RawMediaTranscription } from "./media.js";
 import { archiveIncluded, cachedEmoji, cachedReaction } from "./slack-cache.js";
 import type { CachedWire, RawArchiveIncluded, SlackArchiveInclude, SlackArchiveIncluded,
   SlackCachedEmoji, SlackCachedEmojiOptions, SlackCachedEmojiPage, SlackCachedMediaKind, SlackCachedReaction } from "./slack-cache.js";
+
+/** Lowercase hyphenated form, so compact and canonical UUID spellings compare equal. */
+function canonicalUuid(value: string): string {
+  const hex = value.toLowerCase().replace(/[{}-]/g, "");
+  return /^[0-9a-f]{32}$/.test(hex)
+    ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+    : value.toLowerCase();
+}
 
 export type SlackProcessingStatus =
   "active" | "processing" | "suspended" | "closed";
@@ -105,7 +114,8 @@ export interface SlackArchivedMessage {
   threadTs: string | null;
   userId: string | null;
   text: string;
-  files: Record<string, unknown>[];
+  /** Retained file metadata. Audio files carry `transcription` (`status`, `text`, `error_code`). */
+  files: (Record<string, unknown> & { transcription?: RawMediaTranscription })[];
   mentioned: boolean;
   source: "event" | "backfill" | "action";
   capturedAt: Date;
@@ -154,6 +164,8 @@ export interface SlackArchiveMessagesOptions extends SlackPageOptions {
   /** Page roots, broadcasts, and retained replies whose root is unavailable. */
   rootsOnly?: boolean;
   include?: SlackArchiveInclude[];
+  /** Return only this retained message, such as a received event's `data.message_id`. */
+  messageId?: string;
   conversationId?: string;
   threadTs?: string | null;
   beforeTs?: string | null;
@@ -161,7 +173,7 @@ export interface SlackArchiveMessagesOptions extends SlackPageOptions {
 }
 export interface SlackArchiveSearchOptions extends Omit<
   SlackArchiveMessagesOptions,
-  "threadTs" | "latestPerConversation" | "rootsOnly" | "include"
+  "threadTs" | "latestPerConversation" | "rootsOnly" | "include" | "messageId"
 > {
   userId?: string;
 }
@@ -632,11 +644,25 @@ export class SlackOperationsResource {
     connectionId: string,
     options: SlackArchiveMessagesOptions = {},
   ): Promise<SlackArchiveMessagesResponse> {
-    return this.archiveMessages(`${base(connectionId)}/archive/messages`, options, {
+    const page = await this.archiveMessages(`${base(connectionId)}/archive/messages`, options, {
       latest_per_conversation: options.latestPerConversation,
       roots_only: options.rootsOnly,
       include: options.include?.join(","),
+      message_id: options.messageId,
     });
+    if (options.messageId === undefined) return page;
+    // An API without the filter returns the newest messages instead; keep only
+    // the requested message.
+    const wanted = canonicalUuid(options.messageId);
+    const messages = page.messages.filter((message) => canonicalUuid(message.id) === wanted);
+    return {
+      ...page,
+      messages,
+      // The expansions describe the discarded rows too; drop them.
+      included: messages.length === page.messages.length ? page.included : null,
+      nextCursor: null,
+      pageBoundary: null,
+    };
   }
   async listCachedEmoji(connectionId: string, options: SlackCachedEmojiOptions = {}): Promise<SlackCachedEmojiPage> {
     const r = await this.http.get<{ emoji: CachedWire<SlackCachedEmoji>[]; next_cursor?: string | null;

@@ -880,7 +880,10 @@ export interface SlackWebhookData {
   actor_id?: string | null;
   actor_profile?: SlackActorProfile | null;
   contact_id?: string | null;
+  /** On received-message events, the retained message ID when the message is retained; it matches `message.transcription_finished` `data.message_id`. */
+  message_id?: string;
   message_kinds: import("../slack.js").SlackMessageKind[];
+  /** Event content. Enrolled audio items in `event.files` carry `transcription`; other files omit it. */
   event: Record<string, unknown>;
 }
 export interface SlackWebhookPayload {
@@ -908,15 +911,23 @@ export interface MessageTranscriptionFinishedWebhookPayload {
   data: MessageTranscriptionFinishedWebhookData;
 }
 
-export type MessageTranscriptionFinishedWebhookData = {
+export type MessageTranscriptionFinishedWebhookData =
+  | ({
+      message_id: string;
+      contacts: WebhookContact[];
+      agent_identities: WebhookAgentIdentity[];
+    } & (
+      | { channel: "text"; text_message: TextWebhookMessage; recipient_phone_number: string | null }
+      | { channel: "imessage"; message: IMessageWebhookMessage; reaction: null }
+      | { channel: "whatsapp"; message: WhatsAppWebhookMessage; reaction?: null }
+    ))
+  | SlackTranscriptionFinishedWebhookData;
+
+/** The original Slack message; each audio item in `event.files` carries its `transcription`. */
+export type SlackTranscriptionFinishedWebhookData = Omit<SlackWebhookData, "message_id"> & {
+  channel: "slack";
   message_id: string;
-  contacts: WebhookContact[];
-  agent_identities: WebhookAgentIdentity[];
-} & (
-  | { channel: "text"; text_message: TextWebhookMessage; recipient_phone_number: string | null }
-  | { channel: "imessage"; message: IMessageWebhookMessage; reaction: null }
-  | { channel: "whatsapp"; message: WhatsAppWebhookMessage; reaction?: null }
-);
+};
 
 /** The external request as received. Hop-by-hop, cookie and authorization headers are removed. */
 export interface InboundWebhookRequest {

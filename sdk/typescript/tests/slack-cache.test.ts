@@ -47,6 +47,43 @@ it("keeps legacy reads unexpanded with unknown state", async () => {
   expect(page.messages[0]).toMatchObject({ reactions: null, reactionsComplete: null, replyCount: null });
   expect(Object.fromEntries(new URL(String(fetch.mock.calls[0][0])).searchParams)).toEqual({ limit: "50" });
 });
+it("reads one retained message by ID with its file transcription", async () => {
+  const raw = structuredClone(data.page); delete raw.included;
+  const transcription = { status: "completed", text: "See you at noon", error_code: null };
+  raw.messages[0].files = [{ id: "F123", name: "clip.m4a", transcription }];
+  const { fetch, client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, { messageId: raw.messages[0].id });
+  expect(Object.fromEntries(new URL(String(fetch.mock.calls[0][0])).searchParams)).toEqual({
+    message_id: raw.messages[0].id, limit: "50",
+  });
+  expect(page.messages[0].files[0].transcription).toEqual(transcription);
+});
+it("returns no row for a message ID an older API ignored", async () => {
+  const raw = structuredClone(data.page); delete raw.included;
+  raw.next_cursor = "older";
+  const { client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, { messageId: "33333333-3333-4333-8333-333333333333" });
+  expect(page.messages).toEqual([]);
+  expect(page.nextCursor).toBeNull();
+});
+it("drops expansions describing rows an older API returned for a message ID", async () => {
+  const raw = structuredClone(data.page);
+  expect(raw.included).toBeTruthy();
+  const { client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, {
+    messageId: "33333333-3333-4333-8333-333333333333", include: ["files"],
+  });
+  expect(page.messages).toEqual([]);
+  expect(page.included).toBeNull();
+});
+it("matches a compact message ID against the canonical response and keeps expansions", async () => {
+  const raw = structuredClone(data.page);
+  raw.messages = raw.messages.slice(0, 1);
+  const { client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, { messageId: raw.messages[0].id.replaceAll("-", "").toUpperCase() });
+  expect(page.messages.map((message) => message.id)).toEqual([raw.messages[0].id]);
+  expect(page.included).not.toBeNull();
+});
 it("searches one cached emoji page without following its cursor", async () => {
   const { fetch, client } = setup(data.emoji_page);
   const page = await client.slack.listCachedEmoji(C, { q: "party +", limit: 2, cursor: "previous" });

@@ -83,3 +83,34 @@ test("buildTextSendOptions rejects empty content", () => {
     error: "Pass --text, --media-url, or both.",
   });
 });
+
+test("buildTextSendOptions sends voice note options only when set", () => {
+  assert.deepEqual(buildTextSendOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    text: "Hello",
+    voiceNote: true,
+    fallbackToText: false,
+  }), {
+    sendOptions: { to: "+15551234567", text: "Hello", sendAsVoiceNote: true, fallbackToText: false },
+  });
+  assert.deepEqual(buildTextSendOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    text: "Hello",
+    voiceNote: true,
+    fallbackToText: true,
+  }), { sendOptions: { to: "+15551234567", text: "Hello", sendAsVoiceNote: true } });
+  assert.deepEqual(buildTextSendOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    mediaUrl: ["https://example.com/a.jpg"],
+    voiceNote: true,
+  }), { error: "--voice-note requires --text and no --media-url." });
+  assert.deepEqual(buildTextSendOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    text: "Hello",
+    fallbackToText: false,
+  }), { error: "--no-fallback-to-text requires --voice-note." });
+});
