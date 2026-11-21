@@ -178,7 +178,7 @@ export function registerInboundCommands(program: Command): void {
     if ((opts.source === undefined) === !signature) throw new Error("use either --source or signature options with --header and --secret-stdin");
     const raw = await readFile(opts.bodyFile);
     let body: string | Uint8Array;
-    try { body = new TextDecoder("utf-8", { fatal: true }).decode(raw); } catch { body = raw; }
+    try { body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw); } catch { body = raw; }
     const global = getGlobalOpts(this);
     const result = await createClient(global).inbound.checkSignature(handle, {
       headers, body, ...(signature ? { signature } : { sourceId: opts.source }),

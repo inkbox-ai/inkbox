@@ -366,9 +366,8 @@ fn create_hosted_sends_mailbox_options() {
         ..Default::default()
     };
     let identity = client
-        .identities()
-        .create_hosted("agent", None, Some(&mailbox), None, None)
+        .create_hosted_identity_with("agent", None, Some(&mailbox), None, None)
         .unwrap();
     create.assert();
-    assert!(identity.tunnel.is_none());
+    assert!(identity.tunnel().is_none());
 }

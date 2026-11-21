@@ -126,15 +126,18 @@ test("check-signature sends a sample with settings or a saved source", async () 
     const dir = mkdtempSync(join(tmpdir(), "inbound-check-"));
     writeFileSync(join(dir, "body.json"), '{"ok":true}');
     writeFileSync(join(dir, "body.bin"), Buffer.from([0xff]));
+    writeFileSync(join(dir, "bom.json"), "\ufeff{}");
     const human = await run(["check-signature", "agent", "--secret-stdin", "--header", "X-Sig", "--sample-header", "X-Sig: 00",
       "--sample-header", "X-Id:42", "--body-file", join(dir, "body.json")], {stdin: "s", json: false});
     assert.equal(human.code, 1);
     assert.match(human.stdout, /Signature is not valid: Signature does not match/);
     const json = await run(["check-signature", "agent", "--source", "src_1", "--body-file", join(dir, "body.bin")]);
     assert.deepEqual(JSON.parse(json.stdout), {verified: false, reason: "Signature does not match"});
+    await run(["check-signature", "agent", "--source", "src_1", "--body-file", join(dir, "bom.json")]);
     assert.deepEqual(requests.map(r => [r.method, r.path, r.body]), [
       ["POST", `${base}/signature-check`, {headers: {"X-Sig": "00", "X-Id": "42"}, body: '{"ok":true}', signature: {secret: "s", header: "X-Sig"}}],
       ["POST", `${base}/signature-check`, {headers: {}, body: "/w==", body_encoding: "base64", source_id: "src_1"}],
+      ["POST", `${base}/signature-check`, {headers: {}, body: "\ufeff{}", source_id: "src_1"}],
     ]);
   });
 });

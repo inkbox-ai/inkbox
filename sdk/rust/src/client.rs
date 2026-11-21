@@ -666,9 +666,26 @@ impl Inkbox {
 
     /// Create a hosted identity. No tunnel is created.
     pub fn create_hosted_identity(self: &Arc<Self>, agent_handle: &str) -> Result<AgentIdentity> {
-        let data = self
-            .identities
-            .create_hosted(agent_handle, None, None, None, None)?;
+        self.create_hosted_identity_with(agent_handle, None, None, None, None)
+    }
+
+    /// Create a hosted identity with a display name, mailbox, phone number or
+    /// vault secrets. No tunnel is created.
+    pub fn create_hosted_identity_with(
+        self: &Arc<Self>,
+        agent_handle: &str,
+        display_name: Option<&str>,
+        mailbox: Option<&IdentityMailboxCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
+    ) -> Result<AgentIdentity> {
+        let data = self.identities.create_hosted(
+            agent_handle,
+            display_name,
+            mailbox,
+            phone_number,
+            vault_secret_ids,
+        )?;
         Ok(AgentIdentity::new(data, self.clone()))
     }
 
