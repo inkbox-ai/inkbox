@@ -636,12 +636,22 @@ export class SlackOperationsResource {
     connectionId: string,
     options: SlackArchiveMessagesOptions = {},
   ): Promise<SlackArchiveMessagesResponse> {
-    return this.archiveMessages(`${base(connectionId)}/archive/messages`, options, {
+    const page = await this.archiveMessages(`${base(connectionId)}/archive/messages`, options, {
       latest_per_conversation: options.latestPerConversation,
       roots_only: options.rootsOnly,
       include: options.include?.join(","),
       message_id: options.messageId,
     });
+    if (options.messageId === undefined) return page;
+    // An API without the filter returns the newest messages instead; keep only
+    // the requested message.
+    const wanted = options.messageId.toLowerCase();
+    return {
+      ...page,
+      messages: page.messages.filter((message) => message.id.toLowerCase() === wanted),
+      nextCursor: null,
+      pageBoundary: null,
+    };
   }
   async listCachedEmoji(connectionId: string, options: SlackCachedEmojiOptions = {}): Promise<SlackCachedEmojiPage> {
     const r = await this.http.get<{ emoji: CachedWire<SlackCachedEmoji>[]; next_cursor?: string | null;

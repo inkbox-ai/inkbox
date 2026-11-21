@@ -58,6 +58,14 @@ it("reads one retained message by ID with its file transcription", async () => {
   });
   expect(page.messages[0].files[0].transcription).toEqual(transcription);
 });
+it("returns no row for a message ID an older API ignored", async () => {
+  const raw = structuredClone(data.page); delete raw.included;
+  raw.next_cursor = "older";
+  const { client } = setup(raw);
+  const page = await client.slack.listArchivedMessages(C, { messageId: "33333333-3333-4333-8333-333333333333" });
+  expect(page.messages).toEqual([]);
+  expect(page.nextCursor).toBeNull();
+});
 it("searches one cached emoji page without following its cursor", async () => {
   const { fetch, client } = setup(data.emoji_page);
   const page = await client.slack.listCachedEmoji(C, { q: "party +", limit: 2, cursor: "previous" });

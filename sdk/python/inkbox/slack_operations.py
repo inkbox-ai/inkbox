@@ -620,7 +620,7 @@ class SlackOperationsMixin:
         event's ``data["message_id"]``. Audio file entries in ``files`` carry a
         ``transcription`` (``status``, ``text``, ``error_code``).
         """
-        return self._archive_messages(
+        result = self._archive_messages(
             f"{_base(connection_id)}/archive/messages",
             {
                 "message_id": str(message_id) if message_id is not None else None,
@@ -635,6 +635,14 @@ class SlackOperationsMixin:
                 "include": ",".join(include) if include is not None else None,
             },
         )
+        if message_id is not None:
+            # An API without the filter returns the newest messages instead; keep
+            # only the requested message.
+            wanted = str(UUID(str(message_id)))
+            result.messages = [message for message in result.messages if str(message.id).lower() == wanted]
+            result.next_cursor = None
+            result.page_boundary = None
+        return result
 
     def list_cached_emoji(
         self, connection_id: UUID | str, *, q: str | None = None,
