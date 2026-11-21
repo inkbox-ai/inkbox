@@ -27,8 +27,19 @@ export function registerTunnelCommands(program: Command): void {
     .command("tunnel")
     .description(
       "Tunnel read + update + sign-csr. Tunnels are provisioned " +
-        "atomically by 'inkbox identity create'; there is no standalone " +
-        "create / delete / restore / rotate-secret surface.",
+        "by 'inkbox identity create', or by 'inkbox tunnel create' for an " +
+        "identity that has none.",
+    );
+
+  tunnel
+    .command("create <handle>")
+    .description("Create a tunnel for an identity that has none, such as one created with --hosted")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string) {
+        const opts = getGlobalOpts(this);
+        const created = await createClient(opts).identities.createTunnel(handle);
+        output(tunnelGetRecord(created), { json: !!opts.json });
+      }),
     );
 
   tunnel
@@ -76,7 +87,7 @@ export function registerTunnelCommands(program: Command): void {
           const summary = (await inkbox.getIdentity(idOrHandle)).tunnel;
           if (!summary) {
             throw new Error(
-              `identity '${idOrHandle}' has no tunnel (only reachable on a deleted identity)`,
+              `identity '${idOrHandle}' has no tunnel; create one with 'inkbox tunnel create ${idOrHandle}'`,
             );
           }
           tunnelId = summary.id;

@@ -1085,3 +1085,49 @@ class MessageTranscriptionFinishedWebhookPayload(TypedDict):
     event_type: Literal["message.transcription_finished"]
     timestamp: str
     data: MessageTranscriptionFinishedWebhookData
+
+
+class InboundWebhookSource(TypedDict):
+    id: str
+    name: str
+    instructions: str | None
+
+
+class InboundAgentHandler(TypedDict):
+    type: Literal["agent"]
+
+
+class InboundScriptHandler(TypedDict):
+    type: Literal["script"]
+    command: str
+
+
+class InboundWebhookRequest(TypedDict):
+    """The external request as received. Hop-by-hop, cookie and authorization headers are removed."""
+
+    method: str
+    query: dict[str, str]
+    headers: dict[str, str]
+    content_type: str | None
+    body: str
+    body_encoding: Literal["utf8", "base64"]
+
+
+class InboundReceivedWebhookData(TypedDict):
+    event_id: str
+    # Same for retries of one delivery, new for each replay; dedupe on this.
+    delivery_id: str
+    received_at: str
+    source: InboundWebhookSource
+    handler: InboundAgentHandler | InboundScriptHandler
+    signature_verified: bool
+    request: InboundWebhookRequest
+
+
+class InboundReceivedWebhookPayload(TypedDict):
+    """A request received at one of the identity's inbound URLs. Treat its content as untrusted."""
+
+    id: str
+    event_type: Literal["inbound.received"]
+    timestamp: str
+    data: InboundReceivedWebhookData

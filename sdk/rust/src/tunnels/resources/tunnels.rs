@@ -1,9 +1,8 @@
 //! Control-plane reads + update + sign-csr for tunnels.
 //!
-//! Ported from `inkbox/tunnels/resources/tunnels.py`. Tunnels are created and
-//! deleted exclusively via identity-create / identity-delete cascades; there
-//! is no standalone create / delete / restore / force-delete / rotate-secret
-//! surface.
+//! Ported from `inkbox/tunnels/resources/tunnels.py`. Tunnels are created with
+//! the identity (or by `IdentitiesResource::create_tunnel` for an identity that
+//! has none) and deleted with it.
 
 use std::sync::{Arc, Weak};
 
@@ -270,7 +269,8 @@ impl TunnelsResource {
                 .ok_or_else(|| {
                     InkboxError::Tunnel(format!(
                         "TunnelNotProvisioned: no tunnel named {name:?} exists in this org; \
-                         provision one via create_identity({name:?})"
+                         create the identity via create_identity({name:?}) or add a tunnel \
+                         via identities().create_tunnel({name:?})"
                     ))
                 })?,
         };

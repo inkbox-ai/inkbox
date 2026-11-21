@@ -55,6 +55,7 @@ pub mod contact_rules;
 pub mod contacts;
 pub mod identities;
 pub mod imessage;
+pub mod inbound;
 pub mod mail;
 pub mod message_sends;
 pub mod notes;

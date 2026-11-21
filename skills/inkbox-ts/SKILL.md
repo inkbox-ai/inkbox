@@ -1319,7 +1319,7 @@ await connect(inkbox, {
 });
 ```
 
-Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `rotateSecret` surface.
+Tunnels are provisioned atomically by `inkbox.createIdentity(...)`. An identity without one (for example, created with `hosted: true`) gets an edge tunnel from `await inkbox.identities.createTunnel("my-app")`; it returns `409 tunnel_exists` if one is already there. There is no `delete` / `restore` / `rotateSecret` surface.
 
 `listener.status` is `idle`, `connecting`, `connected`, `reconnecting`,
 `closed`, or `superseded`. `listener.isConnected` is local runtime liveness;
@@ -1434,6 +1434,54 @@ await inkbox.webhooks.subscriptions.update(created.id, { scope: "identity", cont
 **Phone/text contact / identity resolution:** `data.contacts` (text) and top-level `contacts` (inbound call) are lists of `{ id, name, memories }` matches; `memories` contains active memory text newest-first. `data.agent_identities` mirrors contacts for matched agent identities but does not carry memories. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data.text_message.recipients`; **outbound group lifecycle** events name the event target in `data.recipient_phone_number` (one webhook per recipient leg). Inbound and outbound 1:1 events leave `data.recipient_phone_number` as `null` — the singular peer is already in `data.text_message.remote_phone_number` (inbound) or `data.text_message.recipients[0]` (outbound 1:1).
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, the conversation-context shapes (`WebhookContext`, `WebhookContextBlock`, `WebhookTranscriptEntry`, and item types), plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
+
+## Hosted Agent URL & Inbound Sources
+
+```typescript
+const identity = await inkbox.createIdentity("my-agent", { hosted: true }); // no tunnel; identity.tunnel is null
+const ids = inkbox.identities;
+// Enable hosting, then wait for the machine before using ports or inbound sources.
+let hosting = await ids.updateHosting("my-agent", {
+  expectedGeneration: (await ids.getHosting("my-agent")).generation, harness: "codex",
+});
+while (hosting.state === "provisioning") {
+  await new Promise((r) => setTimeout(r, 5000));
+  hosting = await ids.getHosting("my-agent");
+}
+if (hosting.state !== "ready") throw new Error(hosting.lastError ?? hosting.state);
+hosting.url;                                                   // agent's public URL
+
+const ports = await ids.getHostingPorts("my-agent");           // url, defaultPort, version, ports[{ port, public, url }]
+// Pass the version you read; a concurrent edit returns 409 stale_version (re-read and retry).
+await ids.updateHostingPorts("my-agent", {
+  version: ports.version, defaultPort: 3000, ports: [{ port: 3000, public: false }, { port: 8080, public: true }],
+});
+await ids.rotateHostingPortToken("my-agent", 3000);            // old tokenUrl stops working
+```
+
+Private ports are reachable through `tokenUrl` (treat it as a secret; only `updateHostingPorts` responses that issue a token and `rotateHostingPortToken` include it) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
+Inbound sources give a hosted identity public URLs for third-party webhooks.
+Each request is optionally signature-checked, then delivered to the agent as
+an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).
+
+```typescript
+const src = await inkbox.inbound.createSource("my-agent", {
+  name: "payments",
+  signature: { // Stripe-style: Stripe-Signature: t=<unix>,v1=<hex HMAC of "<t>.<body>">
+    secret: signingSecret, header: "Stripe-Signature", format: "list", formatValue: "v1",
+    signedContent: "{timestamp}.{body}", timestampFrom: "list", timestampValue: "t", maxAgeSeconds: 300,
+  },
+  handler: { type: "agent", instructions: "Reconcile the payment." }, // or { type: "script", command: "./handle.sh" }
+});
+console.log(src.url);                                         // give this to the sender
+await inkbox.inbound.updateSource("my-agent", src.id, { signature: null }); // omit = unchanged, null = remove check
+await inkbox.inbound.rotateSource("my-agent", src.id);        // new URL; old URL stops accepting
+const page = await inkbox.inbound.listEvents("my-agent", src.id, { limit: 20 }); // page.events, page.nextCursor
+const event = await inkbox.inbound.getEvent("my-agent", src.id, page.events[0].id); // includes event.request
+await inkbox.inbound.replayEvent("my-agent", src.id, event.id);
+```
+
+Signature settings are one generic HMAC check: `header` (required), `secretEncoding` (`text`/`base64`; base64 ignores a leading `whsec_`), `format` (`whole`/`prefix`/`list`) with `formatValue` (prefix such as `sha256=` or list key such as `v1`), `algorithm` (`sha256`/`sha1`/`sha512`), `encoding` (`hex`/`base64`), `signedContent` (must include `{body}`; may use `{timestamp}`, `{header:Name}` and fixed text), `timestampFrom` (`none`/`header`/`list`) with `timestampValue`, and `maxAgeSeconds`. Secrets are never returned. Test settings without saving: `inkbox.inbound.checkSignature("my-agent", { signature, headers, body })` or `{ sourceId: src.id, ... }`; returns `verified` and `reason`.
 
 ## Error Handling
 

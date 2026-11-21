@@ -1316,7 +1316,7 @@ reconnecting. `listener.tunnel` remains the bootstrap resource snapshot.
 `listener.close()` raises `TimeoutError` if its runtime thread cannot stop within
 30 seconds.
 
-Tunnels are provisioned atomically by `inkbox.create_identity(...)`; there is no standalone `create` / `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
+Tunnels are provisioned atomically by `inkbox.create_identity(...)`. An identity without one (for example, created with `hosted=True`) gets an edge tunnel from `inkbox.identities.create_tunnel("my-app")`; it returns `409 tunnel_exists` if one is already there. There is no `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
 
 Reads + edit:
 
@@ -1419,6 +1419,51 @@ inkbox.webhooks.subscriptions.update(created.id, scope="identity", context_confi
 **Phone/text contact / identity resolution:** `data["contacts"]` (text) and top-level `contacts` (inbound call) are lists of `{"id", "name", "memories"}` matches; `memories` contains active memory text newest-first. `data["agent_identities"]` mirrors contacts for matched agent identities but does not carry memories. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data["text_message"]["recipients"]`; **outbound group lifecycle** events name the event target in `data["recipient_phone_number"]` (one webhook per recipient leg). Inbound and outbound 1:1 events leave `data["recipient_phone_number"]` as `None` — the singular peer is already in `data["text_message"]["remote_phone_number"]` (inbound) or `data["text_message"]["recipients"][0]` (outbound 1:1).
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `TextMessageRecipientWire`, the conversation-context shapes (`WebhookContextWire`, `WebhookContextBlockWire`, `WebhookTranscriptEntryWire`, and item wire types), plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
+
+## Hosted Agent URL & Inbound Sources
+
+```python
+import time
+
+identity = inkbox.create_identity("my-agent", hosted=True)   # no tunnel; identity.tunnel is None
+ids = inkbox.identities
+# Enable hosting, then wait for the machine before using ports or inbound sources.
+hosting = ids.update_hosting("my-agent", {"expected_generation": ids.get_hosting("my-agent").generation, "harness": "codex"})
+while hosting.state == "provisioning":
+    time.sleep(5)
+    hosting = ids.get_hosting("my-agent")
+assert hosting.state == "ready", hosting.last_error
+hosting.url                                                   # agent's public URL
+
+ports = ids.get_hosting_ports("my-agent")                     # url, default_port, version, ports[{port, public, url}]
+# Pass the version you read; a concurrent edit returns 409 stale_version (re-read and retry).
+ids.update_hosting_ports("my-agent", {"version": ports.version, "default_port": 3000, "ports": [{"port": 3000, "public": False}, {"port": 8080, "public": True}]})
+ids.rotate_hosting_port_token("my-agent", 3000)               # old token_url stops working
+```
+
+Private ports are reachable through `token_url` (treat it as a secret; only `update_hosting_ports` responses that issue a token and `rotate_hosting_port_token` include it) or with an Inkbox API key that has access to the agent; an API key reaches any port, listed or not.
+Inbound sources give a hosted identity public URLs for third-party webhooks.
+Each request is optionally signature-checked, then delivered to the agent as
+an `inbound.received` event (`InboundReceivedWebhookPayload`; the body is untrusted).
+
+```python
+src = inkbox.inbound.create_source(
+    "my-agent", name="payments",
+    signature={  # Stripe-style: Stripe-Signature: t=<unix>,v1=<hex HMAC of "<t>.<body>">
+        "secret": signing_secret, "header": "Stripe-Signature", "format": "list", "format_value": "v1",
+        "signed_content": "{timestamp}.{body}", "timestamp_from": "list", "timestamp_value": "t", "max_age_seconds": 300,
+    },
+    handler={"type": "agent", "instructions": "Reconcile the payment."},  # or {"type": "script", "command": "./handle.sh"}
+)
+print(src.url)                                                # give this to the sender
+inkbox.inbound.update_source("my-agent", src.id, signature=None)  # omit = unchanged, None = remove check
+inkbox.inbound.rotate_source("my-agent", src.id)              # new URL; old URL stops accepting
+page = inkbox.inbound.list_events("my-agent", src.id, limit=20)    # page.events, page.next_cursor
+event = inkbox.inbound.get_event("my-agent", src.id, page.events[0].id)  # includes event.request
+inkbox.inbound.replay_event("my-agent", src.id, event.id)
+```
+
+Signature settings are one generic HMAC check: `header` (required), `secret_encoding` (`text`/`base64`; base64 ignores a leading `whsec_`), `format` (`whole`/`prefix`/`list`) with `format_value` (prefix such as `sha256=` or list key such as `v1`), `algorithm` (`sha256`/`sha1`/`sha512`), `encoding` (`hex`/`base64`), `signed_content` (must include `{body}`; may use `{timestamp}`, `{header:Name}` and fixed text), `timestamp_from` (`none`/`header`/`list`) with `timestamp_value`, and `max_age_seconds`. Secrets are never returned. Test settings without saving: `inkbox.inbound.check_signature("my-agent", signature={...}, headers={...}, body=raw)` or `source_id=src.id`; returns `verified` and `reason`.
 
 ## Error Handling
 
