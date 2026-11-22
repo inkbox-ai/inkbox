@@ -2251,9 +2251,11 @@ await identity.sendIMessage({
 ```
 
 `fallbackToText` defaults to `true`: when the voice note can't be produced, including
-text over 600 characters, the text is sent as an ordinary message. Pass
+text over 600 characters or an SMS/MMS recipient outside the US and Canada (SMS/MMS voice
+notes go only to US and Canadian numbers), the text is sent as an ordinary message. Pass
 `fallbackToText: false` to fail instead (`422 voice_note_text_too_long`,
-`502 voice_note_unavailable`, or `409 whatsapp_capability_not_ready`).
+`422 voice_note_unsupported_destination`, `502 voice_note_unavailable`, or
+`409 whatsapp_capability_not_ready`).
 
 A voice note has no message text. The spoken text is stored with the message as the
 audio attachment's completed `transcription`. iMessage, SMS/MMS and WhatsApp send
