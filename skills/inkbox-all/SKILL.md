@@ -284,8 +284,8 @@ Rust's `fallback_to_text` argument, or `--no-fallback-to-text` (CLI) to fail ins
 `409 whatsapp_capability_not_ready`).
 
 A voice note has no message text. The spoken text is stored with the message as the
-audio attachment's completed `transcription`. iMessage and WhatsApp send responses
-include it; on SMS/MMS it appears on the next read of the message. On Slack, the
+audio attachment's completed `transcription`. iMessage, SMS/MMS and WhatsApp send
+responses include it, as do later reads. On Slack, the
 uploaded audio file carries it in archived message reads once Slack confirms which
 message the upload became, which is nearly always. A fallback comes back as an
 ordinary text message.
