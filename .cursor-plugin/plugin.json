@@ -2,7 +2,7 @@
   "name": "inkbox",
   "displayName": "Inkbox",
   "version": "1.0.6",
-  "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, Slack, voice calls, contacts, notes, and agent-to-agent tasks.",
+  "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, WhatsApp, Slack, voice calls, contacts, notes, and agent-to-agent tasks.",
   "author": {
     "name": "Inkbox",
     "email": "hello@inkbox.ai"
@@ -15,6 +15,8 @@
     "email",
     "sms",
     "imessage",
+    "slack",
+    "whatsapp",
     "voice",
     "calls",
     "agent2agent",

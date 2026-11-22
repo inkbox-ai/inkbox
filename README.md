@@ -58,8 +58,8 @@ optional notices. See the [Companion mode guide](https://inkbox.ai/docs/capabili
 Inkbox is available in the
 [Cursor Marketplace](https://cursor.com/marketplace/inkbox). The plugin is an
 MCP-only package that connects to `https://inkbox.ai/mcp/cursor` and gives
-Cursor an Inkbox identity for email, SMS, iMessage, Slack, voice calls,
-contacts, notes, and agent-to-agent tasks.
+Cursor an Inkbox identity for email, SMS, iMessage, WhatsApp, Slack, voice
+calls, contacts, notes, and agent-to-agent tasks.
 
 Install **Inkbox** from Cursor's **Customize** view, enable the Inkbox MCP
 server, and select **Connect** to authorize an organization and identity in the
