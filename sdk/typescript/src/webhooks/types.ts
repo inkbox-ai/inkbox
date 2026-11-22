@@ -917,3 +917,32 @@ export type MessageTranscriptionFinishedWebhookData = {
   | { channel: "imessage"; message: IMessageWebhookMessage; reaction: null }
   | { channel: "whatsapp"; message: WhatsAppWebhookMessage; reaction?: null }
 );
+
+/** The external request as received. Hop-by-hop, cookie and authorization headers are removed. */
+export interface InboundWebhookRequest {
+  method: string;
+  query: Record<string, string>;
+  headers: Record<string, string>;
+  content_type: string | null;
+  body: string;
+  body_encoding: "utf8" | "base64";
+}
+
+export interface InboundReceivedWebhookData {
+  event_id: string;
+  /** Same for retries of one delivery, new for each replay; dedupe on this. */
+  delivery_id: string;
+  received_at: string;
+  source: { id: string; name: string; instructions: string | null };
+  handler: { type: "agent" } | { type: "script"; command: string };
+  signature_verified: boolean;
+  request: InboundWebhookRequest;
+}
+
+/** A request received at one of the identity's inbound URLs. Treat its content as untrusted. */
+export interface InboundReceivedWebhookPayload {
+  id: string;
+  event_type: "inbound.received";
+  timestamp: string;
+  data: InboundReceivedWebhookData;
+}

@@ -24,6 +24,56 @@ pub struct HostingConfiguration {
     pub idle_stop_enabled: bool,
     pub last_error: Option<String>,
     pub updated_at: Option<String>,
+    /// The agent's public URL.
+    #[serde(default)]
+    pub url: Option<String>,
+    /// How Inkbox events reach the agent: `internal`, or `tunnel` over the identity's tunnel.
+    #[serde(default = "default_delivery")]
+    pub delivery: String,
+}
+
+/// Agent URL, default port and per-port access.
+#[derive(Clone, Debug, Deserialize)]
+pub struct HostingPorts {
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub default_port: Option<u16>,
+    #[serde(default)]
+    pub ports: Vec<HostingPort>,
+    #[serde(default)]
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HostingPort {
+    pub port: u16,
+    pub public: bool,
+    #[serde(default)]
+    pub url: Option<String>,
+    /// `url` with a `?_token=` access token; keep private.
+    #[serde(default)]
+    pub token_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct HostingPortSetting {
+    pub port: u16,
+    pub public: bool,
+}
+
+/// Partial update; omitted fields are unchanged. `Unset::Value(None)` clears the default port.
+#[derive(Clone, Debug, Serialize)]
+pub struct HostingPortsUpdate {
+    /// The `version` you read; a stale one gets 409 `stale_version`.
+    pub version: u64,
+    #[serde(
+        skip_serializing_if = "Unset::is_omit",
+        serialize_with = "serialize_port"
+    )]
+    pub default_port: Unset<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Vec<HostingPortSetting>>,
 }
 
 /// Generation-checked partial command. Omitted settings are preserved;
@@ -67,6 +117,16 @@ pub struct HostingUpdate {
     pub reset_instructions: Option<bool>,
 }
 
+fn serialize_port<S: serde::Serializer>(
+    value: &Unset<u16>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match value {
+        Unset::Omit | Unset::Value(None) => serializer.serialize_none(),
+        Unset::Value(Some(port)) => serializer.serialize_u16(*port),
+    }
+}
+
 fn serialize_binding<S: serde::Serializer>(
     value: &Unset<String>,
     serializer: S,
@@ -95,6 +155,10 @@ pub struct HostingDeliveries {
 
 fn default_idle_stop() -> bool {
     true
+}
+
+fn default_delivery() -> String {
+    "tunnel".into()
 }
 
 fn default_model() -> String {

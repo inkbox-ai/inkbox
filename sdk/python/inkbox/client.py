@@ -75,6 +75,7 @@ from inkbox.slack import SlackResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
 from inkbox.webhook_deliveries import WebhookDeliveriesResource
+from inkbox.inbound import InboundResource
 from inkbox.webhook_subscriptions import WebhookSubscriptionsResource
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
@@ -320,6 +321,7 @@ class Inkbox:
         )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+        self.inbound = InboundResource(self._ids_http)
         self.slack = SlackResource(self._api_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
         self._organization_domains = OrganizationDomainsResource(self._api_http)
@@ -566,6 +568,7 @@ class Inkbox:
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
+        hosted: bool | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
         vault_secret_ids: UUID
         | str
@@ -602,6 +605,8 @@ class Inkbox:
                 pass a verified custom-domain name to bind.
             tunnel: Optional nested tunnel spec (tls_mode only).
                 Defaults to edge TLS.
+            hosted: Create a hosted identity. No tunnel is created and
+                ``tunnel`` is ``None``.
             phone_number: Optional phone-number provisioning payload.
             vault_secret_ids: Optional vault secret selection to attach.
 
@@ -628,6 +633,7 @@ class Inkbox:
             claim_imessage_number=claim_imessage_number,
             mailbox=mailbox,
             tunnel=tunnel,
+            hosted=hosted,
             phone_number=phone_number,
             vault_secret_ids=vault_secret_ids,
         )

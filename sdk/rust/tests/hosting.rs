@@ -197,3 +197,177 @@ fn authoritative_server_hosting_fixture() {
         wire["hosting_update"]
     );
 }
+
+#[test]
+fn hosting_url_and_ports_subresource() {
+    use httpmock::prelude::*;
+    use inkbox::identities::{HostingPortSetting, HostingPortsUpdate};
+    let server = MockServer::start();
+    let config = json!({
+        "mode": "inkbox", "identity_id": "identity", "state": "running", "generation": 1,
+        "applied_generation": 1, "instructions": "", "trigger_events": [], "follow_defaults": true,
+        "credential_binding_id": null, "idle_timeout_seconds": 60, "last_error": null, "updated_at": null,
+        "machine_id": null, "harness": null, "tier": null, "shape_id": null,
+        "url": "https://agent.example.test", "delivery": "internal"
+    });
+    let view = json!({
+        "url": "https://agent.example.test", "default_port": 3000, "version": 4,
+        "ports": [
+            {"port": 3000, "public": false, "url": "https://agent.example.test",
+             "token_url": "https://agent.example.test?_token=t"},
+            {"port": 8080, "public": true, "url": null, "token_url": null}
+        ]
+    });
+    let get_hosting = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/identities/agent/hosting");
+        then.status(200).json_body(config.clone());
+    });
+    let get_ports = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/identities/agent/hosting/ports");
+        then.status(200).json_body(view.clone());
+    });
+    let update = server.mock(|when, then| {
+        when.method(httpmock::Method::PATCH)
+            .path("/api/v1/identities/agent/hosting/ports")
+            .json_body(json!({"version": 4, "default_port": null, "ports": [{"port": 8080, "public": true}]}));
+        then.status(200).json_body(view.clone());
+    });
+    let rotate = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/agent/hosting/ports/3000/token");
+        then.status(200).json_body(view.clone());
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let ids = client.identities();
+    let hosting = ids.get_hosting("agent").unwrap();
+    assert_eq!(hosting.url.as_deref(), Some("https://agent.example.test"));
+    assert_eq!(hosting.delivery, "internal");
+    let ports = ids.get_hosting_ports("agent").unwrap();
+    assert_eq!((ports.default_port, ports.version), (Some(3000), 4));
+    assert!(ports.ports[0]
+        .token_url
+        .as_deref()
+        .unwrap()
+        .ends_with("?_token=t"));
+    assert!(ports.ports[1].url.is_none() && ports.ports[1].token_url.is_none());
+    ids.update_hosting_ports(
+        "agent",
+        &HostingPortsUpdate {
+            version: ports.version,
+            default_port: Unset::Value(None),
+            ports: Some(vec![HostingPortSetting {
+                port: 8080,
+                public: true,
+            }]),
+        },
+    )
+    .unwrap();
+    ids.rotate_hosting_port_token("agent", 3000).unwrap();
+    get_hosting.assert();
+    get_ports.assert();
+    update.assert();
+    rotate.assert();
+    assert_eq!(
+        serde_json::to_value(HostingPortsUpdate {
+            version: 4,
+            default_port: Unset::Omit,
+            ports: None
+        })
+        .unwrap(),
+        json!({"version": 4})
+    );
+
+    let mut legacy = config;
+    legacy.as_object_mut().unwrap().remove("url");
+    legacy.as_object_mut().unwrap().remove("delivery");
+    let legacy: inkbox::identities::HostingConfiguration = serde_json::from_value(legacy).unwrap();
+    assert!(legacy.url.is_none());
+    assert_eq!(legacy.delivery, "tunnel");
+}
+
+#[test]
+fn create_tunnel_for_existing_identity() {
+    use httpmock::prelude::*;
+    let server = MockServer::start();
+    let create = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/identities/agent/tunnel");
+        then.status(201).json_body(json!({
+            "id": "00000000-0000-0000-0000-000000000001", "organization_id": "org_example",
+            "tunnel_name": "agent", "agent_identity_id": "00000000-0000-0000-0000-000000000000",
+            "tls_mode": "edge", "cert_pem": null, "cert_fingerprint_sha256": null,
+            "cert_expires_at": null, "status": "active", "last_connected_at": null,
+            "last_connected_ip_addr": null, "last_disconnected_at": null,
+            "currently_connected": false, "public_host": "agent.example.test",
+            "zone": "example.test", "metadata": {},
+            "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"
+        }));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let tunnel = client.identities().create_tunnel("agent").unwrap();
+    create.assert();
+    assert_eq!(tunnel.tunnel_name, "agent");
+    assert_eq!(tunnel.public_host, "agent.example.test");
+}
+
+#[test]
+fn create_hosted_identity_sends_flag_and_has_no_tunnel() {
+    use httpmock::prelude::*;
+    let server = MockServer::start();
+    let create = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/")
+            .json_body(json!({"agent_handle": "agent", "hosted": true}));
+        then.status(201).json_body(json!({
+            "id": "00000000-0000-0000-0000-000000000000", "organization_id": "org_example",
+            "agent_handle": "agent", "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z", "tunnel": null
+        }));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let identity = client.create_hosted_identity("agent").unwrap();
+    create.assert();
+    assert!(identity.tunnel().is_none());
+}
+
+#[test]
+fn create_hosted_sends_mailbox_options() {
+    use httpmock::prelude::*;
+    use inkbox::identities::IdentityMailboxCreateOptions;
+    let server = MockServer::start();
+    let create = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/identities/")
+            .json_body(json!({
+                "agent_handle": "agent", "hosted": true,
+                "mailbox": {"email_local_part": "support"}
+            }));
+        then.status(201).json_body(json!({
+            "id": "00000000-0000-0000-0000-000000000000", "organization_id": "org_example",
+            "agent_handle": "agent", "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z", "tunnel": null
+        }));
+    });
+    let client = inkbox::Inkbox::builder("synthetic-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let mailbox = IdentityMailboxCreateOptions {
+        email_local_part: Some("support".into()),
+        ..Default::default()
+    };
+    let identity = client
+        .create_hosted_identity_with("agent", None, Some(&mailbox), None, None)
+        .unwrap();
+    create.assert();
+    assert!(identity.tunnel().is_none());
+}

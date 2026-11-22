@@ -58,8 +58,8 @@ export class TunnelCSRStateConflict extends TunnelStateConflict {
 
 /**
  * Raised by `connect()` when no tunnel exists for the supplied name in
- * the calling org. Tunnels are provisioned atomically as part of
- * `inkbox.createIdentity(...)`; they have no standalone create surface.
+ * the calling org. Tunnels are provisioned by `inkbox.createIdentity(...)`,
+ * or by `inkbox.identities.createTunnel(handle)` for an identity that has none.
  */
 export class TunnelNotProvisioned extends TunnelError {
   constructor(message: string) {

@@ -16,6 +16,7 @@ from ._file_lock import lock_file
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_EVENTS = 4096
+MAX_DELIVERY_BYTES = 2 * 1024 * 1024
 RECEIPT_RETENTION = 7 * 86400
 
 
@@ -105,9 +106,9 @@ class ManagedInbox:
                 or not re.fullmatch(r'evt_[a-f0-9]{64}', metadata['event_id'])
                 or envelope.get('id') != metadata['event_id']):
             raise InboxError('Invalid delivery identity')
-        payload = json.dumps(envelope, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        payload = json.dumps(envelope, sort_keys=True, separators=(',', ':'), allow_nan=False, ensure_ascii=False)
         size = len(payload.encode())
-        if size > 512 * 1024:
+        if size > MAX_DELIVERY_BYTES:
             raise InboxError('Delivery exceeds size limit')
         # Rehydrated attachment URLs and source projections can change on retry.
         content = {'event_type': envelope.get('event_type'), 'hosted_delivery': metadata}
@@ -126,10 +127,10 @@ class ManagedInbox:
                     for field in ('data', 'timestamp'):
                         if field in envelope:
                             refreshed[field] = envelope[field]
-                    payload = json.dumps(refreshed, sort_keys=True, separators=(',', ':'), allow_nan=False)
+                    payload = json.dumps(refreshed, sort_keys=True, separators=(',', ':'), allow_nan=False, ensure_ascii=False)
                     size = len(payload.encode())
                     used = self.db.execute("SELECT coalesce(sum(bytes),0) FROM deliveries WHERE state != 'completed' AND settled_at IS NULL").fetchone()[0]
-                    if size > 512 * 1024 or used - row[3] + size > MAX_BYTES:
+                    if size > MAX_DELIVERY_BYTES or used - row[3] + size > MAX_BYTES:
                         raise InboxFull('Delivery inbox is full')
                     self.db.execute("UPDATE deliveries SET payload=?,bytes=? WHERE activation=? AND event_id=? AND state='pending'",
                                     (payload, size, self.activation_id, metadata['event_id']))

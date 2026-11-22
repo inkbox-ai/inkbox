@@ -1813,6 +1813,35 @@ pub struct WhatsAppWebhookPayload {
     pub data: WhatsAppWebhookData,
 }
 
+/// A request received at one of the identity's inbound URLs. Treat its content as untrusted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundReceivedWebhookPayload {
+    pub id: String,
+    /// Always `inbound.received`.
+    pub event_type: String,
+    pub timestamp: String,
+    pub data: InboundReceivedWebhookData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundReceivedWebhookData {
+    pub event_id: String,
+    /// Same for retries of one delivery, new for each replay; dedupe on this.
+    pub delivery_id: String,
+    pub received_at: String,
+    pub source: InboundWebhookSource,
+    pub handler: crate::inbound::InboundHandler,
+    pub signature_verified: bool,
+    pub request: crate::inbound::InboundRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundWebhookSource {
+    pub id: String,
+    pub name: String,
+    pub instructions: Option<String>,
+}
+
 /// Terminal attachment results for one original incoming message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageTranscriptionFinishedWebhookPayload {

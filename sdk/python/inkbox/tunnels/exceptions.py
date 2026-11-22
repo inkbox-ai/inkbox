@@ -54,8 +54,9 @@ class TunnelRemoved(TunnelError):
 
 class TunnelNotProvisioned(TunnelError):
     """Raised by :func:`connect` when no tunnel exists for the supplied
-    name in the calling org. Tunnels are provisioned atomically as part
-    of ``inkbox.create_identity(...)``."""
+    name in the calling org. Tunnels are provisioned by
+    ``inkbox.create_identity(...)``, or by ``inkbox.identities.create_tunnel(handle)``
+    for an identity that has none."""
 
 
 class TunnelSupersededError(TunnelError):

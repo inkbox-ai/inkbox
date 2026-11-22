@@ -4,6 +4,7 @@
  * Inkbox — org-level entry point for all Inkbox APIs.
  */
 
+import { InboundResource } from "./inbound.js";
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
 import { collectResponseNotices, observeResponse, type APIResponse, type ResponseNotice, type ResponseObserver } from "./response_metadata.js";
 import type { InkboxAPIErrorDetail } from "./_http.js";
@@ -163,6 +164,8 @@ export interface InkboxOptions {
 export class Inkbox {
   readonly companion: CompanionResource;
   readonly computers: ComputersResource;
+  /** Inbound sources and events for hosted identities. */
+  readonly inbound: InboundResource;
   readonly messageSends: MessageSendsResource;
   readonly whatsapp: WhatsAppResource;
   readonly _mailboxes: MailboxesResource;
@@ -287,6 +290,7 @@ export class Inkbox {
     this._imessageContactRules = new IMessageContactRulesResource(imessageHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
+    this.inbound = new InboundResource(idsHttp);
 
     this._contacts = new ContactsResource(apiHttp);
     this.messageSends = new MessageSendsResource(apiHttp, this._mailboxes);
@@ -508,6 +512,7 @@ export class Inkbox {
    *   the platform default; pass a verified custom-domain name to bind.
    * @param options.tunnel - Optional nested tunnel spec (tlsMode only).
    *   Defaults to edge TLS.
+   * @param options.hosted - Create a hosted identity; no tunnel is created.
    * @param options.phoneNumber - Optional phone-number provisioning payload.
    * @param options.vaultSecretIds - Optional vault secret selection to attach
    *   to the new identity.
@@ -539,6 +544,7 @@ export class Inkbox {
       createArgs.claimIMessageNumber = true;
     }
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
+    if (options.hosted !== undefined) createArgs.hosted = options.hosted;
     const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);
   }

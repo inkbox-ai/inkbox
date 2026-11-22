@@ -77,6 +77,8 @@ export interface CreateIdentityOptions {
   sendingDomain?: string | null;
   /** Optional nested tunnel spec. Server defaults to edge TLS if omitted. */
   tunnel?: IdentityTunnelCreateOptions;
+  /** Create a hosted identity; no tunnel is created and `tunnel` is null. */
+  hosted?: boolean;
   phoneNumber?: IdentityPhoneNumberCreateOptions;
   vaultSecretIds?: string | string[] | "*" | "all";
 }

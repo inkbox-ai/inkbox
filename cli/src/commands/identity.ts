@@ -475,6 +475,7 @@ export function registerIdentityCommands(program: Command): void {
       "--tls-mode <mode>",
       "Tunnel TLS mode: edge (default) or passthrough.",
     )
+    .option("--hosted", "Create a hosted identity; no tunnel is created.")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -489,8 +490,12 @@ export function registerIdentityCommands(program: Command): void {
           sendingDomain?: string;
           platformDomain?: boolean;
           tlsMode?: string;
+          hosted?: boolean;
         },
       ) {
+        if (cmdOpts.hosted && cmdOpts.tlsMode !== undefined) {
+          throw new Error("--hosted and --tls-mode are mutually exclusive");
+        }
         if (cmdOpts.sendingDomain !== undefined && cmdOpts.platformDomain) {
           throw new Error("--sending-domain and --platform-domain are mutually exclusive");
         }
@@ -511,6 +516,7 @@ export function registerIdentityCommands(program: Command): void {
           emailLocalPart?: string;
           sendingDomain?: string | null;
           tunnel?: { tlsMode?: "edge" | "passthrough" };
+          hosted?: boolean;
         } = {};
         if (cmdOpts.displayName !== undefined) createOpts.displayName = cmdOpts.displayName;
         if (cmdOpts.description !== undefined) createOpts.description = cmdOpts.description;
@@ -528,6 +534,7 @@ export function registerIdentityCommands(program: Command): void {
         if (cmdOpts.tlsMode !== undefined) {
           createOpts.tunnel = { tlsMode: cmdOpts.tlsMode as "edge" | "passthrough" };
         }
+        if (cmdOpts.hosted) createOpts.hosted = true;
         const id = await inkbox.createIdentity(handle, createOpts);
         output(
           {

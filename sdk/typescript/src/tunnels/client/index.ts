@@ -256,8 +256,8 @@ export async function connect(
     if (removed) throw removed;
     throw new TunnelNotProvisioned(
       `no tunnel named ${JSON.stringify(options.name)} exists in this org. ` +
-        "Tunnels are provisioned atomically by inkbox.createIdentity(<handle>); " +
-        `call inkbox.createIdentity(${JSON.stringify(options.name)}) first.`,
+        `Create the identity with inkbox.createIdentity(${JSON.stringify(options.name)}), ` +
+        `or add a tunnel to an existing one with inkbox.identities.createTunnel(${JSON.stringify(options.name)}).`,
     );
   }
   if (state?.tunnelId !== tunnel.id) state = null;

@@ -8,7 +8,7 @@ user-invocable: false
 
 Inkbox Tunnels expose a process running on the developer's machine (or any POSIX host) at a public `https://{handle}.inkboxwire.com` URL. The SDK opens an outbound HTTP/2 connection to the data plane; inbound third-party traffic rides back over that same connection. No inbound port to open, no static IP needed.
 
-Tunnels are an **identity property**: every agent identity owns exactly one tunnel, and `tunnel_name == agent_handle`. There is no standalone "create tunnel" call — the tunnel is provisioned atomically by `inkbox.createIdentity(...)`. Pre-existing identities created before this rollout already have tunnels (the migration backfilled them).
+Tunnels are an **identity property**: every agent identity owns exactly one tunnel, and `tunnel_name == agent_handle`. The tunnel is provisioned atomically by `inkbox.createIdentity(...)`. An identity created without one (hosted identities) can get an edge tunnel later with `inkbox.identities.create_tunnel(handle)` (TS `createTunnel`, CLI `inkbox tunnel create <handle>`); it returns `409 tunnel_exists` if the identity already has one. Pre-existing identities created before this rollout already have tunnels (the migration backfilled them).
 
 Two TLS modes:
 
@@ -151,7 +151,7 @@ inkbox.tunnels.update(                 # metadata-only
 signed = inkbox.tunnels.sign_csr("tunnel-uuid", csr_pem=csr_bytes)
 ```
 
-There is no `create`, `delete`, `restore`, `force_delete`, or `rotate_secret` here — tunnel lifecycle is owned by `create_identity` / `identity.delete()` (which cascades).
+There is no `create`, `delete`, `restore`, `force_delete`, or `rotate_secret` here — tunnels are created by `create_identity` (or `inkbox.identities.create_tunnel(handle)` for an identity without one) and deleted by `identity.delete()` (which cascades).
 
 ### Common `connect()` options
 
@@ -269,7 +269,7 @@ await inkbox.tunnels.update("tunnel-uuid", {
 await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 ```
 
-Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `forceDelete` / `rotateSecret` surface.
+Tunnels are provisioned atomically by `inkbox.createIdentity(...)`, or by `inkbox.identities.createTunnel(handle)` for an identity without one. There is no `delete` / `restore` / `forceDelete` / `rotateSecret` surface.
 
 For in-process WebSockets, catch `WsServerDraining` (`4500`) for planned handoff
 and `WsConnectionLost` (`1011`) for cold connection loss. Both extend

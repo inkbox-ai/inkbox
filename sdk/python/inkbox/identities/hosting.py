@@ -11,6 +11,36 @@ HostingModel = Literal[
 ]
 
 
+class HostingPortSetting(TypedDict):
+    port: int
+    public: bool
+
+
+class HostingPort(HostingPortSetting):
+    url: str | None
+    token_url: str | None  # url with a ?_token= access token; keep private
+
+
+class HostingPortsUpdate(TypedDict):
+    """Omitted fields are unchanged. Pass the ``version`` you read; a stale one gets 409 ``stale_version``."""
+
+    version: int
+    default_port: NotRequired[int | None]
+    ports: NotRequired[list[HostingPortSetting]]
+
+
+@dataclass
+class HostingPorts:
+    url: str | None = None
+    default_port: int | None = None
+    ports: list[HostingPort] = field(default_factory=list)
+    version: int = 0
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> 'HostingPorts':
+        return cls(**{key: value for key, value in data.items() if key in cls.__dataclass_fields__})
+
+
 class HostingUpdate(TypedDict):
     """Partial command: omit to preserve; enabled defaults to activate/retry.
 
@@ -54,6 +84,8 @@ class HostingConfiguration:
     idle_stop_enabled: bool = True
     last_error: str | None = None
     updated_at: str | None = None
+    url: str | None = None
+    delivery: Literal['internal', 'tunnel'] = 'tunnel'
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'HostingConfiguration':
