@@ -1006,8 +1006,8 @@ It updates the original message when all its audio attachments have completed,
 failed, or been skipped. When `data.channel` is `whatsapp`, results are in
 `data.message.media[].transcription`. When it is `slack`, results are in
 `data.event.files[].transcription`, alongside `connection_id`, `conversation_id`,
-`message_ts` and `thread_ts`; a Slack subscription receives it only when it also
-selects the original received-message event. Match the receiving identity, channel and
+`message_ts` and `thread_ts`. Every subscription with this event receives every
+completion for the identity, on Slack too, whichever Slack message events it selects. Match the receiving identity, channel and
 `data.message_id` to the original receipt; don't start a second reply. Slack
 received-message events carry the same `data.message_id`; read that message once with
 the archive `message_id` filter (`list_archived_messages(..., message_id=...)`,
