@@ -493,6 +493,37 @@ test("Slack provisioning credentials use stdin or a file without leaking errors"
   }
 });
 
+test("Slack CLI sends voice note options only when set", async () => {
+  const bodies = [];
+  const server = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    bodies.push(JSON.parse(Buffer.concat(chunks).toString()));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(f.action));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const send = ["--api-key", "synthetic-test-key", "--base-url",
+    `http://127.0.0.1:${server.address().port}`, "--json", "slack", "message", "send",
+    "--connection-id", f.connection.id, "--conversation-id", "CEXAMPLE", "--text", "Hello"];
+  try {
+    const voice = await run([...send, "--idempotency-key", "voice:1", "--voice-note", "--no-fallback-to-text"]);
+    assert.equal(voice.error, null, voice.stderr);
+    assert.deepEqual(bodies[0], {
+      conversation_id: "CEXAMPLE", text: "Hello", send_as_voice_note: true, fallback_to_text: false,
+    });
+    const plain = await run([...send, "--idempotency-key", "plain:1"]);
+    assert.equal(plain.error, null, plain.stderr);
+    assert.deepEqual(bodies[1], { conversation_id: "CEXAMPLE", text: "Hello" });
+    const invalid = await run([...send, "--idempotency-key", "plain:2", "--no-fallback-to-text"]);
+    assert.notEqual(invalid.error, null);
+    assert.equal(bodies.length, 2);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("Slack CLI exposes retry delay and recovers by key without sending again", async () => {
   const requests = [];
   const failed = { ...f.action, status: "failed", error_code: "rate_limited" };

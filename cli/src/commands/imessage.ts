@@ -91,6 +91,8 @@ export interface IMessageSendCommandOptions {
   text?: string;
   mediaUrl?: string;
   sendStyle?: string;
+  voiceNote?: boolean;
+  fallbackToText?: boolean;
   idempotencyKey?: string;
 }
 
@@ -119,6 +121,12 @@ export function buildIMessageSendOptions(
   if (cmdOpts.plainReplyFallback === false && cmdOpts.replyToMessageId === undefined) {
     return { error: "--no-plain-reply-fallback requires --reply-to-message-id." };
   }
+  if (cmdOpts.voiceNote && (!cmdOpts.text || cmdOpts.mediaUrl || cmdOpts.sendStyle)) {
+    return { error: "--voice-note requires --text and no --media-url or --send-style." };
+  }
+  if (cmdOpts.fallbackToText === false && !cmdOpts.voiceNote) {
+    return { error: "--no-fallback-to-text requires --voice-note." };
+  }
   const sendOptions: SendIMessageOptions = {};
   if (cmdOpts.replyToMessageId !== undefined) {
     sendOptions.replyToMessageId = cmdOpts.replyToMessageId;
@@ -132,6 +140,8 @@ export function buildIMessageSendOptions(
   if (cmdOpts.text) sendOptions.text = cmdOpts.text;
   if (cmdOpts.mediaUrl) sendOptions.mediaUrls = [cmdOpts.mediaUrl];
   if (cmdOpts.sendStyle) sendOptions.sendStyle = cmdOpts.sendStyle;
+  if (cmdOpts.voiceNote) sendOptions.sendAsVoiceNote = true;
+  if (cmdOpts.voiceNote && cmdOpts.fallbackToText === false) sendOptions.fallbackToText = false;
   return { sendOptions };
 }
 
@@ -312,19 +322,12 @@ export function registerIMessageCommands(program: Command): void {
       "--send-style <style>",
       "Expressive style for one-to-one or group sends (e.g. slam, confetti)",
     )
+    .option("--voice-note", "Speak --text (at most 600 characters) in the agent's voice and send it as a native voice note")
+    .option("--no-fallback-to-text", "With --voice-note, fail instead of sending the text when a voice note can't be produced")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: {
-          identity: string;
-          to?: string;
-          conversationId?: string;
-          replyToMessageId?: string;
-          plainReplyFallback?: boolean;
-          text?: string;
-          mediaUrl?: string;
-          sendStyle?: string;
-        },
+        cmdOpts: IMessageSendCommandOptions,
       ) {
         const sendResult = buildIMessageSendOptions(cmdOpts);
         if ("error" in sendResult) {

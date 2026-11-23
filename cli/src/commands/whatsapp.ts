@@ -12,6 +12,8 @@ export function buildWhatsAppSendOptions(options: {
   replyToMessageId?: string;
   plainReplyFallback?: boolean;
   gifPlayback?: boolean;
+  voiceNote?: boolean;
+  fallbackToText?: boolean;
   text?: string;
   mediaId?: string;
   idempotencyKey?: string;
@@ -25,6 +27,8 @@ export function buildWhatsAppSendOptions(options: {
   if (options.gifPlayback && !options.mediaId) throw new Error("--gif-playback requires --media-id with an MP4 attachment.");
   if (!options.text?.trim() && !options.mediaId)
     throw new Error("Pass --text, --media-id, or both.");
+  if (options.voiceNote && (!options.text?.trim() || options.mediaId)) throw new Error("--voice-note requires --text and no --media-id.");
+  if (options.fallbackToText === false && !options.voiceNote) throw new Error("--no-fallback-to-text requires --voice-note.");
   return {
     ...(options.to != null ? { to: options.to } : {}),
     ...(options.conversationId
@@ -35,6 +39,8 @@ export function buildWhatsAppSendOptions(options: {
     ...(options.text !== undefined ? { text: options.text } : {}),
     ...(options.mediaId ? { mediaIds: [options.mediaId] } : {}),
     ...(options.gifPlayback ? { gifPlayback: true } : {}),
+    ...(options.voiceNote ? { sendAsVoiceNote: true } : {}),
+    ...(options.voiceNote && options.fallbackToText === false ? { fallbackToText: false } : {}),
     ...(options.idempotencyKey !== undefined
       ? { idempotencyKey: options.idempotencyKey }
       : {}),
@@ -131,6 +137,8 @@ export function registerWhatsAppCommands(program: Command): void {
     .option("--text <text>", "Message text (at most 4000 characters)")
     .option("--media-id <id>", "Owned attachment ID from upload-media")
     .option("--gif-playback", "Play an MP4 media attachment as an animation")
+    .option("--voice-note", "Speak --text (at most 600 characters) in the agent's voice and send it as a native voice note")
+    .option("--no-fallback-to-text", "With --voice-note, fail instead of sending the text when a voice note can't be produced")
     .option(
       "--idempotency-key <key>",
       "Stable key for this logical send; reuse after uncertainty",

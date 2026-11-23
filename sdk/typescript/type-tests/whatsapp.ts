@@ -61,9 +61,25 @@ void directRemoval;
 declare const completed: import("../dist/index.js").MessageTranscriptionFinishedWebhookPayload;
 const completionType: "message.transcription_finished" = completed.event_type;
 const originalId: string = completed.data.message_id;
-const sourceId: string = completed.data.channel === "text"
+const sourceId: string | null | undefined = completed.data.channel === "text"
   ? completed.data.text_message.id
-  : completed.data.message.id;
+  : completed.data.channel === "slack"
+    ? completed.data.message_ts
+    : completed.data.message.id;
 // @ts-expect-error The original message projection depends on the channel.
 completed.data.text_message;
-void [completionType, originalId, sourceId];
+if (completed.data.channel === "slack") {
+  const slackCompletion: import("../dist/index.js").SlackTranscriptionFinishedWebhookData = completed.data;
+  const coordinates: [string, string | null | undefined, string | null | undefined] = [
+    slackCompletion.connection_id, slackCompletion.conversation_id, slackCompletion.thread_ts,
+  ];
+  const files: unknown = slackCompletion.event.files;
+  // @ts-expect-error Slack completions carry no contact list.
+  slackCompletion.contacts;
+  void [coordinates, files];
+}
+declare const received: import("../dist/index.js").SlackWebhookData;
+const receivedKey: string | undefined = received.message_id;
+declare const archived: import("../dist/index.js").SlackArchivedMessage;
+const archivedTranscript: string | null | undefined = archived.files[0]?.transcription?.text;
+void [completionType, originalId, sourceId, receivedKey, archivedTranscript];

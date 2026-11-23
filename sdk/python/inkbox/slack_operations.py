@@ -612,11 +612,18 @@ class SlackOperationsMixin:
         latest_per_conversation: bool | None = None,
         roots_only: bool | None = None,
         include: list[SlackArchiveInclude] | None = None,
+        message_id: UUID | str | None = None,
     ) -> SlackArchiveMessagesResponse:
-        """List retained messages, optionally the latest match per conversation."""
-        return self._archive_messages(
+        """List retained messages, optionally the latest match per conversation.
+
+        ``message_id`` returns only that retained message, such as a received
+        event's ``data["message_id"]``. Audio file entries in ``files`` carry a
+        ``transcription`` (``status``, ``text``, ``error_code``).
+        """
+        result = self._archive_messages(
             f"{_base(connection_id)}/archive/messages",
             {
+                "message_id": str(message_id) if message_id is not None else None,
                 "conversation_id": conversation_id,
                 "thread_ts": thread_ts,
                 "before_ts": before_ts,
@@ -628,6 +635,18 @@ class SlackOperationsMixin:
                 "include": ",".join(include) if include is not None else None,
             },
         )
+        if message_id is not None:
+            # An API without the filter returns the newest messages instead; keep
+            # only the requested message.
+            wanted = str(UUID(str(message_id)))
+            kept = [message for message in result.messages if str(message.id).lower() == wanted]
+            if len(kept) != len(result.messages):
+                # The expansions describe the discarded rows too; drop them.
+                result.included = None
+            result.messages = kept
+            result.next_cursor = None
+            result.page_boundary = None
+        return result
 
     def list_cached_emoji(
         self, connection_id: UUID | str, *, q: str | None = None,

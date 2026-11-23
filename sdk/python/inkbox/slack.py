@@ -309,19 +309,31 @@ class SlackResource(SlackOperationsMixin):
         text: str,
         idempotency_key: str,
         thread_ts: str | None = None,
+        send_as_voice_note: bool = False,
+        fallback_to_text: bool = True,
     ) -> SlackAction:
-        """Use a stable key for this exact message; poll get_action while sending; unknown is terminal uncertainty, never blindly resend."""
+        """Use a stable key for this exact message; poll get_action while sending; unknown is terminal uncertainty, never blindly resend.
+
+        send_as_voice_note speaks ``text`` (at most 600 characters) in the
+        agent's voice and posts it as an audio file. With fallback_to_text
+        (default True) the text is posted instead when audio can't be
+        produced; False makes the send fail.
+        """
         if not isinstance(idempotency_key, str) or not re.fullmatch(
             r"[A-Za-z0-9._:-]{1,128}", idempotency_key
         ):
             raise ValueError(
                 "idempotency_key must be 1..128 letters, digits, '.', '_', ':', or '-'"
             )
-        body = {"conversation_id": conversation_id, "text": text}
+        body: dict[str, Any] = {"conversation_id": conversation_id, "text": text}
         if thread_ts is not None:
             if not isinstance(thread_ts, str):
                 raise ValueError("thread_ts must be a string")
             body["thread_ts"] = thread_ts
+        if send_as_voice_note:
+            body["send_as_voice_note"] = True
+        if not fallback_to_text:
+            body["fallback_to_text"] = False
         return _parse(
             SlackAction,
             self._http.post(

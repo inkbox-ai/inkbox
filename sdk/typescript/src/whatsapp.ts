@@ -406,6 +406,10 @@ export interface WhatsAppSendOptions {
   plainReplyFallback?: boolean;
   /** Play an uploaded MP4 attachment as an animation. */
   gifPlayback?: boolean;
+  /** Speak `text` (at most 600 characters, no media) in the agent's voice and send it as audio. */
+  sendAsVoiceNote?: boolean;
+  /** Defaults true: send `text` as an ordinary message when a voice note can't be produced. False makes the send fail. */
+  fallbackToText?: boolean;
   text?: string;
   mediaIds?: string[];
   agentIdentityId?: string;
@@ -538,6 +542,8 @@ export class WhatsAppResource {
       ...(o.text != null ? { text: o.text } : {}),
       ...(o.mediaIds != null ? { media_ids: o.mediaIds } : {}),
       ...(o.gifPlayback === true ? { gif_playback: true } : {}),
+      ...(o.sendAsVoiceNote === true ? { send_as_voice_note: true } : {}),
+      ...(o.fallbackToText === false ? { fallback_to_text: false } : {}),
     };
     const key = messageKey(o.idempotencyKey);
     const data = await postMessage<{ message: RawWhatsAppMessage }>(

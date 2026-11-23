@@ -89,6 +89,20 @@ describe("TextsResource.send", () => {
     expect(msg.recipients).toHaveLength(2);
   });
 
+  it("sends voice note options only when set", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_TEXT_MESSAGE_OUTBOUND_QUEUED);
+    const res = new TextsResource(http);
+
+    await res.send(NUM_ID, { to: REMOTE, text: "Hello", sendAsVoiceNote: true, fallbackToText: false });
+    expect(vi.mocked(http.post).mock.calls.at(-1)![1]).toEqual({
+      to: REMOTE, text: "Hello", send_as_voice_note: true, fallback_to_text: false,
+    });
+
+    await res.send(NUM_ID, { to: REMOTE, text: "Hello", sendAsVoiceNote: false, fallbackToText: true });
+    expect(vi.mocked(http.post).mock.calls.at(-1)![1]).toEqual({ to: REMOTE, text: "Hello" });
+  });
+
   it("posts conversation reply payloads", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_TEXT_MESSAGE_GROUP);

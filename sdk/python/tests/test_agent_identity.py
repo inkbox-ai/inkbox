@@ -213,6 +213,17 @@ class TestAgentIdentitySendText:
             PHONE_NUMBER_ID, conversation_id=conv_id, text="Reply all",
         )
 
+    def test_send_text_passes_voice_note_options_only_when_set(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._texts.send.return_value = MagicMock(spec=TextMessage)
+
+        identity.send_text(to="+15551234567", text="Hello!", send_as_voice_note=True, fallback_to_text=False)
+
+        inkbox._texts.send.assert_called_once_with(
+            PHONE_NUMBER_ID, to="+15551234567", text="Hello!",
+            send_as_voice_note=True, fallback_to_text=False,
+        )
+
     def test_send_text_requires_phone(self):
         identity, _ = _identity_without_phone()
 

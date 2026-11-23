@@ -338,6 +338,8 @@ export function registerSlackCommands(program: Command): void {
       "Stable key for this exact operation; reuse only with the same body",
     )
     .option("--thread-ts <timestamp>", "Reply thread timestamp (string)")
+    .option("--voice-note", "Speak --text (at most 600 characters) in the agent's voice and post it as an audio file")
+    .option("--no-fallback-to-text", "With --voice-note, fail instead of sending the text when a voice note can't be produced")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -347,10 +349,14 @@ export function registerSlackCommands(program: Command): void {
           text: string;
           idempotencyKey: string;
           threadTs?: string;
+          voiceNote?: boolean;
+          fallbackToText?: boolean;
         },
       ) {
+        if (o.fallbackToText === false && !o.voiceNote)
+          throw new Error("--no-fallback-to-text requires --voice-note.");
         const opts = getGlobalOpts(this);
-        output(await createClient(opts).slack.sendMessage(o.connectionId, o), {
+        output(await createClient(opts).slack.sendMessage(o.connectionId, { ...o, sendAsVoiceNote: o.voiceNote }), {
           json: !!opts.json,
         });
       }),

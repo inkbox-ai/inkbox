@@ -172,6 +172,10 @@ export class IMessagesResource {
    * @param options.sendStyle - Optional expressive send style. The same
    *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
    *   replies by group `conversationId`, including sends with one media URL.
+   * @param options.sendAsVoiceNote - Speak `text` (at most 600 characters) in
+   *   the agent's voice and send it as a native voice note. Requires `text`; no media or `sendStyle`.
+   * @param options.fallbackToText - When a voice note can't be produced, send
+   *   `text` as an ordinary message (default true). False makes the send fail.
    * @param options.agentIdentityId - Identity to send as. Required for
    *   org-wide API keys when sending by `to`; ignored for
    *   identity-scoped keys (the key's identity wins).
@@ -190,6 +194,8 @@ export class IMessagesResource {
     text?: string | null;
     mediaUrls?: string[] | null;
     sendStyle?: IMessageSendStyle | string | null;
+    sendAsVoiceNote?: boolean;
+    fallbackToText?: boolean;
     agentIdentityId?: string | null;
     idempotencyKey?: string;
   }): Promise<IMessage> {
@@ -204,6 +210,8 @@ export class IMessagesResource {
       text?: string;
       media_urls?: string[];
       send_style?: string;
+      send_as_voice_note?: boolean;
+      fallback_to_text?: boolean;
     } = {};
     if (options.replyToMessageId != null) {
       body.reply_to_message_id = options.replyToMessageId;
@@ -223,6 +231,12 @@ export class IMessagesResource {
     }
     if (options.sendStyle != null) {
       body.send_style = options.sendStyle;
+    }
+    if (options.sendAsVoiceNote === true) {
+      body.send_as_voice_note = true;
+    }
+    if (options.fallbackToText === false) {
+      body.fallback_to_text = false;
     }
     const params: Record<string, string> = {};
     if (options.agentIdentityId != null) {
