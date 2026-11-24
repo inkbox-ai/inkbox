@@ -3,7 +3,7 @@ export type HostingModel = "gpt-6-luna" | "gpt-6.1-terra" | "gpt-6.1-sol" | "gpt
 
 /** Generation-checked partial command: omitted settings stay unchanged.
  * enabled defaults to true (activate/retry); false removes hosting.
- * Null only clears credentialBindingId. Empty triggerEvents disables triggers;
+ * Null only clears credentialBindingId (Inkbox credits). Empty triggerEvents disables triggers;
  * followDefaults/resetInstructions restore the respective defaults.
  */
 export interface HostingUpdate {

@@ -41,7 +41,7 @@ export function registerHostingCommands(identity: Command): void {
     .option("--events <events>", "Comma-separated trigger events; an empty string disables event triggers")
     .option("--default-events", "Restore default trigger events")
     .option("--model-key <id>", "Use a saved organization model-key ID")
-    .option("--credits", "Use the organization's remaining model credits")
+    .option("--credits", "Use Inkbox credits")
     .option("--idle-seconds <seconds>", "Stop after 60 or 300 idle seconds")
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
       expectedGeneration: string; harness?: HostingHarness; size?: "medium";
@@ -53,7 +53,6 @@ export function registerHostingCommands(identity: Command): void {
       const expectedGeneration = generation(opts.expectedGeneration);
       if (opts.events !== undefined && opts.defaultEvents) throw new Error("Choose events or default events, not both");
       if (opts.modelKey && opts.credits) throw new Error("Choose a model key or credits, not both");
-      if (opts.credits && opts.defaultModel && !opts.defaultModel.startsWith("gpt-")) throw new Error("This model requires a saved provider API key");
       if (opts.shape && opts.size) throw new Error("Choose a shape or legacy size, not both");
       const update: HostingUpdate = { expectedGeneration, harness: opts.harness, tier: opts.size, shapeId: opts.shape, defaultModel: opts.defaultModel };
       if (opts.resetInstructions && opts.instructionsFile) throw new Error("Choose reset or custom instructions");

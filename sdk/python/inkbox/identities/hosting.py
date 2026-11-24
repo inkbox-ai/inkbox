@@ -44,7 +44,7 @@ class HostingPorts:
 class HostingUpdate(TypedDict):
     """Partial command: omit to preserve; enabled defaults to activate/retry.
 
-    Only credential_binding_id accepts None (included credits). Empty events
+    Only credential_binding_id accepts None (Inkbox credits). Empty events
     disable triggers; follow_defaults/reset_instructions reset their settings.
     enabled=False removes hosting.
     """

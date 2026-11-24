@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.43
+
+### Changed
+
+- Inkbox credits now work for Anthropic models. `identity hosting configure --credits` (CLI) accepts Claude models; the server checks which harness, model and funding combinations are available. `--credits` help now says Inkbox credits.
+- Hosting update docs in Python, TypeScript and Rust state that a null credential binding (`credential_binding_id=None`, `credentialBindingId: null`, `Unset::Value(None)`) selects Inkbox credits. Hosting capabilities can list `inkbox_credits` in a provider's `funding`, including Anthropic on Claude Code.
+
 ## 0.7.42
 
 - Send text as a voice note on iMessage, SMS/MMS, WhatsApp and Slack with `send_as_voice_note` (Python), `sendAsVoiceNote` (TypeScript), the Rust `send_voice_note` methods, and `--voice-note` (CLI). iMessage and WhatsApp get a native voice note; SMS/MMS and Slack get a plain audio file. Text is limited to 600 characters and can't be combined with media.

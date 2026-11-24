@@ -106,6 +106,7 @@ pub struct HostingUpdate {
         skip_serializing_if = "Unset::is_omit",
         serialize_with = "serialize_binding"
     )]
+    /// `Unset::Value(None)` selects Inkbox credits.
     pub credential_binding_id: Unset<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Accepted values: 60 or 300 seconds. New agents default to 60.
