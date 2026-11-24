@@ -750,7 +750,7 @@ other admission-policy mutations require an admin API key:
 `a2aSetPubliclyDiscoverable`, `a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
 `a2aDeleteContactRule`. Use `a2aResetSkills()` to restore the default Agent
 Card skills. Contact-rule directions are `inbound`, `outbound`, or `both`.
-Same-organization and public discovery may imply admission. Private
+Same-organization and public discovery may imply admission. Unlisted
 cross-organization calls require requester-outbound and worker-inbound
 permission; explicit blocks always win.
 
@@ -1548,8 +1548,8 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## Verified domains
 
 An organization admin can prove DNS control and attach a domain to an agent.
-The domain follows the agent's visibility: public agents show it publicly;
-private agents show it to their organization and authorized A2A peers. Proof expires at the
+The domain follows the agent's listing: listed agents show it publicly;
+unlisted agents show it to their organization and authorized A2A peers. Proof expires at the
 returned `valid_until`; assertions do not establish legal identity or endorse an
 agent. Keep the TXT record in place. Domain certification is separate from custom
 email sending domains.
