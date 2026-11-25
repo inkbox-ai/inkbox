@@ -4,8 +4,8 @@
 
 ### Changed
 
-- Inkbox credits now work for Anthropic models. `identity hosting configure --credits` (CLI) accepts Claude models; the server checks which harness, model and funding combinations are available. `--credits` help now says Inkbox credits.
-- Hosting update docs in Python, TypeScript and Rust state that a null credential binding (`credential_binding_id=None`, `credentialBindingId: null`, `Unset::Value(None)`) selects Inkbox credits. Hosting capabilities can list `inkbox_credits` in a provider's `funding`, including Anthropic on Claude Code.
+- Anthropic models can now be billed by Inkbox. `identity hosting configure --credits` (CLI) accepts Claude models; the server checks which harness, model and funding combinations are available. `--credits` help now says "Bill model usage to Inkbox (requires a payment method)".
+- Hosting update docs in Python, TypeScript and Rust state that a null credential binding (`credential_binding_id=None`, `credentialBindingId: null`, `Unset::Value(None)`) selects model usage billed by Inkbox. Hosting capabilities can list `inkbox_credits` in a provider's `funding`, including Anthropic on Claude Code; the funding value is unchanged.
 
 ## 0.7.42
 

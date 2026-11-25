@@ -41,7 +41,7 @@ export function registerHostingCommands(identity: Command): void {
     .option("--events <events>", "Comma-separated trigger events; an empty string disables event triggers")
     .option("--default-events", "Restore default trigger events")
     .option("--model-key <id>", "Use a saved organization model-key ID")
-    .option("--credits", "Use Inkbox credits")
+    .option("--credits", "Bill model usage to Inkbox (requires a payment method)")
     .option("--idle-seconds <seconds>", "Stop after 60 or 300 idle seconds")
     .action(withErrorHandler(async function (this: Command, handle: string, opts: {
       expectedGeneration: string; harness?: HostingHarness; size?: "medium";

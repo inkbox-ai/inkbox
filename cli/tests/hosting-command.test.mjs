@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const config = {mode: "inkbox", identity_id: "identity", state: "ready", generation: 2, applied_generation: 2, default_model: "gpt-6-luna"};
 
-test("provider harness configuration retains the saved key and sends Inkbox credits for Claude models", async () => {
+test("provider harness configuration retains the saved key and bills Claude models to Inkbox", async () => {
   await withApi(async (run, requests) => {
     for (const [harness, model] of [["claude_code","claude-sonnet-5-5"],["deepseek","deepseek-v4-pro"],["opencode","claude-fable-5-2"],["openclaw","deepseek-flash"]]) {
       const result = await run(["configure","example","--expected-generation","0","--harness",harness,"--default-model",model,"--model-key","saved-key"]);
