@@ -196,3 +196,17 @@ def test_schedule_control_wire_compatibility(case):
         else:
             result = workspace.update_schedule(wire["schedule_id"], 1, {"enabled": case == "resume_pending"}, idempotency_key="update-once")
         assert result == wire
+
+
+def test_workspace_credit_fixtures_describe_a_recurring_usage_limit():
+    for case in json.loads((FIXTURES / "workspace-v1.json").read_text()):
+        funding = case["workspace"].get("funding") or {}
+        credits = funding.get("credits")
+        if not credits:
+            continue
+        assert credits["one_time"] is False
+        assert credits["available_microusd"] == max(credits["grant_microusd"] - credits["settled_microusd"], 0)
+        for blocker in funding["blockers"]:
+            if blocker["code"] in {"included_credits_exhausted", "included_credits_unavailable", "model_capacity_reserved"}:
+                assert blocker["actions"] == ["manage_model_key", "refresh_status"]
+                assert "API key" in blocker["message"]

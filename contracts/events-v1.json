@@ -173,7 +173,7 @@
       "terminal": true,
       "blocker": {
         "code": "included_credits_exhausted",
-        "message": "Add a model key to continue.",
+        "message": "Model usage billed by Inkbox is paused until your latest invoice is paid, or use your own API key.",
         "scope": "organization",
         "retryable": false,
         "actions": [
