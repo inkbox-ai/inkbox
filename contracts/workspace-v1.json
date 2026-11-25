@@ -42,10 +42,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -116,10 +116,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -190,10 +190,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -264,10 +264,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -338,10 +338,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 12000000,
           "reserved_microusd": 0,
-          "available_microusd": 13000000,
+          "available_microusd": 38000000,
           "activated": true,
           "eligible": true,
           "exhausted": true
@@ -423,10 +423,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 0,
           "reserved_microusd": 0,
-          "available_microusd": 25000000,
+          "available_microusd": 50000000,
           "activated": false,
           "eligible": false,
           "exhausted": false
@@ -508,10 +508,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -592,10 +592,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -666,10 +666,10 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
+          "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
-          "available_microusd": 7400000,
+          "available_microusd": 32400000,
           "activated": true,
           "eligible": true,
           "exhausted": false
@@ -792,8 +792,8 @@
         "credits": {
           "currency": "USD",
           "one_time": false,
-          "grant_microusd": 25000000,
-          "settled_microusd": 25000000,
+          "grant_microusd": 50000000,
+          "settled_microusd": 50000000,
           "reserved_microusd": 0,
           "available_microusd": 0,
           "activated": true,
