@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.43
+
+### Changed
+
+- Model usage selected with `--credits` (a null credential binding) is now billed to your organization after use and requires a payment method on file. Existing configurations start accruing charges; without a payment method, managed chat returns `402` `included_credits_unavailable`.
+- Anthropic models can now be billed by Inkbox. `identity hosting configure --credits` (CLI) accepts Claude models; the server checks which harness, model and funding combinations are available. `--credits` help now says "Bill model usage to Inkbox (requires a payment method)".
+- Hosting update docs in Python, TypeScript and Rust state that a null credential binding (`credential_binding_id=None`, `credentialBindingId: null`, `Unset::Value(None)`) selects model usage billed by Inkbox. Hosting capabilities can list `inkbox_credits` in a provider's `funding`, including Anthropic on Claude Code; the funding value is unchanged.
+
 ## 0.7.42
 
 - Send text as a voice note on iMessage, SMS/MMS, WhatsApp and Slack with `send_as_voice_note` (Python), `sendAsVoiceNote` (TypeScript), the Rust `send_voice_note` methods, and `--voice-note` (CLI). iMessage and WhatsApp get a native voice note; SMS/MMS and Slack get a plain audio file. Text is limited to 600 characters and can't be combined with media.

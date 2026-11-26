@@ -41,7 +41,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -115,7 +115,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -189,7 +189,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -263,7 +263,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -337,11 +337,11 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
-          "settled_microusd": 50000000,
+          "settled_microusd": 12000000,
           "reserved_microusd": 0,
-          "available_microusd": 0,
+          "available_microusd": 38000000,
           "activated": true,
           "eligible": true,
           "exhausted": true
@@ -350,10 +350,11 @@
         "blockers": [
           {
             "code": "included_credits_exhausted",
-            "message": "Update model access or agent settings before continuing.",
+            "message": "Model usage billed by Inkbox is paused until your latest invoice is paid, or use your own API key.",
             "scope": "organization",
             "retryable": false,
             "actions": [
+              "manage_model_key",
               "refresh_status"
             ]
           }
@@ -421,11 +422,11 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
-          "grant_microusd": 0,
+          "one_time": false,
+          "grant_microusd": 50000000,
           "settled_microusd": 0,
           "reserved_microusd": 0,
-          "available_microusd": 0,
+          "available_microusd": 50000000,
           "activated": false,
           "eligible": false,
           "exhausted": false
@@ -434,10 +435,11 @@
         "blockers": [
           {
             "code": "included_credits_unavailable",
-            "message": "Update model access or agent settings before continuing.",
+            "message": "Add a payment method in Billing to use models billed by Inkbox, or use your own API key.",
             "scope": "organization",
             "retryable": false,
             "actions": [
+              "manage_model_key",
               "refresh_status"
             ]
           }
@@ -505,7 +507,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -589,7 +591,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -663,7 +665,7 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
           "settled_microusd": 17600000,
           "reserved_microusd": 0,
@@ -789,23 +791,24 @@
         "pending": false,
         "credits": {
           "currency": "USD",
-          "one_time": true,
+          "one_time": false,
           "grant_microusd": 50000000,
-          "settled_microusd": 40000000,
-          "reserved_microusd": 10000000,
+          "settled_microusd": 50000000,
+          "reserved_microusd": 0,
           "available_microusd": 0,
           "activated": true,
           "eligible": true,
-          "exhausted": false
+          "exhausted": true
         },
         "observed_at": "2026-01-01T00:00:00Z",
         "blockers": [
           {
             "code": "model_capacity_reserved",
-            "message": "Model credits are reserved by active requests.",
+            "message": "Your organization reached its model usage limit. Try again after payment, or use your own API key.",
             "scope": "organization",
             "retryable": true,
             "actions": [
+              "manage_model_key",
               "refresh_status"
             ]
           }
