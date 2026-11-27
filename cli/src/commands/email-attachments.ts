@@ -34,10 +34,15 @@ export function contentTypeForPath(path: string): string {
 
 export function parseInlineImageSpec(spec: string): { cid: string; path: string } {
   const eq = spec.indexOf("=");
-  if (eq <= 0 || eq === spec.length - 1) {
+  if (eq < 0) {
     throw new Error(`--inline-image must be <cid>=<path>, got: ${spec}`);
   }
-  return { cid: spec.slice(0, eq).trim(), path: spec.slice(eq + 1).trim() };
+  const cid = spec.slice(0, eq).trim();
+  const path = spec.slice(eq + 1).trim();
+  if (!cid || !path) {
+    throw new Error(`--inline-image must be <cid>=<path>, got: ${spec}`);
+  }
+  return { cid, path };
 }
 
 function fileToAttachment(path: string, contentId?: string): MailAttachmentInput {
