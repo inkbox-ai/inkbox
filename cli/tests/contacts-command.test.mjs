@@ -23,6 +23,14 @@ test("access files preserve omission and reject malformed or contradictory group
     { phone: { contactable: Array.from({ length: 51 }, (_, i) => `+1555555${String(i).padStart(4, "0")}`) } }]) {
     assert.throws(() => parseContactAccessFile(JSON.stringify(body)));
   }
+  assert.throws(
+    () => parseContactAccessFile(JSON.stringify({ email: { inboundContactable: ["a@example.com", "a@example.com"] } })),
+    /access\.email\.inboundContactable must not contain duplicates/,
+  );
+  assert.throws(
+    () => parseContactAccessFile(JSON.stringify({ phone: { outboundContactable: ["+15555550123", "+15555550123"] } })),
+    /access\.phone\.outboundContactable must not contain duplicates/,
+  );
 });
 
 test("access get and set preserve nested choices and reject invalid files before HTTP", async () => {
