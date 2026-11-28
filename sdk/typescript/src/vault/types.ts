@@ -393,8 +393,17 @@ export function parsePayload(
         notes: raw.notes as string | undefined,
         totp: raw.totp ? parseTotpConfig(raw.totp as Record<string, unknown>) : undefined,
       } satisfies LoginPayload;
-    case "other":
-      return { data: raw.data as string, notes: raw.notes as string | undefined } satisfies OtherPayload;
+    case "other": {
+      let dataStr: string;
+      if (typeof raw.data === "string") {
+        dataStr = raw.data;
+      } else if (raw.data !== undefined && raw.data !== null) {
+        dataStr = typeof raw.data === "object" ? JSON.stringify(raw.data) : String(raw.data);
+      } else {
+        dataStr = "";
+      }
+      return { data: dataStr, notes: raw.notes as string | undefined } satisfies OtherPayload;
+    }
     case "ssh_key":
       return {
         privateKey: raw.private_key as string,
